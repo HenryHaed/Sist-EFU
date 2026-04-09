@@ -33,29 +33,16 @@
               <span class="text-sm">Estadísticas</span>
             </button>
 
-            <!-- GESTIÓN DE EVENTO (Administración de Fases y Criterios) -->
-            <div v-if="can('gestion_evento')" class="w-full">
-              <button
-                @click="gestionEventoOpen = !gestionEventoOpen"
-                :class="(vistaActual.startsWith('gestion_fases') || vistaActual === 'gestion_criterios') ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
-                class="w-full flex items-center justify-between px-4 py-3 rounded-r-xl transition-all text-left"
-              >
-                <div class="flex items-center gap-3">
-                  <span class="material-symbols-outlined text-[20px]" :class="(vistaActual.startsWith('gestion_fases') || vistaActual === 'gestion_criterios') ? 'text-secondary' : 'text-slate-400'">event_available</span>
-                  <span class="text-sm font-bold">Gestión Evento</span>
-                </div>
-                <span class="material-symbols-outlined text-slate-400 text-lg transition-transform duration-300" :class="gestionEventoOpen ? 'rotate-180' : ''">expand_more</span>
-              </button>
+            <button
+              v-if="can('gestion_evento')"
+              @click="setVista('gestion_fases')"
+              :class="vistaActual.startsWith('gestion_fases') ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual.startsWith('gestion_fases') ? 'text-secondary' : 'text-slate-400'">event_available</span>
+              <span class="text-sm font-bold">Gestión Evento</span>
+            </button>
 
-              <div v-show="gestionEventoOpen" class="flex flex-col gap-1 mx-4 mt-1 mb-2 pl-6 border-l-2 border-slate-100 overflow-hidden">
-                <button @click="setVista('gestion_fases')" :class="vistaActual.startsWith('gestion_fases') ? 'text-secondary font-bold' : 'text-slate-500'" class="flex items-center gap-2 py-2 text-xs transition-colors">
-                  <span class="material-symbols-outlined text-[16px]">calendar_month</span> Configuración Fases
-                </button>
-                <button @click="setVista('gestion_criterios')" :class="vistaActual === 'gestion_criterios' ? 'text-secondary font-bold' : 'text-slate-500'" class="flex items-center gap-2 py-2 text-xs transition-colors">
-                  <span class="material-symbols-outlined text-[16px]">rule</span> Configuración Criterios
-                </button>
-              </div>
-            </div>
 
             <button
               v-if="can('calificar')"
@@ -296,12 +283,15 @@
               key="gestion_fases_detalle"
               :gestion-seleccionada="gestionSeleccionada"
               @volver="() => { gestionSeleccionada = null; vistaActual = 'gestion_fases' }"
+              @gestionar-criterios="(f) => { faseSeleccionada = f; vistaActual = 'gestion_criterios_detalle' }"
             />
 
-            <!-- Vista: Gestión Criterios (Admin) -->
+            <!-- Vista: Gestión Criterios (Admin) - Nivel Sub-Detalle -->
             <GestionCriteriosView
-              v-else-if="vistaActual === 'gestion_criterios'"
-              key="gestion_criterios"
+              v-else-if="vistaActual === 'gestion_criterios_detalle'"
+              key="gestion_criterios_detalle"
+              :fase="faseSeleccionada"
+              @volver="() => { faseSeleccionada = null; vistaActual = 'gestion_fases_detalle' }"
             />
 
             <!-- Vista: Wizard de Evaluación -->
@@ -522,8 +512,9 @@ const tituloVista = computed(() => {
     wizard: 'Evaluación de Fraternidad',
     gestion_fases: 'Gestiones Anuales',
     gestion_fases_detalle: gestionSeleccionada.value ? `Gestión ${gestionSeleccionada.value.anio} — Fases` : 'Fases de Evaluación',
-    gestion_criterios: 'Gestión de Criterios de Evaluación',
+    gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
   }
+
   return titulos[vistaActual.value] || ''
 })
 

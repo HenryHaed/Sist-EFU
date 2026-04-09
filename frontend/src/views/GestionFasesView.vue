@@ -30,30 +30,29 @@
       <div>
         <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Presupuesto EFU Total</p>
         <div class="flex items-end gap-2">
-          <p class="text-4xl font-black" :class="resumen.pesoEFUTotal >= 100 ? 'text-emerald-600' : 'text-primary'">
+          <p class="text-4xl font-black text-primary">
             {{ resumen.pesoEFUTotal || 0 }}%
           </p>
           <p class="text-sm text-slate-400 font-bold pb-1">/ 100%</p>
         </div>
         <div class="mt-2 h-2 w-48 bg-slate-100 rounded-full overflow-hidden">
           <div
-            class="h-full rounded-full transition-all duration-500"
-            :class="resumen.pesoEFUTotal >= 100 ? 'bg-emerald-500' : resumen.pesoEFUTotal >= 80 ? 'bg-amber-500' : 'bg-primary'"
+            class="h-full rounded-full transition-all duration-500 bg-primary"
             :style="{ width: Math.min(resumen.pesoEFUTotal || 0, 100) + '%' }"
           ></div>
         </div>
       </div>
       <div class="flex gap-6">
         <div class="text-center">
-          <p class="text-2xl font-black text-blue-700">{{ resumen.fases?.filter(f => f.tipoConcurso === 'EFU').length || 0 }}</p>
-          <p class="text-[10px] uppercase font-black text-blue-400 tracking-widest">Fases EFU</p>
+          <p class="text-2xl font-black text-primary">{{ resumen.fases?.filter(f => f.tipoConcurso === 'EFU').length || 0 }}</p>
+          <p class="text-[10px] uppercase font-black text-slate-400 tracking-widest">Fases EFU</p>
         </div>
         <div class="text-center">
-          <p class="text-2xl font-black text-amber-700">{{ resumen.fases?.filter(f => f.tipoConcurso === 'EXTERNO').length || 0 }}</p>
-          <p class="text-[10px] uppercase font-black text-amber-400 tracking-widest">Concursos Externos</p>
+          <p class="text-2xl font-black text-secondary">{{ resumen.fases?.filter(f => f.tipoConcurso === 'EXTERNO').length || 0 }}</p>
+          <p class="text-[10px] uppercase font-black text-slate-400 tracking-widest">Concursos Externos</p>
         </div>
         <div class="text-center">
-          <p class="text-2xl font-black" :class="(resumen.disponibleEFU || 0) === 0 ? 'text-emerald-600' : 'text-slate-600'">
+          <p class="text-2xl font-black text-slate-600">
             {{ resumen.disponibleEFU ?? 100 }}%
           </p>
           <p class="text-[10px] uppercase font-black text-slate-400 tracking-widest">EFU Disponible</p>
@@ -101,17 +100,16 @@
             </td>
             <td class="px-6 py-4">
               <span v-if="fase.tipoConcurso === 'EFU'"
-                class="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                <span class="size-1.5 bg-blue-500 rounded-full"></span>EFU
+                class="inline-flex items-center gap-1.5 bg-blue-50 text-primary border border-primary/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                <span class="size-1.5 bg-primary rounded-full"></span>EFU
               </span>
               <span v-else
-                class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                <span class="size-1.5 bg-amber-500 rounded-full"></span>Externo
+                class="inline-flex items-center gap-1.5 bg-red-50 text-secondary border border-secondary/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                <span class="size-1.5 bg-secondary rounded-full"></span>Externo
               </span>
             </td>
             <td class="px-6 py-4">
-              <span :class="fase.tipoConcurso === 'EFU' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-amber-50 text-amber-700 border-amber-100'"
-                class="px-3 py-1 rounded-full font-black text-xs border">
+              <span class="bg-slate-50 text-slate-700 border-slate-200 px-3 py-1 rounded-full font-black text-xs border">
                 {{ fase.pesoPorcentaje }}%
               </span>
             </td>
@@ -122,20 +120,27 @@
               </div>
             </td>
             <td class="px-6 py-4">
-              <div :class="fase.estaActiva ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border">
-                <span class="size-1.5 rounded-full" :class="fase.estaActiva ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'"></span>
+              <div :class="fase.estaActiva ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-500'"
+                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200">
+                <span class="size-1.5 rounded-full" :class="fase.estaActiva ? 'bg-primary animate-pulse' : 'bg-slate-400'"></span>
                 {{ fase.estaActiva ? 'Activa' : 'Inactiva' }}
               </div>
             </td>
             <td class="px-6 py-4">
               <span class="text-xs font-bold text-slate-500">{{ fase.jurados?.length || 0 }} asignado(s)</span>
             </td>
-            <td class="px-6 py-4 text-right space-x-2">
-              <button @click="abrirModal(fase)" class="size-9 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-all">
+            <td class="px-6 py-4 text-right flex items-center justify-end gap-2">
+              <button 
+                @click="$emit('gestionar-criterios', fase)" 
+                class="px-3 py-1.5 bg-primary text-white hover:bg-blue-900 rounded-lg transition-all flex items-center gap-2 shadow-sm shadow-primary/20"
+              >
+                <span class="material-symbols-outlined text-[18px]">rule</span>
+                <span class="text-[10px] font-black uppercase tracking-widest">Editar Criterios</span>
+              </button>
+              <button @click="abrirModal(fase)" class="size-9 bg-slate-50 text-slate-600 hover:bg-primary hover:text-white rounded-lg transition-all border border-slate-200 shadow-sm" title="Editar Fase">
                 <span class="material-symbols-outlined text-[20px]">edit</span>
               </button>
-              <button @click="eliminar(fase)" class="size-9 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all">
+              <button @click="eliminar(fase)" class="size-9 bg-slate-50 text-slate-400 hover:bg-secondary hover:text-white rounded-lg transition-all border border-slate-200 shadow-sm" title="Eliminar Fase">
                 <span class="material-symbols-outlined text-[20px]">delete</span>
               </button>
             </td>
@@ -180,7 +185,7 @@
                   </div>
                 </button>
                 <button type="button" @click="form.tipoConcurso = 'EXTERNO'"
-                  :class="form.tipoConcurso === 'EXTERNO' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-400 hover:border-amber-300'"
+                  :class="form.tipoConcurso === 'EXTERNO' ? 'border-secondary bg-secondary/5 text-secondary' : 'border-slate-200 text-slate-400 hover:border-secondary/30'"
                   class="flex flex-col items-center gap-2 border-2 rounded-xl py-4 px-2 transition-all">
                   <span class="material-symbols-outlined text-2xl">emoji_events</span>
                   <div class="text-center">
@@ -197,12 +202,12 @@
                 <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Ponderación (%) *</label>
                 <!-- Indicador solo para EFU -->
                 <div v-if="form.tipoConcurso === 'EFU'" class="flex items-center gap-1.5 text-[10px] font-black">
-                  <span :class="disponibleEFUCalc < 0 ? 'text-red-600' : disponibleEFUCalc === 0 ? 'text-emerald-600' : 'text-indigo-600'">
-                    {{ disponibleEFUCalc < 0 ? '⚠ Excede' : 'Disponible:' }}
+                  <span :class="disponibleEFUCalc < 0 ? 'text-secondary' : 'text-primary'">
+                    {{ disponibleEFUCalc < 0 ? '⚠ Techo Excedido' : 'Disponible en Gestión:' }}
                     {{ Math.max(0, disponibleEFUCalc) }}%
                   </span>
                 </div>
-                <span v-else class="text-[10px] font-black text-amber-500 uppercase tracking-widest">Independiente</span>
+                <span v-else class="text-[10px] font-black text-secondary uppercase tracking-widest">Independiente</span>
               </div>
 
               <input
@@ -219,13 +224,13 @@
                 <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-300"
-                    :class="pesoEFUConActual > 100 ? 'bg-red-500' : pesoEFUConActual >= 90 ? 'bg-amber-500' : 'bg-primary'"
+                    :class="pesoEFUConActual > 100 ? 'bg-secondary' : 'bg-primary'"
                     :style="{ width: Math.min(pesoEFUConActual, 100) + '%' }"
                   ></div>
                 </div>
                 <div class="flex justify-between text-[9px] text-slate-400 font-black mt-1">
                   <span>0%</span>
-                  <span :class="pesoEFUConActual > 100 ? 'text-red-500' : ''">{{ pesoEFUConActual }}% usado</span>
+                  <span :class="pesoEFUConActual > 100 ? 'text-secondary' : ''">{{ pesoEFUConActual }}% usado</span>
                   <span>100%</span>
                 </div>
               </div>
@@ -257,10 +262,16 @@
 
             <!-- Asignación de Jurados -->
             <div class="border-t border-slate-100 pt-4">
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Asignar Jurados</label>
-              <div class="bg-slate-50 border-2 border-slate-100 p-3 rounded-xl max-h-32 overflow-y-auto space-y-1">
-                <div v-if="juradosList.length === 0" class="text-xs text-slate-400 italic py-2 text-center">No hay jurados registrados.</div>
-                <label v-for="jurado in juradosList" :key="jurado.idJurado"
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center justify-between">
+                <span>Asignar Jurados Especialistas</span>
+                <span v-if="editandoId && form.tipoConcurso === 'EFU'" class="text-[9px] text-primary italic lowercase font-bold tracking-normal">Filtrados por especialidad en "{{ form.nombre }}"</span>
+              </label>
+              <div class="bg-slate-50 border-2 border-slate-100 p-3 rounded-xl max-h-40 overflow-y-auto space-y-1">
+                <div v-if="juradosDisponibles.length === 0" class="text-xs text-slate-400 italic py-4 text-center">
+                  <span class="material-symbols-outlined block mb-1 opacity-50">person_search</span>
+                  No hay jurados de tipo {{ form.tipoConcurso }} registrados{{ editandoId && form.tipoConcurso === 'EFU' ? ' y habilitados para esta fase' : '' }}.
+                </div>
+                <label v-for="jurado in juradosDisponibles" :key="jurado.idJurado"
                   class="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition-all">
                   <input type="checkbox" :value="jurado.idJurado" v-model="form.juradosIds" class="size-4 accent-primary rounded" />
                   <div>
@@ -279,9 +290,7 @@
           <button @click="modalOpen = false" class="px-6 py-2 text-slate-500 font-bold hover:text-primary transition-all">Cancelar</button>
           <button
             @click="guardar"
-            :disabled="guardadoBloqueado"
-            :class="guardadoBloqueado ? 'opacity-50 cursor-not-allowed bg-slate-400' : 'bg-primary hover:bg-blue-900 shadow-lg shadow-primary/20'"
-            class="text-white px-8 py-2.5 rounded-xl font-black uppercase tracking-tighter transition-all"
+            class="bg-primary hover:bg-blue-900 shadow-lg shadow-primary/20 text-white px-8 py-2.5 rounded-xl font-black uppercase tracking-tighter transition-all"
           >
             Guardar Fase
           </button>
@@ -300,13 +309,14 @@ import Swal from 'sweetalert2'
 const props = defineProps({
   gestionSeleccionada: { type: Object, default: null }
 })
-defineEmits(['volver'])
+const emit = defineEmits(['volver', 'gestionar-criterios'])
 
 const resumen = ref({ fases: [], pesoEFUTotal: 0, disponibleEFU: 100, gestion: null })
 const juradosList = ref([])
 const cargando = ref(true)
 const modalOpen = ref(false)
 const editandoId = ref(null)
+const errorFormulario = ref('')
 
 const form = ref({
   nombre: '',
@@ -337,9 +347,21 @@ const disponibleEFUCalc = computed(() => {
 })
 
 const guardadoBloqueado = computed(() => {
-  if (form.value.tipoConcurso === 'EFU' && pesoEFUConActual.value > 100) return true
-  if (!form.value.nombre?.trim()) return true
-  return false
+  return false; // Desactivar bloqueo duro para permitir mostrar las alertas visuales
+})
+
+const juradosDisponibles = computed(() => {
+  let list = juradosList.value.filter(j => j.tipoJurado === form.value.tipoConcurso)
+  
+  // Filtro estricto por fase específica (solo en edición de EFU según requerimiento)
+  if (editandoId.value && form.value.tipoConcurso === 'EFU') {
+    list = list.filter(j => {
+      if (!j.fasesHabilitadas || j.fasesHabilitadas.length === 0) return false
+      return j.fasesHabilitadas.some(fh => fh.idFase === editandoId.value)
+    })
+  }
+
+  return list
 })
 
 // ── Carga de datos ────────────────────────────────────────────────────────
@@ -391,7 +413,20 @@ const abrirModal = (item = null) => {
 }
 
 const guardar = async () => {
-  if (guardadoBloqueado.value) return
+  if (!form.value.nombre?.trim()) {
+    return Swal.fire('Error', 'El nombre de la fase no puede estar vacío.', 'error')
+  }
+  if (form.value.pesoPorcentaje <= 0 || !form.value.pesoPorcentaje) {
+    return Swal.fire('Error', 'El porcentaje de ponderación no puede ser 0 o negativo.', 'error')
+  }
+  if (form.value.tipoConcurso === 'EFU' && pesoEFUConActual.value > 100) {
+    return Swal.fire('Error', `La suma de fases EFU no puede superar el 100%. Disponible: ${disponibleEFUCalc.value + Number(form.value.pesoPorcentaje || 0)}%`, 'error')
+  }
+  if (form.value.fechaInicio && form.value.fechaFin) {
+    if (new Date(form.value.fechaFin) < new Date(form.value.fechaInicio)) {
+      return Swal.fire('Error Lógico', 'La fecha de fin debe ser estrictamente posterior o igual a la fecha de inicio.', 'error')
+    }
+  }
 
   try {
     const payload = {
