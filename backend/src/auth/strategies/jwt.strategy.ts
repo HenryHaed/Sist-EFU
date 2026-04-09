@@ -15,11 +15,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   // El payload que guardamos al hacer login: { sub, ci, rol }
   // Este objeto queda disponible como req.user en los controladores protegidos
-  async validate(payload: { sub: number; ci: string; rol: string }) {
+  async validate(payload: { sub: number; ci: string; rol: string; primerLogin: boolean }) {
     return {
       idUsuario: payload.sub,
       ci: payload.ci,
       rol: payload.rol,
+      primerLogin: payload.primerLogin,
     };
   }
 }

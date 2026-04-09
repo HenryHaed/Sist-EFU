@@ -18,6 +18,24 @@ export class Fase {
     @Column({ name: 'peso_porcentaje', type: 'decimal', precision: 5, scale: 2 })
     pesoPorcentaje: number;
 
+    @Column({ name: 'tipo_concurso', type: 'varchar', length: 50, default: 'EFU' })
+    tipoConcurso: string;
+
+    @Column({ name: 'categoria_efu', type: 'varchar', length: 50, nullable: true })
+    categoriaEfu: string;
+
+    @Column({ name: 'fecha_inicio', type: 'timestamp', nullable: true })
+    fechaInicio: Date;
+
+    @Column({ name: 'fecha_fin', type: 'timestamp', nullable: true })
+    fechaFin: Date;
+
+    @Column({ name: 'esta_activa', type: 'boolean', default: false })
+    estaActiva: boolean;
+
+    @Column({ name: 'url_imagen', length: 500, nullable: true })
+    urlImagen: string;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

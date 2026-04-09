@@ -33,13 +33,37 @@
               <span class="text-sm">Estadísticas</span>
             </button>
 
+            <!-- GESTIÓN DE EVENTO (Administración de Fases y Criterios) -->
+            <div v-if="can('gestion_evento')" class="w-full">
+              <button
+                @click="gestionEventoOpen = !gestionEventoOpen"
+                :class="(vistaActual.startsWith('gestion_fases') || vistaActual === 'gestion_criterios') ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+                class="w-full flex items-center justify-between px-4 py-3 rounded-r-xl transition-all text-left"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-outlined text-[20px]" :class="(vistaActual.startsWith('gestion_fases') || vistaActual === 'gestion_criterios') ? 'text-secondary' : 'text-slate-400'">event_available</span>
+                  <span class="text-sm font-bold">Gestión Evento</span>
+                </div>
+                <span class="material-symbols-outlined text-slate-400 text-lg transition-transform duration-300" :class="gestionEventoOpen ? 'rotate-180' : ''">expand_more</span>
+              </button>
+
+              <div v-show="gestionEventoOpen" class="flex flex-col gap-1 mx-4 mt-1 mb-2 pl-6 border-l-2 border-slate-100 overflow-hidden">
+                <button @click="setVista('gestion_fases')" :class="vistaActual.startsWith('gestion_fases') ? 'text-secondary font-bold' : 'text-slate-500'" class="flex items-center gap-2 py-2 text-xs transition-colors">
+                  <span class="material-symbols-outlined text-[16px]">calendar_month</span> Configuración Fases
+                </button>
+                <button @click="setVista('gestion_criterios')" :class="vistaActual === 'gestion_criterios' ? 'text-secondary font-bold' : 'text-slate-500'" class="flex items-center gap-2 py-2 text-xs transition-colors">
+                  <span class="material-symbols-outlined text-[16px]">rule</span> Configuración Criterios
+                </button>
+              </div>
+            </div>
+
             <button
               v-if="can('calificar')"
-              @click="setVista('fraternidades')"
-              :class="(vistaActual === 'fraternidades' || vistaActual === 'fases' || vistaActual === 'wizard') ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              @click="setVista('seleccionar_fase')"
+              :class="(vistaActual === 'seleccionar_fase' || vistaActual === 'listado_fase' || vistaActual === 'wizard') ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
               class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
             >
-              <span class="material-symbols-outlined text-[20px]" :class="(vistaActual === 'fraternidades' || vistaActual === 'fases' || vistaActual === 'wizard') ? 'text-secondary' : 'text-slate-400'">grade</span>
+              <span class="material-symbols-outlined text-[20px]" :class="(vistaActual === 'seleccionar_fase' || vistaActual === 'listado_fase' || vistaActual === 'wizard') ? 'text-secondary' : 'text-slate-400'">grade</span>
               <span class="text-sm">Calificar Fraternidad</span>
             </button>
 
@@ -63,20 +87,66 @@
 
             <p v-if="can('ajustes') || can('gestion_sistema')" class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-4 mt-6 mb-2">Configuración</p>
             
+            <!-- Menú Acordeón: Gestión Usuarios -->
+            <div v-if="can('gestion_usuarios')" class="w-full">
+              <button
+                @click="gestionUsuariosOpen = !gestionUsuariosOpen"
+                :class="vistaActual.startsWith('usuarios_') ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+                class="w-full flex items-center justify-between px-4 py-3 rounded-r-xl transition-all text-left"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-outlined text-[20px]" :class="vistaActual.startsWith('usuarios_') ? 'text-secondary' : 'text-slate-400'">manage_accounts</span>
+                  <span class="text-sm font-bold">Gestión Usuarios</span>
+                </div>
+                <span class="material-symbols-outlined text-slate-400 text-lg transition-transform duration-300" :class="gestionUsuariosOpen ? 'rotate-180' : ''">expand_more</span>
+              </button>
+
+              <div 
+                v-show="gestionUsuariosOpen"
+                class="flex flex-col gap-1 mx-4 mt-1 mb-2 pl-6 border-l-2 border-slate-100 overflow-hidden transition-all"
+              >
+                <button
+                  v-if="can('gestion_admin')"
+                  @click="setVista('usuarios_admin')"
+                  :class="vistaActual === 'usuarios_admin' ? 'text-secondary font-bold' : 'text-slate-500 hover:text-primary'"
+                  class="flex items-center gap-2 py-2 text-xs transition-colors text-left w-full"
+                >
+                  <span class="material-symbols-outlined text-[16px]">shield_person</span>
+                  Administradores
+                </button>
+                <button
+                  @click="setVista('usuarios_controladorhcu')"
+                  :class="vistaActual === 'usuarios_controladorhcu' ? 'text-secondary font-bold' : 'text-slate-500 hover:text-primary'"
+                  class="flex items-center gap-2 py-2 text-xs transition-colors text-left w-full"
+                >
+                  <span class="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+                  Controladores HCU
+                </button>
+                <button
+                  @click="setVista('usuarios_delegado')"
+                  :class="vistaActual === 'usuarios_delegado' ? 'text-secondary font-bold' : 'text-slate-500 hover:text-primary'"
+                  class="flex items-center gap-2 py-2 text-xs transition-colors text-left w-full"
+                >
+                  <span class="material-symbols-outlined text-[16px]">assignment_ind</span>
+                  Delegados
+                </button>
+                <button
+                  @click="setVista('usuarios_jurado')"
+                  :class="vistaActual === 'usuarios_jurado' ? 'text-secondary font-bold' : 'text-slate-500 hover:text-primary'"
+                  class="flex items-center gap-2 py-2 text-xs transition-colors text-left w-full"
+                >
+                  <span class="material-symbols-outlined text-[16px]">gavel</span>
+                  Jurados
+                </button>
+              </div>
+            </div>
+
             <button
               v-if="can('gestion_sistema')"
               class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
             >
               <span class="material-symbols-outlined text-[20px] text-slate-400">admin_panel_settings</span>
               <span class="text-sm font-bold">Gestión Sistema</span>
-            </button>
-
-            <button
-              v-if="can('gestion_evento')"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
-            >
-              <span class="material-symbols-outlined text-[20px] text-slate-400">event_available</span>
-              <span class="text-sm font-bold">Gestión Evento</span>
             </button>
 
             <button
@@ -197,20 +267,41 @@
               @ir-calificar="setVista('fraternidades')"
             />
 
-            <!-- Vista: Seleccionar Fraternidad -->
-            <SeleccionarFraternidadView
-              v-else-if="vistaActual === 'fraternidades'"
-              key="fraternidades"
-              @seleccionar-fraternidad="seleccionarFraternidad"
+            <!-- Vista: Nueva Selección Inteligente de Fase -->
+            <SeleccionarFaseJuradoView
+              v-else-if="vistaActual === 'seleccionar_fase'"
+              key="seleccionar_fase"
+              @fase-seleccionada="handleFaseSeleccionada"
             />
 
-            <!-- Vista: Seleccionar Fase -->
-            <EvaluacionFasesContent
-              v-else-if="vistaActual === 'fases'"
-              key="fases"
-              :fraternidad="fraternidadSeleccionada"
-              @seleccionar-fase="seleccionarFase"
-              @volver="setVista('fraternidades')"
+            <!-- Vista: Listado de Evaluación por Fase -->
+            <ListadoEvaluacionFaseView
+              v-else-if="vistaActual === 'listado_fase'"
+              key="listado_fase"
+              :fase-seleccionada="faseSeleccionada"
+              @volver="setVista('seleccionar_fase')"
+              @evaluar-fraternidad="handleEvaluarFraternidad"
+            />
+
+            <!-- Vista: Gestiones Anuales (Admin) - Nivel Maestro -->
+            <GestionesAnualesView
+              v-else-if="vistaActual === 'gestion_fases'"
+              key="gestion_fases_maestro"
+              @seleccionar-gestion="(g) => { gestionSeleccionada = g; vistaActual = 'gestion_fases_detalle' }"
+            />
+
+            <!-- Vista: Fases de una Gestión (Admin) - Nivel Detalle -->
+            <GestionFasesView
+              v-else-if="vistaActual === 'gestion_fases_detalle'"
+              key="gestion_fases_detalle"
+              :gestion-seleccionada="gestionSeleccionada"
+              @volver="() => { gestionSeleccionada = null; vistaActual = 'gestion_fases' }"
+            />
+
+            <!-- Vista: Gestión Criterios (Admin) -->
+            <GestionCriteriosView
+              v-else-if="vistaActual === 'gestion_criterios'"
+              key="gestion_criterios"
             />
 
             <!-- Vista: Wizard de Evaluación -->
@@ -219,7 +310,7 @@
               key="wizard"
               :fase-seleccionada="faseSeleccionada"
               :fraternidad="fraternidadSeleccionada"
-              @volver="setVista('fases')"
+              @volver="setVista('listado_fase')"
               @finalizar="manejarFinalizacion"
             />
 
@@ -229,8 +320,85 @@
               key="fraternidades_crud"
             />
 
+            <!-- Vista: Usuarios CRUD Múltiple (Filtrado por rolFiltro) -->
+            <UsuariosCRUDView
+              v-else-if="vistaActual.startsWith('usuarios_')"
+              :key="vistaActual"
+              :rol-filtro="vistaActual.replace('usuarios_', '')"
+            />
+
           </transition>
         </main>
+
+        <!-- MODAL: CAMBIO DE CONTRASEÑA OBLIGATORIO (PRIMER LOGIN) -->
+        <v-dialog 
+          v-model="mostrarModalPass" 
+          max-width="450" 
+          persistent
+          no-click-animation
+        >
+          <v-card class="rounded-2xl overflow-hidden border-4 border-primary shadow-2xl">
+            <div class="bg-primary p-6 text-white text-center">
+              <div class="size-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/50">
+                <span class="material-symbols-outlined text-4xl">lock_reset</span>
+              </div>
+              <h3 class="text-2xl font-black italic uppercase tracking-tighter">Seguridad Requerida</h3>
+              <p class="text-white/80 text-sm font-medium mt-1">Este es tu primer inicio de sesión. Por favor, personaliza tu contraseña.</p>
+            </div>
+
+            <v-card-text class="pa-8 bg-white">
+              <div class="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
+                <span class="material-symbols-outlined text-amber-600">info</span>
+                <p class="text-xs text-amber-800 font-medium">
+                  Tu contraseña actual es tu número de carnet. Cámbiala por una combinación segura que solo tú conozcas.
+                </p>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Nueva Contraseña</label>
+                  <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">lock</span>
+                    <input 
+                      v-model="newPassword" 
+                      type="password" 
+                      placeholder="Mínimo 6 caracteres"
+                      class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Confirmar Contraseña</label>
+                  <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">check_circle</span>
+                    <input 
+                      v-model="confirmPassword" 
+                      type="password" 
+                      placeholder="Repite la contraseña"
+                      class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <p v-if="passError" class="text-secondary text-xs font-bold mt-4 flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">error</span> {{ passError }}
+              </p>
+            </v-card-text>
+
+            <v-card-actions class="pa-6 bg-slate-50 border-t border-slate-100">
+              <button 
+                @click="actualizarPassword"
+                :disabled="changingPass"
+                class="w-full bg-primary hover:bg-blue-900 text-white font-black py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2"
+                :class="{'opacity-75 cursor-wait': changingPass}"
+              >
+                <span v-if="changingPass" class="material-symbols-outlined animate-spin">progress_activity</span>
+                {{ changingPass ? 'Procesando...' : 'Cambiar y Empezar' }}
+              </button>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
       </div>
     </div>
   </div>
@@ -240,11 +408,17 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
+import api from '../services/api'
+import Swal from 'sweetalert2'
 import EstadisticasView from './EstadisticasView.vue'
-import SeleccionarFraternidadView from './SeleccionarFraternidadView.vue'
-import EvaluacionFasesContent from './EvaluacionFasesContent.vue'
+import SeleccionarFaseJuradoView from './SeleccionarFaseJuradoView.vue'
+import ListadoEvaluacionFaseView from './ListadoEvaluacionFaseView.vue'
+import GestionesAnualesView from './GestionesAnualesView.vue'
+import GestionFasesView from './GestionFasesView.vue'
+import GestionCriteriosView from './GestionCriteriosView.vue'
 import AsistenteContent from './AsistenteContent.vue'
 import FraternidadesCRUDView from './FraternidadesCRUDView.vue'
+import UsuariosCRUDView from './UsuariosCRUDView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -252,8 +426,18 @@ const authStore = useAuthStore()
 // State
 const vistaActual = ref('estadisticas')
 const sidebarOpen = ref(false)
+const gestionUsuariosOpen = ref(false)
+const gestionEventoOpen = ref(false)
 const fraternidadSeleccionada = ref(null)
-const faseSeleccionada = ref('')
+const faseSeleccionada = ref(null)
+const gestionSeleccionada = ref(null)  // Maestro → Detalle de Gestión
+
+// Control Cambio Password Primer Login
+const mostrarModalPass = ref(false)
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passError = ref('')
+const changingPass = ref(false)
 
 // User data from store
 const currentUser = computed(() => authStore.user)
@@ -262,8 +446,8 @@ const currentUser = computed(() => authStore.user)
 const can = (permission) => {
   const role = authStore.userRole?.toLowerCase()
   const permissions = {
-    superusuario: ['estadisticas', 'calificar', 'fraternidades', 'reglamento', 'ajustes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina'],
-    admin: ['estadisticas', 'calificar', 'fraternidades', 'reglamento', 'ajustes', 'gestion_evento', 'asistencias', 'disciplina'],
+    superusuario: ['estadisticas', 'calificar', 'fraternidades', 'reglamento', 'ajustes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin'],
+    admin: ['estadisticas', 'calificar', 'fraternidades', 'reglamento', 'ajustes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
     jurado: ['estadisticas', 'calificar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
     delegado: ['estadisticas', 'reglamento', 'informes']
@@ -283,45 +467,93 @@ const timer = computed(() => {
 
 onMounted(() => {
   timerInterval = setInterval(() => { timerSegundos.value-- }, 1000)
+
+  // Chequear si es primer login
+  if (currentUser.value?.primerLogin) {
+    mostrarModalPass.value = true
+  }
 })
+
+const actualizarPassword = async () => {
+  passError.value = ''
+  if (!newPassword.value || newPassword.value.length < 6) {
+    passError.value = 'La contraseña debe tener al menos 6 caracteres.'
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    passError.value = 'Las contraseñas no coinciden.'
+    return
+  }
+
+  changingPass.value = true
+  try {
+    await api.post('/auth/change-password', { newPassword: newPassword.value })
+    authStore.updatePrimerLogin(false)
+    mostrarModalPass.value = false
+    Swal.fire({
+      icon: 'success',
+      title: '¡Contraseña Actualizada!',
+      text: 'Tu acceso ahora es seguro y privado.',
+      confirmButtonColor: '#003399'
+    })
+  } catch (error) {
+    passError.value = 'Error al cambiar la contraseña. Inténtalo de nuevo.'
+  } finally {
+    changingPass.value = false
+  }
+}
 onUnmounted(() => {
   clearInterval(timerInterval)
 })
 
 const tituloVista = computed(() => {
+  if (vistaActual.value.startsWith('usuarios_')) {
+    const rol = vistaActual.value.replace('usuarios_', '')
+    if (rol === 'admin') return 'Gestión de Administradores'
+    if (rol === 'controladorhcu') return 'Gestión de Controladores HCU'
+    return `Gestión de ${rol.charAt(0).toUpperCase() + rol.slice(1)}s`
+  }
+
   const titulos = {
     estadisticas: 'Panel de Estadísticas',
-    fraternidades: 'Calificar Fraternidad',
+    seleccionar_fase: 'Calificación de Fraternidades',
     fraternidades_crud: 'Listado de Fraternidades',
-    fases: 'Selección de Fase',
-    wizard: 'Evaluación Wizard',
+    listado_fase: 'Listado de Fraternidades por Fase',
+    wizard: 'Evaluación de Fraternidad',
+    gestion_fases: 'Gestiones Anuales',
+    gestion_fases_detalle: gestionSeleccionada.value ? `Gestión ${gestionSeleccionada.value.anio} — Fases` : 'Fases de Evaluación',
+    gestion_criterios: 'Gestión de Criterios de Evaluación',
   }
   return titulos[vistaActual.value] || ''
 })
 
 const setVista = (vista) => {
-  if (vista !== 'fases' && vista !== 'wizard') {
+  if (vista !== 'listado_fase' && vista !== 'wizard') {
     fraternidadSeleccionada.value = null
-    faseSeleccionada.value = ''
+    faseSeleccionada.value = null
+  }
+  // Resetear gestión al salir del módulo
+  if (!vista.startsWith('gestion_fases')) {
+    gestionSeleccionada.value = null
   }
   vistaActual.value = vista
   sidebarOpen.value = false
 }
 
-const seleccionarFraternidad = (fraternidad) => {
-  fraternidadSeleccionada.value = fraternidad
-  vistaActual.value = 'fases'
+const handleFaseSeleccionada = (fase) => {
+  faseSeleccionada.value = fase
+  vistaActual.value = 'listado_fase'
 }
 
-const seleccionarFase = (faseId) => {
-  faseSeleccionada.value = faseId
+const handleEvaluarFraternidad = (payload) => {
+  fraternidadSeleccionada.value = payload.fraternidad
   vistaActual.value = 'wizard'
 }
 
 const manejarFinalizacion = (resultados) => {
   console.log('Resultados finales:', resultados)
-  alert(`¡Calificaciones de ${fraternidadSeleccionada.value?.nombre} - ${faseSeleccionada.value.toUpperCase()} guardadas!\nPromedio: ${resultados.promedio.toFixed(1)}/100`)
-  setVista('fraternidades')
+  alert(`¡Calificaciones de ${fraternidadSeleccionada.value?.nombre} - ${faseSeleccionada.value?.nombre} guardadas!\nPromedio: ${resultados.promedio.toFixed(1)}/100`)
+  setVista('listado_fase')
 }
 
 const handleLogout = () => {

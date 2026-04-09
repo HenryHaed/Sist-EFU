@@ -3,6 +3,7 @@ import { Role } from './Role';
 import { Jurado } from './Jurado';
 import { Incidencia } from './Incidencia';
 import { Asistencia } from './Asistencia';
+import { Fraternidad } from './Fraternidad';
 
 @Entity('usuarios')
 export class Usuario {
@@ -27,6 +28,13 @@ export class Usuario {
 
     @Column({ length: 255 })
     password: string;
+
+    @ManyToOne(() => Fraternidad, { nullable: true })
+    @JoinColumn({ name: 'id_fraternidad' })
+    fraternidad: Fraternidad;
+
+    @Column({ name: 'primer_login', default: true })
+    primerLogin: boolean;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

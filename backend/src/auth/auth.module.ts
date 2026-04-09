@@ -19,7 +19,7 @@ import { Usuario } from '../entities/Usuario';
         secret: configService.get<string>('JWT_SECRET', 'efu_secret_key'),
         signOptions: {
           // El token expira en 8 horas (una jornada de trabajo)
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '8h') as any,
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '1h') as any,
         },
       }),
     }),

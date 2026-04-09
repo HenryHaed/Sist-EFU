@@ -29,11 +29,20 @@ export class Gestion {
     @Column({ name: 'subtitulo_principal', type: 'text', nullable: true })
     subtituloPrincipal: string;
 
-    @Column({ name: 'url_banner', length: 255, nullable: true })
+    @Column({ name: 'url_banner', length: 500, nullable: true })
     urlBanner: string;
 
-    @Column({ name: 'url_logo', length: 255, nullable: true })
+    @Column({ name: 'url_logo', length: 500, nullable: true })
     urlLogo: string;
+
+    @Column({ name: 'url_reglamento', length: 500, nullable: true })
+    urlReglamento: string;
+
+    @Column({ name: 'url_imagen_login', length: 500, nullable: true })
+    urlImagenLogin: string;
+
+    @Column({ name: 'url_mapa_ubicacion', length: 500, nullable: true })
+    urlMapaUbicacion: string;
 
     @Column({ name: 'modo_mantenimiento', default: false })
     modoMantenimiento: boolean;

@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Gestion } from './Gestion';
 import { Fraternidad } from './Fraternidad';
 import { Usuario } from './Usuario';
+import { EventoControl } from './EventoControl';
 
 @Entity('asistencias')
 export class Asistencia {
@@ -20,8 +21,15 @@ export class Asistencia {
     @JoinColumn({ name: 'id_usuario' })
     usuario: Usuario;
 
-    @Column({ name: 'fecha_hora', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-    fechaHora: Date;
+    @ManyToOne(() => EventoControl, (eventoControl) => eventoControl.asistencias)
+    @JoinColumn({ name: 'id_evento' })
+    eventoControl: EventoControl;
+
+    @Column({ type: 'boolean', default: false })
+    asistio: boolean;
+
+    @Column({ type: 'text', nullable: true })
+    observaciones: string;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

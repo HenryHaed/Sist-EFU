@@ -1,269 +1,339 @@
 <template>
-  <div class="p-4 md:p-8 max-w-6xl mx-auto w-full">
-    <!-- Header -->
-    <div class="mb-6 flex items-center justify-between flex-wrap gap-4">
-      <div>
-        <button @click="$emit('volver')" class="flex items-center gap-1 text-slate-500 hover:text-primary text-sm font-bold mb-3 transition-colors group">
-          <span class="material-symbols-outlined text-[18px] group-hover:-translate-x-1 transition-transform">arrow_back</span>
-          Cambiar Fase
+  <div class="relative min-h-[calc(100vh-4rem)] flex flex-col bg-slate-50">
+    <!-- WIZARD HEADER FIJO -->
+    <div class="sticky top-0 z-30 bg-white border-b border-slate-200 px-6 py-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <button @click="$emit('volver')" class="size-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-colors">
+          <span class="material-symbols-outlined">arrow_back</span>
         </button>
-        <!-- Progress -->
-        <div class="flex items-center gap-2 mb-1">
-          <span class="text-secondary font-black text-xs uppercase tracking-widest border-l-2 border-secondary pl-2">Progreso de Calificación</span>
+        <div>
+          <h2 class="text-xl font-black text-primary uppercase italic tracking-tighter">{{ fraternidad?.nombre || 'Cargando...' }}</h2>
+          <p class="text-xs text-slate-500 font-medium">Fase: <span class="font-bold text-secondary">{{ faseSeleccionada?.nombre }}</span></p>
         </div>
-        <h3 class="text-2xl font-black text-primary mt-1">Paso {{ currentIndex + 1 }}: {{ criterioActual.tituloCorto }}</h3>
-        <p class="text-xs text-slate-500 font-bold uppercase mt-1">{{ fraternidad?.nombre }} · Fase: {{ faseSeleccionada.toUpperCase() }}</p>
       </div>
-      <div class="text-right">
-        <span class="text-slate-500 text-xs font-bold uppercase d-block">Criterio {{ currentIndex + 1 }} de {{ criterios.length }}</span>
-        <p class="text-primary font-black text-2xl mt-1">{{ progresoPorcentaje }}%<span class="inline-block size-2 rounded-full bg-secondary ml-1 align-middle"></span></p>
+      
+      <!-- Contador de Fase -->
+      <div 
+        class="flex items-center gap-3 px-4 py-2 border rounded-xl"
+        :class="urgenciaStatus.bgClass"
+      >
+        <span class="material-symbols-outlined animate-pulse" :class="urgenciaStatus.textClass">timer</span>
+        <div>
+          <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo de Fase</p>
+          <p class="text-sm font-black" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
+        </div>
       </div>
     </div>
 
-    <!-- Progress bar -->
-    <v-progress-linear
-      v-model="progresoPorcentaje"
-      color="primary"
-      bg-color="rgba(0,0,0,0.05)"
-      height="10"
-      rounded
-      class="mb-8 shadow-sm"
-    ></v-progress-linear>
+    <!-- MAIN FORM -->
+    <div class="flex-1 p-6 md:p-8 max-w-4xl mx-auto w-full">
+      <div v-if="loading" class="flex justify-center py-20">
+        <span class="material-symbols-outlined animate-spin text-4xl text-primary">sync</span>
+      </div>
 
-    <!-- Wizard Slider -->
-    <v-row>
-      <!-- Main Card -->
-      <v-col cols="12" lg="8" class="d-flex flex-column">
-        <v-card class="flex-grow-1 d-flex flex-column bg-white rounded-xl overflow-hidden shadow-sm relative border-t-4 border-t-primary border border-slate-200" color="white" elevation="0">
-          <transition name="fade" mode="out-in">
-            <div :key="currentIndex" class="d-flex flex-column flex-grow-1 w-full h-full">
-              <!-- Image -->
-              <div class="aspect-video relative w-full overflow-hidden shrink-0 bg-black">
-                <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent z-10"></div>
-                <div class="absolute top-4 left-4 z-20 bg-secondary px-3 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest text-white shadow-lg">En Evaluación</div>
-                <div class="w-full h-full bg-cover bg-center transition-transform duration-700 hover:scale-105"
-                  :style="{ backgroundImage: `url(${criterioActual.imagen})` }"></div>
+      <div v-else class="space-y-6">
+        <!-- Resumen de Evaluación Actual -->
+        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="size-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+              <span class="material-symbols-outlined text-2xl">monitoring</span>
+            </div>
+            <div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-indigo-500">Estado de Evaluación</p>
+              <h3 class="text-lg font-black text-indigo-900">{{ estadoTexto }}</h3>
+            </div>
+          </div>
+          
+          <div class="text-right">
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Puntaje Parcial</p>
+            <p class="text-3xl font-black text-primary">{{ puntajeCalculado }}<span class="text-lg text-slate-400 font-medium"> / {{ puntajePosible }}</span></p>
+          </div>
+        </div>
+
+        <!-- Criterios -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-6">
+          <h3 class="text-lg font-black text-slate-800 uppercase italic tracking-tighter">Panel de Criterios</h3>
+
+          <div v-if="criterios.length === 0" class="text-center py-10 text-slate-400">
+            <span class="material-symbols-outlined text-4xl">inventory_2</span>
+            <p class="mt-2 font-bold">No existen criterios definidos para esta fase.</p>
+          </div>
+
+          <div 
+            v-for="(criterio, index) in criterios" 
+            :key="criterio.idCriterio"
+            class="p-5 border-2 rounded-2xl transition-all"
+            :class="formValues[criterio.idCriterio] ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 bg-slate-50 hover:border-slate-200'"
+          >
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="flex items-center gap-4">
+                <div 
+                  class="size-10 rounded-xl flex items-center justify-center font-black text-lg"
+                  :class="formValues[criterio.idCriterio] ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'"
+                >
+                  <span v-if="formValues[criterio.idCriterio]" class="material-symbols-outlined">check</span>
+                  <span v-else>{{ index + 1 }}</span>
+                </div>
+                <div>
+                  <h4 class="font-bold text-slate-800">{{ criterio.nombre }}</h4>
+                  <p class="text-xs text-slate-500 font-medium tracking-wide">Puntaje Máximo: {{ Number(criterio.puntajeMaximo) }} pts</p>
+                </div>
               </div>
 
-              <v-card-text class="pa-6 pa-md-8 d-flex flex-column flex-grow-1 text-left bg-white">
-                <div class="mb-6">
-                  <div class="d-flex align-center gap-2 mb-2">
-                    <span class="h-px w-8 bg-secondary inline-block"></span>
-                    <h4 class="text-xl font-black text-primary">{{ criterioActual.titulo }}</h4>
-                  </div>
-                  <p class="text-slate-500 text-sm leading-relaxed">{{ criterioActual.descripcion }}</p>
-                </div>
-
-                <div class="mt-auto space-y-6">
-                  <!-- Score control -->
-                  <v-sheet class="bg-slate-50 pa-6 rounded-xl border border-slate-200" color="transparent">
-                    <div class="d-flex justify-space-between align-center mb-6 flex-wrap gap-4">
-                      <label class="text-primary font-bold text-sm d-flex align-center gap-2 uppercase tracking-wide">
-                        <span class="material-symbols-outlined text-secondary text-[20px]">analytics</span>
-                        Puntaje del Criterio
-                      </label>
-                      <div class="d-flex align-center gap-3">
-                        <input
-                          v-model.number="criterios[currentIndex].puntaje"
-                          class="w-20 bg-white border border-slate-300 text-primary font-black text-center rounded-lg py-2 focus:outline-none"
-                          :max="criterioActual.puntajeMaximo" min="0" type="number"
-                        />
-                        <span class="text-slate-400 font-bold text-sm">/ {{ criterioActual.puntajeMaximo }}</span>
-                      </div>
-                    </div>
-                    <v-slider
-                      v-model="criterios[currentIndex].puntaje"
-                      color="primary"
-                      track-color="rgba(0,0,0,0.05)"
-                      min="0" :max="criterioActual.puntajeMaximo" step="1"
-                      hide-details
-                      class="mt-2 u-glow-slider"
-                    >
-                      <template v-slot:prepend><span class="text-xs font-bold text-slate-400 mr-2">0</span></template>
-                      <template v-slot:append><span class="text-xs font-bold text-slate-400 ml-2">{{ criterioActual.puntajeMaximo }}</span></template>
-                    </v-slider>
-                  </v-sheet>
-
-                  <!-- Nav buttons -->
-                  <div class="d-flex align-center justify-space-between gap-4 flex-wrap">
-                    <button
-                      @click="pasoAnterior"
-                      :disabled="currentIndex === 0"
-                      class="d-flex align-center justify-center gap-2 px-6 py-3 rounded-lg bg-white text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all border border-slate-200 flex-1 sm:flex-none disabled:opacity-40"
-                      style="height: 52px;"
-                    >
-                      <span class="material-symbols-outlined text-[20px]">arrow_back</span>
-                      Anterior
-                    </button>
-                    <button
-                      @click="pasoSiguiente"
-                      class="flex-1 d-flex align-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary text-white font-bold text-sm hover:brightness-110 shadow-[0_4px_15px_rgba(0,74,153,0.2)] transition-all border border-blue-900"
-                      style="height: 52px;"
-                    >
-                      {{ isUltimoPaso ? 'Finalizar Evaluación' : 'Siguiente Criterio' }}
-                      <span class="material-symbols-outlined text-[20px]">{{ isUltimoPaso ? 'check_circle' : 'arrow_forward' }}</span>
-                    </button>
-                  </div>
-                </div>
-              </v-card-text>
+              <!-- Input Score -->
+              <div class="flex items-center gap-2">
+                <input 
+                  type="number" 
+                  v-model.number="formValues[criterio.idCriterio]" 
+                  min="0" 
+                  :max="Number(criterio.puntajeMaximo)"
+                  class="w-24 text-center py-2 px-3 bg-white border-2 border-slate-300 rounded-xl focus:border-secondary focus:ring-0 outline-none font-bold text-lg text-primary transition-colors"
+                  :placeholder="'0 - ' + Number(criterio.puntajeMaximo)"
+                  :disabled="estadoOriginal === 'COMPLETADO'"
+                />
+                <span class="text-slate-400 font-bold">pts</span>
+              </div>
             </div>
-          </transition>
-        </v-card>
-      </v-col>
-
-      <!-- Sidebar widgets -->
-      <v-col cols="12" lg="4" class="d-flex flex-column gap-6">
-        <!-- Next step preview -->
-        <v-card v-if="criterioSiguiente" @click="pasoSiguiente"
-          class="bg-white border-dashed border-2 border-slate-200 rounded-xl pa-5 d-flex flex-column opacity-80 hover:opacity-100 transition-all cursor-pointer group"
-          color="white" elevation="0">
-          <div class="d-flex align-center gap-3 mb-4">
-            <div class="size-10 rounded-lg bg-slate-50 d-flex align-center justify-center text-slate-400 group-hover:text-secondary transition-colors border border-slate-100">
-              <span class="material-symbols-outlined">{{ criterioSiguiente.icono }}</span>
+            <!-- Slider opcional para UI más refinada -->
+            <div class="mt-4 px-1" v-if="estadoOriginal !== 'COMPLETADO'">
+              <input 
+                type="range" 
+                v-model.number="formValues[criterio.idCriterio]" 
+                min="0" 
+                :max="Number(criterio.puntajeMaximo)"
+                class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
+              />
             </div>
-            <div class="text-left">
-              <p class="text-[9px] text-secondary font-black uppercase tracking-widest mb-0">Siguiente Paso</p>
-              <p class="text-primary font-bold text-sm mb-0">Paso {{ currentIndex + 2 }}: {{ criterioSiguiente.tituloCorto }}</p>
-            </div>
-          </div>
-          <div class="aspect-video rounded-lg overflow-hidden border border-slate-200 relative w-full grayscale group-hover:grayscale-0 transition-all">
-            <div class="w-full h-full bg-cover bg-center" :style="{ backgroundImage: `url(${criterioSiguiente.imagen})` }"></div>
-          </div>
-        </v-card>
-
-        <v-card v-else class="bg-slate-50 border-dashed border-2 border-slate-200 rounded-xl pa-5 d-flex flex-column align-center justify-center text-center min-h-[180px]" color="transparent" elevation="0">
-          <span class="material-symbols-outlined text-4xl text-emerald-500 mb-2">task_alt</span>
-          <p class="text-primary font-bold mb-0">Último Criterio</p>
-          <p class="text-xs text-slate-500 mt-1 mb-0">Revise antes de finalizar</p>
-        </v-card>
-
-        <!-- Score summary (neobrutal) -->
-        <div class="bg-white border-2 border-black rounded-xl p-6 flex flex-col justify-center items-center text-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden min-h-[160px]">
-          <div class="absolute -top-4 -right-4 size-24 bg-slate-50 rounded-full"></div>
-          <div class="size-14 rounded-full bg-secondary flex items-center justify-center text-white mb-4 shadow-lg border-2 border-white relative z-10">
-            <span class="material-symbols-outlined text-3xl">workspace_premium</span>
-          </div>
-          <h5 class="text-slate-500 font-black mb-1 uppercase text-[10px] tracking-[0.2em] relative z-10">Puntaje Obtenido</h5>
-          <p class="text-6xl font-black text-primary mb-3 relative z-10">{{ promedioActual }}</p>
-          <div class="inline-flex items-center px-4 py-1 rounded-full bg-primary text-white text-[9px] font-black uppercase tracking-widest relative z-10">
-            Sobre {{ puntajeTotalFase }} puntos
           </div>
         </div>
 
-        <!-- Notes -->
-        <div class="bg-white border-l-4 border-l-secondary rounded-xl p-5 text-left border border-slate-200 shadow-sm">
-          <label class="d-flex align-center gap-2 text-primary text-xs font-black mb-3 uppercase tracking-widest">
-            <span class="material-symbols-outlined text-lg text-secondary">edit_note</span>
-            Observaciones Rápidas
-          </label>
-          <textarea
-            v-model="criterios[currentIndex].observacion"
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 min-h-[90px] placeholder:text-slate-400 p-3 focus:outline-none focus:ring-2 focus:ring-primary"
-            :placeholder="`Comentarios sobre ${criterioActual.tituloCorto.toLowerCase()}...`"
-          ></textarea>
+        <!-- Footer Actions -->
+        <div v-if="estadoOriginal !== 'COMPLETADO'" class="flex flex-col sm:flex-row items-center gap-4 pt-4">
+          <button 
+            @click="guardar(false)"
+            :disabled="saving"
+            class="w-full sm:w-1/2 py-4 bg-white border-2 border-primary text-primary hover:bg-primary/5 rounded-2xl font-black transition-all flex items-center justify-center gap-2"
+          >
+            <span class="material-symbols-outlined text-[20px]">save</span>
+            Guardar Progreso
+          </button>
+          
+          <button 
+            @click="intentarFinalizar"
+            :disabled="saving"
+            class="w-full sm:w-1/2 py-4 bg-primary text-white hover:bg-blue-900 shadow-xl shadow-primary/20 rounded-2xl font-black transition-all flex items-center justify-center gap-2"
+          >
+            <span class="material-symbols-outlined text-[20px]">verified</span>
+            Sellar Calificación
+          </button>
         </div>
-      </v-col>
-    </v-row>
 
-    <!-- Modal de confirmación -->
-    <v-dialog v-model="mostrarModal" max-width="500" persistent>
-      <v-card class="bg-white border border-slate-200 rounded-xl text-slate-900 shadow-2xl">
-        <v-card-title class="text-xl font-bold border-b border-slate-100 pa-6 d-flex align-center gap-3">
-          <span class="material-symbols-outlined text-primary text-3xl">fact_check</span>
-          Confirmar Calificación
-        </v-card-title>
-        <v-card-text class="pa-6">
-          <p class="text-slate-500 mb-6">Revise las notas asignadas a cada criterio antes de enviar definitivamente:</p>
-          <v-list bg-color="transparent" class="pa-0 border border-slate-100 rounded-lg overflow-hidden mb-4">
-            <v-list-item v-for="(criterio, index) in criterios" :key="index" class="border-b border-slate-100 pa-4 bg-slate-50">
-              <template v-slot:prepend>
-                <v-avatar color="primary" variant="tonal" size="36" class="mr-4 font-bold text-primary">{{ index + 1 }}</v-avatar>
-              </template>
-              <v-list-item-title class="font-bold text-slate-800">{{ criterio.tituloCorto }}</v-list-item-title>
-              <template v-slot:append>
-                <span class="font-black text-lg text-primary">{{ criterio.puntaje }}<span class="text-xs text-slate-400 ml-1">/{{ criterio.puntajeMaximo }}</span></span>
-              </template>
-            </v-list-item>
-          </v-list>
-          <div class="d-flex align-center justify-space-between bg-primary/5 pa-4 rounded-lg border border-primary/20">
-            <span class="font-bold text-slate-500 uppercase tracking-widest text-sm">Puntaje Final</span>
-            <span class="font-black text-3xl text-primary">{{ promedioActual }} <span class="text-sm text-slate-500">/ {{ puntajeTotalFase }}</span></span>
-          </div>
-        </v-card-text>
-        <v-card-actions class="pa-6 pt-0 d-flex gap-4">
-          <v-btn variant="outlined" color="slate" class="flex-1 rounded-lg text-none font-weight-bold border-slate-200" height="48" @click="mostrarModal = false">Revisar</v-btn>
-          <v-btn class="flex-1 bg-primary text-white rounded-lg text-none font-weight-bold shadow-lg shadow-primary/20" height="48" elevation="0" @click="confirmar">
-            Confirmar y Enviar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        <div v-else class="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-6 text-center">
+            <span class="material-symbols-outlined text-5xl text-emerald-500 mb-2">lock</span>
+            <h3 class="text-emerald-800 font-black text-xl">Acta Sellada</h3>
+            <p class="text-emerald-700 text-sm mt-1">Esta calificación ha finalizado y ya no puede ser alterada.</p>
+        </div>
+
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import Swal from 'sweetalert2'
+import api from '../services/api'
 
 const props = defineProps({
-  faseSeleccionada: { type: String, default: 'entrada' },
-  fraternidad: { type: Object, default: null }
+  faseSeleccionada: {
+    type: Object,
+    required: true
+  },
+  fraternidad: {
+    type: Object,
+    required: true
+  }
 })
 
 const emit = defineEmits(['volver', 'finalizar'])
 
-const criteriosPorFase = {
-  entrada: [
-    { id: 1, tituloCorto: 'Vestimenta', titulo: 'Evaluación de Indumentaria Tradicional', descripcion: 'Analice la autenticidad de los tejidos, la complejidad de los bordados y la fidelidad histórica del traje típico de la fraternidad. Considere el uso de accesorios y la uniformidad del bloque.', imagen: '/src/assets/img/caporal.jpg', icono: 'apparel', puntaje: 0, puntajeMaximo: 15, observacion: '' },
-    { id: 2, tituloCorto: 'Coreografía', titulo: 'Evaluación de Coreografía y Desplazamiento', descripcion: 'Evalúe la coordinación, el dominio de pasos, la complejidad de las figuras y la sincronía del bloque durante el recorrido.', imagen: '/src/assets/img/tinkus.jpg', icono: 'directions_run', puntaje: 0, puntajeMaximo: 15, observacion: '' },
-    { id: 3, tituloCorto: 'Música', titulo: 'Evaluación de Ejecución Musical', descripcion: 'Ritmo, armonía, repertorio tradicional y desempeño general de la banda que acompaña a la fraternidad.', imagen: '/src/assets/img/morenada.jpg', icono: 'music_note', puntaje: 0, puntajeMaximo: 10, observacion: '' }
-  ],
-  monografia: [
-    { id: 1, tituloCorto: 'Presentación', titulo: 'Presentación de Monografía', descripcion: 'Evaluación del documento escrito, investigación y fundamentación histórica.', imagen: '/src/assets/img/monografia.png', icono: 'menu_book', puntaje: 0, puntajeMaximo: 15, observacion: '' },
-    { id: 2, tituloCorto: 'Defensa', titulo: 'Defensa de Monografía', descripcion: 'Evaluación de la exposición oral, dominio del tema y respuestas a preguntas.', imagen: '/src/assets/img/monografia.png', icono: 'record_voice_over', puntaje: 0, puntajeMaximo: 15, observacion: '' }
-  ],
-  disciplina: [
-    { id: 1, tituloCorto: 'Comportamiento', titulo: 'Evaluación de Disciplina', descripcion: 'Comportamiento de la fraternidad, organización durante el recorrido y cumplimiento del reglamento.', imagen: '/src/assets/img/disciplina.png', icono: 'gavel', puntaje: 0, puntajeMaximo: 100, observacion: '' }
-  ]
+const loading = ref(true)
+const saving = ref(false)
+const criterios = ref([])
+const formValues = ref({}) // Almacenará { idCriterio: score }
+
+// Control Estado
+const estadoOriginal = ref('PENDIENTE')
+
+// Timer Fase
+const tiempoRestante = ref(0)
+let timerInterval = null
+
+const cargarDatos = async () => {
+  loading.value = true
+  try {
+    // 1. Obtener los criterios que aplican a esta fase
+    const resCriterios = await api.get(`/evaluaciones/fase/${props.faseSeleccionada.idFase}/criterios`)
+    criterios.value = resCriterios.data
+
+    // Inicializar form values a null o 0
+    criterios.value.forEach(c => {
+      formValues.value[c.idCriterio] = null
+    })
+
+    // 2. Traer Evaluación Existente si hay (para cargar el JSONB)
+    const resEval = await api.get(`/evaluaciones/fase/${props.faseSeleccionada.idFase}/fraternidades/${props.fraternidad.idFraternidad}/evaluacion`)
+    
+    if (resEval.data) {
+      estadoOriginal.value = resEval.data.estado
+      const jsonb = resEval.data.criteriosEvaluados
+      if (jsonb) {
+        Object.keys(jsonb).forEach(key => {
+          formValues.value[key] = jsonb[key]
+        })
+      }
+    }
+
+    iniciarCronometro(new Date(props.faseSeleccionada.fechaFin))
+  } catch (error) {
+    Swal.fire('Error', 'No se pudieron cargar los criterios.', 'error')
+    emit('volver')
+  } finally {
+    loading.value = false
+  }
 }
 
-const criterios = ref([...(criteriosPorFase[props.faseSeleccionada] || criteriosPorFase['entrada']).map(c => ({...c}))])
+const iniciarCronometro = (fechaFin) => {
+  const actualizar = () => {
+    const ahora = new Date().getTime()
+    const fin = fechaFin.getTime()
+    tiempoRestante.value = Math.max(0, fin - ahora)
+  }
+  actualizar()
+  timerInterval = setInterval(actualizar, 1000)
+}
 
-const currentIndex = ref(0)
-const mostrarModal = ref(false)
-
-const criterioActual = computed(() => criterios.value[currentIndex.value])
-const isUltimoPaso = computed(() => currentIndex.value === criterios.value.length - 1)
-const criterioSiguiente = computed(() => isUltimoPaso.value ? null : criterios.value[currentIndex.value + 1])
-const progresoPorcentaje = computed(() => Math.round(((currentIndex.value + 1) / criterios.value.length) * 100))
-const promedioActual = computed(() => {
-  return criterios.value.reduce((acc, c) => acc + Number(c.puntaje || 0), 0)
+const countdownText = computed(() => {
+  if (tiempoRestante.value <= 0) return 'TIEMPO FINALIZADO'
+  const dias = Math.floor(tiempoRestante.value / (1000 * 60 * 60 * 24))
+  const horas = Math.floor((tiempoRestante.value % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const min = Math.floor((tiempoRestante.value % (1000 * 60 * 60)) / (1000 * 60))
+  return `${dias} Días / ${horas} Hrs / ${min} Min`
 })
-const puntajeTotalFase = computed(() => {
-  return criterios.value.reduce((acc, c) => acc + Number(c.puntajeMaximo || 0), 0)
+
+const urgenciaStatus = computed(() => {
+  const dias = Math.floor(tiempoRestante.value / (1000 * 60 * 60 * 24))
+  if (dias <= 1) return { bgClass: 'bg-secondary/10 border-secondary', textClass: 'text-secondary' }
+  if (dias <= 2) return { bgClass: 'bg-orange-50 border-orange-200', textClass: 'text-orange-600' }
+  return { bgClass: 'bg-emerald-50 border-emerald-200', textClass: 'text-emerald-700' }
 })
 
-const pasoSiguiente = () => {
-  if (isUltimoPaso.value) mostrarModal.value = true
-  else currentIndex.value++
+const puntajeCalculado = computed(() => {
+  let total = 0
+  Object.values(formValues.value).forEach(val => {
+    total += Number(val) || 0
+  })
+  return total
+})
+
+const puntajePosible = computed(() => {
+  return criterios.value.reduce((acc, curr) => acc + Number(curr.puntajeMaximo), 0)
+})
+
+const estadoTexto = computed(() => {
+  if (estadoOriginal.value === 'PENDIENTE') return 'Sin Iniciar'
+  if (estadoOriginal.value === 'EN_PROGRESO') return 'En Progreso (Borrador)'
+  return 'Calificación Finalizada'
+})
+
+// Acciones Guardado
+const guardar = async (finalizar = false) => {
+  saving.value = true
+  
+  // Limpiar nulos para guardado JSON
+  const payloadCriterios = {}
+  Object.keys(formValues.value).forEach(k => {
+    if (formValues.value[k] !== null) {
+      payloadCriterios[k] = formValues.value[k]
+    }
+  })
+
+  try {
+    await api.post('/evaluaciones/guardar', {
+      idFase: props.faseSeleccionada.idFase,
+      idFraternidad: props.fraternidad.idFraternidad,
+      criterios: payloadCriterios,
+      finalizar
+    })
+
+    if (finalizar) {
+      Swal.fire({
+        icon: 'success',
+        title: '¡Acta Sellada!',
+        text: 'Las calificaciones se han asegurado.',
+        confirmButtonColor: '#003399'
+      })
+      emit('finalizar', { promedio: puntajeCalculado.value })
+    } else {
+      Swal.fire({
+        icon: 'success',
+        title: 'Progreso Guardado',
+        text: 'Puedes continuar editando más tarde.',
+        timer: 2000,
+        showConfirmButton: false
+      })
+      estadoOriginal.value = 'EN_PROGRESO'
+    }
+  } catch (error) {
+    Swal.fire('Error', error.response?.data?.message || 'No se pudo guardar la evaluación.', 'error')
+  } finally {
+    saving.value = false
+  }
 }
 
-const pasoAnterior = () => {
-  if (currentIndex.value > 0) currentIndex.value--
+const intentarFinalizar = () => {
+  // Validar que todos los criterios estén llenados
+  const sinLlenar = criterios.value.some(c => {
+    const v = formValues.value[c.idCriterio]
+    return v === null || v === undefined || v === ''
+  })
+
+  // Validar límites lógicos base
+  const superaLimites = criterios.value.some(c => {
+    const v = formValues.value[c.idCriterio]
+    return Number(v) > Number(c.puntajeMaximo) || Number(v) < 0
+  })
+
+  if (sinLlenar) {
+    Swal.fire('Atención', 'Debes ingresar un valor para todos los criterios antes de sellar el acta.', 'warning')
+    return
+  }
+
+  if (superaLimites) {
+    Swal.fire('Error', 'Existen puntajes que superan el máximo permitido según el reglamento.', 'error')
+    return
+  }
+
+  Swal.fire({
+    icon: 'warning',
+    title: '¿Confirmas la calificación?',
+    html: `Puntaje total calculado: <b>${puntajeCalculado.value} / ${puntajePosible.value}</b><br><br>Al "Sellar", ya no podrás realizar ediciones.`,
+    showCancelButton: true,
+    confirmButtonText: 'Sí, Sellar Calificación',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#003399'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      guardar(true)
+    }
+  })
 }
 
-const confirmar = () => {
-  mostrarModal.value = false
-  emit('finalizar', { criterios: criterios.value, promedio: promedioActual.value })
-}
+onMounted(() => {
+  cargarDatos()
+})
+
+onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval)
+})
 </script>
-
-<style scoped>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
-.fade-enter-from { opacity: 0; transform: translateX(20px); }
-.fade-leave-to { opacity: 0; transform: translateX(-20px); }
-
-:deep(.u-glow-slider .v-slider-thumb) {
-  border: 3px solid white !important;
-  box-shadow: 0 0 10px rgba(0, 74, 153, 0.3) !important;
-}
-</style>

@@ -1,3 +1,17 @@
+<script setup lang="ts">
+import { onMounted } from 'vue';
+import SessionExpiryModal from './components/SessionExpiryModal.vue';
+import { useAuthStore } from './store/auth';
+
+const authStore = useAuthStore();
+
+onMounted(() => {
+  if (authStore.isAuthenticated) {
+    authStore.startSessionTimer();
+  }
+});
+</script>
+
 <template>
   <v-app style="background: transparent;">
     <router-view v-slot="{ Component }">
@@ -5,12 +19,9 @@
         <component :is="Component" />
       </transition>
     </router-view>
+    <SessionExpiryModal />
   </v-app>
 </template>
-
-<script setup lang="ts">
-// No logic needed here for now
-</script>
 
 
 <style>

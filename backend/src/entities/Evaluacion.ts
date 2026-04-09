@@ -3,7 +3,6 @@ import { Gestion } from './Gestion';
 import { Jurado } from './Jurado';
 import { Fraternidad } from './Fraternidad';
 import { Fase } from './Fase';
-import { Criterio } from './Criterio';
 
 @Entity('evaluaciones')
 export class Evaluacion {
@@ -26,15 +25,20 @@ export class Evaluacion {
     @JoinColumn({ name: 'id_fase' })
     fase: Fase;
 
-    @ManyToOne(() => Criterio, (criterio) => criterio.evaluaciones)
-    @JoinColumn({ name: 'id_criterio' })
-    criterio: Criterio;
+    @Column({ type: 'enum', enum: ['PENDIENTE', 'EN_PROGRESO', 'COMPLETADO'], default: 'PENDIENTE' })
+    estado: string;
 
-    @Column({ type: 'decimal', precision: 5, scale: 2 })
-    puntaje: number;
+    @Column({ name: 'criterios_evaluados', type: 'jsonb', nullable: true })
+    criteriosEvaluados: any;
 
-    @Column({ name: 'fecha_hora', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-    fechaHora: Date;
+    @Column({ name: 'puntaje_total', type: 'decimal', precision: 5, scale: 2, default: 0 })
+    puntajeTotal: number;
+
+    @Column({ name: 'fecha_apertura', type: 'timestamp', nullable: true })
+    fechaApertura: Date;
+
+    @Column({ name: 'fecha_cierre', type: 'timestamp', nullable: true })
+    fechaCierre: Date;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

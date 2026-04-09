@@ -39,6 +39,7 @@ export class AuthService {
       sub: usuario.idUsuario,
       ci: usuario.ci,
       rol: usuario.rol.nombre,
+      primerLogin: usuario.primerLogin,
     };
 
     // 4. Firmar y devolver el token junto con los datos basicos del usuario
@@ -51,6 +52,7 @@ export class AuthService {
         primerApellido: usuario.primerApellido,
         segundoApellido: usuario.segundoApellido,
         rol: usuario.rol.nombre,
+        primerLogin: usuario.primerLogin,
       },
     };
   }
@@ -58,5 +60,14 @@ export class AuthService {
   // Metodo util para verificar un token desde otros modulos si fuera necesario
   verifyToken(token: string) {
     return this.jwtService.verify(token);
+  }
+
+  async changePassword(userId: number, newPassword: string) {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.usuarioRepo.update(userId, {
+      password: hashedPassword,
+      primerLogin: false,
+    });
+    return { message: 'Contraseña actualizada correctamente' };
   }
 }

@@ -277,7 +277,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useAuthStore } from '../store/auth'
+
+const authStore = useAuthStore()
 
 const props = defineProps({
   faseSeleccionada: {
@@ -287,6 +290,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['volver', 'finalizar'])
+
+// Clave única para el borrador basada en usuario y fase
+const draftKey = computed(() => `evaluacion_draft_${authStore.user?.id || 'anon'}_${props.faseSeleccionada}`)
 
 const criterios = ref([
   {
@@ -329,6 +335,23 @@ const progresoPorcentaje = computed(() => {
   return Math.round(((currentIndex.value + 1) / criterios.value.length) * 100)
 })
 
+// Auto-guardado al cambiar cualquier puntaje u observación
+watch(criterios, (newVal) => {
+  localStorage.setItem(draftKey.value, JSON.stringify(newVal))
+  localStorage.setItem('evaluacion_draft_active', 'true')
+}, { deep: true })
+
+onMounted(() => {
+  const savedDraft = localStorage.getItem(draftKey.value)
+  if (savedDraft) {
+    try {
+      criterios.value = JSON.parse(savedDraft)
+    } catch (e) {
+      console.error("Error cargando borrador", e)
+    }
+  }
+})
+
 const promedioActual = computed(() => {
   const sum = criterios.value.reduce((acc, curr) => acc + Number(curr.puntaje), 0)
   return sum / criterios.value.length
@@ -346,6 +369,10 @@ const pasoSiguiente = () => {
 
 const confirmarFinalizar = () => {
     mostrarModalFinal.value = false
+    // Limpiar borrador al finalizar con éxito
+    localStorage.removeItem(draftKey.value)
+    localStorage.removeItem('evaluacion_draft_active')
+    
     emit('finalizar', {
         criterios: criterios.value,
         promedio: promedioActual.value
