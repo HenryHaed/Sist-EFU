@@ -19,6 +19,13 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     userRole: (state) => state.user?.rol || null,
+    remainingSessionSeconds: () => {
+      const loginAt = localStorage.getItem('loginAt');
+      if (!loginAt) return 0;
+      const oneHour = 3600000;
+      const remaining = oneHour - (Date.now() - parseInt(loginAt));
+      return Math.max(0, Math.floor(remaining / 1000));
+    }
   },
   actions: {
     startSessionTimer() {

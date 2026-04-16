@@ -1,8 +1,12 @@
 <template>
   <div class="p-6 md:p-8 max-w-7xl mx-auto min-h-[calc(100vh-4rem)]">
     <div class="mb-8">
-      <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">Calificar Fases</h2>
-      <p class="text-slate-500 font-medium text-sm mt-1">Selecciona el módulo de evaluación al que deseas ingresar.</p>
+      <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">
+        {{ tipoConcurso === 'EFU' ? 'Calificar Fases EFU' : 'Concursos Externos' }}
+      </h2>
+      <p class="text-slate-500 font-medium text-sm mt-1">
+        {{ tipoConcurso === 'EFU' ? 'Selecciona el módulo de evaluación de la Entrada Universitaria.' : 'Califica a los participantes de los concursos y actividades externas.' }}
+      </p>
     </div>
 
     <!-- Error/Loading state -->
@@ -56,9 +60,9 @@
 
           <button 
             class="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
-            :class="fase.accesible ? 'bg-primary/5 text-primary hover:bg-primary hover:text-white' : 'bg-slate-100 text-slate-400'"
+            :class="fase.accesible ? (tipoConcurso === 'EFU' ? 'bg-primary/5 text-primary hover:bg-primary hover:text-white' : 'bg-secondary/5 text-secondary hover:bg-secondary hover:text-white') : 'bg-slate-100 text-slate-400'"
           >
-            {{ fase.accesible ? 'Ingresar a Calificar' : 'Acceso Restringido' }}
+            {{ fase.accesible ? (tipoConcurso === 'EFU' ? 'Ingresar a Calificar' : 'Ver Participantes') : 'Acceso Restringido' }}
             <span class="material-symbols-outlined text-[20px]">{{ fase.accesible ? 'arrow_forward' : 'block' }}</span>
           </button>
         </div>
@@ -72,6 +76,13 @@
 import { ref, onMounted } from 'vue'
 import api from '../services/api'
 
+const props = defineProps({
+  tipoConcurso: {
+    type: String,
+    default: 'EFU'
+  }
+})
+
 const emit = defineEmits(['fase-seleccionada'])
 
 const fases = ref([])
@@ -83,7 +94,8 @@ const cargarFases = async () => {
   error.value = ''
   try {
     const { data } = await api.get('/evaluaciones/fases-auth')
-    fases.value = data
+    // Filter by type
+    fases.value = data.filter(f => f.tipoConcurso === props.tipoConcurso)
   } catch (err) {
     error.value = err.response?.data?.message || 'Error de conexión con el servidor.'
   } finally {

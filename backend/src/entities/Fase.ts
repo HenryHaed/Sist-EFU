@@ -1,9 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany, Check } from 'typeorm';
 import { Gestion } from './Gestion';
 import { Criterio } from './Criterio';
 import { Evaluacion } from './Evaluacion';
 
 @Entity('fases')
+// @Check(`"peso_porcentaje" >= 0 AND "peso_porcentaje" <= 100`)
+// @Check(`"fecha_inicio" IS NULL OR "fecha_fin" IS NULL OR "fecha_fin" >= "fecha_inicio"`)
 export class Fase {
     @PrimaryGeneratedColumn({ name: 'id_fase' })
     idFase: number;
@@ -23,6 +25,9 @@ export class Fase {
 
     @Column({ name: 'categoria_efu', type: 'varchar', length: 50, nullable: true })
     categoriaEfu: string;
+
+    @Column({ name: 'es_precalificacion', default: false })
+    esPrecalificacion: boolean;
 
     @Column({ name: 'fecha_inicio', type: 'timestamp', nullable: true })
     fechaInicio: Date;

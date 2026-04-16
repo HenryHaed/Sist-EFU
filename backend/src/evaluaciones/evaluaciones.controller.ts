@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -31,15 +31,16 @@ export class EvaluacionesController {
   getEvaluacionExistente(
     @Request() req: any,
     @Param('idFase', ParseIntPipe) idFase: number,
-    @Param('idFraternidad', ParseIntPipe) idFraternidad: number
+    @Param('idFraternidad', ParseIntPipe) idFraternidad: number,
+    @Query('participanteNombre') participanteNombre?: string
   ) {
-    return this.evaluacionesService.getEvaluacionActual(req.user.idUsuario, req.user.rol, idFase, idFraternidad);
+    return this.evaluacionesService.getEvaluacionActual(req.user.idUsuario, req.user.rol, idFase, idFraternidad, participanteNombre);
   }
 
   @Post('guardar')
   guardarEvaluacion(
     @Request() req: any,
-    @Body() payload: { idFase: number, idFraternidad: number, criterios: any, finalizar: boolean }
+    @Body() payload: { idFase: number, idFraternidad: number, criterios: any, finalizar: boolean, participanteNombre?: string, participanteTipo?: string }
   ) {
     return this.evaluacionesService.guardarEvaluacion(req.user.idUsuario, req.user.rol, payload);
   }

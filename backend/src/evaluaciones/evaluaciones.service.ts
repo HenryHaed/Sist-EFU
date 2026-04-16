@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Evaluacion } from '../entities/Evaluacion';
@@ -244,6 +244,7 @@ export class EvaluacionesService {
           idFraternidad: frat.idFraternidad,
           nombre: frat.nombre,
           categoria: frat.categoria ? frat.categoria.nombre : null,
+          participantesConcurso: frat.participantesConcurso || null,
           urlPdf: urlPdf || null,
           // Propiedades del estado de evaluación
           idEvaluacion: ev ? ev.idEvaluacion : null,
@@ -265,21 +266,27 @@ export class EvaluacionesService {
   }
 
   // 4. Cargar evaluación actual (para continuar 'EN_PROGRESO')
-  async getEvaluacionActual(idUsuario: number, rol: string, idFase: number, idFraternidad: number) {
+  async getEvaluacionActual(idUsuario: number, rol: string, idFase: number, idFraternidad: number, participanteNombre?: string) {
     const jurado = await this.getValidadorJurado(idUsuario, rol, idFase);
 
+    const whereClause: any = {
+      jurado: { idJurado: jurado.idJurado },
+      fase: { idFase },
+      fraternidad: { idFraternidad }
+    };
+
+    if (participanteNombre) {
+      whereClause.participanteNombre = participanteNombre;
+    }
+
     return this.evaluacionRepo.findOne({
-      where: {
-        jurado: { idJurado: jurado.idJurado },
-        fase: { idFase },
-        fraternidad: { idFraternidad }
-      }
+      where: whereClause
     });
   }
 
   // 5. Guardar Evaluación (Parcial o Completado)
-  async guardarEvaluacion(idUsuario: number, rol: string, args: { idFase: number, idFraternidad: number, criterios: any, finalizar: boolean }) {
-    const { idFase, idFraternidad, criterios, finalizar } = args;
+  async guardarEvaluacion(idUsuario: number, rol: string, args: { idFase: number, idFraternidad: number, criterios: any, finalizar: boolean, participanteNombre?: string, participanteTipo?: string }) {
+    const { idFase, idFraternidad, criterios, finalizar, participanteNombre, participanteTipo } = args;
 
     const jurado = await this.getValidadorJurado(idUsuario, rol, idFase);
 
@@ -292,12 +299,17 @@ export class EvaluacionesService {
       throw new ForbiddenException('Fuera del límite de tiempo para evaluación.');
     }
 
+    const whereClause: any = {
+      jurado: { idJurado: jurado.idJurado },
+      fase: { idFase },
+      fraternidad: { idFraternidad }
+    };
+    if (participanteNombre) {
+      whereClause.participanteNombre = participanteNombre;
+    }
+
     let evaluacion = await this.evaluacionRepo.findOne({
-      where: {
-        jurado: { idJurado: jurado.idJurado },
-        fase: { idFase },
-        fraternidad: { idFraternidad }
-      }
+      where: whereClause
     });
 
     if (evaluacion && evaluacion.estado === 'COMPLETADO') {
@@ -321,6 +333,8 @@ export class EvaluacionesService {
         criteriosEvaluados: criterios,
         puntajeTotal,
         estado: finalizar ? 'COMPLETADO' : 'EN_PROGRESO',
+        participanteNombre: participanteNombre || null,
+        participanteTipo: participanteTipo || null,
         fechaApertura: new Date(),
         fechaCierre: finalizar ? new Date() : null
       });
@@ -343,7 +357,31 @@ export class EvaluacionesService {
       .reduce((sum, f) => sum + Number(f.pesoPorcentaje), 0);
     if (pesoActual + Number(pesoNuevo) > 100) {
       const disponible = (100 - pesoActual).toFixed(2);
-      throw new Error(`El total de fases EFU superaría el 100%. Porcentaje disponible: ${disponible}%`);
+      throw new BadRequestException(`El total de fases EFU superaría el 100%. Porcentaje disponible: ${disponible}%`);
+    }
+  }
+
+  async validarPresupuestoCriterios(idFase: number, nuevoPuntaje: number, idCriterioExclude?: number) {
+    const fase = await this.faseRepo.findOne({ where: { idFase } });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+
+    // REGLA DE ORO: EFU hereda el peso de la fase, Externo usa 100%
+    const limite = fase.tipoConcurso === 'EFU' ? Number(fase.pesoPorcentaje) : 100;
+
+    const criterios = await this.criterioRepo.find({
+      where: { fase: { idFase } },
+    });
+
+    const puntajeActual = criterios
+      .filter(c => c.idCriterio !== idCriterioExclude)
+      .reduce((sum, c) => sum + Number(c.puntajeMaximo), 0);
+
+    if (puntajeActual + nuevoPuntaje > limite) {
+      const disponible = (limite - puntajeActual).toFixed(2);
+      const msg = fase.tipoConcurso === 'EFU' 
+        ? `El total de los criterios no puede exceder el peso de la fase (${limite}%). Disponible: ${disponible}%`
+        : `El total de los criterios no puede exceder el 100%. Disponible: ${disponible}%`;
+      throw new BadRequestException(msg);
     }
   }
 
@@ -357,6 +395,18 @@ export class EvaluacionesService {
       gestion = await this.gestionRepo.findOne({ where: { activa: true } });
     }
     if (!gestion) throw new NotFoundException('No hay una Gestión activa configurada');
+
+    if (data.pesoPorcentaje === undefined || data.pesoPorcentaje <= 0) {
+      throw new BadRequestException('El porcentaje de ponderación debe ser mayor a 0 y no puede estar vacío.');
+    }
+
+    if (data.fechaInicio && data.fechaFin) {
+      const start = new Date(data.fechaInicio);
+      const end = new Date(data.fechaFin);
+      if (end < start) {
+        throw new BadRequestException('La fecha de fin debe ser posterior o igual a la fecha de inicio.');
+      }
+    }
 
     // Validar presupuesto EFU si aplica
     const tipoConcurso = data.tipoConcurso || 'EFU';
@@ -412,7 +462,17 @@ export class EvaluacionesService {
          }
       }
     }
-    
+    if (data.pesoPorcentaje !== undefined && data.pesoPorcentaje <= 0) {
+      throw new BadRequestException('El porcentaje de ponderación debe ser mayor a 0.');
+    }
+
+    const start = data.fechaInicio !== undefined ? (data.fechaInicio ? new Date(data.fechaInicio) : null) : fase.fechaInicio;
+    const end = data.fechaFin !== undefined ? (data.fechaFin ? new Date(data.fechaFin) : null) : fase.fechaFin;
+
+    if (start && end && end < start) {
+      throw new BadRequestException('La fecha de fin debe ser posterior o igual a la fecha de inicio.');
+    }
+
     // Validar presupuesto EFU si aplica
     const tipoConcurso = data.tipoConcurso !== undefined ? data.tipoConcurso : fase.tipoConcurso;
     const nuevoPeso = data.pesoPorcentaje !== undefined ? data.pesoPorcentaje : fase.pesoPorcentaje;
@@ -430,6 +490,7 @@ export class EvaluacionesService {
     if (data.fechaFin !== undefined) fase.fechaFin = data.fechaFin || null;
     if (data.estaActiva !== undefined) fase.estaActiva = data.estaActiva;
     if (data.urlImagen !== undefined) fase.urlImagen = data.urlImagen;
+    if (data.esPrecalificacion !== undefined) fase.esPrecalificacion = data.esPrecalificacion;
 
     return this.faseRepo.save(fase);
   }
@@ -440,13 +501,30 @@ export class EvaluacionesService {
 
   // --- CRUD GESTIÓN DE CRITERIOS ---
   async createCriterio(data: any) {
+    if (!data.fase || !data.fase.idFase) throw new BadRequestException('Debe especificar una fase válida');
+    
+    const puntaje = Number(data.puntajeMaximo || 0);
+    if (puntaje <= 0) throw new BadRequestException('El puntaje máximo debe ser mayor a 0');
+
+    await this.validarPresupuestoCriterios(data.fase.idFase, puntaje);
+
     const criterio = this.criterioRepo.create(data);
     return this.criterioRepo.save(criterio);
   }
 
   async updateCriterio(id: number, data: any) {
-    await this.criterioRepo.update(id, data);
-    return this.criterioRepo.findOne({ where: { idCriterio: id } });
+    const criterio = await this.criterioRepo.findOne({ where: { idCriterio: id }, relations: ['fase'] });
+    if (!criterio) throw new NotFoundException('Criterio no encontrado');
+
+    const nuevoPuntaje = data.puntajeMaximo !== undefined ? Number(data.puntajeMaximo) : Number(criterio.puntajeMaximo);
+    
+    if (nuevoPuntaje <= 0) throw new BadRequestException('El puntaje máximo debe ser mayor a 0');
+
+    const idFase = data.fase?.idFase || criterio.fase.idFase;
+    await this.validarPresupuestoCriterios(idFase, nuevoPuntaje, id);
+
+    Object.assign(criterio, data);
+    return this.criterioRepo.save(criterio);
   }
 
   async deleteCriterio(id: number) {

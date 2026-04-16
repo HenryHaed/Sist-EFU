@@ -176,7 +176,18 @@
 
             <div class="col-span-2 flex items-center gap-3 py-2">
               <input type="checkbox" v-model="form.habilitadoEfu" class="size-5 rounded border-slate-300 text-primary focus:ring-primary/20" />
-              <span class="text-sm font-bold text-slate-700">Habilitado para la Entrada</span>
+              <span class="text-sm font-bold text-slate-700">Habilitado para la Entrada Universitaria (EFU)</span>
+            </div>
+
+            <div class="col-span-2">
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Participantes para Concursos Externos (Opcional)</label>
+              <textarea 
+                v-model="participantesStr" 
+                rows="3" 
+                placeholder='Ej: [{"tipo": "Chacha", "nombre": "Juan Pérez"}, {"tipo": "Warmi", "nombre": "María López"}]'
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-xs font-mono text-slate-600 focus:border-amber-500 transition-colors"
+              ></textarea>
+              <p class="text-[9px] text-slate-400 mt-1 font-bold">Usa formato JSON válido. Cada participante necesita un "tipo" y "nombre".</p>
             </div>
           </div>
 
@@ -246,13 +257,16 @@ const uploadFile = async (file) => {
   }
 }
 
+const participantesStr = ref('')
+
 const form = ref({
   idFraternidad: null,
   nombre: '',
   origenFraternidad: 'Interna (UMSA)',
   idCategoria: 1,
   habilitadoEfu: true,
-  logoUrl: ''
+  logoUrl: '',
+  participantesConcurso: null
 })
 
 const cargarCategorias = async () => {
@@ -295,35 +309,61 @@ const cargarDatos = async () => {
 
 const abrirModalCrear = () => {
   editando.value = false
+  participantesStr.value = ''
   form.value = {
     nombre: '',
     origenFraternidad: 'Interna (UMSA)',
-    idCategoria: 1,
+    idCategoria: categorias.value.length > 0 ? categorias.value[0].idCategoria : 1,
     habilitadoEfu: true,
-    logoUrl: ''
+    logoUrl: '',
+    participantesConcurso: null
   }
   modalAbierto.value = true
 }
 
-const editarFraternidad = (f) => {
+const editarFraternidad = (fraternidad) => {
   editando.value = true
-  form.value = {
-    idFraternidad: f.idFraternidad,
-    nombre: f.nombre,
-    origenFraternidad: f.origenFraternidad,
-    idCategoria: f.categoria?.idCategoria || 1,
-    habilitadoEfu: f.habilitadoEfu,
-    logoUrl: f.logoUrl || ''
+  participantesStr.value = fraternidad.participantesConcurso 
+    ? (typeof fraternidad.participantesConcurso === 'string' ? fraternidad.participantesConcurso : JSON.stringify(fraternidad.participantesConcurso))
+    : ''
+  form.value = { 
+    ...fraternidad,
+    idCategoria: fraternidad.categoria ? fraternidad.categoria.idCategoria : (categorias.value.length > 0 ? categorias.value[0].idCategoria : null)
   }
   modalAbierto.value = true
 }
 
 const guardar = async () => {
+  if (!form.value.nombre) {
+    alert('Ingresa el nombre de la fraternidad')
+    return
+  }
+
+  // Parse participantes
+  let particObj = null
+  if (participantesStr.value.trim()) {
+     try {
+        particObj = JSON.parse(participantesStr.value)
+     } catch (e) {
+        alert('El formato de participantes no es un JSON válido.')
+        return
+     }
+  }
+
+  const payload = {
+    nombre: form.value.nombre,
+    origenFraternidad: form.value.origenFraternidad,
+    categoria: { idCategoria: form.value.idCategoria },
+    habilitadoEfu: form.value.habilitadoEfu,
+    logoUrl: form.value.logoUrl,
+    participantesConcurso: particObj
+  }
+
   try {
     if (editando.value) {
-      await api.put(`/fraternidades/${form.value.idFraternidad}`, form.value)
+      await api.put(`/fraternidades/${form.value.idFraternidad}`, payload)
     } else {
-      await api.post('/fraternidades', form.value)
+      await api.post('/fraternidades', payload)
     }
     modalAbierto.value = false
     cargarDatos()

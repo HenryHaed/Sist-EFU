@@ -34,6 +34,12 @@ export class Evaluacion {
     @Column({ name: 'puntaje_total', type: 'decimal', precision: 5, scale: 2, default: 0 })
     puntajeTotal: number;
 
+    @Column({ name: 'participante_nombre', length: 255, nullable: true })
+    participanteNombre: string;
+
+    @Column({ name: 'participante_tipo', length: 50, nullable: true })
+    participanteTipo: string;
+
     @Column({ name: 'fecha_apertura', type: 'timestamp', nullable: true })
     fechaApertura: Date;
 

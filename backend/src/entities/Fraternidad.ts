@@ -49,6 +49,9 @@ export class Fraternidad {
     @Column({ name: 'logo_url', type: 'text', nullable: true })
     logoUrl: string;
 
+    @Column({ name: 'participantes_concurso', type: 'jsonb', nullable: true })
+    participantesConcurso: any;
+
     @Column({ name: 'promedio_base', type: 'decimal', precision: 5, scale: 2, default: 0 })
     promedioBase: number;
 

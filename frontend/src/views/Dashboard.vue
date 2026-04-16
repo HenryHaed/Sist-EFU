@@ -54,6 +54,29 @@
               <span class="text-sm">Calificar Fraternidad</span>
             </button>
 
+            <!-- GESTIÓN: Concursos Externos (Para Jurados) -->
+            <button
+              v-if="can('evaluar')"
+              @click="setVista('seleccionar_concurso')"
+              :class="(vistaActual === 'seleccionar_concurso' || vistaActual === 'listado_competidores' || vistaActual === 'wizard_concurso') ? 'bg-slate-50 text-secondary border-l-4 border-l-primary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left mt-1 overflow-hidden"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="(vistaActual === 'seleccionar_concurso' || vistaActual === 'listado_competidores' || vistaActual === 'wizard_concurso') ? 'text-primary' : 'text-slate-400'">emoji_events</span>
+              <span class="text-sm whitespace-nowrap overflow-ellipsis">Calificar Concursos</span>
+              <span v-if="(vistaActual === 'seleccionar_concurso' || vistaActual === 'listado_competidores' || vistaActual === 'wizard_concurso')" class="size-1.5 rounded-full bg-primary ml-auto animate-pulse"></span>
+            </button>
+
+            <!-- ADMINISTRACIÓN -->
+            <button
+              v-if="can('gestionar_participantes')"
+              @click="setVista('participantes_concurso')"
+              :class="vistaActual === 'participantes_concurso' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'participantes_concurso' ? 'text-secondary' : 'text-slate-400'">group_add</span>
+              <span class="text-sm">Participantes Concursos</span>
+            </button>
+
             <button
               v-if="can('fraternidades')"
               @click="setVista('fraternidades_crud')"
@@ -255,19 +278,21 @@
             />
 
             <!-- Vista: Nueva Selección Inteligente de Fase -->
-            <SeleccionarFaseJuradoView
-              v-else-if="vistaActual === 'seleccionar_fase'"
-              key="seleccionar_fase"
-              @fase-seleccionada="handleFaseSeleccionada"
-            />
+            <div v-else-if="vistaActual === 'seleccionar_fase'" key="seleccionar_fase">
+              <SeleccionarFaseJuradoView tipoConcurso="EFU" @fase-seleccionada="entrarFase" />
+            </div>
+            
+            <div v-else-if="vistaActual === 'seleccionar_concurso'" key="seleccionar_concurso">
+              <SeleccionarFaseJuradoView tipoConcurso="EXTERNO" @fase-seleccionada="entrarFaseConcurso" />
+            </div>
 
             <!-- Vista: Listado de Evaluación por Fase -->
             <ListadoEvaluacionFaseView
               v-else-if="vistaActual === 'listado_fase'"
               key="listado_fase"
-              :fase-seleccionada="faseSeleccionada"
+              :fase-seleccionada="activeFaseJurado"
               @volver="setVista('seleccionar_fase')"
-              @evaluar-fraternidad="handleEvaluarFraternidad"
+              @evaluar-fraternidad="iniciarWizard"
             />
 
             <!-- Vista: Gestiones Anuales (Admin) - Nivel Maestro -->
@@ -295,13 +320,39 @@
             />
 
             <!-- Vista: Wizard de Evaluación -->
-            <AsistenteContent
-              v-else-if="vistaActual === 'wizard'"
-              key="wizard"
-              :fase-seleccionada="faseSeleccionada"
-              :fraternidad="fraternidadSeleccionada"
-              @volver="setVista('listado_fase')"
-              @finalizar="manejarFinalizacion"
+            <div v-else-if="vistaActual === 'wizard' && activeFaseJurado && activeFraternidadJurado" key="wizard">
+               <AsistenteContent 
+                 :fase-seleccionada="activeFaseJurado" 
+                 :fraternidad="activeFraternidadJurado" 
+                 @volver="vistaActual = 'listado_fase'"
+                 @finalizar="manejarFinalizacion"
+               />
+            </div>
+
+            <div v-else-if="vistaActual === 'listado_competidores'" key="listado_competidores">
+              <ListadoCompetidoresView 
+                v-if="activeFaseJurado" 
+                :fase="activeFaseJurado" 
+                @volver="setVista('seleccionar_concurso')"
+                @evaluar-participante="iniciarWizardConcurso"
+              />
+            </div>
+
+            <div v-else-if="vistaActual === 'wizard_concurso' && activeFaseJurado && activeFraternidadJurado" key="wizard_concurso">
+               <AsistenteContent 
+                 :fase-seleccionada="activeFaseJurado" 
+                 :fraternidad="activeFraternidadJurado" 
+                 :participanteNombre="activeParticipanteNombre"
+                 :participanteTipo="activeParticipanteTipo"
+                 @volver="vistaActual = 'listado_competidores'"
+                 @finalizar="manejarFinalizacion"
+               />
+            </div>
+
+            <!-- Vista: CRUD Participantes Externos (Delegado/Admin) -->
+            <DelegadoParticipantesView
+              v-else-if="vistaActual === 'participantes_concurso'"
+              key="participantes_concurso"
             />
 
             <!-- Vista: CRUD Fraternidades (Admin/SuperUser) -->
@@ -409,6 +460,8 @@ import GestionCriteriosView from './GestionCriteriosView.vue'
 import AsistenteContent from './AsistenteContent.vue'
 import FraternidadesCRUDView from './FraternidadesCRUDView.vue'
 import UsuariosCRUDView from './UsuariosCRUDView.vue'
+import ListadoCompetidoresView from './ListadoCompetidoresView.vue'
+import DelegadoParticipantesView from './DelegadoParticipantesView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -421,6 +474,11 @@ const gestionEventoOpen = ref(false)
 const fraternidadSeleccionada = ref(null)
 const faseSeleccionada = ref(null)
 const gestionSeleccionada = ref(null)  // Maestro → Detalle de Gestión
+
+const activeFaseJurado = ref(null)
+const activeFraternidadJurado = ref(null)
+const activeParticipanteNombre = ref(null)
+const activeParticipanteTipo = ref(null)
 
 // Control Cambio Password Primer Login
 const mostrarModalPass = ref(false)
@@ -436,17 +494,17 @@ const currentUser = computed(() => authStore.user)
 const can = (permission) => {
   const role = authStore.userRole?.toLowerCase()
   const permissions = {
-    superusuario: ['estadisticas', 'calificar', 'fraternidades', 'reglamento', 'ajustes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin'],
-    admin: ['estadisticas', 'calificar', 'fraternidades', 'reglamento', 'ajustes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
-    jurado: ['estadisticas', 'calificar', 'reglamento'],
+    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin'],
+    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
+    jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
-    delegado: ['estadisticas', 'reglamento', 'informes']
+    delegado: ['estadisticas', 'reglamento', 'informes', 'gestionar_participantes']
   }
   return permissions[role]?.includes(permission) || false
 }
 
 // Timer logic
-const timerSegundos = ref(87 * 60 + 23)
+const timerSegundos = ref(authStore.remainingSessionSeconds)
 let timerInterval = null
 const timer = computed(() => {
   const h = Math.floor(timerSegundos.value / 3600)
@@ -507,9 +565,12 @@ const tituloVista = computed(() => {
   const titulos = {
     estadisticas: 'Panel de Estadísticas',
     seleccionar_fase: 'Calificación de Fraternidades',
+    seleccionar_concurso: 'Calificación de Concursos',
     fraternidades_crud: 'Listado de Fraternidades',
     listado_fase: 'Listado de Fraternidades por Fase',
+    listado_competidores: 'Listado de Competidores',
     wizard: 'Evaluación de Fraternidad',
+    wizard_concurso: 'Evaluación de Concurso',
     gestion_fases: 'Gestiones Anuales',
     gestion_fases_detalle: gestionSeleccionada.value ? `Gestión ${gestionSeleccionada.value.anio} — Fases` : 'Fases de Evaluación',
     gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
@@ -531,20 +592,38 @@ const setVista = (vista) => {
   sidebarOpen.value = false
 }
 
-const handleFaseSeleccionada = (fase) => {
-  faseSeleccionada.value = fase
+const entrarFase = (fase) => {
+  activeFaseJurado.value = fase
+  activeParticipanteNombre.value = null
+  activeParticipanteTipo.value = null
   vistaActual.value = 'listado_fase'
 }
 
-const handleEvaluarFraternidad = (payload) => {
-  fraternidadSeleccionada.value = payload.fraternidad
+const entrarFaseConcurso = (fase) => {
+  activeFaseJurado.value = fase
+  activeParticipanteNombre.value = null
+  activeParticipanteTipo.value = null
+  vistaActual.value = 'listado_competidores'
+}
+
+const iniciarWizard = (fraternidad) => {
+  activeFraternidadJurado.value = fraternidad
+  activeParticipanteNombre.value = null
+  activeParticipanteTipo.value = null
   vistaActual.value = 'wizard'
+}
+
+const iniciarWizardConcurso = ({ fraternidad, participanteNombre, participanteTipo }) => {
+  activeFraternidadJurado.value = fraternidad
+  activeParticipanteNombre.value = participanteNombre
+  activeParticipanteTipo.value = participanteTipo
+  vistaActual.value = 'wizard_concurso'
 }
 
 const manejarFinalizacion = (resultados) => {
   console.log('Resultados finales:', resultados)
-  alert(`¡Calificaciones de ${fraternidadSeleccionada.value?.nombre} - ${faseSeleccionada.value?.nombre} guardadas!\nPromedio: ${resultados.promedio.toFixed(1)}/100`)
-  setVista('listado_fase')
+  alert(`¡Calificaciones guardadas!\nPromedio: ${resultados.promedio.toFixed(1)}/100`)
+  setVista('estadisticas')
 }
 
 const handleLogout = () => {

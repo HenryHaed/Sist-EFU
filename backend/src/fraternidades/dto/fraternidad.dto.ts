@@ -60,6 +60,10 @@ export class CreateFraternidadDto {
   @IsString()
   @IsOptional()
   logoUrl?: string;
+
+  @ApiProperty({ example: { chacha: "Juan" }, required: false })
+  @IsOptional()
+  participantesConcurso?: any;
 }
 
 export class UpdateFraternidadDto {
@@ -121,4 +125,8 @@ export class UpdateFraternidadDto {
   @IsString()
   @IsOptional()
   logoUrl?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  participantesConcurso?: any;
 }
