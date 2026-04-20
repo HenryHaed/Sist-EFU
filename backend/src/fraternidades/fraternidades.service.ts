@@ -37,7 +37,7 @@ export class FraternidadesService {
       ...data,
       facultad: idFacultad ? { idFacultad } as any : null,
       carrera: idCarrera ? { idCarrera } as any : null,
-      institucionExterna: idInstitucionExterna ? { idInstitucionExterna } as any : null,
+      institucionExterna: idInstitucionExterna ? { idInstitucion: idInstitucionExterna } as any : null,
       categoria: { idCategoria } as any,
     });
 
@@ -51,7 +51,7 @@ export class FraternidadesService {
     const updateData: any = { ...data };
     if (idFacultad !== undefined) updateData.facultad = idFacultad ? { idFacultad } : null;
     if (idCarrera !== undefined) updateData.carrera = idCarrera ? { idCarrera } : null;
-    if (idInstitucionExterna !== undefined) updateData.institucionExterna = idInstitucionExterna ? { idInstitucionExterna } : null;
+    if (idInstitucionExterna !== undefined) updateData.institucionExterna = idInstitucionExterna ? { idInstitucion: idInstitucionExterna } : null;
     if (idCategoria !== undefined) updateData.categoria = { idCategoria };
 
     Object.assign(fraternidad, updateData);

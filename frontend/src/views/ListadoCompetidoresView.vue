@@ -8,7 +8,7 @@
         </button>
         <div>
           <h2 class="text-xl font-black text-primary uppercase italic tracking-tighter">{{ fase?.nombre || 'Cargando...' }}</h2>
-          <p class="text-xs text-slate-500 font-medium">Listado oficial de postulación por fraternidad</p>
+          <p class="text-xs text-slate-500 font-medium">Listado de participantes habilitados para este concurso</p>
         </div>
       </div>
       
@@ -31,55 +31,56 @@
         <span class="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
       </div>
 
-      <div v-else class="grid grid-cols-1 gap-6">
-         <!-- FRATERNIDADES CARDS ACORDEON -->
-         <div v-for="item in fraternidades" :key="item.idFraternidad" class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
-            <div class="p-6 bg-slate-50 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors" @click="toggleFrat(item.idFraternidad)">
-               <div class="flex items-center gap-4">
-                  <div class="size-12 rounded-full bg-primary/5 text-primary flex items-center justify-center">
-                     <span class="material-symbols-outlined">groups</span>
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+         <!-- PARTICIPANTE CARD -->
+         <div v-for="p in participantes" :key="p.idParticipante" 
+              class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg transition-all group flex flex-col">
+            
+            <div class="p-6 flex-1">
+               <div class="flex justify-between items-start mb-4">
+                  <div class="size-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                     <span class="material-symbols-outlined text-3xl">person</span>
                   </div>
+                  <div class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest"
+                       :class="p.estadoEvaluacion === 'COMPLETADO' ? 'bg-emerald-100 text-emerald-700' : (p.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500')">
+                    {{ p.estadoEvaluacion }}
+                  </div>
+               </div>
+
+               <h3 class="font-black text-xl text-slate-800 uppercase tracking-tighter leading-tight mb-1">{{ p.nombre }}</h3>
+               <p class="text-primary font-bold text-xs uppercase tracking-widest mb-4">{{ p.tipo || 'PARTICIPANTE' }}</p>
+
+               <div class="flex items-center gap-2 mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span class="material-symbols-outlined text-slate-400 text-lg">groups</span>
                   <div>
-                     <h3 class="font-black text-lg text-slate-800 uppercase tracking-tighter">{{ item.nombre }}</h3>
-                     <p class="text-xs text-slate-500 font-medium">{{ getNumeroParticipantes(item) }} Participante(s) Registrados</p>
+                     <p class="text-[8px] font-black uppercase text-slate-400 leading-none mb-1">Representa a</p>
+                     <p class="text-[10px] font-bold text-slate-700 leading-none truncate max-w-[150px]">{{ p.fraternidad }}</p>
                   </div>
                </div>
-               <span class="material-symbols-outlined text-slate-400 transition-transform" :class="expandedFrat === item.idFraternidad ? 'rotate-180' : ''">expand_more</span>
-            </div>
 
-            <!-- Lista de Participantes (Expandible) -->
-            <div v-if="expandedFrat === item.idFraternidad" class="bg-white p-6 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div v-if="!item.participantesParsed || item.participantesParsed.length === 0" class="col-span-full py-8 text-center text-slate-400 font-medium text-sm">
-                  Esta fraternidad no tiene participantes registrados para este concurso.
-               </div>
-
-               <div v-for="(partic, idx) in item.participantesParsed" :key="idx" class="border border-slate-200 rounded-2xl p-5 hover:border-primary hover:shadow-md transition-all group flex flex-col sm:flex-row justify-between items-start gap-4">
-                  <div class="flex items-start gap-3">
-                     <div class="size-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                        <span class="material-symbols-outlined text-lg">person</span>
-                     </div>
-                     <div>
-                        <p class="text-[9px] font-black tracking-widest text-primary uppercase mb-0.5">{{ partic.tipo }}</p>
-                        <h4 class="font-bold text-slate-800 text-sm leading-tight">{{ partic.nombre }}</h4>
-                        <!-- ESTADO EVALUACION CHECK -->
-                        <div class="mt-2 text-[10px] font-bold flex items-center gap-1" :class="partic.evaluacion ? 'text-emerald-600' : 'text-slate-400'">
-                           <span class="material-symbols-outlined text-[14px]">{{ partic.evaluacion ? 'check_circle' : 'pending' }}</span>
-                           {{ partic.evaluacion ? 'EVALUADO' : 'PENDIENTE' }}
-                        </div>
-                     </div>
-                  </div>
-
-                  <button 
-                     @click="iniciarEvaluacion(item, partic)"
-                     :disabled="partic.evaluacion?.estado === 'COMPLETADO'"
-                     class="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2"
-                     :class="partic.evaluacion?.estado === 'COMPLETADO' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-blue-900 shadow-lg shadow-primary/20'"
-                  >
-                     <span>{{ partic.evaluacion ? 'Ver/Editar' : 'Calificar' }}</span>
-                     <span class="material-symbols-outlined text-[16px]">{{ partic.evaluacion ? 'visibility' : 'edit_document' }}</span>
-                  </button>
+               <div v-if="p.fechaApertura" class="text-[9px] text-slate-400 font-bold uppercase tracking-widest flex flex-col gap-1">
+                  <p>Inició: {{ formatearFecha(p.fechaApertura) }}</p>
+                  <p v-if="p.fechaCierre">Cerró: {{ formatearFecha(p.fechaCierre) }}</p>
                </div>
             </div>
+
+            <div class="p-4 bg-slate-50 border-t border-slate-100">
+               <button 
+                  @click="iniciarEvaluacion(p)"
+                  :disabled="p.estadoEvaluacion === 'COMPLETADO'"
+                  class="w-full py-3 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2"
+                  :class="p.estadoEvaluacion === 'COMPLETADO' ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-blue-900 shadow-xl shadow-primary/20'"
+               >
+                  <span>{{ p.estadoEvaluacion === 'PENDIENTE' ? 'Iniciar Calificación' : (p.estadoEvaluacion === 'EN_PROGRESO' ? 'Continuar Calificación' : 'Calificación Cerrada') }}</span>
+                  <span class="material-symbols-outlined text-[20px]">{{ p.estadoEvaluacion === 'COMPLETADO' ? 'lock' : 'arrow_forward' }}</span>
+               </button>
+            </div>
+         </div>
+
+         <!-- EMPTY STATE -->
+         <div v-if="participantes.length === 0" class="col-span-full py-20 text-center">
+            <span class="material-symbols-outlined text-6xl text-slate-200 mb-4">person_off</span>
+            <p class="text-slate-400 font-bold uppercase tracking-widest">No hay participantes registrados para este concurso.</p>
          </div>
       </div>
     </div>
@@ -96,55 +97,19 @@ const props = defineProps({
 })
 const emit = defineEmits(['volver', 'evaluar-participante'])
 
-const fraternidades = ref([])
+const participantes = ref([])
 const loading = ref(true)
-
-const expandedFrat = ref(null)
-const cacheEvaluaciones = ref([])
 
 // Temporizador Regresivo Global
 const tiempoRestante = ref(0)
 let timerInterval = null
 
-const cargarDataEspecial = async () => {
+const cargarParticipantes = async () => {
   loading.value = true
   try {
     const { data } = await api.get(`/evaluaciones/fase/${props.fase.idFase}/fraternidades`)
-    // Extraemos la lista raw
-    const listadoBase = data.listado || []
-    
-    // Necesitamos cargar todas las evaluaciones de este jurado para esta fase para mapear por concursante
-    const { data: evas } = await api.get('/evaluaciones/fases-auth') // No tenemos endpoint directo para listar las mias, pero en getFraternidadesPorFase el backend lo saca? 
-    // Wait, getFraternidadesPorFase ya manda 'idEvaluacion' solo si hay 1. Para particiaptnes multiples necesitamos ajustar cómo se mapean.
-    // Como el backend devolverá la info base, transformaremos el JSON de participantes
-    
-    fraternidades.value = await Promise.all(listadoBase.map(async (frat) => {
-       // Parsear participantes
-       let parsed = []
-       if (frat.participantesConcurso) {
-          try {
-             const raw = typeof frat.participantesConcurso === 'string' ? JSON.parse(frat.participantesConcurso) : frat.participantesConcurso
-             // asume formato { "Chacha": "Juan", "Warmi": "Maria" } o un array
-             if (Array.isArray(raw)) {
-                parsed = raw
-             } else {
-                parsed = Object.keys(raw).map(k => ({ tipo: k, nombre: raw[k] }))
-             }
-          } catch(e) {}
-       }
-       
-       // Por ahora, verificamos si hay evaluaciones individuales llamando al endpoint si es necesario o usando el que ya viene
-       for(const p of parsed) {
-          try {
-             // Check individual eval
-             const evasReq = await api.get(`/evaluaciones/fase/${props.fase.idFase}/fraternidades/${frat.idFraternidad}/evaluacion?participanteNombre=${encodeURIComponent(p.nombre)}`)
-             p.evaluacion = evasReq.data
-          } catch(e) {
-             p.evaluacion = null
-          }
-       }
-       return { ...frat, participantesParsed: parsed }
-    }))
+    // Note: for EXTERNO phases, the backend now returns a list of participants in 'listado'
+    participantes.value = data.listado || []
     
     iniciarCronometro(new Date(props.fase.fechaFin))
   } catch (err) {
@@ -153,19 +118,6 @@ const cargarDataEspecial = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const toggleFrat = (id) => {
-   expandedFrat.value = expandedFrat.value === id ? null : id
-}
-
-const getNumeroParticipantes = (frat) => {
-   if (!frat.participantesConcurso) return 0
-   try {
-     const p = typeof frat.participantesConcurso === 'string' ? JSON.parse(frat.participantesConcurso) : frat.participantesConcurso
-     if (Array.isArray(p)) return p.length
-     return Object.keys(p).length
-   } catch(e) { return 0 }
 }
 
 const iniciarCronometro = (fechaFin) => {
@@ -193,16 +145,23 @@ const urgenciaStatus = computed(() => {
   return { bgClass: 'bg-emerald-50 border-emerald-200', textClass: 'text-emerald-700' }
 })
 
-const iniciarEvaluacion = (fraternidad, participante) => {
+const formatearFecha = (d) => {
+  if (!d) return ''
+  return new Date(d).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })
+}
+
+const iniciarEvaluacion = (participante) => {
   emit('evaluar-participante', {
-    fraternidad,
+    idParticipante: participante.idParticipante,
     participanteNombre: participante.nombre,
-    participanteTipo: participante.tipo
+    participanteTipo: participante.tipo,
+    idFraternidad: participante.idFraternidad,
+    fraternidadNombre: participante.fraternidad
   })
 }
 
 onMounted(() => {
-  cargarDataEspecial()
+  cargarParticipantes()
 })
 
 onUnmounted(() => {

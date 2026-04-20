@@ -10,10 +10,12 @@ import { DocumentoFraternidad } from '../entities/DocumentoFraternidad';
 import { Criterio } from '../entities/Criterio';
 import { Gestion } from '../entities/Gestion';
 
+import { Participante } from '../entities/Participante';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      Evaluacion, Jurado, Fase, Fraternidad, DocumentoFraternidad, Criterio, Gestion
+      Evaluacion, Jurado, Fase, Fraternidad, DocumentoFraternidad, Criterio, Gestion, Participante
     ])
   ],
   controllers: [EvaluacionesController],

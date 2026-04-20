@@ -25,7 +25,7 @@ export class Jurado {
     @Column({ name: 'tipo_jurado', type: 'varchar', length: 20, default: 'EFU' })
     tipoJurado: string; // 'EFU' | 'EXTERNO'
 
-    @ManyToOne(() => Carrera, (carrera) => carrera.jurados)
+    @ManyToOne(() => Carrera, (carrera) => carrera.jurados, { onDelete: 'SET NULL' })
     @JoinColumn({ name: 'id_carrera' })
     carrera: Carrera;
 

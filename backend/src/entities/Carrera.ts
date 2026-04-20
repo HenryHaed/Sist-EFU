@@ -8,7 +8,7 @@ export class Carrera {
     @PrimaryGeneratedColumn({ name: 'id_carrera' })
     idCarrera: number;
 
-    @ManyToOne(() => Facultad, (facultad) => facultad.carreras)
+    @ManyToOne(() => Facultad, (facultad) => facultad.carreras, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'id_facultad' })
     facultad: Facultad;
 

@@ -67,7 +67,7 @@
               </td>
               <td class="px-6 py-4">
                 <p class="text-xs font-bold text-slate-700">
-                  {{ f.facultad?.sigla || f.institucionExterna?.nombre || '—' }}
+                  {{ f.facultad?.sigla || f.institucionExterna?.sigla || f.institucionExterna?.nombre || '—' }}
                 </p>
                 <p class="text-[9px] text-slate-400 font-medium">
                   {{ f.carrera?.nombre || 'Carrera/Institución' }}
@@ -156,6 +156,34 @@
               </select>
             </div>
 
+            <!-- Conditional Organizational Fields -->
+            <template v-if="form.origenFraternidad === 'Interna (UMSA)'">
+              <div class="col-span-2 md:col-span-1">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Facultad (Opcional)</label>
+                <select v-model="form.idFacultad" @change="onFacultadChange" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                  <option :value="null">-- Ninguna (Institucional) --</option>
+                  <option v-for="fac in listFacultades" :key="fac.idFacultad" :value="fac.idFacultad">{{ fac.nombre }}</option>
+                </select>
+              </div>
+              <div class="col-span-2 md:col-span-1">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Carrera (Opcional)</label>
+                <select v-model="form.idCarrera" :disabled="!form.idFacultad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold disabled:opacity-50">
+                  <option :value="null">-- Ninguna --</option>
+                  <option v-for="car in listCarreras" :key="car.idCarrera" :value="car.idCarrera">{{ car.nombre }}</option>
+                </select>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="col-span-2">
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Institución de Procedencia</label>
+                <select v-model="form.idInstitucionExterna" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                  <option :value="null">-- Seleccionar Institución --</option>
+                  <option v-for="inst in listInstituciones" :key="inst.idInstitucion" :value="inst.idInstitucion">{{ inst.nombre }}</option>
+                </select>
+              </div>
+            </template>
+
             <div class="col-span-2">
               <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Categoría según Reglamento</label>
               <select v-model="form.idCategoria" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold transition-all focus:border-primary">
@@ -177,17 +205,6 @@
             <div class="col-span-2 flex items-center gap-3 py-2">
               <input type="checkbox" v-model="form.habilitadoEfu" class="size-5 rounded border-slate-300 text-primary focus:ring-primary/20" />
               <span class="text-sm font-bold text-slate-700">Habilitado para la Entrada Universitaria (EFU)</span>
-            </div>
-
-            <div class="col-span-2">
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Participantes para Concursos Externos (Opcional)</label>
-              <textarea 
-                v-model="participantesStr" 
-                rows="3" 
-                placeholder='Ej: [{"tipo": "Chacha", "nombre": "Juan Pérez"}, {"tipo": "Warmi", "nombre": "María López"}]'
-                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-xs font-mono text-slate-600 focus:border-amber-500 transition-colors"
-              ></textarea>
-              <p class="text-[9px] text-slate-400 mt-1 font-bold">Usa formato JSON válido. Cada participante necesita un "tipo" y "nombre".</p>
             </div>
           </div>
 
@@ -217,6 +234,10 @@ const loadingCategorias = ref(true)
 const dragging = ref(false)
 const uploading = ref(false)
 const fileInput = ref(null)
+
+const listFacultades = ref([])
+const listCarreras = ref([])
+const listInstituciones = ref([])
 
 const getFullUrl = (url) => {
   if (!url) return ''
@@ -257,16 +278,16 @@ const uploadFile = async (file) => {
   }
 }
 
-const participantesStr = ref('')
-
 const form = ref({
   idFraternidad: null,
   nombre: '',
   origenFraternidad: 'Interna (UMSA)',
   idCategoria: 1,
+  idFacultad: null,
+  idCarrera: null,
+  idInstitucionExterna: null,
   habilitadoEfu: true,
-  logoUrl: '',
-  participantesConcurso: null
+  logoUrl: ''
 })
 
 const cargarCategorias = async () => {
@@ -297,8 +318,14 @@ const selectedCategoryDescription = computed(() => {
 const cargarDatos = async () => {
   loading.value = true
   try {
-    const response = await api.get('/fraternidades')
-    fraternidades.value = response.data
+    const [resFrat, resFac, resInst] = await Promise.all([
+      api.get('/fraternidades'),
+      api.get('/organizacion/facultades'),
+      api.get('/organizacion/instituciones')
+    ])
+    fraternidades.value = resFrat.data
+    listFacultades.value = resFac.data
+    listInstituciones.value = resInst.data
     await cargarCategorias()
   } catch (error) {
     console.error('Error al cargar fraternidades:', error)
@@ -307,29 +334,43 @@ const cargarDatos = async () => {
   }
 }
 
+const onFacultadChange = async () => {
+  form.value.idCarrera = null
+  if (form.value.idFacultad) {
+    const { data } = await api.get(`/organizacion/facultades/${form.value.idFacultad}/carreras`)
+    listCarreras.value = data
+  } else {
+    listCarreras.value = []
+  }
+}
+
 const abrirModalCrear = () => {
   editando.value = false
-  participantesStr.value = ''
   form.value = {
     nombre: '',
     origenFraternidad: 'Interna (UMSA)',
     idCategoria: categorias.value.length > 0 ? categorias.value[0].idCategoria : 1,
     habilitadoEfu: true,
-    logoUrl: '',
-    participantesConcurso: null
+    logoUrl: ''
   }
   modalAbierto.value = true
 }
 
-const editarFraternidad = (fraternidad) => {
+const editarFraternidad = async (fraternidad) => {
   editando.value = true
-  participantesStr.value = fraternidad.participantesConcurso 
-    ? (typeof fraternidad.participantesConcurso === 'string' ? fraternidad.participantesConcurso : JSON.stringify(fraternidad.participantesConcurso))
-    : ''
   form.value = { 
     ...fraternidad,
-    idCategoria: fraternidad.categoria ? fraternidad.categoria.idCategoria : (categorias.value.length > 0 ? categorias.value[0].idCategoria : null)
+    idCategoria: fraternidad.categoria ? fraternidad.categoria.idCategoria : (categorias.value.length > 0 ? categorias.value[0].idCategoria : null),
+    idFacultad: fraternidad.facultad ? fraternidad.facultad.idFacultad : null,
+    idCarrera: fraternidad.carrera ? fraternidad.carrera.idCarrera : null,
+    idInstitucionExterna: fraternidad.institucionExterna ? fraternidad.institucionExterna.idInstitucion : null
   }
+  
+  if (form.value.idFacultad) {
+    await onFacultadChange() // Cargar carreras de esa facultad
+    form.value.idCarrera = fraternidad.carrera ? fraternidad.carrera.idCarrera : null // Re-asignar después de cargar lista
+  }
+
   modalAbierto.value = true
 }
 
@@ -339,24 +380,15 @@ const guardar = async () => {
     return
   }
 
-  // Parse participantes
-  let particObj = null
-  if (participantesStr.value.trim()) {
-     try {
-        particObj = JSON.parse(participantesStr.value)
-     } catch (e) {
-        alert('El formato de participantes no es un JSON válido.')
-        return
-     }
-  }
-
   const payload = {
     nombre: form.value.nombre,
     origenFraternidad: form.value.origenFraternidad,
     categoria: { idCategoria: form.value.idCategoria },
+    idFacultad: form.value.idFacultad,
+    idCarrera: form.value.idCarrera,
+    idInstitucionExterna: form.value.idInstitucionExterna,
     habilitadoEfu: form.value.habilitadoEfu,
-    logoUrl: form.value.logoUrl,
-    participantesConcurso: particObj
+    logoUrl: form.value.logoUrl
   }
 
   try {

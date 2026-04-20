@@ -8,12 +8,17 @@
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
         <div class="flex flex-col">
-          <h2 class="text-primary text-lg font-black italic leading-tight tracking-tight uppercase">
-            {{ fraternidad?.nombre || 'Cargando...' }}
-            <span v-if="participanteNombre" class="text-amber-600"> / {{ participanteNombre }}</span>
+          <h2 class="text-primary text-xl font-black italic leading-tight tracking-tight uppercase">
+            <template v-if="participanteNombre">
+              {{ participanteNombre }}
+              <span v-if="fraternidad" class="text-slate-400 font-medium text-sm block sm:inline sm:ml-2">/ {{ fraternidad.nombre }}</span>
+            </template>
+            <template v-else>
+              {{ fraternidad?.nombre || 'Evaluación' }}
+            </template>
           </h2>
           <p class="text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-            Evaluación • {{ faseSeleccionada?.nombre }} <span v-if="participanteTipo">({{ participanteTipo }})</span>
+            {{ faseSeleccionada?.nombre }} <span v-if="participanteTipo" class="text-amber-600 ml-1">• {{ participanteTipo }}</span>
           </p>
         </div>
       </div>
@@ -349,7 +354,8 @@ const props = defineProps({
   },
   fraternidad: {
     type: Object,
-    required: true
+    required: false,
+    default: null
   },
   participanteNombre: {
     type: String,
@@ -357,6 +363,10 @@ const props = defineProps({
   },
   participanteTipo: {
     type: String,
+    default: null
+  },
+  participanteId: {
+    type: Number,
     default: null
   }
 })
@@ -400,9 +410,14 @@ const cargarDatos = async () => {
     criterios.value = resCriterios.data
     criterios.value.forEach(c => { formValues.value[c.idCriterio] = null })
 
-    const queryStr = props.participanteNombre ? `?participanteNombre=${encodeURIComponent(props.participanteNombre)}` : ''
-    const resEval = await api.get(`/evaluaciones/fase/${props.faseSeleccionada.idFase}/fraternidades/${props.fraternidad.idFraternidad}/evaluacion${queryStr}`)
-    if (resEval.data) {
+    let resEval;
+    if (props.participanteId) {
+      resEval = await api.get(`/evaluaciones/fase/${props.faseSeleccionada.idFase}/participante/${props.participanteId}/evaluacion`)
+    } else if (props.fraternidad) {
+      resEval = await api.get(`/evaluaciones/fase/${props.faseSeleccionada.idFase}/fraternidades/${props.fraternidad.idFraternidad}/evaluacion`)
+    }
+
+    if (resEval && resEval.data) {
       estadoOriginal.value = resEval.data.estado
       const jsonb = resEval.data.criteriosEvaluados
       if (jsonb) {
@@ -476,11 +491,10 @@ const guardar = async (finalizar = false) => {
   try {
     await api.post('/evaluaciones/guardar', {
       idFase: props.faseSeleccionada.idFase,
-      idFraternidad: props.fraternidad.idFraternidad,
+      idFraternidad: props.fraternidad ? props.fraternidad.idFraternidad : null,
+      idParticipante: props.participanteId,
       criterios: payloadCriterios,
-      finalizar,
-      participanteNombre: props.participanteNombre,
-      participanteTipo: props.participanteTipo
+      finalizar
     })
 
     if (finalizar) {

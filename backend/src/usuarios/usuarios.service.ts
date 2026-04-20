@@ -25,11 +25,11 @@ export class UsuariosService {
     private readonly faseRepo: Repository<Fase>,
     @InjectRepository(Fraternidad)
     private readonly fraternidadRepo: Repository<Fraternidad>,
-  ) {}
+  ) { }
 
   async findAll() {
     return this.usuarioRepo.find({
-      relations: ['rol'],
+      relations: ['rol', 'fraternidad'],
       order: { idUsuario: 'DESC' },
     });
   }
@@ -56,18 +56,22 @@ export class UsuariosService {
   }
 
   async create(createDto: CreateUsuarioDto & { tipoJurado?: string; fasesIds?: number[]; fraternidadesIds?: number[] }) {
-    const { idRol, password, tipoJurado, fasesIds, fraternidadesIds, ...data } = createDto as any;
+    const { idRol, password, tipoJurado, fasesIds, fraternidadesIds, idFraternidad, ...data } = createDto as any;
 
     const role = await this.roleRepo.findOne({ where: { idRol } });
     if (!role) throw new BadRequestException('Rol no válido');
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = this.usuarioRepo.create({
-      ...data,
-      password: hashedPassword,
-      rol: role,
-    });
+    const newUser = new Usuario();
+    Object.assign(newUser, data);
+    newUser.password = hashedPassword;
+    newUser.rol = role;
+
+    if (role.nombre === 'delegado' && idFraternidad) {
+      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
+      if (frat) newUser.fraternidad = frat;
+    }
 
     let savedUser: Usuario;
     try {
@@ -89,7 +93,7 @@ export class UsuariosService {
 
   async update(id: number, updateDto: UpdateUsuarioDto & { tipoJurado?: string; fasesIds?: number[]; fraternidadesIds?: number[] }) {
     const user = await this.findOne(id);
-    const { idRol, password, tipoJurado, fasesIds, fraternidadesIds, ...data } = updateDto as any;
+    const { idRol, password, tipoJurado, fasesIds, fraternidadesIds, idFraternidad, ...data } = updateDto as any;
 
     let updateData: any = { ...data };
 
@@ -102,6 +106,13 @@ export class UsuariosService {
 
     if (password && password.trim() !== '') {
       updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    if (idFraternidad) {
+      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad: idFraternidad } });
+      if (frat) user.fraternidad = frat;
+    } else if (idFraternidad === null) {
+      user.fraternidad = null;
     }
 
     Object.assign(user, updateData);
@@ -143,7 +154,7 @@ export class UsuariosService {
         tipoJurado,
         fasesHabilitadas: [],
         fraternidadesHabilitadas: [],
-      });
+      }) as any;
     } else {
       perfil.tipoJurado = tipoJurado;
       perfil.gestion = gestion;
@@ -157,7 +168,8 @@ export class UsuariosService {
     }
 
     // Asignar fraternidades habilitadas según los IDs recibidos
-    if (fraternidadesIds.length > 0) {
+    // REGLA: Si es jurado EXTERNO, no puede tener fraternidades asignadas
+    if (tipoJurado !== 'EXTERNO' && fraternidadesIds.length > 0) {
       perfil.fraternidadesHabilitadas = await this.fraternidadRepo.findBy({ idFraternidad: In(fraternidadesIds) });
     } else {
       perfil.fraternidadesHabilitadas = [];

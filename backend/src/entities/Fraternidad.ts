@@ -21,15 +21,15 @@ export class Fraternidad {
     @Column({ name: 'nivel_representacion', length: 100, nullable: true })
     nivelRepresentacion: string;
 
-    @ManyToOne(() => Facultad, (facultad) => facultad.fraternidades)
+    @ManyToOne(() => Facultad, (facultad) => facultad.fraternidades, { onDelete: 'SET NULL' })
     @JoinColumn({ name: 'id_facultad' })
     facultad: Facultad;
 
-    @ManyToOne(() => Carrera, (carrera) => carrera.fraternidades)
+    @ManyToOne(() => Carrera, (carrera) => carrera.fraternidades, { onDelete: 'SET NULL' })
     @JoinColumn({ name: 'id_carrera' })
     carrera: Carrera;
 
-    @ManyToOne(() => InstitucionExterna, (institucionExterna) => institucionExterna.fraternidades)
+    @ManyToOne(() => InstitucionExterna, (institucionExterna) => institucionExterna.fraternidades, { onDelete: 'SET NULL' })
     @JoinColumn({ name: 'id_institucion_externa' })
     institucionExterna: InstitucionExterna;
 
@@ -48,9 +48,6 @@ export class Fraternidad {
 
     @Column({ name: 'logo_url', type: 'text', nullable: true })
     logoUrl: string;
-
-    @Column({ name: 'participantes_concurso', type: 'jsonb', nullable: true })
-    participantesConcurso: any;
 
     @Column({ name: 'promedio_base', type: 'decimal', precision: 5, scale: 2, default: 0 })
     promedioBase: number;

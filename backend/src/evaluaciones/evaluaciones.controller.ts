@@ -28,21 +28,34 @@ export class EvaluacionesController {
   }
 
   @Get('fase/:idFase/fraternidades/:idFraternidad/evaluacion')
-  getEvaluacionExistente(
+  getEvaluacionExistenteFraternidad(
     @Request() req: any,
     @Param('idFase', ParseIntPipe) idFase: number,
-    @Param('idFraternidad', ParseIntPipe) idFraternidad: number,
-    @Query('participanteNombre') participanteNombre?: string
+    @Param('idFraternidad', ParseIntPipe) idFraternidad: number
   ) {
-    return this.evaluacionesService.getEvaluacionActual(req.user.idUsuario, req.user.rol, idFase, idFraternidad, participanteNombre);
+    return this.evaluacionesService.getEvaluacionActual(req.user.idUsuario, req.user.rol, idFase, { idFraternidad });
+  }
+
+  @Get('fase/:idFase/participante/:idParticipante/evaluacion')
+  getEvaluacionExistenteParticipante(
+    @Request() req: any,
+    @Param('idFase', ParseIntPipe) idFase: number,
+    @Param('idParticipante', ParseIntPipe) idParticipante: number
+  ) {
+    return this.evaluacionesService.getEvaluacionActual(req.user.idUsuario, req.user.rol, idFase, { idParticipante });
   }
 
   @Post('guardar')
   guardarEvaluacion(
     @Request() req: any,
-    @Body() payload: { idFase: number, idFraternidad: number, criterios: any, finalizar: boolean, participanteNombre?: string, participanteTipo?: string }
+    @Body() payload: { idFase: number, idFraternidad?: number, idParticipante?: number, criterios: any, finalizar: boolean }
   ) {
     return this.evaluacionesService.guardarEvaluacion(req.user.idUsuario, req.user.rol, payload);
+  }
+
+  @Get('estadisticas')
+  getEstadisticas() {
+    return this.evaluacionesService.getEstadisticasDashboard();
   }
 
   // --- CRUD ADMINISTRATIVO FASES ---

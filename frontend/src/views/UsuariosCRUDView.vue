@@ -89,6 +89,9 @@
                 >
                   {{ user.rol?.nombre || 'Sin Rol' }}
                 </span>
+                <p v-if="user.rol?.nombre === 'delegado' && user.fraternidad" class="text-[9px] font-black text-slate-400 mt-1 uppercase tracking-tighter">
+                   {{ user.fraternidad.nombre }}
+                </p>
               </td>
               <!-- Columna perfil de jurado -->
               <td v-if="props.rolFiltro === 'jurado'" class="p-4">
@@ -235,8 +238,8 @@
                   </div>
                 </div>
 
-                <!-- Fraternidades habilitadas -->
-                <div>
+                <!-- Fraternidades habilitadas (SOLO PARA EFU) -->
+                <div v-if="form.tipoJurado === 'EFU'">
                   <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                     Asignación de Fraternidades
                     <span class="text-slate-300 normal-case font-normal">(Si no marcas ninguna, podrá ver todas las habilitadas)</span>
@@ -257,6 +260,24 @@
                   </div>
                 </div>
 
+              </div>
+
+              <!-- ════ PANEL DELEGADO ════ -->
+              <div v-if="esRolDelegado" class="border-t border-slate-100 pt-5 space-y-6">
+                <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[16px]">how_to_reg</span>
+                  Configuración de Delegado
+                </p>
+                <div>
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Fraternidad a la que pertenece</label>
+                  <select v-model="form.idFraternidad" required
+                    class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all">
+                    <option value="" disabled>Seleccione una fraternidad</option>
+                    <option v-for="frat in todasFraternidades" :key="frat.idFraternidad" :value="frat.idFraternidad">
+                      {{ frat.nombre }}
+                    </option>
+                  </select>
+                </div>
               </div>
 
             </div>
@@ -323,13 +344,19 @@ const form = ref({
   idRol: '',
   tipoJurado: 'EFU',
   fasesIds: [],
-  fraternidadesIds: []
+  fraternidadesIds: [],
+  idFraternidad: null
 })
 
 // ── Computed ──────────────────────────────────────────────────────────────
 const esRolJurado = computed(() => {
   const rolSeleccionado = roles.value.find(r => r.idRol == form.value.idRol)
   return rolSeleccionado?.nombre === 'jurado' || props.rolFiltro === 'jurado'
+})
+
+const esRolDelegado = computed(() => {
+  const rolSeleccionado = roles.value.find(r => r.idRol == form.value.idRol)
+  return rolSeleccionado?.nombre === 'delegado' || props.rolFiltro === 'delegado'
 })
 
 const fasesDisponibles = computed(() =>
@@ -398,7 +425,8 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       idRol: usuario.rol?.idRol || '',
       tipoJurado: usuario._perfil?.tipoJurado || 'EFU',
       fasesIds: usuario._perfil?.fasesHabilitadas?.map(f => f.idFase) || [],
-      fraternidadesIds: usuario._perfil?.fraternidadesHabilitadas?.map(f => f.idFraternidad) || []
+      fraternidadesIds: usuario._perfil?.fraternidadesHabilitadas?.map(f => f.idFraternidad) || [],
+      idFraternidad: usuario.fraternidad?.idFraternidad || null
     }
   } else {
     const rolDefault = roles.value.find(r => r.nombre === props.rolFiltro)
@@ -406,7 +434,8 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       idUsuario: null,
       ci: '', nombres: '', primerApellido: '', segundoApellido: '',
       password: '', idRol: rolDefault?.idRol || '',
-      tipoJurado: 'EFU', fasesIds: [], fraternidadesIds: []
+      tipoJurado: 'EFU', fasesIds: [], fraternidadesIds: [],
+      idFraternidad: null
     }
   }
   modalOpen.value = true

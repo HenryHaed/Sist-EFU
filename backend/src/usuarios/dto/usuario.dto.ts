@@ -36,6 +36,11 @@ export class CreateUsuarioDto {
   @IsNumber()
   @IsNotEmpty()
   idRol: number;
+
+  @ApiProperty({ example: 1, required: false, description: 'SÍ el usuario es delegado, ID de su fraternidad' })
+  @IsNumber()
+  @IsOptional()
+  idFraternidad?: number;
 }
 
 export class UpdateUsuarioDto {
@@ -73,4 +78,9 @@ export class UpdateUsuarioDto {
   @IsNumber()
   @IsOptional()
   idRol?: number;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  idFraternidad?: number;
 }

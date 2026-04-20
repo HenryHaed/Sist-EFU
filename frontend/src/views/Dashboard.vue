@@ -88,6 +88,16 @@
             </button>
 
             <button
+              v-if="can('fraternidades')"
+              @click="setVista('organizacion_crud')"
+              :class="vistaActual === 'organizacion_crud' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'organizacion_crud' ? 'text-secondary' : 'text-slate-400'">account_balance</span>
+              <span class="text-sm">Organización</span>
+            </button>
+
+            <button
               v-if="can('reglamento')"
               class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
             >
@@ -338,12 +348,13 @@
               />
             </div>
 
-            <div v-else-if="vistaActual === 'wizard_concurso' && activeFaseJurado && activeFraternidadJurado" key="wizard_concurso">
+            <div v-else-if="vistaActual === 'wizard_concurso' && activeFaseJurado" key="wizard_concurso">
                <AsistenteContent 
                  :fase-seleccionada="activeFaseJurado" 
                  :fraternidad="activeFraternidadJurado" 
                  :participanteNombre="activeParticipanteNombre"
                  :participanteTipo="activeParticipanteTipo"
+                 :participanteId="activeParticipanteId"
                  @volver="vistaActual = 'listado_competidores'"
                  @finalizar="manejarFinalizacion"
                />
@@ -359,6 +370,11 @@
             <FraternidadesCRUDView
               v-else-if="vistaActual === 'fraternidades_crud'"
               key="fraternidades_crud"
+            />
+
+            <OrganizacionCRUDView
+              v-else-if="vistaActual === 'organizacion_crud'"
+              key="organizacion_crud"
             />
 
             <!-- Vista: Usuarios CRUD Múltiple (Filtrado por rolFiltro) -->
@@ -462,6 +478,7 @@ import FraternidadesCRUDView from './FraternidadesCRUDView.vue'
 import UsuariosCRUDView from './UsuariosCRUDView.vue'
 import ListadoCompetidoresView from './ListadoCompetidoresView.vue'
 import DelegadoParticipantesView from './DelegadoParticipantesView.vue'
+import OrganizacionCRUDView from './OrganizacionCRUDView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -479,6 +496,7 @@ const activeFaseJurado = ref(null)
 const activeFraternidadJurado = ref(null)
 const activeParticipanteNombre = ref(null)
 const activeParticipanteTipo = ref(null)
+const activeParticipanteId = ref(null)
 
 // Control Cambio Password Primer Login
 const mostrarModalPass = ref(false)
@@ -572,6 +590,7 @@ const tituloVista = computed(() => {
     wizard: 'Evaluación de Fraternidad',
     wizard_concurso: 'Evaluación de Concurso',
     gestion_fases: 'Gestiones Anuales',
+    organizacion_crud: 'Gestión de Facultades y Carreras',
     gestion_fases_detalle: gestionSeleccionada.value ? `Gestión ${gestionSeleccionada.value.anio} — Fases` : 'Fases de Evaluación',
     gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
   }
@@ -606,17 +625,21 @@ const entrarFaseConcurso = (fase) => {
   vistaActual.value = 'listado_competidores'
 }
 
-const iniciarWizard = (fraternidad) => {
-  activeFraternidadJurado.value = fraternidad
+const iniciarWizard = (data) => {
+  // data viene del emit de ListadoEvaluacionFaseView: { fase, fraternidad, ... }
+  activeFraternidadJurado.value = data.fraternidad
   activeParticipanteNombre.value = null
   activeParticipanteTipo.value = null
+  activeParticipanteId.value = null
   vistaActual.value = 'wizard'
 }
 
-const iniciarWizardConcurso = ({ fraternidad, participanteNombre, participanteTipo }) => {
-  activeFraternidadJurado.value = fraternidad
+const iniciarWizardConcurso = ({ idParticipante, participanteNombre, participanteTipo, idFraternidad, fraternidadNombre }) => {
+  activeParticipanteId.value = idParticipante
   activeParticipanteNombre.value = participanteNombre
   activeParticipanteTipo.value = participanteTipo
+  // Opcional: cargar fraternidad si existe
+  activeFraternidadJurado.value = idFraternidad ? { idFraternidad, nombre: fraternidadNombre } : null
   vistaActual.value = 'wizard_concurso'
 }
 

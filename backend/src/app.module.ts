@@ -5,6 +5,8 @@ import { AuthModule } from './auth/auth.module';
 import { FraternidadesModule } from './fraternidades/fraternidades.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
+import { ParticipantesModule } from './participantes/participantes.module';
+import { OrganizacionModule } from './organizacion/organizacion.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
     FraternidadesModule,
     UsuariosModule,
     EvaluacionesModule,
+    ParticipantesModule,
+    OrganizacionModule,
   ],
 })
 export class AppModule {}

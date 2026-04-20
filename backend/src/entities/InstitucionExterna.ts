@@ -9,6 +9,9 @@ export class InstitucionExterna {
     @Column({ length: 255, unique: true })
     nombre: string;
 
+    @Column({ length: 20, nullable: true })
+    sigla: string;
+
     @Column({ name: 'tipo_institucion', length: 100, nullable: true })
     tipoInstitucion: string;
 
