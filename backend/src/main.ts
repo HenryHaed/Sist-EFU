@@ -7,10 +7,6 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Servir archivos estáticos (para las imágenes subidas)
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads/',
-  });
 
   // Prefijo global para todas las rutas: /api/v1
   app.setGlobalPrefix('api/v1');

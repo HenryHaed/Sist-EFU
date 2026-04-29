@@ -47,16 +47,36 @@ export class UsuariosService {
     return user;
   }
 
-  // Obtener perfil de jurado de un usuario (incluye fases y fraternidades habilitadas)
+  // Obtener perfil de jurado (incluye fases EFU y EXTERNAS separadas)
   async findPerfilJurado(idUsuario: number) {
-    return this.juradoRepo.findOne({
+    const perfil = await this.juradoRepo.findOne({
       where: { usuario: { idUsuario } },
       relations: ['fasesHabilitadas', 'fraternidadesHabilitadas'],
     });
+    if (!perfil) return null;
+
+    // Separar fases por tipo para el frontend
+    const fasesEfu = perfil.fasesHabilitadas?.filter(f => f.tipoConcurso === 'EFU') || [];
+    const fasesExternas = perfil.fasesHabilitadas?.filter(f => f.tipoConcurso === 'EXTERNO') || [];
+
+    return {
+      ...perfil,
+      fasesEfu,
+      fasesExternas,
+      esEfu: fasesEfu.length > 0 || perfil.tipoJurado === 'EFU' || perfil.tipoJurado === 'AMBOS',
+      esExterno: fasesExternas.length > 0 || perfil.tipoJurado === 'EXTERNO' || perfil.tipoJurado === 'AMBOS',
+    };
   }
 
-  async create(createDto: CreateUsuarioDto & { tipoJurado?: string; fasesIds?: number[]; fraternidadesIds?: number[] }) {
-    const { idRol, password, tipoJurado, fasesIds, fraternidadesIds, idFraternidad, ...data } = createDto as any;
+  async create(createDto: CreateUsuarioDto & {
+    tipoJurado?: string;
+    fasesEfuIds?: number[];
+    fasesExternasIds?: number[];
+    fasesIds?: number[];
+    fraternidadesIds?: number[];
+    idFraternidad?: number;
+  }) {
+    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, ...data } = createDto as any;
 
     const role = await this.roleRepo.findOne({ where: { idRol } });
     if (!role) throw new BadRequestException('Rol no válido');
@@ -77,7 +97,7 @@ export class UsuariosService {
     try {
       savedUser = (await this.usuarioRepo.save(newUser as any)) as unknown as Usuario;
     } catch (error) {
-      if (error.code === '23505' || error.errno === 1062 || error.code === 'SQLITE_CONSTRAINT') {
+      if (error.code === '23505' || error.errno === 1062) {
         throw new BadRequestException('El CI ya se encuentra registrado');
       }
       throw error;
@@ -85,15 +105,24 @@ export class UsuariosService {
 
     // Auto-crear perfil de Jurado si el rol es 'jurado'
     if (role.nombre === 'jurado') {
-      await this.crearOActualizarPerfilJurado(savedUser, tipoJurado || 'EFU', fasesIds || [], fraternidadesIds || []);
+      const allFasesIds = this.mergeAndDedupe(fasesEfuIds || [], fasesExternasIds || [], fasesIds || []);
+      const resolvedTipo = this.resolvetipoJurado(tipoJurado, fasesEfuIds || [], fasesExternasIds || []);
+      await this.crearOActualizarPerfilJurado(savedUser, resolvedTipo, allFasesIds, fraternidadesIds || []);
     }
 
     return savedUser;
   }
 
-  async update(id: number, updateDto: UpdateUsuarioDto & { tipoJurado?: string; fasesIds?: number[]; fraternidadesIds?: number[] }) {
+  async update(id: number, updateDto: UpdateUsuarioDto & {
+    tipoJurado?: string;
+    fasesEfuIds?: number[];
+    fasesExternasIds?: number[];
+    fasesIds?: number[];
+    fraternidadesIds?: number[];
+    idFraternidad?: number;
+  }) {
     const user = await this.findOne(id);
-    const { idRol, password, tipoJurado, fasesIds, fraternidadesIds, idFraternidad, ...data } = updateDto as any;
+    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, ...data } = updateDto as any;
 
     let updateData: any = { ...data };
 
@@ -109,7 +138,7 @@ export class UsuariosService {
     }
 
     if (idFraternidad) {
-      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad: idFraternidad } });
+      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
       if (frat) user.fraternidad = frat;
     } else if (idFraternidad === null) {
       user.fraternidad = null;
@@ -121,7 +150,7 @@ export class UsuariosService {
     try {
       savedUser = await this.usuarioRepo.save(user);
     } catch (error) {
-      if (error.code === '23505' || error.errno === 1062 || error.code === 'SQLITE_CONSTRAINT') {
+      if (error.code === '23505' || error.errno === 1062) {
         throw new BadRequestException('El CI ya se encuentra registrado por otro usuario');
       }
       throw error;
@@ -129,15 +158,38 @@ export class UsuariosService {
 
     // Si el rol resultante es jurado, actualizar o crear su perfil
     const rolFinal = rolActualizado || user.rol;
-    if (rolFinal?.nombre === 'jurado' && (tipoJurado !== undefined || fasesIds !== undefined || fraternidadesIds !== undefined)) {
-      await this.crearOActualizarPerfilJurado(savedUser, tipoJurado || 'EFU', fasesIds || [], fraternidadesIds || []);
+    const tieneUpdateJurado = tipoJurado !== undefined || fasesEfuIds !== undefined || fasesExternasIds !== undefined || fasesIds !== undefined || fraternidadesIds !== undefined;
+    if (rolFinal?.nombre === 'jurado' && tieneUpdateJurado) {
+      const allFasesIds = this.mergeAndDedupe(fasesEfuIds || [], fasesExternasIds || [], fasesIds || []);
+      const resolvedTipo = this.resolvetipoJurado(tipoJurado, fasesEfuIds || [], fasesExternasIds || []);
+      await this.crearOActualizarPerfilJurado(savedUser, resolvedTipo, allFasesIds, fraternidadesIds || []);
     }
 
     return savedUser;
   }
 
+  // HELPER: Determinar el tipo correcto según las fases seleccionadas
+  private resolvetipoJurado(tipoJurado: string | undefined, fasesEfuIds: number[], fasesExternasIds: number[]): string {
+    const tieneEfu = fasesEfuIds.length > 0;
+    const tieneExternas = fasesExternasIds.length > 0;
+    if (tieneEfu && tieneExternas) return 'AMBOS';
+    if (tieneExternas) return 'EXTERNO';
+    if (tieneEfu) return 'EFU';
+    return tipoJurado || 'EFU';
+  }
+
+  // HELPER: Combinar y deduplicar arrays de IDs
+  private mergeAndDedupe(...arrays: number[][]): number[] {
+    return [...new Set(arrays.flat())];
+  }
+
   // HELPER: crea o actualiza el perfil Jurado para un usuario
-  private async crearOActualizarPerfilJurado(usuario: Usuario, tipoJurado: string, fasesIds: number[], fraternidadesIds: number[]) {
+  private async crearOActualizarPerfilJurado(
+    usuario: Usuario,
+    tipoJurado: string,
+    fasesIds: number[],
+    fraternidadesIds: number[]
+  ) {
     const gestion = await this.gestionRepo.findOne({ where: { activa: true } });
     if (!gestion) return; // Sin gestión activa no se puede asignar
 
@@ -150,7 +202,7 @@ export class UsuariosService {
       perfil = this.juradoRepo.create({
         usuario,
         gestion,
-        tipoOrigen: 'Registro',
+        tipoOrigen: 'Registro Administrativo',
         tipoJurado,
         fasesHabilitadas: [],
         fraternidadesHabilitadas: [],
@@ -160,22 +212,60 @@ export class UsuariosService {
       perfil.gestion = gestion;
     }
 
-    // Asignar fases habilitadas según los IDs recibidos
+    // Asignar TODAS las fases habilitadas (EFU + EXTERNAS juntas)
     if (fasesIds.length > 0) {
       perfil.fasesHabilitadas = await this.faseRepo.findBy({ idFase: In(fasesIds) });
     } else {
       perfil.fasesHabilitadas = [];
     }
 
-    // Asignar fraternidades habilitadas según los IDs recibidos
-    // REGLA: Si es jurado EXTERNO, no puede tener fraternidades asignadas
+    // Solo asignar fraternidades para jurados EFU o AMBOS
     if (tipoJurado !== 'EXTERNO' && fraternidadesIds.length > 0) {
       perfil.fraternidadesHabilitadas = await this.fraternidadRepo.findBy({ idFraternidad: In(fraternidadesIds) });
-    } else {
+    } else if (tipoJurado === 'EXTERNO') {
       perfil.fraternidadesHabilitadas = [];
     }
 
     await this.juradoRepo.save(perfil);
+  }
+
+  // Asignar jurados directamente a una fase (llamado desde GestionFasesView)
+  async asignarJuradosAFase(idFase: number, juradoIds: number[]) {
+    const fase = await this.faseRepo.findOne({ where: { idFase } });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+
+    const todosJurados = await this.juradoRepo.find({
+      relations: ['fasesHabilitadas'],
+    });
+
+    for (const jurado of todosJurados) {
+      const debeTener = juradoIds.includes(jurado.idJurado);
+      const tieneFase = jurado.fasesHabilitadas.some(f => f.idFase === idFase);
+
+      if (debeTener && !tieneFase) {
+        jurado.fasesHabilitadas.push(fase);
+        await this.juradoRepo.save(jurado);
+      } else if (!debeTener && tieneFase) {
+        jurado.fasesHabilitadas = jurado.fasesHabilitadas.filter(f => f.idFase !== idFase);
+        await this.juradoRepo.save(jurado);
+      }
+    }
+
+    return { success: true, fase: idFase, juradosAsignados: juradoIds.length };
+  }
+
+  // Obtener todos los jurados disponibles (para asignación en fases)
+  async findAllJurados() {
+    const jurados = await this.juradoRepo.find({
+      relations: ['usuario', 'fasesHabilitadas'],
+    });
+    return jurados.map(j => ({
+      idJurado: j.idJurado,
+      tipoJurado: j.tipoJurado,
+      fasesHabilitadas: j.fasesHabilitadas,
+      nombre: j.usuario ? `${j.usuario.nombres} ${j.usuario.primerApellido}` : 'Sin usuario',
+      ci: j.usuario?.ci || '',
+    }));
   }
 
   async remove(id: number) {

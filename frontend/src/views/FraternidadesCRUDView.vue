@@ -33,7 +33,7 @@
         <p class="text-lg">No hay fraternidades registradas.</p>
       </div>
 
-      <div v-else class="overflow-x-auto">
+      <div v-else class="hidden md:block overflow-x-auto">
         <table class="w-full text-left">
           <thead>
             <tr class="bg-slate-50/50 border-b border-slate-100">
@@ -94,6 +94,58 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Vista Mobile (Tarjetas) -->
+      <div class="md:hidden p-4 space-y-4">
+        <div v-for="f in fraternidades" :key="f.idFraternidad + '_mobile'" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden">
+          
+          <div class="absolute left-0 top-0 bottom-0 w-1.5" :class="f.habilitadoEfu ? 'bg-green-500' : 'bg-red-500'"></div>
+
+          <div class="flex items-start gap-3 pl-2">
+            <div v-if="f.logoUrl" class="size-12 rounded-lg overflow-hidden border border-slate-200 shrink-0">
+              <img :src="getFullUrl(f.logoUrl)" :alt="f.nombre" class="w-full h-full object-cover" />
+            </div>
+            <div v-else class="size-12 rounded-lg bg-white border border-slate-200 shrink-0 flex items-center justify-center text-slate-400 font-bold uppercase text-lg">
+              {{ f.nombre.substring(0, 2) }}
+            </div>
+            
+            <div class="flex-1">
+              <p class="font-black text-slate-900 leading-tight mb-1">{{ f.nombre }}</p>
+              <div class="flex flex-wrap gap-1.5 mt-1">
+                <span class="px-2 py-0.5 bg-white text-slate-600 rounded text-[9px] font-black uppercase tracking-wider border border-slate-200">
+                  {{ f.categoria?.nombre || 'General' }}
+                </span>
+                <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter self-center ml-1">{{ f.origenFraternidad }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pl-2 flex flex-col gap-1 text-[10px] text-slate-600 bg-white p-2 rounded-lg border border-slate-100">
+            <p class="text-xs font-bold text-slate-700">
+              {{ f.facultad?.sigla || f.institucionExterna?.sigla || f.institucionExterna?.nombre || '—' }}
+            </p>
+            <p class="text-[9px] text-slate-400 font-medium">
+              {{ f.carrera?.nombre || 'Carrera/Institución' }}
+            </p>
+          </div>
+
+          <div class="pl-2 flex justify-between items-center">
+            <span class="text-[10px] font-black uppercase tracking-widest" :class="f.habilitadoEfu ? 'text-green-600' : 'text-red-600'">
+              {{ f.habilitadoEfu ? 'Activa' : 'Inactiva' }}
+            </span>
+            
+            <div class="flex gap-2">
+              <button @click="editarFraternidad(f)" class="size-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 shadow-sm">
+                <span class="material-symbols-outlined text-[16px]">edit</span>
+              </button>
+              <button @click="confirmarBorrar(f)" class="size-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-secondary shadow-sm">
+                <span class="material-symbols-outlined text-[16px]">delete</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
 
@@ -223,6 +275,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import api from '../services/api'
+import { notify } from '../utils/notify'
 
 const fraternidades = ref([])
 const loading = ref(true)
@@ -272,7 +325,7 @@ const uploadFile = async (file) => {
     form.value.logoUrl = response.data.url
   } catch (error) {
     console.error('Error al subir archivo:', error)
-    alert('Error al subir la imagen. Intenta con otro formato.')
+    notify.error('Error al subir la imagen', 'Intenta con otro formato.')
   } finally {
     uploading.value = false
   }
@@ -376,7 +429,7 @@ const editarFraternidad = async (fraternidad) => {
 
 const guardar = async () => {
   if (!form.value.nombre) {
-    alert('Ingresa el nombre de la fraternidad')
+    notify.error('Faltan datos', 'Ingresa el nombre de la fraternidad')
     return
   }
 
@@ -398,19 +451,24 @@ const guardar = async () => {
       await api.post('/fraternidades', payload)
     }
     modalAbierto.value = false
+    notify.success('¡Guardado!', `Fraternidad ${editando.value ? 'actualizada' : 'registrada'} correctamente.`)
     cargarDatos()
   } catch (error) {
     console.error('Error al guardar:', error)
+    notify.error('Error', 'No se pudo guardar la fraternidad.')
   }
 }
 
 const confirmarBorrar = async (f) => {
-  if (confirm(`¿Estás seguro de eliminar la fraternidad "${f.nombre}"?`)) {
+  const r = await notify.confirm('¿Eliminar fraternidad?', `¿Estás seguro de eliminar "${f.nombre}"? Esta acción no se puede deshacer.`, 'Sí, eliminar')
+  if (r.isConfirmed) {
     try {
       await api.delete(`/fraternidades/${f.idFraternidad}`)
+      notify.success('Eliminado', 'La fraternidad ha sido removida del listado.')
       cargarDatos()
     } catch (error) {
       console.error('Error al borrar:', error)
+      notify.error('Error', 'No se pudo eliminar la fraternidad.')
     }
   }
 }

@@ -86,7 +86,7 @@
               <!-- Imagen con fallback a textura andina si no hay -->
               <img 
                 v-if="criterioActual.urlImagen" 
-                :src="criterioActual.urlImagen" 
+                :src="getImageUrl(criterioActual.urlImagen)" 
                 class="w-full h-full object-cover" 
                 alt="Imagen Criterio" 
               />
@@ -122,6 +122,8 @@
                         v-model.number="formValues[criterioActual.idCriterio]" 
                         min="0" 
                         :max="Number(criterioActual.puntajeMaximo)"
+                        @input="validarPuntaje(criterioActual)"
+                        @blur="validarPuntaje(criterioActual)"
                         class="w-24 px-3 py-2 bg-white border-2 border-slate-300 text-primary font-black text-2xl text-center rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
                         :disabled="estadoOriginal === 'COMPLETADO'"
                       />
@@ -162,11 +164,11 @@
                     <button 
                       v-if="estadoOriginal !== 'COMPLETADO'"
                       @click="guardar(false)" 
-                      :disabled="saving"
+                      :disabled="saving || tiempoRestante <= 0"
                       class="flex items-center gap-2 px-6 py-4 rounded-xl bg-white border-2 border-primary text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary/5 transition-all shadow-sm"
                     >
                       <span class="material-symbols-outlined text-lg" :class="{'animate-spin': saving}">sync</span>
-                      <span class="hidden sm:inline">Guardar</span>
+                      <span class="hidden sm:inline">{{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Guardar' }}</span>
                     </button>
 
                     <!-- Next or Finish -->
@@ -182,10 +184,11 @@
                     <button 
                       v-else-if="estadoOriginal !== 'COMPLETADO'"
                       @click="abrirResumenModal"
-                      class="flex-1 max-w-[220px] flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-secondary text-white font-black uppercase text-[10px] tracking-widest hover:bg-red-800 transition-all shadow-lg shadow-secondary/30 border-b-4 border-red-900 active:border-b-0 active:translate-y-1"
+                      :disabled="tiempoRestante <= 0"
+                      class="flex-1 max-w-[220px] flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-secondary text-white font-black uppercase text-[10px] tracking-widest hover:bg-red-800 transition-all shadow-lg shadow-secondary/30 border-b-4 border-red-900 active:border-b-0 active:translate-y-1 disabled:bg-slate-200 disabled:text-slate-400 disabled:border-transparent"
                     >
-                      <span class="material-symbols-outlined text-lg">verified</span>
-                      Sellar Acta
+                      <span class="material-symbols-outlined text-lg">{{ tiempoRestante <= 0 ? 'lock' : 'verified' }}</span>
+                      {{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Sellar Acta' }}
                     </button>
                   </div>
                 </div>
@@ -236,7 +239,7 @@
                 <!-- Mini Imagen Próximo -->
                 <img 
                   v-if="criterioSiguiente.urlImagen"
-                  :src="criterioSiguiente.urlImagen" 
+                  :src="getImageUrl(criterioSiguiente.urlImagen)" 
                   class="w-full h-full object-cover grayscale mix-blend-multiply group-hover:grayscale-0 group-hover:mix-blend-normal transition-all duration-500"
                 />
                 <div v-else class="w-full h-full andean-pattern flex items-center justify-center opacity-60">
@@ -284,15 +287,15 @@
     </main>
 
     <!-- MODAL RESUMEN FINAL -->
-    <v-dialog v-model="modalResumen" max-width="500px" persistent>
+    <v-dialog v-model="modalResumen" max-width="500px" persistent scrollable>
       <v-card class="rounded-3xl border-4 border-secondary overflow-hidden">
-        <v-card-title class="bg-secondary text-white pa-6 text-center flex flex-col items-center">
+        <v-card-title class="bg-secondary text-white pa-6 text-center flex flex-col items-center shrink-0">
           <span class="material-symbols-outlined text-5xl mb-2 opacity-90">verified_user</span>
           <h3 class="text-2xl font-black italic uppercase tracking-tighter shadow-sm">Confirmar Acta</h3>
           <p class="text-xs text-white/80 font-medium tracking-wide mt-1 uppercase">Revisión Final de Calificaciones</p>
         </v-card-title>
         
-        <v-card-text class="pa-0 bg-slate-50">
+        <v-card-text class="pa-0 bg-slate-50 flex-grow-1 overflow-y-auto" style="max-height: 60vh;">
           <!-- Total grande -->
           <div class="bg-white border-b border-slate-200 p-8 text-center flex flex-col items-center">
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje Total Calculado</p>
@@ -305,7 +308,7 @@
           <!-- Desglose -->
           <div class="p-6">
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Desglose por Criterio</p>
-            <div class="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+            <div class="space-y-2">
               <div v-for="(c, idx) in criterios" :key="c.idCriterio" class="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl">
                 <div class="flex items-center gap-3">
                   <span class="size-6 bg-slate-100 text-slate-500 rounded font-black text-xs flex items-center justify-center">{{ idx + 1 }}</span>
@@ -344,8 +347,19 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { notify } from '../utils/notify'
 import Swal from 'sweetalert2'
 import api from '../services/api'
+
+const getImageUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  const filename = url.split('/').pop()
+  // Detectar si es imagen de criterio o de fase por el prefijo del archivo
+  const endpoint = filename.startsWith('criterio-') ? 'criterios' : 'fases'
+  return `${api.defaults.baseURL}/archivos/${endpoint}/${filename}`
+}
+
 
 const props = defineProps({
   faseSeleccionada: {
@@ -424,12 +438,45 @@ const cargarDatos = async () => {
         Object.keys(jsonb).forEach(key => { formValues.value[key] = jsonb[key] })
       }
     }
-    iniciarCronometro(new Date(props.faseSeleccionada.fechaFin))
+    
+    const parseSafeDate = (d, isEnd = true) => {
+      if (!d) return null
+      const datePart = typeof d === 'string' ? d.split('T')[0].split(' ')[0] : ''
+      if (!datePart) return new Date(d)
+      const parts = datePart.split('-')
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10)
+        const month = parseInt(parts[1], 10) - 1
+        const day = parseInt(parts[2], 10)
+        if (isEnd) return new Date(year, month, day, 23, 59, 59, 999)
+        return new Date(year, month, day, 0, 0, 0, 0)
+      }
+      return new Date(d)
+    }
+
+    const fechaFin = parseSafeDate(props.faseSeleccionada?.fechaFin, true)
+    if (fechaFin) {
+      iniciarCronometro(fechaFin)
+    }
   } catch (error) {
-    Swal.fire('Error', 'Problema al cargar la evaluación.', 'error')
+    notify.error('Error', 'Problema al cargar la evaluación.')
     emit('volver')
   } finally {
     loading.value = false
+  }
+}
+
+const validarPuntaje = (criterio) => {
+  const id = criterio.idCriterio
+  let val = formValues.value[id]
+  const max = Number(criterio.puntajeMaximo)
+  
+  if (val === null || val === undefined || val === '') return
+
+  if (isNaN(val) || val < 0) {
+    formValues.value[id] = 0
+  } else if (val > max) {
+    formValues.value[id] = max
   }
 }
 
@@ -456,11 +503,11 @@ const abrirResumenModal = () => {
   })
 
   if (sinLlenar) {
-    Swal.fire('Atención', 'Asegúrate de llenar todos los criterios antes de finalizar.', 'warning')
+    notify.warning('Atención', 'Asegúrate de llenar todos los criterios antes de finalizar.')
     return
   }
   if (superaLimites) {
-    Swal.fire('Error', 'Existen puntajes fuera del rango permitido.', 'error')
+    notify.error('Error', 'Existen puntajes fuera del rango permitido.')
     return
   }
   
@@ -498,23 +545,15 @@ const guardar = async (finalizar = false) => {
     })
 
     if (finalizar) {
-      Swal.fire({
-        icon: 'success',
-        title: 'Acta Cerrada',
-        text: 'La calificación oficializó correctamente.',
-        confirmButtonColor: '#003399'
-      })
+      notify.success('Acta Cerrada', 'La calificación se oficializó correctamente.')
       estadoOriginal.value = 'COMPLETADO'
       emit('finalizar', { promedio: puntajeCalculado.value })
     } else {
-      const Toast = Swal.mixin({
-        toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, timerProgressBar: true
-      })
-      Toast.fire({ icon: 'success', title: 'Progreso auto-guardado' })
+      notify.success('Progreso Guardado', 'Los cambios se almacenaron como borrador.')
       estadoOriginal.value = 'EN_PROGRESO'
     }
   } catch (error) {
-    Swal.fire('Error', error.response?.data?.message || 'Fallo el guardado', 'error')
+    notify.error('Error', error.response?.data?.message || 'Falló el guardado')
   } finally {
     saving.value = false
   }
@@ -522,19 +561,23 @@ const guardar = async (finalizar = false) => {
 
 // Timer
 const iniciarCronometro = (fechaFin) => {
+  if (!fechaFin || isNaN(fechaFin.getTime())) return
   const actualizar = () => {
-    tiempoRestante.value = Math.max(0, fechaFin.getTime() - new Date().getTime())
+    const agora = new Date().getTime()
+    const fin = fechaFin.getTime()
+    tiempoRestante.value = Math.max(0, fin - agora)
   }
   actualizar()
   timerInterval = setInterval(actualizar, 1000)
 }
 const countdownText = computed(() => {
-  if (tiempoRestante.value <= 0) return 'FINALIZADO'
+  if (isNaN(tiempoRestante.value) || tiempoRestante.value <= 0) return 'FINALIZADO'
   const horas = Math.floor(tiempoRestante.value / (1000 * 60 * 60))
   const min = Math.floor((tiempoRestante.value % (1000 * 60 * 60)) / (1000 * 60))
   return `${horas} H / ${min} M`
 })
 const urgenciaStatus = computed(() => {
+  if (isNaN(tiempoRestante.value)) return { textClass: 'text-slate-400 bg-slate-50' }
   const horas = Math.floor(tiempoRestante.value / (1000 * 60 * 60))
   if (horas < 1) return { textClass: 'text-secondary bg-red-50' }
   return { textClass: 'text-primary bg-blue-50' }

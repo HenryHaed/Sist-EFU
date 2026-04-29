@@ -1,9 +1,15 @@
 <template>
   <div class="p-6 md:p-8 max-w-5xl mx-auto">
     <!-- Header -->
-    <div class="mb-8">
-      <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">Gestiones Anuales</h2>
-      <p class="text-slate-500 text-sm mt-1">Selecciona una gestión para administrar sus fases de evaluación.</p>
+    <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">Gestiones Anuales</h2>
+        <p class="text-slate-500 text-sm mt-1">Selecciona una gestión para administrar sus fases de evaluación.</p>
+      </div>
+      <button @click="abrirModalNuevaGestion" class="bg-primary text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-primary/20 hover:bg-blue-900 transition-all flex items-center gap-2">
+        <span class="material-symbols-outlined">add_circle</span>
+        NUEVA GESTIÓN
+      </button>
     </div>
 
     <!-- Cargando -->
@@ -26,7 +32,8 @@
           <span class="size-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
           Activa
         </div>
-        <div v-else class="absolute top-4 right-4 bg-slate-100 text-slate-500 border border-slate-200 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+        <div v-else class="absolute top-4 right-4 flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+          <span class="material-symbols-outlined text-[11px]">lock</span>
           Histórica
         </div>
 
@@ -70,23 +77,78 @@
           </div>
         </div>
 
-        <!-- CTA -->
-        <div class="mt-5 flex items-center gap-2 text-primary font-black text-sm group-hover:gap-3 transition-all">
-          <span>Ver Fases</span>
-          <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+        <!-- CTA & Actions -->
+        <div class="mt-5 flex items-center justify-between border-t border-slate-50 pt-4">
+          <div class="flex items-center gap-2 font-black text-sm group-hover:gap-3 transition-all"
+            :class="g.activa ? 'text-primary' : 'text-slate-400'">
+            <span class="material-symbols-outlined text-[18px]">{{ g.activa ? 'arrow_forward' : 'visibility' }}</span>
+            <span>{{ g.activa ? 'Gestionar' : 'Ver Historial' }}</span>
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <button @click.stop="activarGestion(g)" class="size-8 bg-slate-50 text-slate-500 hover:bg-primary hover:text-white rounded-lg flex items-center justify-center transition-all shadow-sm group/btn" :title="g.activa ? 'Configurar Gestión' : 'Configurar y Activar'">
+              <span class="material-symbols-outlined text-[18px]">settings_suggest</span>
+            </button>
+            <button @click.stop="eliminarGestion(g)" class="size-8 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white rounded-lg flex items-center justify-center transition-all shadow-sm" title="Eliminar Gestión">
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- MODAL NUEVA GESTION -->
+    <v-dialog v-model="modalOpen" max-width="450px">
+      <v-card class="rounded-3xl">
+        <v-card-title class="bg-slate-800 text-white pa-6">
+          <h3 class="text-lg font-black italic uppercase tracking-tighter">Crear Gestión</h3>
+          <p class="text-slate-300 text-[10px] uppercase tracking-widest mt-0.5">Configura una nueva temporada</p>
+        </v-card-title>
+        <v-card-text class="pa-6 space-y-5">
+          <div>
+            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Año de la Gestión</label>
+            <input v-model="form.anio" type="number" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary outline-none font-bold transition-all" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Lema o Tenor</label>
+            <textarea v-model="form.lema" rows="2" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary outline-none text-sm transition-all resize-none"></textarea>
+          </div>
+          <div class="p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between">
+            <div>
+              <p class="text-xs font-black text-blue-800 uppercase">Establecer Activa</p>
+              <p class="text-[9px] text-blue-600 uppercase font-bold">Inactivará la gestión actual</p>
+            </div>
+            <input type="checkbox" v-model="form.activa" class="size-5 accent-primary cursor-pointer" />
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-4 border-t border-slate-100 bg-slate-50">
+          <v-spacer></v-spacer>
+          <button @click="modalOpen = false" class="px-4 py-2 text-slate-500 font-bold text-sm hover:text-slate-800 transition-colors">Cancelar</button>
+          <button @click="guardarGestion" :disabled="saving" class="px-6 py-2 bg-primary text-white rounded-xl font-black text-sm shadow-lg shadow-primary/20 hover:bg-blue-900 transition-all">
+            {{ saving ? 'Guardando...' : 'Crear Gestión' }}
+          </button>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '../services/api'
+import { notify } from '../utils/notify'
 
-const emit = defineEmits(['seleccionar-gestion'])
+const emit = defineEmits(['seleccionar-gestion', 'ir-ajustes-gestion'])
 const gestiones = ref([])
 const cargando = ref(true)
+
+const modalOpen = ref(false)
+const saving = ref(false)
+const form = ref({
+  anio: new Date().getFullYear(),
+  lema: '',
+  activa: true
+})
 
 const cargar = async () => {
   cargando.value = true
@@ -98,6 +160,73 @@ const cargar = async () => {
 }
 
 const abrirGestion = (g) => emit('seleccionar-gestion', g)
+
+const abrirModalNuevaGestion = () => {
+  form.value = { anio: new Date().getFullYear(), lema: '', activa: true }
+  modalOpen.value = true
+}
+
+const guardarGestion = async () => {
+  if (!form.value.anio) return notify.error('Error', 'El año es obligatorio')
+  saving.value = true
+  try {
+    await api.post('/evaluaciones/gestiones', form.value)
+    modalOpen.value = false
+    notify.success('Creado', 'Gestión creada correctamente')
+    cargar()
+  } catch (e) {
+    notify.error('Error', 'No se pudo crear la gestión')
+  } finally {
+    saving.value = false
+  }
+}
+
+const activarGestion = (g) => {
+  emit('ir-ajustes-gestion', g.idGestion)
+}
+
+const eliminarGestion = async (g) => {
+  let timerInterval
+  notify.confirm(
+    '¿Estás absolutamente seguro?',
+    `Esta acción eliminará permanentemente la Gestión ${g.anio} y TODAS sus fases, criterios y evaluaciones asociadas. Esta acción NO se puede deshacer.`,
+    'Eliminar permanentemente',
+    {
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Eliminar (10s)',
+      didOpen: () => {
+        const confirmBtn = notify.swal.getConfirmButton()
+        confirmBtn.disabled = true
+        let seconds = 10
+        timerInterval = setInterval(() => {
+          seconds--
+          confirmBtn.innerText = `Eliminar (${seconds}s)`
+          if (seconds <= 0) {
+            confirmBtn.disabled = false
+            confirmBtn.innerText = 'Eliminar permanentemente'
+            clearInterval(timerInterval)
+          }
+        }, 1000)
+      },
+      willClose: () => {
+        clearInterval(timerInterval)
+      }
+    }
+  ).then(async (result) => {
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/evaluaciones/gestiones/${g.idGestion}`)
+        notify.success('Eliminado', `La gestión ${g.anio} ha sido eliminada.`)
+        cargar()
+      } catch (e) {
+        notify.error('Error', 'No se pudo eliminar la gestión. Verifique que no tenga dependencias críticas.')
+      }
+    }
+  })
+}
 
 onMounted(cargar)
 </script>

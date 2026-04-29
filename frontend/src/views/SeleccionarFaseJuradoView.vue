@@ -43,7 +43,7 @@
 
         <div class="h-40 bg-slate-100 relative overflow-hidden">
           <!-- Si no hay urlImagen, usamos degradado -->
-          <img v-if="fase.urlImagen" :src="fase.urlImagen" class="w-full h-full object-cover" />
+          <img v-if="fase.urlImagen" :src="getImageUrl(fase.urlImagen)" class="w-full h-full object-cover" />
           <div v-else class="absolute inset-0 bg-gradient-to-br from-primary to-blue-900 opacity-90"></div>
           
           <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent flex flex-col justify-end p-5">
@@ -75,6 +75,15 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '../services/api'
+
+const getImageUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  
+  const filename = url.split('/').pop()
+  return `${api.defaults.baseURL}/archivos/fases/${filename}`
+}
+
 
 const props = defineProps({
   tipoConcurso: {

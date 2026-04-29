@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #004a99;
+  --color-secondary: #c8102e;
+  --color-primary-umsa: #004a99;
+  --color-secondary-umsa: #c8102e;
+  --color-accent: #ffffff;
+  --color-deep-blue: #002d5a;
+  --color-text-main: #0f172a;
+  --color-text-muted: #64748b;
+  --color-background-light: #ffffff;
+  
+  --font-display: "Inter", "sans-serif";
+}
+
+@layer base {
+  body {
+    @apply text-text-main antialiased min-h-screen m-0 p-0 bg-white;
+    font-family: var(--font-display);
+  }
+}
+
+@utility andean-pattern {
+  background-color: #ffffff;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/src/assets/img/Textura-Andina.png');
+  background-repeat: repeat;
+  background-size: 500px;
+  background-attachment: fixed;
+}
+
+@utility glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+@utility glow-blue {
+  box-shadow: 0 4px 15px rgba(0, 74, 153, 0.2);
+}

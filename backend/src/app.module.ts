@@ -7,6 +7,8 @@ import { UsuariosModule } from './usuarios/usuarios.module';
 import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
 import { ParticipantesModule } from './participantes/participantes.module';
 import { OrganizacionModule } from './organizacion/organizacion.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -27,6 +29,10 @@ import { OrganizacionModule } from './organizacion/organizacion.module';
         entities: [__dirname + '/entities/*{.ts,.js}'],
         synchronize: true,
       }),
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
     }),
     AuthModule,
     FraternidadesModule,

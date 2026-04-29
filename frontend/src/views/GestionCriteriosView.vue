@@ -16,6 +16,7 @@
         <p class="text-slate-500 font-medium text-sm mt-1">Define qué aspectos serán calificados específicamente para esta fase.</p>
       </div>
       <button 
+        v-if="esActiva"
         @click="abrirModal()"
         :disabled="disponiblePuntaje <= 0"
         class="bg-primary hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-black transition-all flex items-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -62,14 +63,17 @@
 
     <!-- Tabla de Criterios (Visual Excellence) -->
     <div class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm transition-all hover:shadow-md">
-      <table class="w-full text-left text-sm whitespace-nowrap">
+      
+      <!-- Vista Desktop (Tabla) -->
+      <div class="hidden md:block overflow-x-auto">
+        <table class="w-full text-left text-sm whitespace-nowrap">
         <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-widest font-black text-[10px]">
           <tr>
             <th class="px-8 py-5">#</th>
             <th class="px-8 py-5">Nombre Criterio</th>
             <th class="px-8 py-5">Peso (Valor)</th>
             <th class="px-8 py-5">Referencia</th>
-            <th class="px-8 py-5 text-right">Acciones</th>
+            <th class="px-8 py-5 text-right" v-if="esActiva">Acciones</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -87,14 +91,14 @@
               </span>
             </td>
             <td class="px-8 py-4">
-               <div v-if="c.urlImagen" class="size-12 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-inner group-hover:scale-110 transition-transform">
-                  <img :src="c.urlImagen" class="size-full object-cover" />
+               <div v-if="c.urlImagen" class="size-12 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-inner group-hover:scale-110 transition-transform cursor-pointer" @click="previsualizarImagen(c.urlImagen)" title="Ver imagen">
+                  <img :src="getImageUrl(c.urlImagen)" class="size-full object-cover" />
                </div>
                <div v-else class="size-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-200">
                   <span class="material-symbols-outlined text-[20px]">image_not_supported</span>
                </div>
             </td>
-            <td class="px-8 py-4 text-right">
+            <td class="px-8 py-4 text-right" v-if="esActiva">
               <div class="flex items-center justify-end gap-2">
                 <button @click="abrirModal(c)" class="size-10 bg-white border border-slate-200 text-slate-600 hover:bg-primary hover:border-primary hover:text-white rounded-xl transition-all shadow-sm">
                   <span class="material-symbols-outlined text-[20px]">edit_note</span>
@@ -114,6 +118,60 @@
           </tr>
         </tbody>
       </table>
+      </div>
+
+      <!-- Vista Mobile (Tarjetas) -->
+      <div class="md:hidden p-4 space-y-4">
+        <div v-if="criterios.length === 0" class="text-center py-10 text-slate-400">
+          <span class="material-symbols-outlined text-5xl mb-3 block opacity-20">rule</span>
+          <p class="font-bold uppercase tracking-widest text-[10px]">Esta fase no tiene criterios asignados todavía.</p>
+          <button @click="abrirModal()" class="mt-4 text-primary font-black uppercase text-[10px] underline tracking-widest hover:text-red-800 transition-colors">Crear primer criterio</button>
+        </div>
+
+        <div v-else v-for="(c, idx) in criterios" :key="c.idCriterio + '_mobile'" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+          <div class="flex gap-4">
+            <div class="flex flex-col items-center justify-center bg-white border border-slate-200 rounded-xl size-12 shrink-0">
+              <span class="text-[10px] font-black text-slate-400">#{{ idx + 1 }}</span>
+            </div>
+            <div class="flex-1 flex flex-col justify-center">
+              <p class="font-bold text-slate-800 text-base leading-tight mb-1">{{ c.nombre }}</p>
+              <div class="flex items-center gap-2">
+                <span class="bg-primary/5 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-black">
+                  {{ Number(c.puntajeMaximo) }}%
+                </span>
+                <span class="text-[9px] uppercase font-black text-slate-400 tracking-widest">Fase: {{ fase?.nombre }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 bg-white p-2 rounded-xl border border-slate-100 mt-1">
+            <div v-if="c.urlImagen" @click="previsualizarImagen(c.urlImagen)" class="size-10 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 shrink-0">
+              <img :src="getImageUrl(c.urlImagen)" class="size-full object-cover" />
+            </div>
+            <div v-else class="size-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 shrink-0">
+              <span class="material-symbols-outlined text-[18px]">image_not_supported</span>
+            </div>
+            <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+              {{ c.urlImagen ? 'Ver Imagen' : 'Sin Referencia' }}
+            </div>
+          </div>
+
+          <!-- Acciones -->
+          <div v-if="esActiva" class="flex items-center gap-2 pt-2 border-t border-slate-200 mt-1">
+            <button @click="abrirModal(c)" class="flex-1 py-2 bg-white text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 flex justify-center shadow-sm">
+              <span class="material-symbols-outlined text-[18px]">edit_note</span>
+            </button>
+            <button @click="eliminar(c)" class="flex-1 py-2 bg-white text-slate-400 hover:text-secondary hover:bg-red-50 rounded-xl border border-slate-200 flex justify-center shadow-sm">
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Banner de solo lectura -->
+    <div v-if="!esActiva" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-amber-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-sm font-bold">
+      <span class="material-symbols-outlined text-xl">history</span>
+      Modo solo lectura — Fase histórica
     </div>
 
     <!-- MODAL CRITERIO (Premium Design) -->
@@ -127,7 +185,7 @@
           <p class="text-blue-200 text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">Configurando parámetros de calificación</p>
         </v-card-title>
 
-        <v-card-text class="p-8 bg-white">
+        <v-card-text class="p-8 bg-white overflow-y-auto max-h-[60vh] custom-scrollbar">
           <div class="space-y-6">
             <div>
               <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fase de Aplicación</label>
@@ -177,8 +235,30 @@
             </div>
 
             <div>
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">URL Imagen Referencial (Opcional)</label>
-              <input v-model="form.urlImagen" type="text" placeholder="https://ejemplo.com/imagen.jpg" class="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none text-xs text-slate-600" />
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Imagen Referencial (.png, .jpg)</label>
+              <div
+                class="w-full relative border-2 border-dashed rounded-xl overflow-hidden group transition-all"
+                :class="archivoPreview || form.urlImagen ? 'border-primary' : 'border-slate-300 hover:border-primary bg-slate-50'"
+              >
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg"
+                  @change="handleFileChange"
+                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <div v-if="archivoPreview || form.urlImagen" class="h-28 w-full relative">
+                  <img :src="archivoPreview || getImageUrl(form.urlImagen)" class="w-full h-full object-cover" />
+                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span class="text-white font-bold text-[10px] uppercase tracking-widest flex items-center gap-2">
+                      <span class="material-symbols-outlined text-[16px]">upload</span> Cambiar Imagen
+                    </span>
+                  </div>
+                </div>
+                <div v-else class="h-28 flex flex-col items-center justify-center text-slate-400 group-hover:text-primary transition-colors">
+                  <span class="material-symbols-outlined text-3xl mb-1">add_photo_alternate</span>
+                  <span class="text-[10px] font-black uppercase tracking-widest">Arrastra o haz clic para subir</span>
+                </div>
+              </div>
             </div>
           </div>
         </v-card-text>
@@ -202,16 +282,49 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
+import { notify } from '../utils/notify'
 import Swal from 'sweetalert2'
 
+const getImageUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  const filename = url.split('/').pop()
+  return `${api.defaults.baseURL}/archivos/criterios/${filename}`
+}
+
+
 const props = defineProps({
-  fase: { type: Object, required: true }
+  fase: { type: Object, required: true },
+  esActiva: { type: Boolean, default: true }
 })
 defineEmits(['volver'])
 
 const criterios = ref([])
 const modalOpen = ref(false)
 const editandoId = ref(null)
+const archivoImagen = ref(null)
+const archivoPreview = ref(null)
+
+const handleFileChange = (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      return notify.error('Formato Inválido', 'Solo se permiten imágenes JPG y PNG')
+    }
+    archivoImagen.value = file
+    archivoPreview.value = URL.createObjectURL(file)
+  }
+}
+
+const previsualizarImagen = (url) => {
+  Swal.fire({
+    imageUrl: getImageUrl(url),
+    imageWidth: '100%',
+    imageAlt: 'Imagen del criterio',
+    showConfirmButton: false,
+    showCloseButton: true,
+  })
+}
 
 const form = ref({ idFase: '', nombre: '', puntajeMaximo: 20, urlImagen: '' })
 
@@ -263,72 +376,60 @@ const abrirModal = (item = null) => {
     form.value = { ...item, idFase: props.fase.idFase, puntajeMaximo: Number(item.puntajeMaximo) }
   } else {
     editandoId.value = null
-    // Sugerir puntaje disponible si es posible
     const sugerido = disponiblePuntaje.value > 0 ? Math.min(20, disponiblePuntaje.value) : 0
     form.value = { idFase: props.fase.idFase, nombre: '', puntajeMaximo: sugerido, urlImagen: '' }
   }
+  archivoImagen.value = null
+  archivoPreview.value = null
   modalOpen.value = true
 }
 
 const guardar = async () => {
-  if (!form.value.idFase) return Swal.fire('Error', 'No hay una fase vinculada.', 'error')
-  if (!form.value.nombre?.trim()) return Swal.fire('Error', 'El nombre del criterio es obligatorio.', 'error')
-  if (form.value.puntajeMaximo <= 0) return Swal.fire('Error', 'El puntaje debe ser mayor a 0%.', 'error')
+  if (!form.value.idFase) return notify.error('Error', 'No hay una fase vinculada.')
+  if (!form.value.nombre?.trim()) return notify.error('Error', 'El nombre del criterio es obligatorio.')
+  if (form.value.puntajeMaximo <= 0) return notify.error('Error', 'El puntaje debe ser mayor a 0%.')
   
   if (puntajeUsadoConActual.value > limiteFase.value) {
     const disp = (limiteFase.value - puntajeUsadoSinActual.value).toFixed(2)
     const extra = props.fase?.tipoConcurso === 'EFU' ? ` (Peso de Fase: ${limiteFase.value}%)` : ''
-    return Swal.fire({
-      title: 'Presupuesto excedido',
-      text: `La suma de criterios de la fase no puede superar el techo permitido${extra}. Solo tienes disponible un ${disp}%.`,
-      icon: 'warning',
-      confirmButtonColor: '#003399'
-    })
+    return notify.warning('Presupuesto excedido', `La suma de criterios de la fase no puede superar el techo permitido${extra}. Solo tienes disponible un ${disp}%.`)
   }
 
   try {
     const payload = { ...form.value, fase: { idFase: form.value.idFase } }
-    delete payload.idFase 
+    delete payload.idFase
+
+    const formData = new FormData()
+    formData.append('data', JSON.stringify(payload))
+    if (archivoImagen.value) {
+      formData.append('imagen', archivoImagen.value)
+    }
 
     if (editandoId.value) {
-      await api.put(`/evaluaciones/criterios/${editandoId.value}`, payload)
+      await api.put(`/evaluaciones/criterios/${editandoId.value}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
     } else {
-      await api.post('/evaluaciones/criterios', payload)
+      await api.post('/evaluaciones/criterios', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
     }
     
     modalOpen.value = false
-    Swal.fire({
-      title: '¡Guardado!',
-      text: 'Criterio configurado correctamente.',
-      icon: 'success',
-      confirmButtonColor: '#003399'
-    })
+    notify.success('¡Guardado!', 'Criterio configurado correctamente.')
     cargarDatos()
   } catch (e) { 
     const msg = e.response?.data?.message || 'No se pudo guardar el criterio.'
-    Swal.fire('Error', msg, 'error') 
+    notify.error('Error', msg) 
   }
 }
 
 const eliminar = async (item) => {
-  const result = await Swal.fire({ 
-    title: '¿Eliminar criterio?', 
-    text: `"${item.nombre}" será borrado de forma permanente y se perderán las calificaciones asociadas.`, 
-    icon: 'warning', 
-    showCancelButton: true,
-    confirmButtonColor: '#d33',
-    cancelButtonColor: '#64748b',
-    confirmButtonText: 'Sí, eliminar',
-    cancelButtonText: 'Cancelar'
-  })
+  const result = await notify.confirm('¿Eliminar criterio?', `"${item.nombre}" será borrado de forma permanente y se perderán las calificaciones asociadas.`, 'Sí, eliminar')
 
   if (result.isConfirmed) {
     try {
       await api.delete(`/evaluaciones/criterios/${item.idCriterio}`)
       cargarDatos()
-      Swal.fire('Eliminado', 'El criterio ha sido removido.', 'success')
+      notify.success('Eliminado', 'El criterio ha sido removido.')
     } catch (e) {
-      Swal.fire('Error', 'No se pudo eliminar el criterio.', 'error')
+      notify.error('Error', 'No se pudo eliminar el criterio.')
     }
   }
 }

@@ -195,7 +195,9 @@
 
             <button
               v-if="can('ajustes')"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
+              @click="setVista('ajustes')"
+              :class="vistaActual === 'ajustes' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all"
             >
               <span class="material-symbols-outlined text-[20px] text-slate-400">settings</span>
               <span class="text-sm">Ajustes</span>
@@ -310,6 +312,7 @@
               v-else-if="vistaActual === 'gestion_fases'"
               key="gestion_fases_maestro"
               @seleccionar-gestion="(g) => { gestionSeleccionada = g; vistaActual = 'gestion_fases_detalle' }"
+              @ir-ajustes-gestion="(id) => { gestionParaAjustes = id; vistaActual = 'ajustes' }"
             />
 
             <!-- Vista: Fases de una Gestión (Admin) - Nivel Detalle -->
@@ -326,6 +329,7 @@
               v-else-if="vistaActual === 'gestion_criterios_detalle'"
               key="gestion_criterios_detalle"
               :fase="faseSeleccionada"
+              :es-activa="gestionSeleccionada ? gestionSeleccionada.activa !== false : true"
               @volver="() => { faseSeleccionada = null; vistaActual = 'gestion_fases_detalle' }"
             />
 
@@ -382,6 +386,13 @@
               v-else-if="vistaActual.startsWith('usuarios_')"
               :key="vistaActual"
               :rol-filtro="vistaActual.replace('usuarios_', '')"
+            />
+
+            <!-- Vista: Ajustes del Sistema -->
+            <AjustesView
+              v-else-if="vistaActual === 'ajustes'"
+              :key="`ajustes-${gestionParaAjustes || 'activa'}`"
+              :gestion-id="gestionParaAjustes"
             />
 
           </transition>
@@ -466,6 +477,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import api from '../services/api'
+import { notify } from '../utils/notify'
 import Swal from 'sweetalert2'
 import EstadisticasView from './EstadisticasView.vue'
 import SeleccionarFaseJuradoView from './SeleccionarFaseJuradoView.vue'
@@ -479,6 +491,7 @@ import UsuariosCRUDView from './UsuariosCRUDView.vue'
 import ListadoCompetidoresView from './ListadoCompetidoresView.vue'
 import DelegadoParticipantesView from './DelegadoParticipantesView.vue'
 import OrganizacionCRUDView from './OrganizacionCRUDView.vue'
+import AjustesView from './AjustesView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -491,6 +504,7 @@ const gestionEventoOpen = ref(false)
 const fraternidadSeleccionada = ref(null)
 const faseSeleccionada = ref(null)
 const gestionSeleccionada = ref(null)  // Maestro → Detalle de Gestión
+const gestionParaAjustes = ref(null)
 
 const activeFaseJurado = ref(null)
 const activeFraternidadJurado = ref(null)
@@ -556,12 +570,7 @@ const actualizarPassword = async () => {
     await api.post('/auth/change-password', { newPassword: newPassword.value })
     authStore.updatePrimerLogin(false)
     mostrarModalPass.value = false
-    Swal.fire({
-      icon: 'success',
-      title: '¡Contraseña Actualizada!',
-      text: 'Tu acceso ahora es seguro y privado.',
-      confirmButtonColor: '#003399'
-    })
+    notify.success('¡Contraseña Actualizada!', 'Tu acceso ahora es seguro y privado.')
   } catch (error) {
     passError.value = 'Error al cambiar la contraseña. Inténtalo de nuevo.'
   } finally {
@@ -593,21 +602,24 @@ const tituloVista = computed(() => {
     organizacion_crud: 'Gestión de Facultades y Carreras',
     gestion_fases_detalle: gestionSeleccionada.value ? `Gestión ${gestionSeleccionada.value.anio} — Fases` : 'Fases de Evaluación',
     gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
+    ajustes: 'Ajustes del Sistema'
   }
 
   return titulos[vistaActual.value] || ''
 })
 
 const setVista = (vista) => {
-  if (vista !== 'listado_fase' && vista !== 'wizard') {
-    fraternidadSeleccionada.value = null
-    faseSeleccionada.value = null
-  }
-  // Resetear gestión al salir del módulo
-  if (!vista.startsWith('gestion_fases')) {
-    gestionSeleccionada.value = null
-  }
   vistaActual.value = vista
+  fraternidadSeleccionada.value = null
+  activeFraternidadJurado.value = null
+  activeParticipanteNombre.value = null
+  activeParticipanteTipo.value = null
+  activeParticipanteId.value = null
+  gestionSeleccionada.value = null
+  faseSeleccionada.value = null
+  if (vista === 'ajustes') {
+    gestionParaAjustes.value = null // reset if clicking from sidebar
+  }
   sidebarOpen.value = false
 }
 
@@ -645,7 +657,7 @@ const iniciarWizardConcurso = ({ idParticipante, participanteNombre, participant
 
 const manejarFinalizacion = (resultados) => {
   console.log('Resultados finales:', resultados)
-  alert(`¡Calificaciones guardadas!\nPromedio: ${resultados.promedio.toFixed(1)}/100`)
+  notify.success('Acta Sellada con Éxito', `Calificaciones guardadas. Promedio: ${resultados.promedio.toFixed(1)}/100`)
   setVista('estadisticas')
 }
 

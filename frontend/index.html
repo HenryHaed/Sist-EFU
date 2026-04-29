@@ -5,56 +5,8 @@
   <meta content="width=device-width, initial-scale=1.0" name="viewport" />
   <title>Evaluación Entrada Universitaria UMSA</title>
   
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-  
-  <script id="tailwind-config">
-      tailwind.config = {
-          darkMode: "class",
-          theme: {
-              extend: {
-                  colors: {
-                      "primary": "#004a99", // Azul UMSA
-                      "secondary": "#c8102e", // Rojo UMSA
-                      "primary-umsa": "#004a99", 
-                      "secondary-umsa": "#c8102e",
-                      "accent": "#ffffff",
-                      "deep-blue": "#002d5a",
-                      "text-main": "#0f172a",
-                      "text-muted": "#64748b",
-                      "background-light": "#ffffff",
-                  },
-                  fontFamily: {
-                      "display": ["Inter", "sans-serif"]
-                  },
-              },
-          },
-      }
-  </script>
-  <style>
-      body {
-          font-family: 'Inter', sans-serif;
-          background-color: #ffffff;
-      }
-      .andean-pattern {
-          background-color: #ffffff;
-          background-image: linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/src/assets/img/Textura-Andina.png');
-          background-repeat: repeat;
-          background-size: 500px;
-          background-attachment: fixed;
-      }
-      .glass {
-          background: rgba(255, 255, 255, 0.8);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(0, 0, 0, 0.05);
-      }
-      .glow-blue {
-          box-shadow: 0 4px 15px rgba(0, 74, 153, 0.2);
-      }
-      /* Remove dark theme overrides */
-  </style>
 </head>
 <body class="bg-white font-display text-text-main antialiased min-h-screen m-0 p-0 andean-pattern">
   <div id="app"></div>

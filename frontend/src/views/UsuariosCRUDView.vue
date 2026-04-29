@@ -45,7 +45,8 @@
         </div>
       </div>
       
-      <div class="overflow-x-auto">
+      <!-- Vista Desktop (Tabla) -->
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 border-b border-slate-100 text-slate-600">
@@ -137,6 +138,72 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Vista Mobile (Tarjetas) -->
+      <div class="md:hidden p-4 space-y-4">
+        <div v-if="loading" class="text-center p-8 text-slate-500 font-medium">Cargando usuarios...</div>
+        <div v-else-if="filteredUsuarios.length === 0" class="text-center p-8 text-slate-500 font-medium">No se encontraron resultados</div>
+        
+        <div v-else v-for="user in filteredUsuarios" :key="user.idUsuario + '_mobile'" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden">
+          
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="font-black text-slate-900 text-base leading-tight">{{ user.nombres }} {{ user.primerApellido }} {{ user.segundoApellido || '' }}</p>
+              <p class="text-xs text-slate-500 mt-0.5"><span class="font-bold">CI:</span> {{ user.ci }}</p>
+            </div>
+            <!-- Rol badge -->
+            <span class="px-2 py-1 text-[9px] font-black uppercase tracking-wider rounded-md border"
+              :class="{
+                'bg-red-50 text-secondary border-red-100': user.rol?.nombre === 'superusuario',
+                'bg-slate-100 text-slate-600 border-slate-200': user.rol?.nombre === 'admin',
+                'bg-blue-50 text-primary border-blue-100': user.rol?.nombre === 'jurado',
+                'bg-emerald-50 text-emerald-600 border-emerald-100': user.rol?.nombre === 'delegado',
+                'bg-amber-50 text-amber-600 border-amber-100': user.rol?.nombre === 'controladorhcu',
+                'bg-gray-50 text-gray-500 border-gray-200': !user.rol?.nombre
+              }"
+            >
+              {{ user.rol?.nombre || 'Sin Rol' }}
+            </span>
+          </div>
+
+          <div v-if="user.rol?.nombre === 'delegado' && user.fraternidad" class="text-[10px] font-black text-slate-500 bg-white border border-slate-100 p-2 rounded-lg">
+            {{ user.fraternidad.nombre }}
+          </div>
+
+          <!-- Perfil Jurado -->
+          <div v-if="props.rolFiltro === 'jurado'" class="bg-white border border-slate-100 p-2.5 rounded-xl">
+            <div v-if="user._perfil" class="flex flex-col gap-2">
+              <div class="flex flex-wrap gap-1.5">
+                <span :class="user._perfil.tipoJurado === 'EFU' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200'" class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border">
+                  {{ user._perfil.tipoJurado }}
+                </span>
+                <span v-for="f in user._perfil.fasesHabilitadas" :key="f.idFase" class="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[9px] font-bold">
+                  {{ f.nombre }}
+                </span>
+              </div>
+              <div v-if="user._perfil.fraternidadesHabilitadas?.length > 0" class="flex items-center gap-1 mt-1">
+                <span class="material-symbols-outlined text-[14px] text-slate-400">groups</span>
+                <p class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">
+                  {{ user._perfil.fraternidadesHabilitadas.length }} Fraternidades Asignadas
+                </p>
+              </div>
+            </div>
+            <span v-else class="text-[10px] text-slate-400 italic">Sin perfil asignado</span>
+          </div>
+
+          <!-- Acciones -->
+          <div class="flex items-center gap-2 pt-2 border-t border-slate-200 mt-1">
+            <button @click="abrirModal(true, user)" class="flex-1 py-2 bg-white text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 flex justify-center shadow-sm">
+              <span class="material-symbols-outlined text-[18px]">edit</span>
+            </button>
+            <button @click="confirmarEliminacion(user)" class="flex-1 py-2 bg-white text-slate-400 hover:text-secondary hover:bg-red-50 rounded-xl border border-slate-200 flex justify-center shadow-sm">
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
     </div>
 
     <!-- Modal Save User -->
@@ -190,76 +257,96 @@
               </div>
 
               <!-- ════ PANEL JURADO ════ -->
-              <div v-if="esRolJurado" class="border-t border-slate-100 pt-5 space-y-6">
+              <div v-if="esRolJurado" class="border-t border-slate-100 pt-5 space-y-5">
                 <p class="text-[10px] font-black uppercase tracking-widest text-blue-600 flex items-center gap-2">
                   <span class="material-symbols-outlined text-[16px]">grade</span>
                   Perfil de Especialización (Jurado)
                 </p>
 
-                <!-- Tipo de Jurado -->
-                <div>
-                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Tipo de Jurado</label>
-                  <div class="grid grid-cols-2 gap-3">
-                    <button type="button" @click="form.tipoJurado = 'EFU'; form.fasesIds = []"
-                      :class="form.tipoJurado === 'EFU' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-400 hover:border-primary/30'"
-                      class="flex items-center gap-2 justify-center border-2 rounded-xl py-3 transition-all">
-                      <span class="material-symbols-outlined text-xl">school</span>
-                      <div class="text-left">
-                        <p class="text-[10px] font-black uppercase tracking-widest">EFU</p>
-                        <p class="text-[9px] text-slate-400">Folclórica Universitaria</p>
-                      </div>
-                    </button>
-                    <button type="button" @click="form.tipoJurado = 'EXTERNO'; form.fasesIds = []"
-                      :class="form.tipoJurado === 'EXTERNO' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-400 hover:border-amber-300'"
-                      class="flex items-center gap-2 justify-center border-2 rounded-xl py-3 transition-all">
-                      <span class="material-symbols-outlined text-xl">emoji_events</span>
-                      <div class="text-left">
-                        <p class="text-[10px] font-black uppercase tracking-widest">Externo</p>
-                        <p class="text-[9px] text-slate-400">Concurso Independiente</p>
-                      </div>
-                    </button>
-                  </div>
+                <!-- Resumen de alcance activo -->
+                <div class="flex gap-2 flex-wrap">
+                  <span v-if="form.fasesEfuIds.length > 0"
+                    class="flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-[9px] font-black uppercase tracking-widest">
+                    <span class="material-symbols-outlined text-[12px]">school</span>
+                    EFU Activo ({{ form.fasesEfuIds.length }} fases)
+                  </span>
+                  <span v-if="form.fasesExternasIds.length > 0"
+                    class="flex items-center gap-1 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[9px] font-black uppercase tracking-widest">
+                    <span class="material-symbols-outlined text-[12px]">emoji_events</span>
+                    Externo Activo ({{ form.fasesExternasIds.length }} concursos)
+                  </span>
+                  <span v-if="form.fasesEfuIds.length === 0 && form.fasesExternasIds.length === 0"
+                    class="text-[9px] text-slate-400 italic">Sin fases asignadas aún</span>
                 </div>
 
-                <!-- Fases habilitadas -->
-                <div v-if="fasesDisponibles.length > 0">
-                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-                    Fases que puede calificar
-                  </label>
-                  <div class="bg-slate-50 border-2 border-slate-100 rounded-xl p-3 max-h-36 overflow-y-auto space-y-1">
-                    <label v-for="fase in fasesDisponibles" :key="fase.idFase"
-                      class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white transition-all">
-                      <input type="checkbox" :value="fase.idFase" v-model="form.fasesIds" class="size-4 accent-primary rounded" />
+                <!-- Panel EFU -->
+                <div class="border border-blue-100 rounded-xl overflow-hidden">
+                  <div class="bg-blue-50 px-4 py-2.5 flex items-center justify-between border-b border-blue-100">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-blue-700 flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[14px]">school</span>
+                      Fases EFU (Entrada Universitaria)
+                    </p>
+                    <button type="button" @click="form.fasesEfuIds = []"
+                      class="text-[9px] text-blue-500 hover:text-blue-700 font-bold transition-colors">Limpiar</button>
+                  </div>
+                  <div v-if="fasesEfu.length > 0" class="p-3 max-h-36 overflow-y-auto space-y-1 bg-white">
+                    <label v-for="fase in fasesEfu" :key="fase.idFase"
+                      class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-blue-50 transition-all">
+                      <input type="checkbox" :value="fase.idFase" v-model="form.fasesEfuIds"
+                        class="size-4 accent-blue-600 rounded" />
                       <div>
                         <p class="text-sm font-bold text-slate-700">{{ fase.nombre }}</p>
-                        <p class="text-[9px] uppercase font-black text-slate-400 tracking-widest">{{ fase.tipoConcurso }} · {{ fase.pesoPorcentaje }}%</p>
+                        <p class="text-[9px] uppercase font-black text-blue-400 tracking-widest">EFU · {{ fase.pesoPorcentaje }}%</p>
                       </div>
                     </label>
                   </div>
+                  <div v-else class="p-4 bg-white text-center text-xs text-slate-400 italic">No hay fases EFU configuradas</div>
                 </div>
 
-                <!-- Fraternidades habilitadas (SOLO PARA EFU) -->
-                <div v-if="form.tipoJurado === 'EFU'">
+                <!-- Panel EXTERNO -->
+                <div class="border border-amber-100 rounded-xl overflow-hidden">
+                  <div class="bg-amber-50 px-4 py-2.5 flex items-center justify-between border-b border-amber-100">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[14px]">emoji_events</span>
+                      Concursos Externos
+                    </p>
+                    <button type="button" @click="form.fasesExternasIds = []"
+                      class="text-[9px] text-amber-500 hover:text-amber-700 font-bold transition-colors">Limpiar</button>
+                  </div>
+                  <div v-if="fasesExternas.length > 0" class="p-3 max-h-36 overflow-y-auto space-y-1 bg-white">
+                    <label v-for="fase in fasesExternas" :key="fase.idFase"
+                      class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-amber-50 transition-all">
+                      <input type="checkbox" :value="fase.idFase" v-model="form.fasesExternasIds"
+                        class="size-4 accent-amber-500 rounded" />
+                      <div>
+                        <p class="text-sm font-bold text-slate-700">{{ fase.nombre }}</p>
+                        <p class="text-[9px] uppercase font-black text-amber-400 tracking-widest">EXTERNO · {{ fase.pesoPorcentaje }}pts</p>
+                      </div>
+                    </label>
+                  </div>
+                  <div v-else class="p-4 bg-white text-center text-xs text-slate-400 italic">No hay concursos externos configurados</div>
+                </div>
+
+                <!-- Fraternidades habilitadas (SOLO SI tiene fases EFU) -->
+                <div v-if="form.fasesEfuIds.length > 0">
                   <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-                    Asignación de Fraternidades
-                    <span class="text-slate-300 normal-case font-normal">(Si no marcas ninguna, podrá ver todas las habilitadas)</span>
+                    Restricción de Fraternidades
+                    <span class="text-slate-300 normal-case font-normal">(Vacío = acceso a todas)</span>
                   </label>
-                  <div class="bg-slate-50 border-2 border-slate-100 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1">
+                  <div class="bg-slate-50 border-2 border-slate-100 rounded-xl p-3 max-h-40 overflow-y-auto space-y-1">
                     <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-200">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Listado de Fraternidades</p>
-                        <button type="button" @click="form.fraternidadesIds = []" class="text-[9px] text-primary font-bold hover:underline">Limpiar Selección</button>
+                      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fraternidades</p>
+                      <button type="button" @click="form.fraternidadesIds = []"
+                        class="text-[9px] text-primary font-bold hover:underline">Limpiar</button>
                     </div>
                     <label v-for="frat in todasFraternidades" :key="frat.idFraternidad"
                       class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white transition-all">
-                      <input type="checkbox" :value="frat.idFraternidad" v-model="form.fraternidadesIds" class="size-4 accent-primary rounded" />
-                      <div>
-                        <p class="text-sm font-bold text-slate-700">{{ frat.nombre }}</p>
-                        <p class="text-[9px] uppercase font-black text-slate-400 tracking-widest">{{ frat.facultad?.nombre || 'Independiente' }}</p>
-                      </div>
+                      <input type="checkbox" :value="frat.idFraternidad" v-model="form.fraternidadesIds"
+                        class="size-4 accent-primary rounded" />
+                      <p class="text-sm font-bold text-slate-700">{{ frat.nombre }}</p>
                     </label>
                   </div>
                 </div>
-
               </div>
 
               <!-- ════ PANEL DELEGADO ════ -->
@@ -342,8 +429,8 @@ const form = ref({
   segundoApellido: '',
   password: '',
   idRol: '',
-  tipoJurado: 'EFU',
-  fasesIds: [],
+  fasesEfuIds: [],
+  fasesExternasIds: [],
   fraternidadesIds: [],
   idFraternidad: null
 })
@@ -359,9 +446,8 @@ const esRolDelegado = computed(() => {
   return rolSeleccionado?.nombre === 'delegado' || props.rolFiltro === 'delegado'
 })
 
-const fasesDisponibles = computed(() =>
-  todasFases.value.filter(f => f.tipoConcurso === form.value.tipoJurado)
-)
+const fasesEfu = computed(() => todasFases.value.filter(f => f.tipoConcurso === 'EFU'))
+const fasesExternas = computed(() => todasFases.value.filter(f => f.tipoConcurso === 'EXTERNO'))
 
 const filteredUsuarios = computed(() => {
   let list = usuarios.value.filter(u => u.rol?.nombre === props.rolFiltro)
@@ -423,8 +509,8 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       segundoApellido: usuario.segundoApellido || '',
       password: '',
       idRol: usuario.rol?.idRol || '',
-      tipoJurado: usuario._perfil?.tipoJurado || 'EFU',
-      fasesIds: usuario._perfil?.fasesHabilitadas?.map(f => f.idFase) || [],
+      fasesEfuIds: usuario._perfil?.fasesEfu?.map(f => f.idFase) || [],
+      fasesExternasIds: usuario._perfil?.fasesExternas?.map(f => f.idFase) || [],
       fraternidadesIds: usuario._perfil?.fraternidadesHabilitadas?.map(f => f.idFraternidad) || [],
       idFraternidad: usuario.fraternidad?.idFraternidad || null
     }
@@ -434,7 +520,7 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       idUsuario: null,
       ci: '', nombres: '', primerApellido: '', segundoApellido: '',
       password: '', idRol: rolDefault?.idRol || '',
-      tipoJurado: 'EFU', fasesIds: [], fraternidadesIds: [],
+      fasesEfuIds: [], fasesExternasIds: [], fraternidadesIds: [],
       idFraternidad: null
     }
   }
@@ -448,7 +534,12 @@ const guardarUsuario = async () => {
   saving.value = true
   errorFormulario.value = ''
   try {
-    const payload = { ...form.value }
+    const payload = {
+      ...form.value,
+      fasesEfuIds: form.value.fasesEfuIds,
+      fasesExternasIds: form.value.fasesExternasIds,
+      fraternidadesIds: form.value.fraternidadesIds
+    }
     delete payload.idUsuario
 
     if (!editando.value) {

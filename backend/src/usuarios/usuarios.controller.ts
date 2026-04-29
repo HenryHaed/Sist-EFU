@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
@@ -20,6 +20,13 @@ export class UsuariosController {
     return this.usuariosService.findRoles();
   }
 
+  @Get('jurados')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Listar todos los perfiles de jurado disponibles' })
+  findAllJurados() {
+    return this.usuariosService.findAllJurados();
+  }
+
   @Get()
   @Roles('superusuario', 'admin')
   @ApiOperation({ summary: 'Listar todos los usuarios disponibles' })
@@ -39,6 +46,16 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Obtener el perfil de jurado de un usuario' })
   findPerfilJurado(@Param('id') id: string) {
     return this.usuariosService.findPerfilJurado(+id);
+  }
+
+  @Post('fases/:idFase/jurados')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Asignar/desasignar jurados a una fase específica' })
+  asignarJuradosAFase(
+    @Param('idFase', ParseIntPipe) idFase: number,
+    @Body() body: { juradoIds: number[] }
+  ) {
+    return this.usuariosService.asignarJuradosAFase(idFase, body.juradoIds);
   }
 
   @Put(':id')

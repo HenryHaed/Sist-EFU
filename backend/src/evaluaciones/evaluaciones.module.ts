@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EvaluacionesService } from './evaluaciones.service';
 import { EvaluacionesController } from './evaluaciones.controller';
+import { ArchivosController } from './archivos.controller';
 import { Evaluacion } from '../entities/Evaluacion';
 import { Fase } from '../entities/Fase';
 import { Jurado } from '../entities/Jurado';
@@ -18,7 +19,7 @@ import { Participante } from '../entities/Participante';
       Evaluacion, Jurado, Fase, Fraternidad, DocumentoFraternidad, Criterio, Gestion, Participante
     ])
   ],
-  controllers: [EvaluacionesController],
+  controllers: [EvaluacionesController, ArchivosController],
   providers: [EvaluacionesService],
   exports: [EvaluacionesService],
 })
