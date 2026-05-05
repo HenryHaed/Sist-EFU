@@ -3,6 +3,7 @@ import { OrganizacionService } from './organizacion.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('organizacion')
@@ -10,6 +11,7 @@ export class OrganizacionController {
   constructor(private readonly organizacionService: OrganizacionService) {}
 
   // FACULTADES
+  @Public()
   @Get('facultades')
   getFacultades() {
     return this.organizacionService.findAllFacultades();
@@ -34,6 +36,13 @@ export class OrganizacionController {
   }
 
   // CARRERAS
+  @Public()
+  @Get('carreras')
+  getAllCarreras() {
+    return this.organizacionService.findAllCarreras();
+  }
+
+  @Public()
   @Get('facultades/:idFacultad/carreras')
   getCarreras(@Param('idFacultad', ParseIntPipe) idFacultad: number) {
     return this.organizacionService.findCarrerasByFacultad(idFacultad);
@@ -58,6 +67,7 @@ export class OrganizacionController {
   }
 
   // INSTITUCIONES
+  @Public()
   @Get('instituciones')
   getInstituciones() {
     return this.organizacionService.findAllInstituciones();

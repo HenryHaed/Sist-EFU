@@ -37,6 +37,13 @@ export class OrganizacionService {
   }
 
   // --- CARRERAS ---
+  async findAllCarreras() {
+    return this.carreraRepo.find({
+      relations: ['facultad'],
+      order: { nombre: 'ASC' }
+    });
+  }
+
   async findCarrerasByFacultad(idFacultad: number) {
     return this.carreraRepo.find({
       where: { facultad: { idFacultad } },

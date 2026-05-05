@@ -50,6 +50,9 @@ export class Gestion {
     @Column({ name: 'mostrar_ranking', default: true })
     mostrarRanking: boolean;
 
+    @Column({ name: 'permite_inscripcion_publica', default: false })
+    permiteInscripcionPublica: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

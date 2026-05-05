@@ -107,6 +107,14 @@
                 <input type="checkbox" v-model="gestion.mostrarRanking" class="toggle-checkbox" />
              </div>
 
+             <div class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 flex items-center justify-between">
+                <div>
+                   <p class="text-xs font-black text-indigo-800 uppercase leading-none mb-1">Inscripción Pública</p>
+                   <p class="text-[10px] text-indigo-600 font-bold">Habilita registro de representantes</p>
+                </div>
+                <input type="checkbox" v-model="gestion.permiteInscripcionPublica" class="toggle-checkbox" style="--checked-bg: #4f46e5" />
+             </div>
+
              <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-center justify-between">
                 <div>
                    <p class="text-xs font-black text-blue-800 uppercase leading-none mb-1">Gestión Activa</p>
@@ -223,7 +231,8 @@ const gestion = ref({
   urlBanner: '',
   urlImagenLogin: '',
   modoMantenimiento: false,
-  mostrarRanking: true
+  mostrarRanking: true,
+  permiteInscripcionPublica: false
 })
 
 const files = ref({
@@ -327,7 +336,7 @@ onMounted(loadGestion)
   transition: all 0.3s;
 }
 .toggle-checkbox:checked {
-  background: #ef4444; /* secondary color */
+  background: var(--checked-bg, #ef4444); /* secondary color default */
 }
 .toggle-checkbox.primary:checked {
   background: #003399;

@@ -6,12 +6,21 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
+import { Public } from '../auth/decorators/public.decorator';
+
 @ApiTags('Usuarios')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
+
+  @Public()
+  @Post('registrar-representante')
+  @ApiOperation({ summary: 'Auto-registro para representantes de fraternidad' })
+  registerRepresentante(@Body() body: any) {
+    return this.usuariosService.registerRepresentante(body);
+  }
 
   @Get('roles')
   @Roles('superusuario', 'admin')

@@ -7,6 +7,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
 import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
 import { ParticipantesModule } from './participantes/participantes.module';
 import { OrganizacionModule } from './organizacion/organizacion.module';
+import { InscripcionesModule } from './inscripciones/inscripciones.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
@@ -40,6 +41,7 @@ import { join } from 'path';
     EvaluacionesModule,
     ParticipantesModule,
     OrganizacionModule,
+    InscripcionesModule,
   ],
 })
 export class AppModule {}

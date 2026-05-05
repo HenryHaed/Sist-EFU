@@ -149,124 +149,125 @@
       </div>
     </div>
 
-    <!-- Modal Form (Simplified version using a simple dialog pattern) -->
+    <!-- Modal Form -->
     <v-dialog v-model="modalAbierto" max-width="600">
-      <v-card class="rounded-2xl p-4 md:p-8">
-        <div class="mb-8">
-          <h3 class="text-2xl font-black text-primary uppercase italic">{{ editando ? 'Editar' : 'Nueva' }} Fraternidad</h3>
-          <p class="text-slate-500 text-sm">Completa los datos de la institución folklórica.</p>
-        </div>
+      <v-card class="rounded-2xl">
+        <v-card-text class="pa-6 max-h-[70vh] overflow-y-auto">
+          <div class="mb-6">
+            <h3 class="text-2xl font-black text-primary uppercase italic">{{ editando ? 'Editar' : 'Nueva' }} Fraternidad</h3>
+            <p class="text-slate-500 text-sm">Completa los datos de la institución folklórica.</p>
+          </div>
 
-        <v-form @submit.prevent="guardar">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div class="col-span-2">
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Nombre de la Fraternidad</label>
-              <input v-model="form.nombre" type="text" placeholder="Ej. Morenada Central" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold" />
-            </div>
+          <v-form @submit.prevent="guardar">
+            <div class="space-y-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="col-span-2">
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Nombre de la Fraternidad</label>
+                  <input v-model="form.nombre" type="text" placeholder="Ej. Morenada Central" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold" />
+                </div>
 
-            <div class="col-span-2">
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Logo de la Fraternidad (Imagen)</label>
-              
-              <div 
-                @dragover.prevent="dragging = true" 
-                @dragleave.prevent="dragging = false"
-                @drop.prevent="onDrop"
-                @click="$refs.fileInput.click()"
-                :class="[
-                  'relative h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all gap-2 overflow-hidden',
-                  dragging ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                ]"
-              >
-                <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelected" />
+                <div class="col-span-2">
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Logo de la Fraternidad (Imagen)</label>
+                  
+                  <div 
+                    @dragover.prevent="dragging = true" 
+                    @dragleave.prevent="dragging = false"
+                    @drop.prevent="onDrop"
+                    @click="$refs.fileInput.click()"
+                    :class="[
+                      'relative h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all gap-2 overflow-hidden',
+                      dragging ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                    ]"
+                  >
+                    <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelected" />
+                    
+                    <template v-if="form.logoUrl">
+                      <img :src="getFullUrl(form.logoUrl)" class="absolute inset-0 w-full h-full object-contain p-2 bg-white" />
+                      <div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <span class="text-white text-[10px] font-black uppercase">Cambiar Imagen</span>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <span class="material-symbols-outlined text-slate-300 text-3xl">add_photo_alternate</span>
+                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center px-4">
+                        Arrastra una imagen o <span class="text-primary">haz clic para buscar</span>
+                      </p>
+                    </template>
+
+                    <div v-if="uploading" class="absolute inset-0 bg-white/80 flex flex-col items-center justify-center gap-2">
+                      <span class="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                      <span class="text-[9px] font-black text-primary uppercase">Subiendo...</span>
+                    </div>
+                  </div>
+                </div>
                 
-                <template v-if="form.logoUrl">
-                  <img :src="getFullUrl(form.logoUrl)" class="absolute inset-0 w-full h-full object-contain p-2 bg-white" />
-                  <div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity">
-                    <span class="text-white text-[10px] font-black uppercase">Cambiar Imagen</span>
+                <div>
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Origen (UMSA, Invitada...)</label>
+                  <select v-model="form.origenFraternidad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                    <option value="Interna (UMSA)">Interna (UMSA)</option>
+                    <option value="Externa">Externa / Invitada</option>
+                  </select>
+                </div>
+
+                <template v-if="form.origenFraternidad === 'Interna (UMSA)'">
+                  <div class="col-span-2 md:col-span-1">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Facultad (Opcional)</label>
+                    <select v-model="form.idFacultad" @change="onFacultadChange" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                      <option :value="null">-- Ninguna (Institucional) --</option>
+                      <option v-for="fac in listFacultades" :key="fac.idFacultad" :value="fac.idFacultad">{{ fac.nombre }}</option>
+                    </select>
+                  </div>
+                  <div class="col-span-2 md:col-span-1">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Carrera (Opcional)</label>
+                    <select v-model="form.idCarrera" :disabled="!form.idFacultad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold disabled:opacity-50">
+                      <option :value="null">-- Ninguna --</option>
+                      <option v-for="car in listCarreras" :key="car.idCarrera" :value="car.idCarrera">{{ car.nombre }}</option>
+                    </select>
                   </div>
                 </template>
+
                 <template v-else>
-                  <span class="material-symbols-outlined text-slate-300 text-3xl">add_photo_alternate</span>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center px-4">
-                    Arrastra una imagen o <span class="text-primary">haz clic para buscar</span>
-                  </p>
+                  <div class="col-span-2">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Institución de Procedencia</label>
+                    <select v-model="form.idInstitucionExterna" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                      <option :value="null">-- Seleccionar Institución --</option>
+                      <option v-for="inst in listInstituciones" :key="inst.idInstitucion" :value="inst.idInstitucion">{{ inst.nombre }}</option>
+                    </select>
+                  </div>
                 </template>
 
-                <!-- Loading overlay for upload -->
-                <div v-if="uploading" class="absolute inset-0 bg-white/80 flex flex-col items-center justify-center gap-2">
-                  <span class="material-symbols-outlined animate-spin text-primary">progress_activity</span>
-                  <span class="text-[9px] font-black text-primary uppercase">Subiendo...</span>
+                <div class="col-span-2">
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Categoría según Reglamento</label>
+                  <select v-model="form.idCategoria" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold transition-all focus:border-primary">
+                    <option v-for="c in categorias" :key="c.idCategoria" :value="c.idCategoria">{{ c.nombre }}</option>
+                  </select>
+                  
+                  <transition name="fade">
+                    <div v-if="selectedCategoryDescription" class="mt-3 p-4 bg-primary/5 border border-primary/10 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <span class="material-symbols-outlined text-primary text-lg">info</span>
+                      <p class="text-[11px] font-medium text-slate-600 leading-relaxed">
+                        <span class="font-black text-primary uppercase tracking-tighter block mb-1">Definición oficial:</span>
+                        {{ selectedCategoryDescription }}
+                      </p>
+                    </div>
+                  </transition>
+                </div>
+
+                <div class="col-span-2 flex items-center gap-3 py-2">
+                  <input type="checkbox" v-model="form.habilitadoEfu" class="size-5 rounded border-slate-300 text-primary focus:ring-primary/20" />
+                  <span class="text-sm font-bold text-slate-700">Habilitado para la Entrada Universitaria (EFU)</span>
                 </div>
               </div>
             </div>
-            
-            <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Origen (UMSA, Invitada...)</label>
-              <select v-model="form.origenFraternidad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                <option value="Interna (UMSA)">Interna (UMSA)</option>
-                <option value="Externa">Externa / Invitada</option>
-              </select>
-            </div>
+          </v-form>
+        </v-card-text>
 
-            <!-- Conditional Organizational Fields -->
-            <template v-if="form.origenFraternidad === 'Interna (UMSA)'">
-              <div class="col-span-2 md:col-span-1">
-                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Facultad (Opcional)</label>
-                <select v-model="form.idFacultad" @change="onFacultadChange" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                  <option :value="null">-- Ninguna (Institucional) --</option>
-                  <option v-for="fac in listFacultades" :key="fac.idFacultad" :value="fac.idFacultad">{{ fac.nombre }}</option>
-                </select>
-              </div>
-              <div class="col-span-2 md:col-span-1">
-                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Carrera (Opcional)</label>
-                <select v-model="form.idCarrera" :disabled="!form.idFacultad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold disabled:opacity-50">
-                  <option :value="null">-- Ninguna --</option>
-                  <option v-for="car in listCarreras" :key="car.idCarrera" :value="car.idCarrera">{{ car.nombre }}</option>
-                </select>
-              </div>
-            </template>
-
-            <template v-else>
-              <div class="col-span-2">
-                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Institución de Procedencia</label>
-                <select v-model="form.idInstitucionExterna" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                  <option :value="null">-- Seleccionar Institución --</option>
-                  <option v-for="inst in listInstituciones" :key="inst.idInstitucion" :value="inst.idInstitucion">{{ inst.nombre }}</option>
-                </select>
-              </div>
-            </template>
-
-            <div class="col-span-2">
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Categoría según Reglamento</label>
-              <select v-model="form.idCategoria" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold transition-all focus:border-primary">
-                <option v-for="c in categorias" :key="c.idCategoria" :value="c.idCategoria">{{ c.nombre }}</option>
-              </select>
-              
-              <!-- Category Description Tooltip Area -->
-              <transition name="fade">
-                <div v-if="selectedCategoryDescription" class="mt-3 p-4 bg-primary/5 border border-primary/10 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
-                  <span class="material-symbols-outlined text-primary text-lg">info</span>
-                  <p class="text-[11px] font-medium text-slate-600 leading-relaxed">
-                    <span class="font-black text-primary uppercase tracking-tighter block mb-1">Definición oficial:</span>
-                    {{ selectedCategoryDescription }}
-                  </p>
-                </div>
-              </transition>
-            </div>
-
-            <div class="col-span-2 flex items-center gap-3 py-2">
-              <input type="checkbox" v-model="form.habilitadoEfu" class="size-5 rounded border-slate-300 text-primary focus:ring-primary/20" />
-              <span class="text-sm font-bold text-slate-700">Habilitado para la Entrada Universitaria (EFU)</span>
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-4">
-            <button type="button" @click="modalAbierto = false" class="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors uppercase text-xs">Cancelar</button>
-            <button type="submit" class="px-8 py-3 bg-primary text-white rounded-xl font-black uppercase text-xs shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">
-              {{ editando ? 'Actualizar' : 'Crear Registro' }}
-            </button>
-          </div>
-        </v-form>
+        <v-card-actions class="p-6 border-t border-slate-100 flex justify-end gap-4">
+          <button type="button" @click="modalAbierto = false" class="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors uppercase text-xs">Cancelar</button>
+          <button type="submit" @click="guardar" class="px-8 py-3 bg-primary text-white rounded-xl font-black uppercase text-xs shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">
+            {{ editando ? 'Actualizar' : 'Crear Registro' }}
+          </button>
+        </v-card-actions>
       </v-card>
     </v-dialog>
   </div>

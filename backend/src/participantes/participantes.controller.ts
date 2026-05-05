@@ -17,13 +17,13 @@ export class ParticipantesController {
 
   @Post()
   @Roles('superusuario', 'admin')
-  create(@Body() data: { nombre: string, tipo?: string, idFase: number, idFraternidad?: number }) {
+  create(@Body() data: any) {
     return this.service.create(data);
   }
 
   @Put(':id')
   @Roles('superusuario', 'admin')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: { nombre?: string, tipo?: string, idFraternidad?: number }) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
     return this.service.update(id, data);
   }
 

@@ -2,6 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Fraternidad } from './Fraternidad';
 import { Fase } from './Fase';
 import { Evaluacion } from './Evaluacion';
+import { Facultad } from './Facultad';
+import { Carrera } from './Carrera';
 
 @Entity('participantes_concurso')
 export class Participante {
@@ -13,6 +15,23 @@ export class Participante {
 
     @Column({ length: 100, nullable: true })
     tipo: string; // Ej: 'Chacha', 'Warmi', 'Fotógrafo', 'Diseñador'
+
+    @Column({ name: 'es_umsa', default: false })
+    esUmsa: boolean;
+
+    @ManyToOne(() => Facultad, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'id_facultad' })
+    facultad: Facultad;
+
+    @ManyToOne(() => Carrera, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'id_carrera' })
+    carrera: Carrera;
+
+    @Column({ name: 'institucion_externa', length: 255, nullable: true })
+    institucionExterna: string;
+
+    @Column({ name: 'pertenece_fraternidad', default: false })
+    perteneceFraternidad: boolean;
 
     @ManyToOne(() => Fraternidad, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'id_fraternidad' })

@@ -105,6 +105,17 @@
               <span class="text-sm">Reglamento</span>
             </button>
 
+            <!-- REPRESENTANTE: Inscripción -->
+            <button
+              v-if="can('inscripcion_fraternidad')"
+              @click="setVista('inscripcion_fraternidad')"
+              :class="vistaActual === 'inscripcion_fraternidad' ? 'bg-slate-50 text-secondary border-l-4 border-l-primary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'inscripcion_fraternidad' ? 'text-primary' : 'text-slate-400'">app_registration</span>
+              <span class="text-sm font-bold">Inscribir Fraternidad</span>
+            </button>
+
             <p v-if="can('ajustes') || can('gestion_sistema')" class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-4 mt-6 mb-2">Configuración</p>
             
             <!-- Menú Acordeón: Gestión Usuarios -->
@@ -395,6 +406,12 @@
               :gestion-id="gestionParaAjustes"
             />
 
+            <!-- Vista: Inscripción de Fraternidad (Representante) -->
+            <InscribirFraternidadView 
+              v-else-if="vistaActual === 'inscripcion_fraternidad'" 
+              :key="`inscripcion-${currentUser?.idUsuario}`"
+            />
+
           </transition>
         </main>
 
@@ -492,6 +509,7 @@ import ListadoCompetidoresView from './ListadoCompetidoresView.vue'
 import DelegadoParticipantesView from './DelegadoParticipantesView.vue'
 import OrganizacionCRUDView from './OrganizacionCRUDView.vue'
 import AjustesView from './AjustesView.vue'
+import InscribirFraternidadView from './InscribirFraternidadView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -530,7 +548,8 @@ const can = (permission) => {
     admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
     jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
-    delegado: ['estadisticas', 'reglamento', 'informes', 'gestionar_participantes']
+    delegado: ['estadisticas', 'reglamento', 'informes', 'gestionar_participantes'],
+    representante: ['inscripcion_fraternidad', 'reglamento']
   }
   return permissions[role]?.includes(permission) || false
 }
@@ -551,6 +570,11 @@ onMounted(() => {
   // Chequear si es primer login
   if (currentUser.value?.primerLogin) {
     mostrarModalPass.value = true
+  }
+
+  // Vista inicial según rol
+  if (authStore.userRole?.toLowerCase() === 'representante') {
+    vistaActual.value = 'inscripcion_fraternidad'
   }
 })
 
@@ -602,7 +626,8 @@ const tituloVista = computed(() => {
     organizacion_crud: 'Gestión de Facultades y Carreras',
     gestion_fases_detalle: gestionSeleccionada.value ? `Gestión ${gestionSeleccionada.value.anio} — Fases` : 'Fases de Evaluación',
     gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
-    ajustes: 'Ajustes del Sistema'
+    ajustes: 'Ajustes del Sistema',
+    inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad'
   }
 
   return titulos[vistaActual.value] || ''

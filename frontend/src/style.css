@@ -39,3 +39,35 @@
 @utility glow-blue {
   box-shadow: 0 4px 15px rgba(0, 74, 153, 0.2);
 }
+
+.form-input {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background-color: var(--color-slate-50);
+  border: 1px solid var(--color-slate-200);
+  border-radius: 1rem;
+  outline: none;
+  transition: all 0.2s;
+  font-weight: 700;
+  color: var(--color-slate-700);
+  font-size: 0.875rem;
+}
+
+.form-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.form-input::placeholder {
+  color: var(--color-slate-300);
+}
+
+.label-xs {
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-slate-400);
+  margin-bottom: 0.5rem;
+}

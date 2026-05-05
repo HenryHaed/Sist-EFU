@@ -85,11 +85,22 @@
              <h4 class="font-black text-xl text-slate-800 uppercase tracking-tighter leading-tight mb-1">{{ p.nombre }}</h4>
              <p class="text-primary font-black text-[10px] uppercase tracking-widest mb-4">{{ p.tipo || 'PARTICIPANTE' }}</p>
 
-             <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                <span class="material-symbols-outlined text-slate-400">account_balance</span>
-                <div>
-                  <p class="text-[8px] font-black uppercase text-slate-400 leading-none mb-1">Fraternidad / Institución</p>
-                  <p class="text-xs font-bold text-slate-700 truncate max-w-[180px]">{{ p.fraternidad?.nombre || 'PARTICIPANTE EXTERNO' }}</p>
+             <div class="flex flex-col gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-slate-400 text-sm">account_balance</span>
+                  <div>
+                    <p class="text-[8px] font-black uppercase text-slate-400 leading-none mb-1">Institución</p>
+                    <p class="text-xs font-bold text-slate-700 truncate max-w-[180px]">
+                      {{ p.esUmsa ? `${p.facultad?.nombre || ''} - ${p.carrera?.nombre || ''}` : (p.institucionExterna || 'EXTERNO') }}
+                    </p>
+                  </div>
+                </div>
+                <div v-if="p.perteneceFraternidad" class="flex items-center gap-2 border-t border-slate-200 pt-2">
+                  <span class="material-symbols-outlined text-primary text-sm">groups</span>
+                  <div>
+                    <p class="text-[8px] font-black uppercase text-slate-400 leading-none mb-1">Fraternidad</p>
+                    <p class="text-xs font-bold text-slate-700 truncate max-w-[180px]">{{ p.fraternidad?.nombre || 'SIN ESPECIFICAR' }}</p>
+                  </div>
                 </div>
              </div>
           </div>
@@ -112,7 +123,7 @@
           </button>
         </div>
 
-        <div class="p-8 space-y-6">
+        <div class="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
           <div>
             <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Nombre Completo</label>
             <input 
@@ -136,21 +147,62 @@
               </select>
             </div>
             <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Origen</label>
-              <select v-model="form.isExternal" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary appearance-none">
-                <option :value="false">De Fraternidad</option>
-                <option :value="true">Externo / Independiente</option>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Procedencia</label>
+              <select v-model="form.esUmsa" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary appearance-none">
+                <option :value="true">Pertenece a la UMSA</option>
+                <option :value="false">Es Externo</option>
               </select>
             </div>
           </div>
 
-          <div v-if="!form.isExternal">
-            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Fraternidad Perteneciente</label>
-            <div class="relative">
-              <select v-model="form.idFraternidad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary appearance-none">
-                <option v-for="f in fraternidades" :key="f.idFraternidad" :value="f.idFraternidad">{{ f.nombre }}</option>
+          <!-- UMSA FIELDS -->
+          <div v-if="form.esUmsa" class="grid grid-cols-1 gap-4 animate-in fade-in duration-300">
+            <div>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Facultad</label>
+              <select v-model="form.idFacultad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary appearance-none">
+                <option :value="null" disabled>Selecciona Facultad</option>
+                <option v-for="f in facultades" :key="f.idFacultad" :value="f.idFacultad">{{ f.nombre }}</option>
               </select>
-              <span class="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 pointer-events-none">expand_more</span>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Carrera</label>
+              <select v-model="form.idCarrera" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary appearance-none" :disabled="!form.idFacultad || loadingCarreras">
+                <option :value="null" disabled>{{ loadingCarreras ? 'Cargando...' : 'Selecciona Carrera' }}</option>
+                <option v-for="c in carreras" :key="c.idCarrera" :value="c.idCarrera">{{ c.nombre }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- EXTERNAL FIELDS -->
+          <div v-else class="animate-in fade-in duration-300">
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Institución / Lugar de procedencia</label>
+            <input 
+              v-model="form.institucionExterna" 
+              type="text" 
+              placeholder="Ej. Institución ABC"
+              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all shadow-inner"
+            />
+          </div>
+
+          <!-- FRATERNITY LOGIC -->
+          <div class="space-y-4 pt-2">
+            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-primary">groups</span>
+                <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">¿Pertenece a una Fraternidad?</span>
+              </div>
+              <v-switch v-model="form.perteneceFraternidad" color="primary" density="compact" hide-details></v-switch>
+            </div>
+
+            <div v-if="form.perteneceFraternidad" class="animate-in slide-in-from-top-2 duration-300">
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Seleccionar Fraternidad</label>
+              <div class="relative">
+                <select v-model="form.idFraternidad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary appearance-none">
+                  <option :value="null" disabled>Selecciona Fraternidad</option>
+                  <option v-for="f in fraternidades" :key="f.idFraternidad" :value="f.idFraternidad">{{ f.nombre }}</option>
+                </select>
+                <span class="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 pointer-events-none">expand_more</span>
+              </div>
             </div>
           </div>
         </div>
@@ -159,7 +211,7 @@
           <button @click="modalAbierto = false" class="px-5 py-3 text-slate-500 hover:bg-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest transition-colors">Cancelar</button>
           <button 
             @click="guardar" 
-            :disabled="!form.nombre || (!form.isExternal && !form.idFraternidad) || guardando"
+            :disabled="!form.nombre || (form.esUmsa && (!form.idFacultad || !form.idCarrera)) || (!form.esUmsa && !form.institucionExterna) || (form.perteneceFraternidad && !form.idFraternidad) || guardando"
             class="px-8 py-3 bg-primary text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <span v-if="guardando" class="material-symbols-outlined animate-spin text-[16px]">sync</span>
@@ -173,7 +225,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import api from '../services/api'
 import Swal from 'sweetalert2'
 
@@ -194,9 +246,17 @@ const form = ref({
   idParticipante: null,
   nombre: '',
   tipo: 'Participante',
-  isExternal: false,
+  esUmsa: true,
+  idFacultad: null,
+  idCarrera: null,
+  institucionExterna: '',
+  perteneceFraternidad: false,
   idFraternidad: null
 })
+
+const facultades = ref([])
+const carreras = ref([])
+const loadingCarreras = ref(false)
 
 const cargarFases = async () => {
   loadingFases.value = true
@@ -234,13 +294,45 @@ const cargarFraternidades = async () => {
   } catch (e) {}
 }
 
+const cargarFacultades = async () => {
+  try {
+    const { data } = await api.get('/organizacion/facultades')
+    facultades.value = data
+  } catch (e) {}
+}
+
+const cargarCarreras = async (idFacultad) => {
+  if (!idFacultad) {
+    carreras.value = []
+    return
+  }
+  loadingCarreras.value = true
+  try {
+    const { data } = await api.get(`/organizacion/facultades/${idFacultad}/carreras`)
+    carreras.value = data
+  } catch (e) {
+    carreras.value = []
+  } finally {
+    loadingCarreras.value = false
+  }
+}
+
+watch(() => form.value.idFacultad, (newVal) => {
+  if (newVal) cargarCarreras(newVal)
+  else carreras.value = []
+})
+
 const abrirModalCrear = () => {
   editando.value = false
   form.value = {
     nombre: '',
     tipo: 'Participante',
-    isExternal: false,
-    idFraternidad: fraternidades.value[0]?.idFraternidad
+    esUmsa: true,
+    idFacultad: null,
+    idCarrera: null,
+    institucionExterna: '',
+    perteneceFraternidad: false,
+    idFraternidad: null
   }
   modalAbierto.value = true
 }
@@ -251,9 +343,14 @@ const abrirModalEditar = (p) => {
     idParticipante: p.idParticipante,
     nombre: p.nombre,
     tipo: p.tipo,
-    isExternal: !p.fraternidad,
-    idFraternidad: p.fraternidad?.idFraternidad || fraternidades.value[0]?.idFraternidad
+    esUmsa: !!p.esUmsa,
+    idFacultad: p.facultad?.idFacultad || null,
+    idCarrera: p.carrera?.idCarrera || null,
+    institucionExterna: p.institucionExterna || '',
+    perteneceFraternidad: !!p.perteneceFraternidad,
+    idFraternidad: p.fraternidad?.idFraternidad || null
   }
+  if (p.facultad?.idFacultad) cargarCarreras(p.facultad.idFacultad)
   modalAbierto.value = true
 }
 
@@ -264,7 +361,12 @@ const guardar = async () => {
       nombre: form.value.nombre,
       tipo: form.value.tipo,
       idFase: faseSeleccionada.value.idFase,
-      idFraternidad: form.value.isExternal ? null : form.value.idFraternidad
+      esUmsa: form.value.esUmsa,
+      idFacultad: form.value.esUmsa ? form.value.idFacultad : null,
+      idCarrera: form.value.esUmsa ? form.value.idCarrera : null,
+      institucionExterna: !form.value.esUmsa ? form.value.institucionExterna : null,
+      perteneceFraternidad: form.value.perteneceFraternidad,
+      idFraternidad: form.value.perteneceFraternidad ? form.value.idFraternidad : null
     }
 
     if (editando.value) {
@@ -313,5 +415,6 @@ const confirmarEliminar = (p) => {
 onMounted(() => {
   cargarFases()
   cargarFraternidades()
+  cargarFacultades()
 })
 </script>

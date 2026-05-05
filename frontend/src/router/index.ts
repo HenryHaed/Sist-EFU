@@ -3,10 +3,12 @@ import { useAuthStore } from '../store/auth';
 import LandingView from '../views/LandingView.vue';
 import LoginView from '../views/LoginView.vue';
 import Dashboard from '../views/Dashboard.vue';
+import RegistroRepresentanteView from '../views/RegistroRepresentanteView.vue';
 
 const routes = [
   { path: '/', component: LandingView },
   { path: '/login', component: LoginView },
+  { path: '/registro-representante', component: RegistroRepresentanteView },
   { 
     path: '/dashboard', 
     component: Dashboard,

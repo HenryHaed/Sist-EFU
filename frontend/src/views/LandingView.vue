@@ -96,7 +96,17 @@
         <!-- Content -->
         <div class="relative z-10 flex flex-col h-full min-h-screen">
           <!-- Top header with login button (Hidden on mobile as it's in bottom bar) -->
-          <header class="hidden md:flex justify-end p-8 w-full">
+          <header class="hidden md:flex justify-end p-8 w-full gap-4">
+            <!-- Registration Button (Floating style) -->
+            <router-link
+              v-if="siteInfo.permiteInscripcionPublica"
+              to="/registro-representante"
+              class="flex items-center gap-2 bg-white border-2 border-primary text-primary hover:bg-primary hover:text-white px-7 py-3 rounded-full font-black tracking-widest uppercase text-sm transition-all shadow-xl shadow-primary/10"
+            >
+              <span class="material-symbols-outlined text-base">app_registration</span>
+              <span>Registra tu Fraternidad</span>
+            </router-link>
+
             <router-link
               to="/login"
               class="flex items-center gap-2 bg-secondary hover:bg-red-700 text-white px-7 py-3 rounded-full font-black tracking-widest uppercase text-sm transition-all shadow-lg shadow-red-200"
@@ -123,6 +133,16 @@
                   Vive la majestuosidad de nuestras danzas tradicionales en la mayor expresión folklórica universitaria.
                 </p>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6 mt-8 md:mt-10">
+                  <!-- Registration Primary Button -->
+                  <router-link 
+                    v-if="siteInfo.permiteInscripcionPublica"
+                    to="/registro-representante"
+                    class="w-full md:w-auto bg-secondary text-white hover:bg-red-700 px-8 py-4 rounded-full font-black tracking-wider uppercase text-sm transition-all shadow-xl shadow-red-200 flex items-center justify-center gap-3"
+                  >
+                    <span class="material-symbols-outlined text-xl">app_registration</span>
+                    Inscribir Fraternidad
+                  </router-link>
+
                   <button class="w-full md:w-auto bg-primary text-white hover:bg-blue-900 px-8 py-4 rounded-full font-black tracking-wider uppercase text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3">
                     <span class="material-symbols-outlined text-xl">play_circle</span>
                     Ver Resumen
@@ -399,10 +419,21 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import api from '../services/api'
 
+const siteInfo = ref({})
 const mostrarMapa = ref(false)
 const mainRef = ref(null)
+
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/evaluaciones/gestion-activa')
+    if (data) siteInfo.value = data
+  } catch (err) {
+    console.warn('Usando valores por defecto')
+  }
+})
 
 const scrollTo = (id) => {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })

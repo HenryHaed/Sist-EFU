@@ -280,7 +280,7 @@
           <p class="text-blue-200 text-xs font-medium mt-0.5">Gestión {{ resumen.gestion?.anio }}</p>
         </v-card-title>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-6 max-h-[70vh] overflow-y-auto">
           <div class="space-y-5">
 
             <!-- Nombre -->

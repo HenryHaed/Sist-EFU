@@ -273,4 +273,41 @@ export class UsuariosService {
     await this.usuarioRepo.remove(user);
     return { message: 'Usuario eliminado con éxito' };
   }
+
+  async registerRepresentante(data: { ci: string; nombres: string; primerApellido: string; segundoApellido?: string; password: string }) {
+    // 1. Verificar si la inscripción pública está habilitada
+    const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
+    if (!gestionActiva || !gestionActiva.permiteInscripcionPublica) {
+        throw new BadRequestException('El registro de fraternidades no está habilitado en este momento.');
+    }
+
+    // 2. Buscar el rol 'representante'
+    let roleRepresentante = await this.roleRepo.findOne({ where: { nombre: 'representante' } });
+    if (!roleRepresentante) {
+        roleRepresentante = await this.roleRepo.save({
+            nombre: 'representante',
+            descripcion: 'Rol para inscripción de fraternidades'
+        });
+    }
+
+    // 3. Crear el usuario
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const newUser = this.usuarioRepo.create({
+        ...data,
+        password: hashedPassword,
+        rol: roleRepresentante,
+        primerLogin: true
+    });
+
+    try {
+        const savedUser = await this.usuarioRepo.save(newUser);
+        const { password, ...result } = savedUser as any;
+        return result;
+    } catch (error) {
+        if (error.code === '23505' || error.errno === 1062) {
+            throw new BadRequestException('El CI ya se encuentra registrado.');
+        }
+        throw error;
+    }
+  }
 }
