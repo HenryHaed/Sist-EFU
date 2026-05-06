@@ -105,10 +105,16 @@ export class InscripcionesService {
             delSuplenteCelular: data.delSuplenteCelular,
         });
 
-        // Relaciones opcionales
-        if (data.idFacultad) solicitud.facultad = { idFacultad: parseInt(data.idFacultad) } as any;
-        if (data.idCarrera) solicitud.carrera = { idCarrera: parseInt(data.idCarrera) } as any;
-        if (data.idInstitucionExterna) solicitud.institucionExterna = { idInstitucionExterna: parseInt(data.idInstitucionExterna) } as any;
+        // Relaciones opcionales con validación de ID
+        if (data.idFacultad && !isNaN(parseInt(data.idFacultad))) {
+            solicitud.facultad = { idFacultad: parseInt(data.idFacultad) } as any;
+        }
+        if (data.idCarrera && !isNaN(parseInt(data.idCarrera))) {
+            solicitud.carrera = { idCarrera: parseInt(data.idCarrera) } as any;
+        }
+        if (data.idInstitucionExterna && !isNaN(parseInt(data.idInstitucionExterna))) {
+            solicitud.institucionExterna = { idInstitucionExterna: parseInt(data.idInstitucionExterna) } as any;
+        }
 
         // 5. Asignar URLs de archivos
         if (files) {

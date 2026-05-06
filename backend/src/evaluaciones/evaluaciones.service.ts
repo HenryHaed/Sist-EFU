@@ -11,6 +11,7 @@ import { DocumentoFraternidad } from '../entities/DocumentoFraternidad';
 import { Criterio } from '../entities/Criterio';
 import { Gestion } from '../entities/Gestion';
 import { Participante } from '../entities/Participante';
+import { DocumentoGestion } from '../entities/DocumentoGestion';
 
 @Injectable()
 export class EvaluacionesService {
@@ -31,6 +32,8 @@ export class EvaluacionesService {
     private readonly gestionRepo: Repository<Gestion>,
     @InjectRepository(Participante)
     private readonly participanteRepo: Repository<Participante>,
+    @InjectRepository(DocumentoGestion)
+    private readonly documentoGestionRepo: Repository<DocumentoGestion>,
   ) {}
 
   // 0. Obtener jurados para asignar fases
@@ -397,6 +400,51 @@ export class EvaluacionesService {
   async createCriterio(data: any) { return this.criterioRepo.save(this.criterioRepo.create(data)); }
   async updateCriterio(id: number, data: any) { await this.criterioRepo.update(id, data); return this.criterioRepo.findOne({ where: { idCriterio: id } }); }
   async deleteCriterio(id: number) { return this.criterioRepo.delete(id); }
+
+  // ── Documentos de Gestión (Reglamentos, circulares, etc.) ──────────────────
+
+  async getDocumentosGestion(idGestion?: number) {
+    let gestion: any;
+    if (idGestion) {
+      gestion = await this.gestionRepo.findOne({ where: { idGestion } });
+    } else {
+      gestion = await this.gestionRepo.findOne({ where: { activa: true } });
+    }
+    if (!gestion) return [];
+    return this.documentoGestionRepo.find({
+      where: { gestion: { idGestion: gestion.idGestion } },
+      order: { orden: 'ASC', createdAt: 'ASC' },
+    });
+  }
+
+  async createDocumentoGestion(dto: { titulo: string; descripcion?: string; tipo?: string; urlPdf: string; orden?: number }, idGestion?: number) {
+    let gestion: any;
+    if (idGestion) {
+      gestion = await this.gestionRepo.findOne({ where: { idGestion } });
+    } else {
+      gestion = await this.gestionRepo.findOne({ where: { activa: true } });
+    }
+    if (!gestion) throw new BadRequestException('No hay gestión activa.');
+    const doc = this.documentoGestionRepo.create({ ...dto, gestion });
+    return this.documentoGestionRepo.save(doc);
+  }
+
+  async updateDocumentoGestion(id: number, dto: any) {
+    await this.documentoGestionRepo.update(id, dto);
+    return this.documentoGestionRepo.findOne({ where: { idDocumento: id } });
+  }
+
+  async deleteDocumentoGestion(id: number) {
+    const doc = await this.documentoGestionRepo.findOne({ where: { idDocumento: id } });
+    if (!doc) throw new NotFoundException('Documento no encontrado');
+    // Eliminar archivo físico
+    try {
+      const filename = doc.urlPdf.split('/').pop();
+      const filePath = path.join(process.cwd(), 'uploads', 'Doc_Gestion', filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch (e) {}
+    return this.documentoGestionRepo.delete(id);
+  }
 
   private eliminarImagenSiExiste(url: string) {
     try { const p = path.join(process.cwd(), url.replace('/api/v1/archivos/', 'uploads/')); if (fs.existsSync(p)) fs.unlinkSync(p); } catch (e) {}

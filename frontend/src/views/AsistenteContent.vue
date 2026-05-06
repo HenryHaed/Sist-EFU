@@ -351,14 +351,7 @@ import { notify } from '../utils/notify'
 import Swal from 'sweetalert2'
 import api from '../services/api'
 
-const getImageUrl = (url) => {
-  if (!url) return ''
-  if (url.startsWith('http')) return url
-  const filename = url.split('/').pop()
-  // Detectar si es imagen de criterio o de fase por el prefijo del archivo
-  const endpoint = filename.startsWith('criterio-') ? 'criterios' : 'fases'
-  return `${api.defaults.baseURL}/archivos/${endpoint}/${filename}`
-}
+import { getImageUrl } from '../utils/url'
 
 
 const props = defineProps({

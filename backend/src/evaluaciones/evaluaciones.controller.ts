@@ -81,7 +81,7 @@ const multerOptionsGestion = {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('evaluaciones')
 export class EvaluacionesController {
-  constructor(private readonly evaluacionesService: EvaluacionesService) {}
+  constructor(private readonly evaluacionesService: EvaluacionesService) { }
 
   @Get('fases-auth')
   getMisFases(@Request() req: any) {
@@ -258,5 +258,61 @@ export class EvaluacionesController {
   @Roles('superusuario', 'admin')
   removeCriterio(@Param('id', ParseIntPipe) id: number) {
     return this.evaluacionesService.deleteCriterio(id);
+  }
+
+  // ── Documentos de Gestión (Reglamentos) ──────────────────────────────────
+
+  @Public()
+  @Get('documentos-gestion')
+  getDocumentosGestion(@Query('idGestion') idGestion?: string) {
+    return this.evaluacionesService.getDocumentosGestion(idGestion ? parseInt(idGestion) : undefined);
+  }
+
+  @Post('documentos-gestion')
+  @Roles('superusuario', 'admin')
+  @UseInterceptors(FileInterceptor('pdf', {
+    storage: diskStorage({
+      destination: (req, file, cb) => {
+        const uploadPath = './uploads/Doc_Gestion';
+        if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
+        cb(null, uploadPath);
+      },
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        cb(null, 'doc-gestion-' + uniqueSuffix + extname(file.originalname));
+      },
+    }),
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'application/pdf') cb(null, true);
+      else cb(new BadRequestException('Solo se permiten archivos PDF'), false);
+    },
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  }))
+  async createDocumentoGestion(
+    @UploadedFile() file: any,
+    @Body() body: any,
+    @Query('idGestion') idGestion?: string,
+  ) {
+    if (!file) throw new BadRequestException('El archivo PDF es requerido.');
+    const dto = {
+      titulo: body.titulo || 'Documento sin título',
+      descripcion: body.descripcion || '',
+      tipo: body.tipo || 'otro',
+      orden: body.orden ? parseInt(body.orden) : 0,
+      urlPdf: `/api/v1/archivos/doc-gestion/${file.filename}`,
+    };
+    return this.evaluacionesService.createDocumentoGestion(dto, idGestion ? parseInt(idGestion) : undefined);
+  }
+
+  @Put('documentos-gestion/:id')
+  @Roles('superusuario', 'admin')
+  updateDocumentoGestion(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    return this.evaluacionesService.updateDocumentoGestion(id, body);
+  }
+
+  @Delete('documentos-gestion/:id')
+  @Roles('superusuario', 'admin')
+  deleteDocumentoGestion(@Param('id', ParseIntPipe) id: number) {
+    return this.evaluacionesService.deleteDocumentoGestion(id);
   }
 }

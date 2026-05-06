@@ -35,9 +35,6 @@ export class Gestion {
     @Column({ name: 'url_logo', length: 500, nullable: true })
     urlLogo: string;
 
-    @Column({ name: 'url_reglamento', length: 500, nullable: true })
-    urlReglamento: string;
-
     @Column({ name: 'url_imagen_login', length: 500, nullable: true })
     urlImagenLogin: string;
 

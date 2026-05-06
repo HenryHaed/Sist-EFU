@@ -59,8 +59,8 @@
           </div>
 
           <button 
-            class="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
-            :class="fase.accesible ? (tipoConcurso === 'EFU' ? 'bg-primary/5 text-primary hover:bg-primary hover:text-white' : 'bg-secondary/5 text-secondary hover:bg-secondary hover:text-white') : 'bg-slate-100 text-slate-400'"
+            class="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+            :class="fase.accesible ? (tipoConcurso === 'EFU' ? 'bg-primary/5 text-primary hover:bg-primary hover:!text-white shadow-sm hover:shadow-primary/20' : 'bg-secondary/5 text-secondary hover:bg-secondary hover:!text-white shadow-sm hover:shadow-secondary/20') : 'bg-slate-100 text-slate-400'"
           >
             {{ fase.accesible ? (tipoConcurso === 'EFU' ? 'Ingresar a Calificar' : 'Ver Participantes') : 'Acceso Restringido' }}
             <span class="material-symbols-outlined text-[20px]">{{ fase.accesible ? 'arrow_forward' : 'block' }}</span>
@@ -76,13 +76,7 @@
 import { ref, onMounted } from 'vue'
 import api from '../services/api'
 
-const getImageUrl = (url) => {
-  if (!url) return ''
-  if (url.startsWith('http')) return url
-  
-  const filename = url.split('/').pop()
-  return `${api.defaults.baseURL}/archivos/fases/${filename}`
-}
+import { getImageUrl } from '../utils/url'
 
 
 const props = defineProps({

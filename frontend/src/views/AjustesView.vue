@@ -177,8 +177,8 @@
         </div>
       </div>
 
-      <!-- Footer Buttons -->
-      <div class="flex justify-end gap-4 pt-6 border-t border-slate-100">
+      <!-- Footer Buttons (solo para general/multimedia) -->
+      <div v-if="activeTab !== 'documentos'" class="flex justify-end gap-4 pt-6 border-t border-slate-100">
          <button 
           v-if="hasChanges"
           type="button" @click="resetChanges"
@@ -197,6 +197,105 @@
          </button>
       </div>
 
+      <!-- TAB: DOCUMENTOS -->
+      <div v-if="activeTab === 'documentos'" class="space-y-6">
+        <!-- Upload Form -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="bg-primary px-6 py-4 flex items-center gap-3">
+            <span class="material-symbols-outlined text-white">upload_file</span>
+            <h3 class="text-sm font-black text-white uppercase tracking-widest">Subir Nuevo Documento</h3>
+          </div>
+          <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Título del Documento *</label>
+              <input v-model="docForm.titulo" type="text" placeholder="Ej. Reglamento EFU 2026"
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-700 transition-all" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Tipo de Documento</label>
+              <select v-model="docForm.tipo"
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-700 transition-all">
+                <option value="reglamento_efu">Reglamento EFU</option>
+                <option value="reglamento_afiche">Reglamento Afiche</option>
+                <option value="reglamento_chachawarmi">Reglamento Chachawarmi</option>
+                <option value="reglamento_fotografia">Reglamento Fotografía</option>
+                <option value="circular">Circular Oficial</option>
+                <option value="convocatoria">Convocatoria</option>
+                <option value="otro">Otro Documento</option>
+              </select>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Descripción (opcional)</label>
+              <input v-model="docForm.descripcion" type="text" placeholder="Breve descripción del contenido..."
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-medium text-slate-700 transition-all" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Archivo PDF *</label>
+              <div
+                class="w-full border-2 border-dashed rounded-2xl transition-all relative overflow-hidden group"
+                :class="docForm.archivo ? 'border-primary bg-primary/5' : 'border-slate-300 hover:border-primary bg-slate-50'"
+              >
+                <input type="file" accept="application/pdf" @change="handleDocFile" class="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full" />
+                <div class="py-8 px-6 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span class="material-symbols-outlined text-4xl mb-2" :class="docForm.archivo ? 'text-primary' : 'text-slate-300 group-hover:text-primary'">picture_as_pdf</span>
+                  <p class="font-black text-sm" :class="docForm.archivo ? 'text-primary' : 'text-slate-400'">{{ docForm.archivo ? docForm.archivo.name : 'Arrastra o haz clic para seleccionar un PDF' }}</p>
+                  <p class="text-[10px] text-slate-400 mt-1">Máximo 20MB</p>
+                </div>
+              </div>
+            </div>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="button" @click="subirDocumento"
+                :disabled="uploadingDoc || !docForm.titulo || !docForm.archivo"
+                class="px-8 py-3 bg-primary hover:bg-blue-900 text-white rounded-xl font-black text-sm flex items-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50 transition-all">
+                <span v-if="uploadingDoc" class="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                <span v-else class="material-symbols-outlined text-sm">upload</span>
+                {{ uploadingDoc ? 'Subiendo...' : 'Publicar Documento' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de documentos existentes -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-sm font-black text-slate-700 uppercase tracking-widest">Documentos Publicados</h3>
+            <span class="text-[10px] font-black text-slate-400">{{ documentos.length }} documento{{ documentos.length !== 1 ? 's' : '' }}</span>
+          </div>
+
+          <div v-if="loadingDocs" class="py-12 text-center text-slate-400">
+            <span class="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+          </div>
+
+          <div v-else-if="documentos.length === 0" class="py-12 text-center text-slate-400">
+            <span class="material-symbols-outlined text-4xl mb-2 block opacity-30">folder_off</span>
+            <p class="text-sm font-bold">No hay documentos publicados aún.</p>
+          </div>
+
+          <div v-else class="divide-y divide-slate-100">
+            <div v-for="doc in documentos" :key="doc.idDocumento" class="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors">
+              <div class="size-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-primary text-xl">picture_as_pdf</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-slate-800 text-sm truncate">{{ doc.titulo }}</p>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{{ etiquetaTipoDoc(doc.tipo) }}</p>
+                <p v-if="doc.descripcion" class="text-xs text-slate-500 mt-0.5 truncate">{{ doc.descripcion }}</p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <a :href="getImageUrl(doc.urlPdf)" target="_blank"
+                  class="size-9 bg-slate-100 hover:bg-primary hover:text-white text-slate-600 rounded-xl flex items-center justify-center transition-all">
+                  <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+                </a>
+                <button type="button" @click="eliminarDocumento(doc)"
+                  class="size-9 bg-slate-100 hover:bg-secondary hover:text-white text-slate-500 rounded-xl flex items-center justify-center transition-all">
+                  <span class="material-symbols-outlined text-[18px]">delete</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </form>
   </div>
 </template>
@@ -212,7 +311,8 @@ const props = defineProps({
 
 const tabs = [
   { id: 'general', label: 'Información General' },
-  { id: 'multimedia', label: 'Multimedia e Imagen' }
+  { id: 'multimedia', label: 'Multimedia e Imagen' },
+  { id: 'documentos', label: 'Reglamentos y Docs' }
 ]
 const activeTab = ref('general')
 const loading = ref(true)
@@ -247,17 +347,19 @@ const previews = ref({
   loginImg: null
 })
 
+import { getImageUrl } from '../utils/url'
+
 const loadGestion = async () => {
   loading.value = true
   try {
     const url = props.gestionId ? `/evaluaciones/gestiones/${props.gestionId}` : '/evaluaciones/gestion-activa'
     const { data } = await api.get(url)
     if (data) {
+      // Transformamos las URLs relativas a absolutas para la previsualización
+      data.urlLogo = getImageUrl(data.urlLogo)
+      data.urlBanner = getImageUrl(data.urlBanner)
+      data.urlImagenLogin = getImageUrl(data.urlImagenLogin)
       gestion.value = data
-      // Ensure absolute URLs if they don't start with http
-      if (gestion.value.urlLogo && !gestion.value.urlLogo.startsWith('http')) gestion.value.urlLogo = gestion.value.urlLogo
-      if (gestion.value.urlBanner && !gestion.value.urlBanner.startsWith('http')) gestion.value.urlBanner = gestion.value.urlBanner
-      if (gestion.value.urlImagenLogin && !gestion.value.urlImagenLogin.startsWith('http')) gestion.value.urlImagenLogin = gestion.value.urlImagenLogin
     }
   } catch (err) {
     console.error('Error al cargar gestion:', err)
@@ -320,6 +422,84 @@ const saveSettings = async () => {
 watch(gestion, () => {
   if (!loading.value) hasChanges.value = true
 }, { deep: true })
+
+// ── Documentos de Gestión ─────────────────────────────────────────────────
+const documentos = ref([])
+const loadingDocs = ref(false)
+const uploadingDoc = ref(false)
+const docForm = ref({ titulo: '', tipo: 'reglamento_efu', descripcion: '', archivo: null })
+
+const handleDocFile = (e) => {
+  docForm.value.archivo = e.target.files[0] || null
+}
+
+const cargarDocumentos = async () => {
+  loadingDocs.value = true
+  try {
+    const params = props.gestionId ? `?idGestion=${props.gestionId}` : ''
+    const { data } = await api.get(`/evaluaciones/documentos-gestion${params}`)
+    documentos.value = data || []
+  } catch (e) {
+    console.error('Error cargando documentos:', e)
+  } finally {
+    loadingDocs.value = false
+  }
+}
+
+const subirDocumento = async () => {
+  if (!docForm.value.titulo || !docForm.value.archivo) return
+  uploadingDoc.value = true
+  try {
+    const fd = new FormData()
+    fd.append('pdf', docForm.value.archivo)
+    fd.append('titulo', docForm.value.titulo)
+    fd.append('tipo', docForm.value.tipo)
+    fd.append('descripcion', docForm.value.descripcion)
+    const params = props.gestionId ? `?idGestion=${props.gestionId}` : ''
+    await api.post(`/evaluaciones/documentos-gestion${params}`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    docForm.value = { titulo: '', tipo: 'reglamento_efu', descripcion: '', archivo: null }
+    Swal.fire({ icon: 'success', title: 'Documento publicado', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
+    cargarDocumentos()
+  } catch (e) {
+    Swal.fire('Error', e.response?.data?.message || 'No se pudo subir el documento.', 'error')
+  } finally {
+    uploadingDoc.value = false
+  }
+}
+
+const eliminarDocumento = async (doc) => {
+  const result = await Swal.fire({
+    title: '¿Eliminar documento?',
+    text: `"${doc.titulo}" será eliminado permanentemente.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#C8102E',
+    cancelButtonText: 'Cancelar',
+    confirmButtonText: 'Sí, eliminar'
+  })
+  if (!result.isConfirmed) return
+  try {
+    await api.delete(`/evaluaciones/documentos-gestion/${doc.idDocumento}`)
+    cargarDocumentos()
+    Swal.fire({ icon: 'success', title: 'Eliminado', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false })
+  } catch (e) {
+    Swal.fire('Error', 'No se pudo eliminar el documento.', 'error')
+  }
+}
+
+const etiquetaTipoDoc = (tipo) => {
+  const map = {
+    reglamento_efu: 'Reglamento EFU', reglamento_afiche: 'Reglamento Afiche',
+    reglamento_chachawarmi: 'Reglamento Chachawarmi', reglamento_fotografia: 'Reglamento Fotografía',
+    circular: 'Circular Oficial', convocatoria: 'Convocatoria', otro: 'Otro Documento'
+  }
+  return map[tipo] || 'Documento'
+}
+
+// Cargar documentos cuando se activa esa pestaña
+watch(activeTab, (val) => { if (val === 'documentos') cargarDocumentos() })
 
 onMounted(loadGestion)
 </script>

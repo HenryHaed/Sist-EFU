@@ -10,12 +10,19 @@
         <div class="p-6 flex flex-col h-full overflow-y-auto">
           <!-- Logo/Brand -->
           <div class="flex items-center gap-3 mb-10">
-            <div class="size-10 bg-primary rounded-lg flex items-center justify-center text-white font-black text-xl shadow-[2px_2px_0px_0px_rgba(200,16,46,1)] border-2 border-primary">
+            <div v-if="siteInfo.urlLogo" class="size-12 overflow-hidden rounded-lg flex items-center justify-center border-2 border-primary shadow-sm bg-white">
+              <img :src="siteInfo.urlLogo" class="size-full object-contain" alt="Logo" />
+            </div>
+            <div v-else class="size-10 bg-primary rounded-lg flex items-center justify-center text-white font-black text-xl shadow-[2px_2px_0px_0px_rgba(200,16,46,1)] border-2 border-primary">
               <span class="material-symbols-outlined text-xl">account_balance</span>
             </div>
             <div>
-              <h1 class="font-black text-lg leading-tight tracking-tight text-primary uppercase">UMS<span class="text-secondary">A</span></h1>
-              <p class="text-[9px] text-slate-500 uppercase tracking-widest font-black leading-none mt-1">Entrada Folklórica Universitaria</p>
+              <h1 class="font-black text-lg leading-tight tracking-tight text-primary uppercase">
+                {{ siteInfo.nombreSitio?.split(' ')[0] || 'UMS' }}<span class="text-secondary">{{ siteInfo.nombreSitio?.split(' ')[1] || 'A' }}</span>
+              </h1>
+              <p class="text-[9px] text-slate-500 uppercase tracking-widest font-black leading-none mt-1">
+                {{ siteInfo.subtituloPrincipal || 'Entrada Folklórica Universitaria' }}
+              </p>
             </div>
           </div>
 
@@ -99,9 +106,11 @@
 
             <button
               v-if="can('reglamento')"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
+              @click="setVista('reglamento')"
+              :class="vistaActual === 'reglamento' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all"
             >
-              <span class="material-symbols-outlined text-[20px] text-slate-400">menu_book</span>
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'reglamento' ? 'text-secondary' : 'text-slate-400'">menu_book</span>
               <span class="text-sm">Reglamento</span>
             </button>
 
@@ -412,6 +421,12 @@
               :key="`inscripcion-${currentUser?.idUsuario}`"
             />
 
+            <!-- Vista: Reglamento (todos los roles) -->
+            <ReglamentoView
+              v-else-if="vistaActual === 'reglamento'"
+              key="reglamento"
+            />
+
           </transition>
         </main>
 
@@ -510,11 +525,15 @@ import DelegadoParticipantesView from './DelegadoParticipantesView.vue'
 import OrganizacionCRUDView from './OrganizacionCRUDView.vue'
 import AjustesView from './AjustesView.vue'
 import InscribirFraternidadView from './InscribirFraternidadView.vue'
+import ReglamentoView from './ReglamentoView.vue'
+
+import { getImageUrl } from '../utils/url'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 // State
+const siteInfo = ref({})
 const vistaActual = ref('estadisticas')
 const sidebarOpen = ref(false)
 const gestionUsuariosOpen = ref(false)
@@ -564,8 +583,19 @@ const timer = computed(() => {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
 })
 
-onMounted(() => {
+onMounted(async () => {
   timerInterval = setInterval(() => { timerSegundos.value-- }, 1000)
+
+  // Cargar info del sitio
+  try {
+    const { data } = await api.get('/evaluaciones/gestion-activa')
+    if (data) {
+      data.urlLogo = getImageUrl(data.urlLogo)
+      siteInfo.value = data
+    }
+  } catch (err) {
+    console.warn('Error al cargar info del sitio')
+  }
 
   // Chequear si es primer login
   if (currentUser.value?.primerLogin) {
@@ -627,7 +657,9 @@ const tituloVista = computed(() => {
     gestion_fases_detalle: gestionSeleccionada.value ? `Gestión ${gestionSeleccionada.value.anio} — Fases` : 'Fases de Evaluación',
     gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
     ajustes: 'Ajustes del Sistema',
-    inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad'
+    inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad',
+    reglamento: 'Reglamentos y Documentos Oficiales'
+
   }
 
   return titulos[vistaActual.value] || ''

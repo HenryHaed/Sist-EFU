@@ -7,12 +7,12 @@
         <!-- Logo -->
         <div class="flex items-center gap-3">
           <img 
-            src="/src/assets/img/Logo_Umsa.png" 
-            alt="Logo UMSA" 
+            :src="siteInfo.urlLogo || '/src/assets/img/Logo_Umsa.png'" 
+            alt="Logo Institucional" 
             class="h-14 w-auto object-contain"
           />
           <h1 class="text-xl font-bold leading-tight italic tracking-tight text-primary">
-            UMS<span class="text-secondary">A</span><br />
+            {{ siteInfo.nombreSitio?.split(' ')[0] || 'UMS' }}<span class="text-secondary">{{ siteInfo.nombreSitio?.split(' ')[1] || 'A' }}</span><br />
             <span class="text-slate-900 leading-none">Entrada</span>
           </h1>
         </div>
@@ -87,7 +87,7 @@
           <!-- Hero Image -->
           <div
             class="absolute top-0 right-0 w-full md:w-2/3 h-full bg-cover bg-center opacity-90 transition-all duration-1000 scale-105"
-            style="background-image: url('/src/assets/img/img_backgroud.png'); clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);"
+            :style="{ backgroundImage: `url('${siteInfo.urlBanner || '/src/assets/img/img_backgroud.png'}')`, clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)' }"
             :class="{'md:[clip-path:polygon(25%_0%,_100%_0%,_100%_100%,_0%_100%)]': true}"
           ></div>
           <div class="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-[#fdfdfd] via-[#fdfdfd]/80 to-transparent"></div>
@@ -125,12 +125,12 @@
                   Patrimonio Cultural de Bolivia
                 </span>
                 <h1 class="text-5xl md:text-8xl lg:text-9xl font-black italic leading-[0.85] tracking-tighter text-slate-900">
-                  ENTRADA<br />
-                  <span class="text-primary">UNIVERSITARIA</span><br />
-                  <span>UMS<span class="text-secondary">A</span></span>
+                  {{ siteInfo.tituloPrincipal?.split(' ')[0] || 'ENTRADA' }}<br />
+                  <span class="text-primary">{{ siteInfo.tituloPrincipal?.split(' ').slice(1).join(' ') || 'UNIVERSITARIA' }}</span><br />
+                  <span>{{ siteInfo.nombreSitio || 'UMSA' }}</span>
                 </h1>
                 <p class="text-lg md:text-2xl text-slate-600 max-w-xl font-medium leading-relaxed mt-6 border-l-4 border-secondary pl-4 md:pl-6">
-                  Vive la majestuosidad de nuestras danzas tradicionales en la mayor expresión folklórica universitaria.
+                  {{ siteInfo.subtituloPrincipal || 'Vive la majestuosidad de nuestras danzas tradicionales en la mayor expresión folklórica universitaria.' }}
                 </p>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6 mt-8 md:mt-10">
                   <!-- Registration Primary Button -->
@@ -422,6 +422,8 @@
 import { ref, onMounted } from 'vue'
 import api from '../services/api'
 
+import { getImageUrl } from '../utils/url'
+
 const siteInfo = ref({})
 const mostrarMapa = ref(false)
 const mainRef = ref(null)
@@ -429,7 +431,12 @@ const mainRef = ref(null)
 onMounted(async () => {
   try {
     const { data } = await api.get('/evaluaciones/gestion-activa')
-    if (data) siteInfo.value = data
+    if (data) {
+       // Transformamos las URLs para que apunten al backend
+       data.urlLogo = getImageUrl(data.urlLogo)
+       data.urlBanner = getImageUrl(data.urlBanner)
+       siteInfo.value = data
+    }
   } catch (err) {
     console.warn('Usando valores por defecto')
   }

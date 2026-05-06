@@ -92,7 +92,7 @@
                       <span class="material-symbols-outlined text-[20px]">visibility</span>
                     </button>
                     <a 
-                      :href="item.urlPdf" target="_blank" download
+                      :href="getImageUrl(item.urlPdf)" target="_blank" download
                       title="Descargar PDF"
                       class="inline-flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
                     >
@@ -209,6 +209,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Swal from 'sweetalert2'
 import api from '../services/api'
 import PdfViewerModal from '../components/PdfViewerModal.vue'
+import { getImageUrl } from '../utils/url'
 
 const props = defineProps({
   faseSeleccionada: {
@@ -342,7 +343,7 @@ const formatearHora = (fechaString) => {
 }
 
 const verPdf = (url, titulo) => {
-  pdfUrlActual.value = url
+  pdfUrlActual.value = getImageUrl(url)
   pdfTituloActual.value = titulo
   visorPdfAbierto.value = true
 }

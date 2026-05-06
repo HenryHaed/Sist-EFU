@@ -450,14 +450,7 @@ import api from '../services/api'
 import { notify } from '../utils/notify'
 import Swal from 'sweetalert2'
 
-const getImageUrl = (url) => {
-  if (!url) return ''
-  if (url.startsWith('http')) return url
-  
-  // Normalizar cualquier path antiguo de la BD
-  const filename = url.split('/').pop()
-  return `${api.defaults.baseURL}/archivos/fases/${filename}`
-}
+import { getImageUrl } from '../utils/url'
 
 
 const props = defineProps({

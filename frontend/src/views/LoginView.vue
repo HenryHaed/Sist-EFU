@@ -151,6 +151,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import api from '../services/api'
+import { getImageUrl } from '../utils/url'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -213,8 +214,9 @@ const handleLogin = async () => {
 }
 
 const backgroundImg = computed(() => {
-  const url = siteInfo.value.urlImagenLogin || '/src/assets/img/login.png'
-  return `url('${url}')`
+  const url = siteInfo.value.urlImagenLogin
+  const fullUrl = getImageUrl(url) || '/src/assets/img/login.png'
+  return `url('${fullUrl}')`
 })
 </script>
 
