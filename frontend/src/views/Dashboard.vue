@@ -86,6 +86,16 @@
 
             <button
               v-if="can('fraternidades')"
+              @click="setVista('solicitudes_inscripcion')"
+              :class="vistaActual === 'solicitudes_inscripcion' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'solicitudes_inscripcion' ? 'text-secondary' : 'text-slate-400'">mark_email_unread</span>
+              <span class="text-sm">Solicitudes Inscripción</span>
+            </button>
+
+            <button
+              v-if="can('fraternidades')"
               @click="setVista('fraternidades_crud')"
               :class="vistaActual === 'fraternidades_crud' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
               class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
@@ -191,17 +201,21 @@
 
             <button
               v-if="can('asistencias')"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
+              @click="setVista('asistencias')"
+              :class="vistaActual === 'asistencias' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all"
             >
-              <span class="material-symbols-outlined text-[20px] text-slate-400">how_to_reg</span>
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'asistencias' ? 'text-secondary' : 'text-slate-400'">how_to_reg</span>
               <span class="text-sm font-bold">Control Asistencia</span>
             </button>
 
             <button
               v-if="can('disciplina')"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
+              @click="setVista('seleccionar_fase_disciplina')"
+              :class="vistaActual === 'seleccionar_fase_disciplina' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all"
             >
-              <span class="material-symbols-outlined text-[20px] text-slate-400">gavel</span>
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'seleccionar_fase_disciplina' ? 'text-secondary' : 'text-slate-400'">gavel</span>
               <span class="text-sm font-bold">Control Disciplina</span>
             </button>
 
@@ -312,6 +326,10 @@
             <!-- Vista: Nueva Selección Inteligente de Fase -->
             <div v-else-if="vistaActual === 'seleccionar_fase'" key="seleccionar_fase">
               <SeleccionarFaseJuradoView tipoConcurso="EFU" @fase-seleccionada="entrarFase" />
+            </div>
+
+            <div v-else-if="vistaActual === 'seleccionar_fase_disciplina'" key="seleccionar_fase_disciplina">
+              <SeleccionarFaseJuradoView tipoConcurso="EFU" :solo-disciplina="true" @fase-seleccionada="entrarFase" />
             </div>
             
             <div v-else-if="vistaActual === 'seleccionar_concurso'" key="seleccionar_concurso">
@@ -427,6 +445,17 @@
               key="reglamento"
             />
 
+            <!-- Vista: Solicitudes de Inscripción (Admin) -->
+            <SolicitudesInscripcionView
+              v-else-if="vistaActual === 'solicitudes_inscripcion'"
+              key="solicitudes_inscripcion"
+            />
+
+            <AsistenciaView
+              v-else-if="vistaActual === 'asistencias'"
+              key="asistencias"
+            />
+
           </transition>
         </main>
 
@@ -526,6 +555,8 @@ import OrganizacionCRUDView from './OrganizacionCRUDView.vue'
 import AjustesView from './AjustesView.vue'
 import InscribirFraternidadView from './InscribirFraternidadView.vue'
 import ReglamentoView from './ReglamentoView.vue'
+import SolicitudesInscripcionView from './SolicitudesInscripcionView.vue'
+import AsistenciaView from './AsistenciaView.vue'
 
 import { getImageUrl } from '../utils/url'
 
@@ -658,8 +689,10 @@ const tituloVista = computed(() => {
     gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
     ajustes: 'Ajustes del Sistema',
     inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad',
-    reglamento: 'Reglamentos y Documentos Oficiales'
-
+    reglamento: 'Reglamentos y Documentos Oficiales',
+    solicitudes_inscripcion: 'Solicitudes de Preinscripción',
+    asistencias: 'Control de Asistencia Delegados',
+    seleccionar_fase_disciplina: 'Control de Disciplina HCU'
   }
 
   return titulos[vistaActual.value] || ''

@@ -127,6 +127,24 @@ export class EvaluacionesController {
     return this.evaluacionesService.guardarEvaluacion(req.user.idUsuario, req.user.rol, payload);
   }
 
+  @Post('fase/:idFase/fraternidad/:idFraternidad/penalizar')
+  penalizarFraternidad(
+    @Request() req: any,
+    @Param('idFase', ParseIntPipe) idFase: number,
+    @Param('idFraternidad', ParseIntPipe) idFraternidad: number,
+    @Body() payload: { tipo: string, observacion?: string }
+  ) {
+    return this.evaluacionesService.registrarPenalizacionDisciplina(req.user.idUsuario, idFase, idFraternidad, payload.tipo, payload.observacion);
+  }
+
+  @Delete('fase/:idFase/fraternidad/:idFraternidad/penalizaciones/:idIncidencia')
+  @Roles('superusuario', 'admin')
+  removerPenalizacion(
+    @Param('idIncidencia', ParseIntPipe) idIncidencia: number
+  ) {
+    return this.evaluacionesService.removerPenalizacion(idIncidencia);
+  }
+
   @Public()
   @Get('estadisticas')
   getEstadisticas() {

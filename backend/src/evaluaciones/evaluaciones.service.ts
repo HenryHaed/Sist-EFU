@@ -12,6 +12,9 @@ import { Criterio } from '../entities/Criterio';
 import { Gestion } from '../entities/Gestion';
 import { Participante } from '../entities/Participante';
 import { DocumentoGestion } from '../entities/DocumentoGestion';
+import { Incidencia } from '../entities/Incidencia';
+import { Infraccion } from '../entities/Infraccion';
+import { Usuario } from '../entities/Usuario';
 
 @Injectable()
 export class EvaluacionesService {
@@ -34,6 +37,12 @@ export class EvaluacionesService {
     private readonly participanteRepo: Repository<Participante>,
     @InjectRepository(DocumentoGestion)
     private readonly documentoGestionRepo: Repository<DocumentoGestion>,
+    @InjectRepository(Incidencia)
+    private readonly incidenciaRepo: Repository<Incidencia>,
+    @InjectRepository(Infraccion)
+    private readonly infraccionRepo: Repository<Infraccion>,
+    @InjectRepository(Usuario)
+    private readonly usuarioRepo: Repository<Usuario>,
   ) {}
 
   // 0. Obtener jurados para asignar fases
@@ -103,23 +112,43 @@ export class EvaluacionesService {
       const ahora = new Date();
 
       if (rol === 'superusuario' || rol === 'admin') {
-        fases = await this.faseRepo.find({ order: { idFase: 'ASC' } });
-        const todosJurados = await this.juradoRepo.find({ relations: ['fasesHabilitadas', 'usuario'] });
-        fases.forEach(f => {
-           (f as any).jurados = todosJurados.filter(j => j.fasesHabilitadas.some(hf => hf.idFase === f.idFase));
+        fases = await this.faseRepo.find({ order: { idFase: 'ASC' }, relations: ['gestion'] });
+        const todosJurados = await this.juradoRepo.find({ 
+          relations: ['fasesHabilitadas', 'usuario', 'usuario.rol'] 
         });
-      } else {
+        fases.forEach(f => {
+           (f as any).jurados = todosJurados
+            .filter(j => j.fasesHabilitadas.some(hf => hf.idFase === f.idFase))
+            .map(j => ({
+              idJurado: j.idJurado,
+              nombre: j.usuario ? `${j.usuario.nombres} ${j.usuario.primerApellido}` : 'Sin nombre',
+              usuario: j.usuario
+            }));
+        });
+      } else if (rol === 'delegado') {
+        const gestionActiva = await this.getGestionActiva();
+        if (gestionActiva) {
+          fases = await this.faseRepo.find({
+            where: { 
+              gestion: { idGestion: gestionActiva.idGestion },
+              tipoConcurso: 'EXTERNO',
+              estaActiva: true 
+            },
+            order: { idFase: 'ASC' }
+          });
+        }
+      } else if (rol === 'jurado' || rol === 'controladorhcu') {
         const jurado = await this.juradoRepo.findOne({
           where: { usuario: { idUsuario } },
           relations: ['fasesHabilitadas'],
         });
-        if (!jurado) throw new NotFoundException('El usuario no está registrado como Jurado.');
+        if (!jurado) return []; // Retornar vacío si no tiene perfil aún, en lugar de error
         fases = jurado.fasesHabilitadas;
       }
 
       return fases.map(fase => {
         const isActivaGlobal = fase.estaActiva;
-        const isVigente = fase.fechaInicio <= ahora && (fase.fechaFin ? fase.fechaFin >= ahora : true);
+        const isVigente = (!fase.fechaInicio || new Date(fase.fechaInicio) <= ahora) && (!fase.fechaFin || new Date(fase.fechaFin) >= ahora);
         const adminAcceso = (rol === 'superusuario' || rol === 'admin');
 
         return {
@@ -166,7 +195,10 @@ export class EvaluacionesService {
 
   async getFraternidadesPorFase(idUsuario: number, rol: string, idFase: number) {
     const jurado = await this.getValidadorJurado(idUsuario, rol, idFase);
-    const fase = await this.faseRepo.findOne({ where: { idFase } });
+    const fase = await this.faseRepo.findOne({ 
+      where: { idFase },
+      relations: ['gestion']
+    });
     if (!fase) throw new NotFoundException('Fase no encontrada');
 
     if (fase.tipoConcurso === 'EXTERNO') {
@@ -193,11 +225,48 @@ export class EvaluacionesService {
     const evaluadas = await this.evaluacionRepo.find({ where: { jurado: { idJurado: jurado.idJurado }, fase: { idFase } }, relations: ['fraternidad'] });
     const mapEv = new Map(evaluadas.map(ev => [ev.fraternidad?.idFraternidad, ev]));
 
+    // Obtener incidencias/penalizaciones
+    const idGestion = fase.gestion?.idGestion || (await this.getGestionActiva())?.idGestion;
+    const incidencias = await this.incidenciaRepo.find({
+      where: { 
+        gestion: { idGestion },
+        fraternidad: In(fraternidades.map(f => f.idFraternidad))
+      },
+      relations: ['fraternidad', 'infraccion']
+    });
+
+    const mapInc = new Map<number, any[]>();
+    incidencias.forEach(inc => {
+      const fid = inc.fraternidad.idFraternidad;
+      if (!mapInc.has(fid)) mapInc.set(fid, []);
+      mapInc.get(fid).push({
+        idIncidencia: inc.idIncidencia,
+        nombre: inc.infraccion?.nombre,
+        valor: Number(inc.infraccion?.valorImpacto || 0),
+        fecha: inc.fechaHora
+      });
+    });
+
     return {
       fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: 'EFU' },
       listado: fraternidades.map(frat => {
         const ev = mapEv.get(frat.idFraternidad);
-        return { idFraternidad: frat.idFraternidad, nombre: frat.nombre, idEvaluacion: ev?.idEvaluacion || null, estadoEvaluacion: ev?.estado || 'PENDIENTE', puntajeActual: ev?.puntajeTotal || 0 };
+        const penalties = mapInc.get(frat.idFraternidad) || [];
+        const totalPenalties = penalties.reduce((acc, p) => acc + p.valor, 0);
+        
+        let score = ev?.puntajeTotal || 0;
+        // Si hay una sanción de puntaje 0 (valor -30 o similar), forzamos a 0 si el impacto es grande
+        // Pero el usuario dijo "descuenta", así que restamos.
+        score = Math.max(0, Number(score) + totalPenalties);
+
+        return { 
+          idFraternidad: frat.idFraternidad, 
+          nombre: frat.nombre, 
+          idEvaluacion: ev?.idEvaluacion || null, 
+          estadoEvaluacion: ev?.estado || 'PENDIENTE', 
+          puntajeActual: score,
+          penalizaciones: penalties
+        };
       })
     };
   }
@@ -302,7 +371,9 @@ export class EvaluacionesService {
 
   // --- GESTIONES (AJUSTES) ---
   async getGestionActiva() {
-    return this.gestionRepo.findOne({ where: { activa: true } }) || this.gestionRepo.findOne({ order: { anio: 'DESC' } });
+    let g = await this.gestionRepo.findOne({ where: { activa: true } });
+    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
+    return g;
   }
 
   async getGestionById(id: number) {
@@ -448,5 +519,91 @@ export class EvaluacionesService {
 
   private eliminarImagenSiExiste(url: string) {
     try { const p = path.join(process.cwd(), url.replace('/api/v1/archivos/', 'uploads/')); if (fs.existsSync(p)) fs.unlinkSync(p); } catch (e) {}
+  }
+
+  async registrarPenalizacionDisciplina(idUsuario: number, idFase: number, idFraternidad: number, tipo: string, observacion?: string) {
+    const gestion = await this.getGestionActiva();
+    if (!gestion) throw new BadRequestException('No hay gestión activa.');
+
+    const fraternidad = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
+    if (!fraternidad) throw new NotFoundException('Fraternidad no encontrada.');
+
+    const usuario = await this.usuarioRepo.findOne({ where: { idUsuario } });
+
+    // Definir valores de impacto
+    let valorImpacto = 0;
+    let nombreInfraccion = tipo;
+    let tipoImpacto = 'RESTA_PUNTOS';
+
+    switch (tipo) {
+      case 'AMARILLA':
+        valorImpacto = -1;
+        nombreInfraccion = 'Bandera Amarilla - Disciplina';
+        break;
+      case 'ROJA':
+        valorImpacto = -2;
+        nombreInfraccion = 'Bandera Roja - Disciplina';
+        break;
+      case 'SANCION_ALCOHOL':
+        valorImpacto = -30;
+        nombreInfraccion = 'Sanción: Consumo de Bebidas Alcohólicas';
+        break;
+      case 'SANCION_AGRESION':
+        valorImpacto = 0;
+        nombreInfraccion = 'Sanción: Agresividad (Suspensión 1 Año)';
+        tipoImpacto = 'SUSPENSION';
+        fraternidad.habilitadoEfu = false;
+        await this.fraternidadRepo.save(fraternidad);
+        break;
+      case 'SANCION_BANDA':
+        valorImpacto = -30;
+        nombreInfraccion = 'Sanción: Exceso de Bandas/Músicos';
+        break;
+      case 'SANCION_AJENO':
+        valorImpacto = 0;
+        nombreInfraccion = 'Sanción: Personal ajeno a la UMSA (Suspensión 1 Año)';
+        tipoImpacto = 'SUSPENSION';
+        fraternidad.habilitadoEfu = false;
+        await this.fraternidadRepo.save(fraternidad);
+        break;
+    }
+
+    // Buscar o crear la infracción
+    let infraccion = await this.infraccionRepo.findOne({ where: { nombre: nombreInfraccion, gestion: { idGestion: gestion.idGestion } } });
+    if (!infraccion) {
+      infraccion = this.infraccionRepo.create({
+        nombre: nombreInfraccion,
+        tipoImpacto: tipoImpacto,
+        valorImpacto: valorImpacto,
+        gestion
+      });
+      infraccion = await this.infraccionRepo.save(infraccion);
+    }
+
+    const incidencia = this.incidenciaRepo.create({
+      gestion,
+      fraternidad,
+      usuario,
+      infraccion,
+      observacion: observacion || `Registrado por controlador HCU`
+    });
+
+    return this.incidenciaRepo.save(incidencia);
+  }
+
+  async removerPenalizacion(idIncidencia: number) {
+    const inc = await this.incidenciaRepo.findOne({ 
+      where: { idIncidencia }, 
+      relations: ['infraccion', 'fraternidad'] 
+    });
+    if (!inc) throw new NotFoundException('Penalización no encontrada');
+
+    if (inc.infraccion?.tipoImpacto === 'SUSPENSION') {
+      const frat = inc.fraternidad;
+      frat.habilitadoEfu = true;
+      await this.fraternidadRepo.save(frat);
+    }
+
+    return this.incidenciaRepo.delete(idIncidencia);
   }
 }

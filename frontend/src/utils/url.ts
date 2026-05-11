@@ -11,8 +11,8 @@ export const getImageUrl = (url: string): string => {
   // El host del backend es http://localhost:3000
   const host = 'http://localhost:3000';
   
-  // Si la URL ya empieza con /api/v1, solo concatenamos el host
-  if (url.startsWith('/api')) {
+  // Si la URL empieza con /api o /uploads, concatenamos el host
+  if (url.startsWith('/api') || url.startsWith('/uploads')) {
     return `${host}${url}`;
   }
   

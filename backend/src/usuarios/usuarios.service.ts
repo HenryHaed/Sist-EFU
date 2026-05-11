@@ -230,9 +230,19 @@ export class UsuariosService {
   }
 
   // Asignar jurados directamente a una fase (llamado desde GestionFasesView)
-  async asignarJuradosAFase(idFase: number, juradoIds: number[]) {
+  async asignarJuradosAFase(idFase: number, juradoIds: number[], usuarioIds?: number[]) {
     const fase = await this.faseRepo.findOne({ where: { idFase } });
     if (!fase) throw new NotFoundException('Fase no encontrada');
+
+    // Si recibimos usuarioIds (de controladores), aseguramos su perfil de jurado primero
+    if (usuarioIds && usuarioIds.length > 0) {
+      for (const uid of usuarioIds) {
+        const perfil = await this.asegurarPerfilJurado(uid);
+        if (!juradoIds.includes(perfil.idJurado)) {
+          juradoIds.push(perfil.idJurado);
+        }
+      }
+    }
 
     const todosJurados = await this.juradoRepo.find({
       relations: ['fasesHabilitadas'],
@@ -266,6 +276,49 @@ export class UsuariosService {
       nombre: j.usuario ? `${j.usuario.nombres} ${j.usuario.primerApellido}` : 'Sin usuario',
       ci: j.usuario?.ci || '',
     }));
+  }
+
+  // Obtener todos los controladores HCU (para la fase de disciplina)
+  async findAllControladores() {
+    const roleControlador = await this.roleRepo.findOne({ where: { nombre: 'controladorhcu' } });
+    if (!roleControlador) return [];
+
+    const controladores = await this.usuarioRepo.find({
+      where: { rol: { idRol: roleControlador.idRol } },
+      relations: ['jurados', 'jurados.fasesHabilitadas'],
+    });
+
+    return controladores.map(c => {
+      const j = c.jurados && c.jurados.length > 0 ? c.jurados[0] : null;
+      return {
+        idUsuario: c.idUsuario,
+        idJurado: j ? j.idJurado : null,
+        nombre: `${c.nombres} ${c.primerApellido}`,
+        ci: c.ci,
+        fasesHabilitadas: j ? j.fasesHabilitadas : [],
+      };
+    });
+  }
+
+  // Asegurar perfil de jurado para un usuario (útil para controladores asignados a disciplina)
+  async asegurarPerfilJurado(idUsuario: number) {
+    const user = await this.usuarioRepo.findOne({ where: { idUsuario }, relations: ['rol'] });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const gestion = await this.gestionRepo.findOne({ where: { activa: true } });
+    if (!gestion) throw new BadRequestException('No hay gestión activa');
+
+    let perfil = await this.juradoRepo.findOne({ where: { usuario: { idUsuario: user.idUsuario } } });
+    if (!perfil) {
+      perfil = this.juradoRepo.create({
+        usuario: user,
+        gestion,
+        tipoOrigen: 'Asignación Automática HCU',
+        tipoJurado: 'EFU',
+      }) as any;
+      perfil = await this.juradoRepo.save(perfil);
+    }
+    return perfil;
   }
 
   async remove(id: number) {

@@ -295,6 +295,72 @@
           </div>
         </div>
       </div>
+      
+      <!-- TAB: CRONOGRAMAS -->
+      <div v-if="activeTab === 'cronogramas'" class="space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="bg-indigo-600 px-6 py-4 flex items-center gap-3">
+            <span class="material-symbols-outlined text-white">calendar_month</span>
+            <h3 class="text-sm font-black text-white uppercase tracking-widest">Cronograma de Inscripciones por Categoría</h3>
+          </div>
+          
+          <div class="p-6">
+            <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-start gap-3">
+              <span class="material-symbols-outlined text-blue-600">info</span>
+              <p class="text-xs text-blue-800 font-medium">
+                Define los periodos de tiempo en los que los representantes podrán enviar sus solicitudes de inscripción. 
+                Los usuarios solo verán el formulario si están dentro del rango de fechas establecido para su categoría.
+              </p>
+            </div>
+
+            <div v-if="loadingCronos" class="py-12 text-center text-slate-400">
+              <span class="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+            </div>
+
+            <div v-else class="space-y-4">
+              <div v-for="cat in categorias" :key="cat.idCategoria" class="bg-slate-50 rounded-2xl border border-slate-200 p-6">
+                <div class="flex flex-col md:flex-row md:items-center gap-6">
+                  <div class="md:w-1/3">
+                    <p class="text-sm font-black text-slate-800 uppercase tracking-tighter">{{ cat.nombre }}</p>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configurar periodo</p>
+                  </div>
+                  
+                  <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 px-1">Fecha y Hora de Inicio</label>
+                      <input 
+                        type="datetime-local" 
+                        v-model="cronoForms[cat.idCategoria].fechaInicio"
+                        class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary font-bold text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 px-1">Fecha y Hora de Cierre</label>
+                      <input 
+                        type="datetime-local" 
+                        v-model="cronoForms[cat.idCategoria].fechaFin"
+                        class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary font-bold text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="md:w-32 flex justify-end">
+                    <button 
+                      type="button"
+                      @click="guardarCronograma(cat.idCategoria)"
+                      :disabled="savingCrono === cat.idCategoria"
+                      class="px-4 py-2 bg-slate-800 hover:bg-black text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      <span v-if="savingCrono === cat.idCategoria" class="material-symbols-outlined animate-spin text-xs">sync</span>
+                      {{ savingCrono === cat.idCategoria ? '...' : 'Actualizar' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </form>
   </div>
@@ -312,7 +378,8 @@ const props = defineProps({
 const tabs = [
   { id: 'general', label: 'Información General' },
   { id: 'multimedia', label: 'Multimedia e Imagen' },
-  { id: 'documentos', label: 'Reglamentos y Docs' }
+  { id: 'documentos', label: 'Reglamentos y Docs' },
+  { id: 'cronogramas', label: 'Cronogramas' }
 ]
 const activeTab = ref('general')
 const loading = ref(true)
@@ -499,7 +566,74 @@ const etiquetaTipoDoc = (tipo) => {
 }
 
 // Cargar documentos cuando se activa esa pestaña
-watch(activeTab, (val) => { if (val === 'documentos') cargarDocumentos() })
+watch(activeTab, (val) => { 
+  if (val === 'documentos') cargarDocumentos()
+  if (val === 'cronogramas') cargarDatosCronogramas()
+})
+
+// ── Cronogramas ───────────────────────────────────────────────────────────
+const categorias = ref([])
+const cronoForms = ref({})
+const loadingCronos = ref(false)
+const savingCrono = ref(null)
+
+const cargarDatosCronogramas = async () => {
+  loadingCronos.value = true
+  try {
+    // 1. Cargar Categorías
+    const { data: cats } = await api.get('/categorias')
+    categorias.value = cats
+
+    // Inicializar formularios
+    cats.forEach(c => {
+      cronoForms.value[c.idCategoria] = { fechaInicio: '', fechaFin: '' }
+    })
+
+    // 2. Cargar Cronogramas existentes para esta gestión
+    const { data: cronos } = await api.get(`/inscripciones/cronogramas/${gestion.value.idGestion}`)
+    
+    cronos.forEach(c => {
+      if (cronoForms.value[c.categoria.idCategoria]) {
+        // Formatear para datetime-local (YYYY-MM-DDThh:mm)
+        const format = (dateStr) => {
+          if (!dateStr) return ''
+          const d = new Date(dateStr)
+          return d.toISOString().slice(0, 16)
+        }
+        cronoForms.value[c.categoria.idCategoria].fechaInicio = format(c.fechaInicio)
+        cronoForms.value[c.categoria.idCategoria].fechaFin = format(c.fechaFin)
+      }
+    })
+  } catch (e) {
+    console.error('Error cargando datos cronograma:', e)
+  } finally {
+    loadingCronos.value = false
+  }
+}
+
+const guardarCronograma = async (idCategoria) => {
+  const form = cronoForms.value[idCategoria]
+  if (!form.fechaInicio || !form.fechaFin) {
+    Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Debes definir ambas fechas.', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false })
+    return
+  }
+
+  savingCrono.value = idCategoria
+  try {
+    await api.post('/inscripciones/cronogramas', {
+      idGestion: gestion.value.idGestion,
+      idCategoria: idCategoria,
+      fechaInicio: form.fechaInicio,
+      fechaFin: form.fechaFin
+    })
+    Swal.fire({ icon: 'success', title: 'Cronograma actualizado', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
+  } catch (e) {
+    console.error('Error al guardar cronograma:', e)
+    Swal.fire('Error', 'No se pudo guardar el cronograma.', 'error')
+  } finally {
+    savingCrono.value = null
+  }
+}
 
 onMounted(loadGestion)
 </script>

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseInterceptors, UploadedFiles, UseGuards, Request, ParseIntPipe, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, Param, Query, UseInterceptors, UploadedFiles, UseGuards, Request, ParseIntPipe, BadRequestException } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
@@ -10,7 +10,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 
 const storage = diskStorage({
   destination: (req, file, cb) => {
-    const path = './uploads/Docs_Registro';
+    const path = join(process.cwd(), 'uploads', 'Docs_Registro');
     if (!fs.existsSync(path)) {
       fs.mkdirSync(path, { recursive: true });
     }
@@ -66,5 +66,37 @@ export class InscripcionesController {
   @Roles('representante', 'superusuario', 'admin')
   async getSolicitud(@Param('id', ParseIntPipe) id: number) {
     return this.inscripcionesService.getSolicitudById(id);
+  }
+
+  // ── Admin: Ver todas las solicitudes ─────────────────────────────────────
+
+  @Get('admin/todas')
+  @Roles('superusuario', 'admin')
+  async getAllSolicitudes(@Query('estado') estado?: string) {
+    return this.inscripcionesService.getAllSolicitudes(estado);
+  }
+
+  @Put(':id/estado')
+  @Roles('superusuario', 'admin')
+  async updateEstado(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('estado') estado: string,
+    @Body('observaciones') observaciones?: string,
+  ) {
+    return this.inscripcionesService.updateEstadoSolicitud(id, estado, observaciones);
+  }
+
+  // ── Cronogramas ──────────────────────────────────────────────────────────
+
+  @Get('cronogramas/:idGestion')
+  @Roles('superusuario', 'admin', 'representante')
+  async getCronogramas(@Param('idGestion', ParseIntPipe) idGestion: number) {
+    return this.inscripcionesService.getCronogramasByGestion(idGestion);
+  }
+
+  @Post('cronogramas')
+  @Roles('superusuario', 'admin')
+  async upsertCronograma(@Body() data: any) {
+    return this.inscripcionesService.upsertCronograma(data);
   }
 }

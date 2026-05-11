@@ -50,6 +50,23 @@
                 <td class="px-6 py-4">
                   <p class="font-bold text-primary">{{ item.nombre }}</p>
                   <p class="text-xs text-slate-500">{{ item.categoria || 'Sin Categoría' }}</p>
+                  
+                  <!-- LISTADO DE PENALIZACIONES (Solo en Disciplina) -->
+                  <div v-if="item.penalizaciones && item.penalizaciones.length > 0" class="mt-2 flex flex-wrap gap-1">
+                    <div v-for="p in item.penalizaciones" :key="p.idIncidencia" 
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-50 border border-red-100 text-[9px] font-bold text-red-700"
+                    >
+                      <span class="material-symbols-outlined text-[10px]">warning</span>
+                      {{ p.nombre }}
+                      <button v-if="authStore.userRole === 'admin' || authStore.userRole === 'superusuario'"
+                        @click="removerPenalizacion(item, p.idIncidencia)"
+                        class="ml-1 hover:text-red-900"
+                        title="Remover (Solo Admin)"
+                      >
+                        <span class="material-symbols-outlined text-[12px]">close</span>
+                      </button>
+                    </div>
+                  </div>
                 </td>
                 
                 <td class="px-6 py-4 text-center">
@@ -115,6 +132,32 @@
                     </span>
                     <span v-else class="material-symbols-outlined text-[16px]">lock</span>
                   </button>
+
+                  <!-- BOTONES DE DISCIPLINA (Solo si es fase de disciplina) -->
+                  <template v-if="fase?.nombre?.toLowerCase().includes('disciplina')">
+                    <button 
+                      @click="aplicarPenalizacion(item, 'AMARILLA')"
+                      title="Bandera Amarilla (-1 pto)"
+                      class="inline-flex size-9 items-center justify-center rounded-lg bg-yellow-400 text-white hover:brightness-110 shadow-sm"
+                    >
+                      <span class="material-symbols-outlined text-[20px]">flag</span>
+                    </button>
+                    <button 
+                      @click="aplicarPenalizacion(item, 'ROJA')"
+                      title="Bandera Roja (-2 ptos)"
+                      class="inline-flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:brightness-110 shadow-sm"
+                    >
+                      <span class="material-symbols-outlined text-[20px]">flag</span>
+                    </button>
+                    <button 
+                      @click="abrirSanciones(item)"
+                      title="Sanciones Graves"
+                      class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-slate-900 text-white hover:bg-black shadow-sm transition-all"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">gavel</span>
+                      <span class="text-[10px] font-black uppercase tracking-widest">Sanciones</span>
+                    </button>
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -157,6 +200,20 @@
                 </span>
                 {{ item.estadoEvaluacion.replace('_', ' ') }}
               </div>
+            </div>
+            
+            <!-- ACCIONES DISCIPLINA MOBILE -->
+            <div v-if="fase?.nombre?.toLowerCase().includes('disciplina')" class="flex items-center gap-2 pl-2">
+              <button @click="aplicarPenalizacion(item, 'AMARILLA')" class="flex-1 py-2 rounded-xl bg-yellow-400 text-white flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">flag</span>
+              </button>
+              <button @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">flag</span>
+              </button>
+              <button @click="abrirSanciones(item)" class="flex-[2] py-2 rounded-xl bg-slate-900 text-white flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-sm">
+                <span class="material-symbols-outlined text-[18px]">gavel</span>
+                Sanciones
+              </button>
             </div>
 
             <div v-if="item.fechaApertura" class="text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-100 pl-2">
@@ -201,6 +258,86 @@
       :titulo="pdfTituloActual"
       @cerrar="visorPdfAbierto = false" 
     />
+
+    <!-- MODAL DE SANCIONES GRAVES -->
+    <v-dialog v-model="modalSanciones" max-width="600" persistent>
+      <v-card class="rounded-2xl overflow-hidden border-4 border-slate-900">
+        <div class="bg-slate-900 p-6 text-white text-center relative">
+          <button @click="modalSanciones = false" class="absolute right-4 top-4 size-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
+            <span class="material-symbols-outlined text-xl text-white">close</span>
+          </button>
+          <div class="size-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/20">
+            <span class="material-symbols-outlined text-4xl text-red-500">warning</span>
+          </div>
+          <h3 class="text-2xl font-black italic uppercase tracking-tighter">Sanciones de Disciplina</h3>
+          <p class="text-white/60 text-xs font-bold mt-1">{{ fraternidadParaSancion?.nombre }}</p>
+        </div>
+
+        <v-card-text class="pa-8 bg-white">
+          <p class="text-slate-500 text-sm mb-6">Seleccione una sanción grave según el reglamento de disciplina. <b>Estas acciones son irreversibles</b> y afectan directamente la participación de la fraternidad.</p>
+          
+          <div class="grid gap-3">
+            <button v-for="s in sancionesReglamento" :key="s.id"
+              @click="preconfirmarSancion(s)"
+              class="w-full p-4 rounded-xl border border-slate-200 hover:border-red-500 hover:bg-red-50 text-left transition-all flex items-center gap-4 group"
+            >
+              <div class="size-10 rounded-lg bg-slate-100 group-hover:bg-red-100 flex items-center justify-center text-slate-400 group-hover:text-red-600">
+                <span class="material-symbols-outlined">{{ s.icono }}</span>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm font-black text-slate-800">{{ s.titulo }}</p>
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{{ s.penalidad }}</p>
+              </div>
+              <span class="material-symbols-outlined text-slate-300 group-hover:text-red-400">chevron_right</span>
+            </button>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="pa-6 bg-slate-50 border-t border-slate-100">
+          <v-btn block height="48" variant="tonal" color="slate" class="rounded-xl font-bold" @click="modalSanciones = false">Cancelar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- MODAL DE CONFIRMACIÓN CON CUENTA REGRESIVA -->
+    <v-dialog v-model="modalConfirmacion" max-width="450" persistent>
+      <v-card class="rounded-2xl border-4 border-red-600">
+        <div class="bg-red-600 p-6 text-white text-center">
+          <h3 class="text-2xl font-black italic uppercase tracking-tighter">¿Está Seguro?</h3>
+          <p class="text-white/80 text-xs font-bold mt-2">ESTA ACCIÓN NO SE PUEDE DESHACER</p>
+        </div>
+        
+        <v-card-text class="pa-8 text-center bg-white">
+          <p class="text-slate-800 font-bold mb-2">{{ sancionSeleccionada?.titulo }}</p>
+          <p class="text-slate-500 text-sm mb-6">{{ sancionSeleccionada?.descripcion }}</p>
+
+          <div v-if="contador > 0" class="size-16 rounded-full border-4 border-slate-100 flex items-center justify-center mx-auto mb-4">
+             <span class="text-2xl font-black text-primary">{{ contador }}</span>
+          </div>
+          <p v-if="contador > 0" class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Espere para confirmar...</p>
+        </v-card-text>
+
+        <v-card-actions class="pa-6 pt-0 bg-white flex flex-col gap-2">
+          <button
+            :disabled="contador > 0 || cargandoSancion"
+            @click="confirmarSancion"
+            class="w-full h-[52px] rounded-xl font-black shadow-lg transition-all flex items-center justify-center text-sm uppercase tracking-widest"
+            :class="contador > 0 
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+              : 'bg-red-600 text-white hover:bg-red-700 active:scale-95'"
+          >
+            {{ cargandoSancion ? 'Aplicando...' : 'Confirmar Sanción' }}
+          </button>
+          
+          <button 
+            @click="modalConfirmacion = false"
+            class="w-full h-[48px] text-slate-500 font-bold text-sm hover:text-slate-800 transition-colors"
+          >
+            Arrepentirse y Cancelar
+          </button>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -210,7 +347,9 @@ import Swal from 'sweetalert2'
 import api from '../services/api'
 import PdfViewerModal from '../components/PdfViewerModal.vue'
 import { getImageUrl } from '../utils/url'
+import { useAuthStore } from '../store/auth'
 
+const authStore = useAuthStore()
 const props = defineProps({
   faseSeleccionada: {
     type: Object,
@@ -232,6 +371,22 @@ let timerInterval = null
 const visorPdfAbierto = ref(false)
 const pdfUrlActual = ref('')
 const pdfTituloActual = ref('')
+
+// Disciplina / Sanciones
+const modalSanciones = ref(false)
+const modalConfirmacion = ref(false)
+const fraternidadParaSancion = ref(null)
+const sancionSeleccionada = ref(null)
+const contador = ref(5)
+const cargandoSancion = ref(false)
+let countdownInterval = null
+
+const sancionesReglamento = [
+  { id: 'SANCION_ALCOHOL', titulo: 'Consumo de Bebidas Alcohólicas', penalidad: 'Puntaje 0 en Disciplina', icono: 'local_bar', descripcion: 'Se ha detectado consumo de alcohol por parte de los integrantes durante el recorrido.', tipo: 'SANCION_ALCOHOL' },
+  { id: 'SANCION_AGRESION', titulo: 'Mostrar Agresividad', penalidad: 'Suspensión de 1 año', icono: 'person_off', descripcion: 'Comportamiento violento o agresivo hacia el público o personal de la UMSA.', tipo: 'SANCION_AGRESION' },
+  { id: 'SANCION_BANDA', titulo: 'Exceso de Bandas/Músicos', penalidad: 'Puntaje 0 en Disciplina', icono: 'music_off', descripcion: 'Más de 2 bandas de 80 músicos cada una o exceso de personal musical permitido.', tipo: 'SANCION_BANDA' },
+  { id: 'SANCION_AJENO', titulo: 'Personal ajeno a la UMSA', penalidad: 'Suspensión de 1 año', icono: 'group_remove', descripcion: 'Se detectó personal externo no perteneciente a la universidad dentro de las filas.', tipo: 'SANCION_AJENO' }
+]
 
 const cargarFaseData = async () => {
   loading.value = true
@@ -355,6 +510,85 @@ const iniciarEvaluacion = (fraternidad) => {
     fraternidad,
     idEvaluacionGuardada: fraternidad.idEvaluacion
   })
+}
+
+// LÓGICA DE DISCIPLINA
+const aplicarPenalizacion = async (fraternidad, tipo) => {
+  const result = await Swal.fire({
+    title: tipo === 'AMARILLA' ? '¿Bandera Amarilla?' : '¿Bandera Roja?',
+    text: `Se descontarán ${tipo === 'AMARILLA' ? '1 punto' : '2 puntos'} de la nota de disciplina.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: tipo === 'AMARILLA' ? '#facc15' : '#dc2626',
+    confirmButtonText: 'Sí, aplicar penalización',
+    cancelButtonText: 'Cancelar'
+  })
+
+  if (result.isConfirmed) {
+    try {
+      await api.post(`/evaluaciones/fase/${fase.value.idFase}/fraternidad/${fraternidad.idFraternidad}/penalizar`, { tipo })
+      Swal.fire('Aplicado', 'La penalización se registró correctamente.', 'success')
+      cargarFaseData() // recargar para ver el puntaje
+    } catch (e) {
+      Swal.fire('Error', 'No se pudo aplicar la penalización.', 'error')
+    }
+  }
+}
+
+const abrirSanciones = (fraternidad) => {
+  fraternidadParaSancion.value = fraternidad
+  modalSanciones.value = true
+}
+
+const preconfirmarSancion = (sancion) => {
+  sancionSeleccionada.value = sancion
+  contador.value = 5
+  modalConfirmacion.value = true
+  
+  if (countdownInterval) clearInterval(countdownInterval)
+  countdownInterval = setInterval(() => {
+    contador.value--
+    if (contador.value <= 0) clearInterval(countdownInterval)
+  }, 1000)
+}
+
+const confirmarSancion = async () => {
+  cargandoSancion.value = true
+  try {
+    await api.post(`/evaluaciones/fase/${fase.value.idFase}/fraternidad/${fraternidadParaSancion.value.idFraternidad}/penalizar`, { 
+      tipo: sancionSeleccionada.value.tipo 
+    })
+    modalConfirmacion.value = false
+    modalSanciones.value = false
+    Swal.fire('Sanción Aplicada', 'Se ha registrado la sanción definitiva.', 'error')
+    cargarFaseData()
+  } catch (e) {
+    Swal.fire('Error', 'No se pudo aplicar la sanción.', 'error')
+  } finally {
+    cargandoSancion.value = false
+  }
+}
+
+const removerPenalizacion = async (fraternidad, idIncidencia) => {
+  const result = await Swal.fire({
+    title: '¿Remover Penalización?',
+    text: 'Esta acción revertirá el descuento de puntos. Solo debe hacerse en caso de error.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#334155',
+    confirmButtonText: 'Sí, remover',
+    cancelButtonText: 'Cancelar'
+  })
+
+  if (result.isConfirmed) {
+    try {
+      await api.delete(`/evaluaciones/fase/${fase.value.idFase}/fraternidad/${fraternidad.idFraternidad}/penalizaciones/${idIncidencia}`)
+      Swal.fire('Removida', 'La penalización fue eliminada.', 'success')
+      cargarFaseData()
+    } catch (e) {
+      Swal.fire('Error', 'No se pudo remover la penalización.', 'error')
+    }
+  }
 }
 
 onMounted(() => {

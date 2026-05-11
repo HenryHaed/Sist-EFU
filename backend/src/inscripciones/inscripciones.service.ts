@@ -144,4 +144,54 @@ export class InscripcionesService {
         if (!sol) throw new NotFoundException('Solicitud no encontrada');
         return sol;
     }
+
+    async getAllSolicitudes(estado?: string) {
+        const where: any = {};
+        if (estado) where.estado = estado;
+        return await this.solicitudRepo.find({
+            where,
+            relations: ['gestion', 'categoria', 'facultad', 'carrera', 'institucionExterna', 'representante'],
+            order: { createdAt: 'DESC' }
+        });
+    }
+
+    async updateEstadoSolicitud(id: number, estado: string, observaciones?: string) {
+        const sol = await this.solicitudRepo.findOne({ where: { idSolicitud: id } });
+        if (!sol) throw new NotFoundException('Solicitud no encontrada');
+        sol.estado = estado as EstadoSolicitud;
+        if (observaciones !== undefined) sol.observaciones = observaciones;
+        return this.solicitudRepo.save(sol);
+    }
+
+    // ── Cronograma Management ──────────────────────────────────────────────
+
+    async getCronogramasByGestion(idGestion: number) {
+        return await this.cronogramaRepo.find({
+            where: { gestion: { idGestion } },
+            relations: ['categoria']
+        });
+    }
+
+    async upsertCronograma(data: { idGestion: number, idCategoria: number, fechaInicio: Date, fechaFin: Date }) {
+        let cronograma = await this.cronogramaRepo.findOne({
+            where: { 
+                gestion: { idGestion: data.idGestion },
+                categoria: { idCategoria: data.idCategoria }
+            }
+        });
+
+        if (cronograma) {
+            cronograma.fechaInicio = new Date(data.fechaInicio);
+            cronograma.fechaFin = new Date(data.fechaFin);
+        } else {
+            cronograma = this.cronogramaRepo.create({
+                gestion: { idGestion: data.idGestion } as any,
+                categoria: { idCategoria: data.idCategoria } as any,
+                fechaInicio: new Date(data.fechaInicio),
+                fechaFin: new Date(data.fechaFin)
+            });
+        }
+
+        return await this.cronogramaRepo.save(cronograma);
+    }
 }

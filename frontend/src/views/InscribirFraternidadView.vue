@@ -34,7 +34,53 @@
     <!-- FORM CONTAINER -->
     <div class="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden min-h-[500px]">
       
-      <form @submit.prevent="handleSubmit" class="p-8 md:p-12">
+      <!-- LOADING STATE -->
+      <div v-if="loadingForm" class="py-32 flex flex-col items-center justify-center">
+        <span class="material-symbols-outlined animate-spin text-5xl text-primary mb-4">progress_activity</span>
+        <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">Verificando estado de inscripción...</p>
+      </div>
+
+      <!-- SOLICITUD YA ENVIADA -->
+      <div v-else-if="solicitudExistente" class="py-24 px-8 text-center flex flex-col items-center">
+        <div class="size-24 bg-indigo-50 text-primary rounded-full flex items-center justify-center mb-6">
+          <span class="material-symbols-outlined text-5xl">mark_email_read</span>
+        </div>
+        <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Solicitud en Revisión</h3>
+        <p class="max-w-md text-slate-500 font-medium mb-4">
+          Ya has enviado una solicitud de inscripción para la gestión {{ siteInfo.anio }}. 
+          Tu registro se encuentra actualmente en estado: 
+          <span class="px-3 py-1 bg-primary/10 text-primary rounded-full font-black text-[10px] uppercase ml-2">
+            {{ solicitudExistente.estado }}
+          </span>
+        </p>
+        <p class="max-w-sm text-slate-400 text-xs italic mb-8">
+          Por favor, espera a que el comité administrativo revise tu documentación. Serás notificado una vez se tome una decisión.
+        </p>
+        <div v-if="solicitudExistente.observaciones" class="bg-amber-50 border border-amber-100 p-4 rounded-xl mb-8 max-w-md">
+           <p class="text-[10px] font-black uppercase text-amber-600 mb-1">Observaciones del Admin:</p>
+           <p class="text-xs text-amber-800 font-medium">{{ solicitudExistente.observaciones }}</p>
+        </div>
+        <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-primary text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+          Ir a Mi Panel
+        </button>
+      </div>
+
+      <!-- NO ACTIVE CATEGORIES / EXPIRED STATE -->
+      <div v-else-if="activeCategories.length === 0" class="py-24 px-8 text-center flex flex-col items-center">
+        <div class="size-24 bg-red-50 text-secondary rounded-full flex items-center justify-center mb-6">
+          <span class="material-symbols-outlined text-5xl">event_busy</span>
+        </div>
+        <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Periodo de Inscripción Cerrado</h3>
+        <p class="max-w-md text-slate-500 font-medium mb-8">
+          Actualmente no existen categorías con periodos de inscripción habilitados. 
+          Por favor, consulta el cronograma oficial o contacta con el comité administrativo.
+        </p>
+        <button @click="$router.push('/')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all">
+          Volver al Inicio
+        </button>
+      </div>
+
+      <form v-else @submit.prevent="handleSubmit" class="p-8 md:p-12">
         
         <!-- STEP 1: FRATERNIDAD -->
         <div v-if="currentStep === 1" class="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -47,7 +93,7 @@
             <!-- 1. Nombre -->
             <div class="md:col-span-2">
               <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">1. Nombre de la Fraternidad o Taller Cultural</label>
-              <input v-model="form.nombreFraternidad" type="text" required class="form-input" placeholder="Ej. Caporales Ingeniería" />
+              <input v-model="form.nombreFraternidad" @input="form.nombreFraternidad = form.nombreFraternidad.toUpperCase()" type="text" required class="form-input" placeholder="Ej. Caporales Ingeniería" />
             </div>
 
             <!-- 2. Instancia -->
@@ -67,8 +113,14 @@
             <div>
               <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">3. Categoría</label>
               <select v-model="form.idCategoria" required class="form-input">
-                <option v-for="cat in categorias" :key="cat.idCategoria" :value="cat.idCategoria">{{ cat.nombre }}</option>
+                <option :value="null" disabled>Selecciona una categoría</option>
+                <option v-for="cat in activeCategories" :key="cat.idCategoria" :value="cat.idCategoria">
+                  {{ cat.nombre }}
+                </option>
               </select>
+              <p v-if="form.idCategoria" class="text-[9px] text-indigo-500 font-bold uppercase mt-2">
+                Inscripción abierta hasta el {{ formatFecha(getCronograma(form.idCategoria)?.fechaFin) }}
+              </p>
             </div>
 
             <!-- Conditional Selects based on Instancia -->
@@ -110,15 +162,15 @@
                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
                  <div class="md:col-span-6">
                     <label class="label-xs">4. Nombre Completo</label>
-                    <input v-model="form.presiNombre" type="text" required class="form-input" placeholder="Nombres y Apellidos Completos" />
+                    <input v-model="form.presiNombre" @input="form.presiNombre = form.presiNombre.toUpperCase()" type="text" required class="form-input" placeholder="NOMBRES Y APELLIDOS COMPLETOS" />
                  </div>
                  <div class="md:col-span-3">
                     <label class="label-xs">5. Carnet CI</label>
-                    <input v-model="form.presiCi" type="text" required class="form-input" placeholder="CI" />
+                    <input v-model="form.presiCi" @keypress="onlyNumbers" type="text" required class="form-input" placeholder="CI" />
                  </div>
                  <div class="md:col-span-3">
                     <label class="label-xs">6. Celular</label>
-                    <input v-model="form.presiCelular" type="text" required class="form-input" placeholder="Celular" />
+                    <input v-model="form.presiCelular" @keypress="onlyNumbers" type="text" required class="form-input" placeholder="Celular" />
                  </div>
                </div>
             </div>
@@ -132,15 +184,15 @@
                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
                  <div class="md:col-span-6">
                     <label class="label-xs">7. Nombre Completo</label>
-                    <input v-model="form.viceNombre" type="text" required class="form-input" placeholder="Nombres y Apellidos Completos" />
+                    <input v-model="form.viceNombre" @input="form.viceNombre = form.viceNombre.toUpperCase()" type="text" required class="form-input" placeholder="NOMBRES Y APELLIDOS COMPLETOS" />
                  </div>
                  <div class="md:col-span-3">
                     <label class="label-xs">8. Carnet CI</label>
-                    <input v-model="form.viceCi" type="text" required class="form-input" placeholder="CI" />
+                    <input v-model="form.viceCi" @keypress="onlyNumbers" type="text" required class="form-input" placeholder="CI" />
                  </div>
                  <div class="md:col-span-3">
                     <label class="label-xs">9. Celular</label>
-                    <input v-model="form.viceCelular" type="text" required class="form-input" placeholder="Celular" />
+                    <input v-model="form.viceCelular" @keypress="onlyNumbers" type="text" required class="form-input" placeholder="Celular" />
                  </div>
                </div>
             </div>
@@ -151,10 +203,10 @@
                   <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Secretario General</p>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-8">
-                       <input v-model="form.secGenNombre" placeholder="10. Nombre Completo" type="text" required class="form-input" />
+                       <input v-model="form.secGenNombre" @input="form.secGenNombre = form.secGenNombre.toUpperCase()" placeholder="10. Nombre Completo" type="text" required class="form-input" />
                     </div>
                     <div class="md:col-span-4">
-                       <input v-model="form.secGenCi" placeholder="11. CI" type="text" required class="form-input" />
+                       <input v-model="form.secGenCi" @keypress="onlyNumbers" placeholder="11. CI" type="text" required class="form-input" />
                     </div>
                   </div>
                </div>
@@ -162,10 +214,10 @@
                   <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Secretario de Hacienda</p>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-8">
-                       <input v-model="form.secHaciNombre" placeholder="12. Nombre Completo" type="text" required class="form-input" />
+                       <input v-model="form.secHaciNombre" @input="form.secHaciNombre = form.secHaciNombre.toUpperCase()" placeholder="12. Nombre Completo" type="text" required class="form-input" />
                     </div>
                     <div class="md:col-span-4">
-                       <input v-model="form.secHaciCi" placeholder="13. CI" type="text" required class="form-input" />
+                       <input v-model="form.secHaciCi" @keypress="onlyNumbers" placeholder="13. CI" type="text" required class="form-input" />
                     </div>
                   </div>
                </div>
@@ -187,10 +239,10 @@
                   <p class="label-xs mb-3">Secretario de Actas (14-15)</p>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-9">
-                      <input v-model="form.secActasNombre" placeholder="14. Nombre Completo" type="text" class="form-input" />
+                      <input v-model="form.secActasNombre" @input="form.secActasNombre = form.secActasNombre.toUpperCase()" placeholder="14. Nombre Completo" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.secActasCi" placeholder="15. CI" type="text" class="form-input" />
+                      <input v-model="form.secActasCi" @keypress="onlyNumbers" placeholder="15. CI" type="text" class="form-input" />
                     </div>
                   </div>
                </div>
@@ -199,10 +251,10 @@
                   <p class="label-xs mb-3">Secretario de Prensa y Propaganda (16-17)</p>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-9">
-                      <input v-model="form.secPrensaNombre" placeholder="16. Nombre Completo" type="text" class="form-input" />
+                      <input v-model="form.secPrensaNombre" @input="form.secPrensaNombre = form.secPrensaNombre.toUpperCase()" placeholder="16. Nombre Completo" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.secPrensaCi" placeholder="17. CI" type="text" class="form-input" />
+                      <input v-model="form.secPrensaCi" @keypress="onlyNumbers" placeholder="17. CI" type="text" class="form-input" />
                     </div>
                   </div>
                </div>
@@ -211,10 +263,10 @@
                   <p class="label-xs mb-3">Vocal (18-19)</p>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-9">
-                      <input v-model="form.vocalNombre" placeholder="18. Nombre Completo" type="text" class="form-input" />
+                      <input v-model="form.vocalNombre" @input="form.vocalNombre = form.vocalNombre.toUpperCase()" placeholder="18. Nombre Completo" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.vocalCi" placeholder="19. CI" type="text" class="form-input" />
+                      <input v-model="form.vocalCi" @keypress="onlyNumbers" placeholder="19. CI" type="text" class="form-input" />
                     </div>
                   </div>
                </div>
@@ -227,13 +279,13 @@
                   <p class="text-[10px] font-black uppercase text-indigo-800 mb-4">Delegado a Co-Gobierno (20-22)</p>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-6">
-                      <input v-model="form.delCogobNombre" placeholder="20. Nombre Completo" type="text" class="form-input" />
+                      <input v-model="form.delCogobNombre" @input="form.delCogobNombre = form.delCogobNombre.toUpperCase()" placeholder="20. Nombre Completo" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.delCogobCi" placeholder="21. CI" type="text" class="form-input" />
+                      <input v-model="form.delCogobCi" @keypress="onlyNumbers" placeholder="21. CI" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.delCogobCelular" placeholder="22. Celular" type="text" class="form-input" />
+                      <input v-model="form.delCogobCelular" @keypress="onlyNumbers" placeholder="22. Celular" type="text" class="form-input" />
                     </div>
                   </div>
                 </div>
@@ -242,13 +294,13 @@
                   <p class="text-[10px] font-black uppercase text-slate-800 mb-4">Delegado Titular (23-25)</p>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-6">
-                      <input v-model="form.delTitularNombre" placeholder="23. Nombre Completo" type="text" class="form-input" />
+                      <input v-model="form.delTitularNombre" @input="form.delTitularNombre = form.delTitularNombre.toUpperCase()" placeholder="23. Nombre Completo" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.delTitularCi" placeholder="24. CI" type="text" class="form-input" />
+                      <input v-model="form.delTitularCi" @keypress="onlyNumbers" placeholder="24. CI" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.delTitularCelular" placeholder="25. Celular" type="text" class="form-input" />
+                      <input v-model="form.delTitularCelular" @keypress="onlyNumbers" placeholder="25. Celular" type="text" class="form-input" />
                     </div>
                   </div>
                 </div>
@@ -257,13 +309,13 @@
                   <p class="text-[10px] font-black uppercase text-slate-800 mb-4">Delegado Suplente (26-28)</p>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-6">
-                      <input v-model="form.delSuplenteNombre" placeholder="26. Nombre Completo" type="text" class="form-input" />
+                      <input v-model="form.delSuplenteNombre" @input="form.delSuplenteNombre = form.delSuplenteNombre.toUpperCase()" placeholder="26. Nombre Completo" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.delSuplenteCi" placeholder="27. CI" type="text" class="form-input" />
+                      <input v-model="form.delSuplenteCi" @keypress="onlyNumbers" placeholder="27. CI" type="text" class="form-input" />
                     </div>
                     <div class="md:col-span-3">
-                      <input v-model="form.delSuplenteCelular" placeholder="28. Celular" type="text" class="form-input" />
+                      <input v-model="form.delSuplenteCelular" @keypress="onlyNumbers" placeholder="28. Celular" type="text" class="form-input" />
                     </div>
                   </div>
                 </div>
@@ -324,7 +376,7 @@
 
            <button 
             v-if="currentStep < 4"
-            type="button" @click="currentStep++"
+            type="button" @click="nextStep"
             class="px-10 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
            >
              Siguiente
@@ -354,7 +406,10 @@ import Swal from 'sweetalert2'
 
 const currentStep = ref(1)
 const submitting = ref(false)
+const loadingForm = ref(true)
 const siteInfo = ref({})
+const cronogramas = ref([])
+const solicitudExistente = ref(null)
 
 const steps = [
   { label: 'Fraternidad' },
@@ -405,6 +460,7 @@ const facultades = ref([])
 const carreras = ref([])
 
 onMounted(async () => {
+  loadingForm.value = true
   try {
     const [cfg, cats, facs, cars] = await Promise.all([
       api.get('/evaluaciones/gestion-activa'),
@@ -416,10 +472,95 @@ onMounted(async () => {
     categorias.value = cats.data
     facultades.value = facs.data
     carreras.value = cars.data
+
+    // Cargar cronogramas
+    if (siteInfo.value.idGestion) {
+      const { data: cronos } = await api.get(`/inscripciones/cronogramas/${siteInfo.value.idGestion}`)
+      cronogramas.value = cronos
+    }
+
+    // Verificar si el usuario ya tiene una solicitud
+    const { data: misSols } = await api.get('/inscripciones/mis-solicitudes')
+    if (misSols && misSols.length > 0) {
+      // Buscamos si hay alguna activa para esta gestión
+      const actual = misSols.find(s => s.gestion?.idGestion === siteInfo.value.idGestion)
+      if (actual && actual.estado !== 'RECHAZADO') {
+        solicitudExistente.value = actual
+      }
+    }
   } catch (err) {
     console.error('Error loading form data:', err)
+  } finally {
+    loadingForm.value = false
   }
 })
+
+const getCronograma = (idCat) => {
+  return cronogramas.value.find(c => c.categoria.idCategoria === idCat)
+}
+
+const activeCategories = computed(() => {
+  const ahora = new Date()
+  return categorias.value.filter(cat => {
+    const crono = getCronograma(cat.idCategoria)
+    if (!crono) return false
+    return ahora >= new Date(crono.fechaInicio) && ahora <= new Date(crono.fechaFin)
+  })
+})
+
+const formatFecha = (dateStr) => {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleString('es-BO', { 
+    day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' 
+  })
+}
+
+const onlyNumbers = (e) => {
+  const char = String.fromCharCode(e.keyCode)
+  if (!/[0-9]/.test(char)) e.preventDefault()
+}
+
+const nextStep = () => {
+  if (validateStep(currentStep.value)) {
+    currentStep.value++
+  } else {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Campos Incompletos',
+      text: 'Por favor, llena todos los campos obligatorios para continuar.',
+      toast: true,
+      position: 'top-end',
+      timer: 3000,
+      showConfirmButton: false
+    })
+  }
+}
+
+const validateStep = (step) => {
+  const f = form.value
+  if (step === 1) {
+    if (!f.nombreFraternidad || !f.instanciaRepresentacion || !f.idCategoria) return false
+    if (f.instanciaRepresentacion === 'Facultad' && !f.idFacultad) return false
+    if (f.instanciaRepresentacion === 'Carrera' && (!f.idFacultad || !f.idCarrera)) return false
+    if (f.instanciaRepresentacion === 'Externo' && !f.nombreInstitucionExterna) return false
+    return true
+  }
+  if (step === 2) {
+    return f.presiNombre && f.presiCi && f.presiCelular &&
+           f.viceNombre && f.viceCi && f.viceCelular &&
+           f.secGenNombre && f.secGenCi &&
+           f.secHaciNombre && f.secHaciCi
+  }
+  if (step === 3) {
+    return f.secActasNombre && f.secActasCi &&
+           f.secPrensaNombre && f.secPrensaCi &&
+           f.vocalNombre && f.vocalCi &&
+           f.delCogobNombre && f.delCogobCi && f.delCogobCelular &&
+           f.delTitularNombre && f.delTitularCi && f.delTitularCelular &&
+           f.delSuplenteNombre && f.delSuplenteCi && f.delSuplenteCelular
+  }
+  return true
+}
 
 // Reset conditional fields on change
 watch(() => form.value.instanciaRepresentacion, () => {

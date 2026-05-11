@@ -13,11 +13,15 @@ import { Gestion } from '../entities/Gestion';
 
 import { Participante } from '../entities/Participante';
 import { DocumentoGestion } from '../entities/DocumentoGestion';
+import { Incidencia } from '../entities/Incidencia';
+import { Infraccion } from '../entities/Infraccion';
+import { Usuario } from '../entities/Usuario';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      Evaluacion, Jurado, Fase, Fraternidad, DocumentoFraternidad, Criterio, Gestion, Participante, DocumentoGestion
+      Evaluacion, Jurado, Fase, Fraternidad, DocumentoFraternidad, Criterio, Gestion, Participante, DocumentoGestion,
+      Incidencia, Infraccion, Usuario
     ])
   ],
   controllers: [EvaluacionesController, ArchivosController],

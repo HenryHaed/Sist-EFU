@@ -11,6 +11,11 @@ async function bootstrap() {
   // Prefijo global para todas las rutas: /api/v1
   app.setGlobalPrefix('api/v1');
 
+  // Servir archivos estáticos de la carpeta uploads
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+  });
+
   // Habilitar CORS para que el frontend pueda conectar
   app.enableCors();
 

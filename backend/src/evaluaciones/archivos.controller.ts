@@ -43,4 +43,13 @@ export class ArchivosController {
     }
     return res.sendFile(filePath);
   }
+
+  @Get('docs-registro/:filename')
+  serveDocsRegistro(@Param('filename') filename: string, @Res() res: Response) {
+    const filePath = join(process.cwd(), 'uploads', 'Docs_Registro', filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send('Documento no encontrado');
+    }
+    return res.sendFile(filePath);
+  }
 }

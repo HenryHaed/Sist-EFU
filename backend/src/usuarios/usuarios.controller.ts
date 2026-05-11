@@ -36,6 +36,13 @@ export class UsuariosController {
     return this.usuariosService.findAllJurados();
   }
 
+  @Get('controladores')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Listar todos los controladores HCU disponibles' })
+  findAllControladores() {
+    return this.usuariosService.findAllControladores();
+  }
+
   @Get()
   @Roles('superusuario', 'admin')
   @ApiOperation({ summary: 'Listar todos los usuarios disponibles' })
@@ -62,9 +69,9 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Asignar/desasignar jurados a una fase específica' })
   asignarJuradosAFase(
     @Param('idFase', ParseIntPipe) idFase: number,
-    @Body() body: { juradoIds: number[] }
+    @Body() body: { juradoIds: number[], usuarioIds?: number[] }
   ) {
-    return this.usuariosService.asignarJuradosAFase(idFase, body.juradoIds);
+    return this.usuariosService.asignarJuradosAFase(idFase, body.juradoIds, body.usuarioIds);
   }
 
   @Put(':id')

@@ -83,6 +83,10 @@ const props = defineProps({
   tipoConcurso: {
     type: String,
     default: 'EFU'
+  },
+  soloDisciplina: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -97,8 +101,16 @@ const cargarFases = async () => {
   error.value = ''
   try {
     const { data } = await api.get('/evaluaciones/fases-auth')
-    // Filter by type
-    fases.value = data.filter(f => f.tipoConcurso === props.tipoConcurso)
+    // Filter by type and optionally by discipline
+    fases.value = data.filter(f => {
+      const matchType = f.tipoConcurso === props.tipoConcurso
+      if (!matchType) return false
+      
+      if (props.soloDisciplina) {
+        return f.nombre.toLowerCase().includes('disciplina')
+      }
+      return true
+    })
   } catch (err) {
     error.value = err.response?.data?.message || 'Error de conexión con el servidor.'
   } finally {

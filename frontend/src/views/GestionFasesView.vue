@@ -240,24 +240,50 @@
         </v-card-title>
         <v-card-text class="pa-6">
           <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">
-            {{ juradosParaFase.length }} jurado(s) disponibles para este tipo de fase
+            {{ esFaseDisciplina(faseParaJurados) ? controladoresList.length : juradosParaFase.length }} 
+            {{ esFaseDisciplina(faseParaJurados) ? 'Controlador(es)' : 'Jurado(s)' }} 
+            disponibles para {{ esFaseDisciplina(faseParaJurados) ? 'esta tarea' : 'este tipo de fase' }}
           </p>
           <div class="space-y-2 max-h-72 overflow-y-auto">
-            <label v-for="j in juradosParaFase" :key="j.idJurado"
-              class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-primary/30 hover:bg-primary/5 cursor-pointer transition-all">
-              <input type="checkbox" :value="j.idJurado" v-model="juradosSeleccionados" class="size-4 accent-primary rounded" />
-              <div class="size-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span class="material-symbols-outlined text-[16px] text-primary">person</span>
-              </div>
-              <div class="flex-1">
-                <p class="text-sm font-bold text-slate-800">{{ j.nombre }}</p>
-                <p class="text-[9px] uppercase font-black tracking-widest"
-                  :class="j.tipoJurado === 'EFU' ? 'text-blue-500' : j.tipoJurado === 'EXTERNO' ? 'text-amber-500' : 'text-emerald-500'">
-                  {{ j.tipoJurado }} · CI: {{ j.ci }}
-                </p>
-              </div>
-            </label>
-            <p v-if="juradosParaFase.length === 0" class="text-center text-slate-400 italic text-sm py-6">No hay jurados registrados para este tipo de fase.</p>
+            <!-- LISTADO PARA DISCIPLINA (CONTROLADORES) -->
+            <template v-if="esFaseDisciplina(faseParaJurados)">
+              <label v-for="c in controladoresList" :key="c.idUsuario"
+                class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-primary/30 hover:bg-primary/5 cursor-pointer transition-all">
+                <input type="checkbox" :value="c.idUsuario" v-model="usuariosSeleccionados" class="size-4 accent-primary rounded" />
+                <div class="size-8 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                  <span class="material-symbols-outlined text-[16px] text-emerald-600">shield_person</span>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-bold text-slate-800">{{ c.nombre }}</p>
+                  <p class="text-[9px] uppercase font-black tracking-widest text-emerald-600">
+                    Controlador HCU · CI: {{ c.ci }}
+                  </p>
+                </div>
+              </label>
+            </template>
+
+            <!-- LISTADO PARA OTRAS FASES (JURADOS) -->
+            <template v-else>
+              <label v-for="j in juradosParaFase" :key="j.idJurado"
+                class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-primary/30 hover:bg-primary/5 cursor-pointer transition-all">
+                <input type="checkbox" :value="j.idJurado" v-model="juradosSeleccionados" class="size-4 accent-primary rounded" />
+                <div class="size-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span class="material-symbols-outlined text-[16px] text-primary">person</span>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-bold text-slate-800">{{ j.nombre }}</p>
+                  <p class="text-[9px] uppercase font-black tracking-widest"
+                    :class="j.tipoJurado === 'EFU' ? 'text-blue-500' : j.tipoJurado === 'EXTERNO' ? 'text-amber-500' : 'text-emerald-500'">
+                    {{ j.tipoJurado }} · CI: {{ j.ci }}
+                  </p>
+                </div>
+              </label>
+            </template>
+            
+            <p v-if="(!esFaseDisciplina(faseParaJurados) && juradosParaFase.length === 0) || (esFaseDisciplina(faseParaJurados) && controladoresList.length === 0)" 
+              class="text-center text-slate-400 italic text-sm py-6">
+              No hay personal registrado para este tipo de fase.
+            </p>
           </div>
         </v-card-text>
         <v-card-actions class="pa-4 border-t border-slate-100 bg-slate-50">
@@ -460,6 +486,7 @@ const emit = defineEmits(['volver', 'gestionar-criterios'])
 
 const resumen = ref({ fases: [], pesoEFUTotal: 0, disponibleEFU: 100, gestion: null })
 const juradosList = ref([])
+const controladoresList = ref([])
 const cargando = ref(true)
 const modalOpen = ref(false)
 const editandoId = ref(null)
@@ -469,6 +496,7 @@ const errorFormulario = ref('')
 const modalJuradosOpen = ref(false)
 const faseParaJurados = ref(null)
 const juradosSeleccionados = ref([])
+const usuariosSeleccionados = ref([])
 const savingJurados = ref(false)
 
 // Computed: solo mostrar escritura si la gestión está activa
@@ -562,17 +590,39 @@ const abrirModalJurados = (fase) => {
   faseParaJurados.value = fase
   // Pre-seleccionar los jurados ya asignados
   juradosSeleccionados.value = (fase.jurados || []).map(j => j.idJurado)
+  // Pre-seleccionar los controladores si es fase de disciplina
+  if (esFaseDisciplina(fase)) {
+    usuariosSeleccionados.value = (fase.jurados || [])
+      .filter(j => j.usuario && j.usuario.rol?.nombre === 'controladorhcu')
+      .map(j => j.usuario.idUsuario)
+  }
   modalJuradosOpen.value = true
+}
+
+const esFaseDisciplina = (fase) => {
+  return fase?.nombre?.toLowerCase().includes('disciplina')
+}
+
+const cargarControladores = async () => {
+  try {
+    const { data } = await api.get('/usuarios/controladores')
+    controladoresList.value = data
+  } catch (e) { console.error(e) }
 }
 
 const guardarAsignacionJurados = async () => {
   savingJurados.value = true
   try {
-    await api.post(`/usuarios/fases/${faseParaJurados.value.idFase}/jurados`, {
+    const payload = {
       juradoIds: juradosSeleccionados.value
-    })
+    }
+    if (esFaseDisciplina(faseParaJurados.value)) {
+      payload.usuarioIds = usuariosSeleccionados.value
+    }
+
+    await api.post(`/usuarios/fases/${faseParaJurados.value.idFase}/jurados`, payload)
     modalJuradosOpen.value = false
-    notify.success('Asignación guardada', `${juradosSeleccionados.value.length} jurado(s) asignado(s) a "${faseParaJurados.value.nombre}"`)
+    notify.success('Asignación guardada', `Personal asignado a "${faseParaJurados.value.nombre}"`)
     cargarFases()
   } catch (e) {
     notify.error('Error', 'No se pudo guardar la asignación de jurados.')
@@ -671,5 +721,6 @@ watch(() => props.gestionSeleccionada, cargarFases)
 onMounted(() => {
   cargarFases()
   cargarJurados()
+  cargarControladores()
 })
 </script>
