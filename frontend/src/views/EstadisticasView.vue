@@ -227,7 +227,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, defineComponent } from 'vue'
+import { ref, onMounted, onUnmounted, computed, defineComponent } from 'vue'
 import api from '../services/api'
 import VueApexCharts from 'vue3-apexcharts'
 
@@ -328,8 +328,16 @@ const cargarEstadisticas = async () => {
     }
 }
 
+let refreshInterval = null
+
 onMounted(() => {
     cargarEstadisticas()
+    // Auto-actualizar cada 15 segundos en el dashboard interno
+    refreshInterval = setInterval(cargarEstadisticas, 15000)
+})
+
+onUnmounted(() => {
+    if (refreshInterval) clearInterval(refreshInterval)
 })
 </script>
 

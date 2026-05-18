@@ -388,12 +388,12 @@
             <!-- Estado + Fechas -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha Inicio</label>
-                <input v-model="form.fechaInicio" type="date" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha y Hora Inicio</label>
+                <input v-model="form.fechaInicio" type="datetime-local" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
               </div>
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha Fin</label>
-                <input v-model="form.fechaFin" type="date" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha y Hora Fin</label>
+                <input v-model="form.fechaFin" type="datetime-local" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
               </div>
             </div>
 
@@ -613,11 +613,12 @@ const cargarControladores = async () => {
 const guardarAsignacionJurados = async () => {
   savingJurados.value = true
   try {
-    const payload = {
-      juradoIds: juradosSeleccionados.value
-    }
+    const payload = {}
     if (esFaseDisciplina(faseParaJurados.value)) {
+      payload.juradoIds = []
       payload.usuarioIds = usuariosSeleccionados.value
+    } else {
+      payload.juradoIds = juradosSeleccionados.value
     }
 
     await api.post(`/usuarios/fases/${faseParaJurados.value.idFase}/jurados`, payload)
@@ -631,6 +632,13 @@ const guardarAsignacionJurados = async () => {
   }
 }
 
+const toLocalISOString = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+};
+
 // ── CRUD ──────────────────────────────────────────────────────────────────
 const abrirModal = (item = null) => {
   if (item) {
@@ -639,8 +647,8 @@ const abrirModal = (item = null) => {
       nombre: item.nombre,
       tipoConcurso: item.tipoConcurso || 'EFU',
       pesoPorcentaje: Number(item.pesoPorcentaje),
-      fechaInicio: item.fechaInicio?.split('T')[0] || '',
-      fechaFin: item.fechaFin?.split('T')[0] || '',
+      fechaInicio: toLocalISOString(item.fechaInicio),
+      fechaFin: toLocalISOString(item.fechaFin),
       estaActiva: item.estaActiva,
       urlImagen: item.urlImagen || '',
       juradosIds: item.jurados?.map(j => j.idJurado) || []
@@ -713,7 +721,10 @@ const eliminar = async (fase) => {
   }
 }
 
-const fmtFecha = (s) => s ? new Date(s).toLocaleDateString('es-BO') : '—'
+const fmtFecha = (s) => s ? new Date(s).toLocaleString('es-BO', {
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit'
+}) : '—'
 
 // Recargar si cambia la gestión seleccionada
 watch(() => props.gestionSeleccionada, cargarFases)

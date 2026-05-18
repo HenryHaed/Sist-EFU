@@ -48,7 +48,7 @@ export class EvaluacionesService {
   // 0. Obtener jurados para asignar fases
   async getJuradosDisponibles() {
       return this.juradoRepo.find({
-          relations: ['usuario']
+          relations: ['usuario', 'usuario.rol']
       });
   }
 
@@ -80,7 +80,7 @@ export class EvaluacionesService {
       order: { idFase: 'ASC' }
     });
 
-    const todosJurados = await this.juradoRepo.find({ relations: ['fasesHabilitadas', 'usuario'] });
+    const todosJurados = await this.juradoRepo.find({ relations: ['fasesHabilitadas', 'usuario', 'usuario.rol'] });
     fases.forEach(f => {
       (f as any).jurados = todosJurados.filter(j => j.fasesHabilitadas.some(hf => hf.idFase === f.idFase));
     });
@@ -322,28 +322,66 @@ export class EvaluacionesService {
 
     const frats = await this.fraternidadRepo.find({ where: { habilitadoEfu: true } });
     const evsEfu = await this.evaluacionRepo.find({
-      where: { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } },
+      where: [
+        { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } },
+        { estado: 'EN_PROGRESO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } }
+      ],
       relations: ['fraternidad']
+    });
+
+    const incidencias = await this.incidenciaRepo.find({
+      where: { gestion: { idGestion: gestion.idGestion } },
+      relations: ['fraternidad', 'infraccion']
     });
 
     const evaluadasIds = new Set(evsEfu.map(e => e.fraternidad?.idFraternidad).filter(id => !!id));
     const progreso = frats.length > 0 ? Math.round((evaluadasIds.size / frats.length) * 100) : 0;
 
-    const ranking = new Map<number, { nombre: string, tipo: string, sum: number, count: number }>();
+    const ranking = new Map<number, { nombre: string, tipo: string, sum: number, count: number, impactos: number }>();
+    
+    // Inicializar con todas las fraternidades habilitadas
+    frats.forEach(f => {
+      ranking.set(f.idFraternidad, { 
+        nombre: f.nombre, 
+        tipo: f.categoria?.nombre || 'General', 
+        sum: 0, 
+        count: 0,
+        impactos: 0
+      });
+    });
+
+    // Sumar evaluaciones de jurados
     evsEfu.forEach(e => {
         if (!e.fraternidad) return;
         const pts = Number(e.puntajeTotal) || 0;
         const ex = ranking.get(e.fraternidad.idFraternidad);
         if (ex) { ex.sum += pts; ex.count++; }
-        else ranking.set(e.fraternidad.idFraternidad, { nombre: e.fraternidad.nombre, tipo: e.fraternidad.categoria?.nombre || 'General', sum: pts, count: 1 });
     });
 
-    const rankingSorted = Array.from(ranking.values()).map(r => ({
-        nombre: r.nombre, tipo: r.tipo, puntaje: Number((r.sum / r.count).toFixed(2))
-    })).sort((a, b) => b.puntaje - a.puntaje);
+    // Aplicar impactos de sanciones/puntos extra (HCU)
+    incidencias.forEach(i => {
+        if (!i.fraternidad || !i.infraccion) return;
+        const ex = ranking.get(i.fraternidad.idFraternidad);
+        if (ex) {
+            ex.impactos += Number(i.infraccion.valorImpacto) || 0;
+        }
+    });
+
+    const rankingSorted = Array.from(ranking.values()).map(r => {
+        const promedio = r.count > 0 ? r.sum / r.count : 0;
+        const puntajeFinal = Math.max(0, promedio + r.impactos);
+        return {
+            nombre: r.nombre, 
+            tipo: r.tipo, 
+            puntaje: Number(puntajeFinal.toFixed(2))
+        };
+    }).sort((a, b) => b.puntaje - a.puntaje);
 
     const evsExt = await this.evaluacionRepo.find({
-      where: { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } },
+      where: [
+        { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } },
+        { estado: 'EN_PROGRESO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } }
+      ],
       relations: ['participante', 'fase', 'fraternidad']
     });
 

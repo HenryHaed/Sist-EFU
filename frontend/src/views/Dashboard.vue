@@ -192,14 +192,6 @@
             </div>
 
             <button
-              v-if="can('gestion_sistema')"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
-            >
-              <span class="material-symbols-outlined text-[20px] text-slate-400">admin_panel_settings</span>
-              <span class="text-sm font-bold">Gestión Sistema</span>
-            </button>
-
-            <button
               v-if="can('asistencias')"
               @click="setVista('asistencias')"
               :class="vistaActual === 'asistencias' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
@@ -295,14 +287,13 @@
           </div>
 
           <div class="flex items-center gap-3">
-            <!-- Search -->
-            <button class="size-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 transition-colors">
-              <span class="material-symbols-outlined text-[20px]">search</span>
-            </button>
-            <!-- Notifications -->
-            <button class="size-9 rounded-lg flex items-center justify-center text-slate-500 bg-white hover:text-secondary transition-colors border border-slate-200 relative">
-              <span class="material-symbols-outlined text-[20px]">notifications</span>
-              <span class="absolute top-1.5 right-1.5 size-2 bg-secondary rounded-full border-2 border-white"></span>
+            <!-- Dark Mode Toggle -->
+            <button 
+              @click="toggleDarkMode" 
+              class="size-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 transition-colors border border-slate-200 bg-white shadow-sm"
+              :title="isDarkMode ? 'Modo Claro' : 'Modo Oscuro'"
+            >
+              <span class="material-symbols-outlined text-[20px]">{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</span>
             </button>
             <!-- Timer -->
             <div class="hidden sm:flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm">
@@ -490,10 +481,13 @@
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">lock</span>
                     <input 
                       v-model="newPassword" 
-                      type="password" 
-                      placeholder="Mínimo 6 caracteres"
-                      class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all"
+                      :type="showNewPass ? 'text' : 'password'" 
+                      placeholder="Mínimo 8 caracteres"
+                      class="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all font-bold"
                     />
+                    <button @click="showNewPass = !showNewPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors">
+                      <span class="material-symbols-outlined text-lg">{{ showNewPass ? 'visibility_off' : 'visibility' }}</span>
+                    </button>
                   </div>
                 </div>
                 <div>
@@ -502,11 +496,16 @@
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">check_circle</span>
                     <input 
                       v-model="confirmPassword" 
-                      type="password" 
+                      :type="showConfirmPass ? 'text' : 'password'" 
                       placeholder="Repite la contraseña"
-                      class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all"
+                      class="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all font-bold"
+                      :class="{'border-red-300 bg-red-50': confirmPassword && newPassword !== confirmPassword}"
                     />
+                    <button @click="showConfirmPass = !showConfirmPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors">
+                      <span class="material-symbols-outlined text-lg">{{ showConfirmPass ? 'visibility_off' : 'visibility' }}</span>
+                    </button>
                   </div>
+                  <p v-if="confirmPassword && newPassword !== confirmPassword" class="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-widest">Las contraseñas no coinciden</p>
                 </div>
               </div>
 
@@ -518,9 +517,8 @@
             <v-card-actions class="pa-6 bg-slate-50 border-t border-slate-100">
               <button 
                 @click="actualizarPassword"
-                :disabled="changingPass"
-                class="w-full bg-primary hover:bg-blue-900 text-white font-black py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2"
-                :class="{'opacity-75 cursor-wait': changingPass}"
+                :disabled="changingPass || !newPassword || newPassword.length < 8 || newPassword !== confirmPassword"
+                class="w-full bg-primary hover:bg-blue-900 text-white font-black py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
               >
                 <span v-if="changingPass" class="material-symbols-outlined animate-spin">progress_activity</span>
                 {{ changingPass ? 'Procesando...' : 'Cambiar y Empezar' }}
@@ -534,7 +532,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import api from '../services/api'
@@ -584,6 +582,8 @@ const activeParticipanteId = ref(null)
 const mostrarModalPass = ref(false)
 const newPassword = ref('')
 const confirmPassword = ref('')
+const showNewPass = ref(false)
+const showConfirmPass = ref(false)
 const passError = ref('')
 const changingPass = ref(false)
 
@@ -604,6 +604,20 @@ const can = (permission) => {
   return permissions[role]?.includes(permission) || false
 }
 
+// Dark Mode Toggle Logic
+const isDarkMode = ref(document.documentElement.classList.contains('dark'))
+const toggleDarkMode = () => {
+  if (isDarkMode.value) {
+    document.documentElement.classList.remove('dark')
+    localStorage.theme = 'light'
+    isDarkMode.value = false
+  } else {
+    document.documentElement.classList.add('dark')
+    localStorage.theme = 'dark'
+    isDarkMode.value = true
+  }
+}
+
 // Timer logic
 const timerSegundos = ref(authStore.remainingSessionSeconds)
 let timerInterval = null
@@ -615,6 +629,14 @@ const timer = computed(() => {
 })
 
 onMounted(async () => {
+  if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark')
+    isDarkMode.value = true
+  } else {
+    document.documentElement.classList.remove('dark')
+    isDarkMode.value = false
+  }
+
   timerInterval = setInterval(() => { timerSegundos.value-- }, 1000)
 
   // Cargar info del sitio
@@ -633,16 +655,29 @@ onMounted(async () => {
     mostrarModalPass.value = true
   }
 
-  // Vista inicial según rol
-  if (authStore.userRole?.toLowerCase() === 'representante') {
+  // Cargar vista desde URL si existe
+  const queryVista = router.currentRoute.value.query.v
+  if (queryVista) {
+    vistaActual.value = queryVista
+  }
+
+  // Vista inicial según rol (si no hay query)
+  if (!queryVista && authStore.userRole?.toLowerCase() === 'representante') {
     vistaActual.value = 'inscripcion_fraternidad'
+  }
+})
+
+// Sincronizar vista con URL para habilitar flechas de navegación
+watch(() => router.currentRoute.value.query.v, (newV) => {
+  if (newV && newV !== vistaActual.value) {
+    vistaActual.value = newV
   }
 })
 
 const actualizarPassword = async () => {
   passError.value = ''
-  if (!newPassword.value || newPassword.value.length < 6) {
-    passError.value = 'La contraseña debe tener al menos 6 caracteres.'
+  if (!newPassword.value || newPassword.value.length < 8) {
+    passError.value = 'La contraseña debe tener al menos 8 caracteres.'
     return
   }
   if (newPassword.value !== confirmPassword.value) {
@@ -700,6 +735,9 @@ const tituloVista = computed(() => {
 
 const setVista = (vista) => {
   vistaActual.value = vista
+  // Actualizar URL para habilitar navegación del navegador
+  router.push({ query: { ...router.currentRoute.value.query, v: vista } })
+  
   fraternidadSeleccionada.value = null
   activeFraternidadJurado.value = null
   activeParticipanteNombre.value = null

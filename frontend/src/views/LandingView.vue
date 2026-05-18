@@ -124,12 +124,12 @@
                   <span class="w-12 md:w-16 h-[3px] bg-secondary shadow-sm"></span>
                   Patrimonio Cultural de Bolivia
                 </span>
-                <h1 class="text-5xl md:text-8xl lg:text-9xl font-black italic leading-[0.85] tracking-tighter text-slate-900">
+                <h1 class="text-4xl md:text-8xl lg:text-9xl font-black italic leading-[0.85] tracking-tighter text-slate-900 reveal reveal-left">
                   {{ siteInfo.tituloPrincipal?.split(' ')[0] || 'ENTRADA' }}<br />
                   <span class="text-primary">{{ siteInfo.tituloPrincipal?.split(' ').slice(1).join(' ') || 'UNIVERSITARIA' }}</span><br />
                   <span>{{ siteInfo.nombreSitio || 'UMSA' }}</span>
                 </h1>
-                <p class="text-lg md:text-2xl text-slate-600 max-w-xl font-medium leading-relaxed mt-6 border-l-4 border-secondary pl-4 md:pl-6">
+                <p class="text-lg md:text-2xl text-slate-600 max-w-xl font-medium leading-relaxed mt-6 border-l-4 border-secondary pl-4 md:pl-6 reveal reveal-left">
                   {{ siteInfo.subtituloPrincipal || 'Vive la majestuosidad de nuestras danzas tradicionales en la mayor expresión folklórica universitaria.' }}
                 </p>
                 <div class="flex flex-wrap items-center gap-4 md:gap-6 mt-8 md:mt-10">
@@ -143,35 +143,58 @@
                     Inscribir Fraternidad
                   </router-link>
 
-                  <button class="w-full md:w-auto bg-primary text-white hover:bg-blue-900 px-8 py-4 rounded-full font-black tracking-wider uppercase text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3">
-                    <span class="material-symbols-outlined text-xl">play_circle</span>
-                    Ver Resumen
-                  </button>
-                  <button @click="scrollTo('fraternidades')" class="w-full md:w-auto bg-white hover:bg-slate-50 text-slate-900 border-2 border-slate-200 px-8 py-4 rounded-full font-bold tracking-wider uppercase text-sm transition-all flex items-center justify-center gap-3 text-center">
-                    Danzas
-                    <span class="material-symbols-outlined">arrow_downward</span>
-                  </button>
+                  <router-link
+                    to="/login"
+                    class="w-full md:w-auto bg-primary text-white hover:bg-blue-900 px-8 py-4 rounded-full font-black tracking-wider uppercase text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 reveal reveal-right"
+                  >
+                    <span class="material-symbols-outlined text-base">login</span>
+                    Iniciar Sesión
+                  </router-link>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Stats Bar -->
-          <div class="absolute bottom-0 left-0 w-full border-t border-slate-100 bg-white/80 backdrop-blur-md z-20">
-            <div class="flex justify-start px-6 md:px-12 lg:px-24 py-6 md:py-8 gap-10 md:gap-16 overflow-x-auto no-scrollbar">
-              <div class="flex flex-col gap-1 shrink-0">
-                <span class="text-3xl md:text-4xl font-black italic text-primary">65+</span>
-                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Fraternidades</span>
-              </div>
-              <div class="w-px h-10 bg-slate-200 self-center shrink-0"></div>
-              <div class="flex flex-col gap-1 shrink-0">
-                <span class="text-3xl md:text-4xl font-black italic text-primary">20k</span>
-                <span class="text-xs text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Bailarines</span>
-              </div>
-              <div class="w-px h-10 bg-slate-200 self-center shrink-0"></div>
-              <div class="flex flex-col gap-1 shrink-0">
-                <span class="text-3xl md:text-4xl font-black italic text-secondary">36</span>
-                <span class="text-xs text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Años Tradición</span>
+          <div class="absolute bottom-0 left-0 w-full border-t border-slate-100 bg-white/80 backdrop-blur-md z-20 overflow-hidden">
+            <div class="marquee-container py-6 md:py-8">
+              <div class="marquee-content flex items-center gap-10 md:gap-16">
+                <!-- Group 1 -->
+                <div class="flex items-center gap-10 md:gap-16 shrink-0">
+                  <div class="flex flex-col gap-1 shrink-0">
+                    <span class="text-3xl md:text-4xl font-black italic text-primary">80+</span>
+                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Fraternidades</span>
+                  </div>
+                  <div class="w-px h-10 bg-slate-200 self-center shrink-0"></div>
+                  <div class="flex flex-col gap-1 shrink-0">
+                    <span class="text-3xl md:text-4xl font-black italic text-primary">+10k</span>
+                    <span class="text-xs text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Bailarines</span>
+                  </div>
+                  <div class="w-px h-10 bg-slate-200 self-center shrink-0"></div>
+                  <div class="flex flex-col gap-1 shrink-0">
+                    <span class="text-3xl md:text-4xl font-black italic text-secondary">{{ aniosTradicion }}</span>
+                    <span class="text-xs text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Años Tradición</span>
+                  </div>
+                  <div class="w-px h-10 bg-slate-200 self-center shrink-0"></div>
+                </div>
+                <!-- Duplicate for Seamless Loop -->
+                <div class="flex items-center gap-10 md:gap-16 shrink-0">
+                  <div class="flex flex-col gap-1 shrink-0">
+                    <span class="text-3xl md:text-4xl font-black italic text-primary">80+</span>
+                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Fraternidades</span>
+                  </div>
+                  <div class="w-px h-10 bg-slate-200 self-center shrink-0"></div>
+                  <div class="flex flex-col gap-1 shrink-0">
+                    <span class="text-3xl md:text-4xl font-black italic text-primary">+10k</span>
+                    <span class="text-xs text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Bailarines</span>
+                  </div>
+                  <div class="w-px h-10 bg-slate-200 self-center shrink-0"></div>
+                  <div class="flex flex-col gap-1 shrink-0">
+                    <span class="text-3xl md:text-4xl font-black italic text-secondary">{{ aniosTradicion }}</span>
+                    <span class="text-xs text-slate-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">Años Tradición</span>
+                  </div>
+                  <div class="w-px h-10 bg-slate-200 self-center shrink-0"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -180,14 +203,17 @@
 
       <!-- ===== FRATERNIDADES ===== -->
       <section class="py-16 md:py-24 px-6 md:px-12 lg:px-24 bg-white" id="fraternidades">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-16 gap-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-16 gap-6 reveal reveal-left">
           <div>
             <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic uppercase tracking-tighter">FRATERNIDADES <span class="text-secondary">ESTRELLA</span></h2>
             <div class="h-1.5 w-24 md:w-32 bg-primary mt-4"></div>
           </div>
-          <a href="#" class="text-primary font-bold flex items-center gap-2 hover:text-secondary transition-colors tracking-widest uppercase text-xs md:text-sm">
-            Ver todas <span class="material-symbols-outlined">arrow_forward</span>
-          </a>
+          <button 
+            @click="mostrarRanking = true"
+            class="text-primary font-black flex items-center gap-2 hover:text-secondary transition-all tracking-[0.2em] uppercase text-[10px] md:text-xs"
+          >
+            Ver todas <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          </button>
         </div>
         <div class="grid grid-cols-12 gap-6 md:gap-8">
           <!-- Featured card -->
@@ -219,41 +245,50 @@
         </div>
       </section>
 
-      <!-- ===== RECORRIDO ===== -->
-      <section class="py-16 md:py-24 px-6 md:px-12 lg:px-24 bg-slate-50 relative overflow-hidden" id="ruta">
-        <div class="andean-dots absolute inset-0 opacity-30"></div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 md:gap-20 items-center relative z-10">
-          <div class="relative">
-            <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-6 md:mb-8 uppercase tracking-tighter">RECORRIDO <span class="text-primary">OFICIAL</span></h2>
-            <p class="text-slate-600 mb-8 md:mb-12 leading-relaxed text-base md:text-lg font-medium text-left">Puntos estratégicos desde el Monoblock hasta el Estadio Siles.</p>
-            <div class="space-y-4 md:space-y-6">
-              <div v-for="(punto, i) in ruta" :key="i"
-                class="flex items-start gap-4 md:gap-6 p-4 md:p-6 rounded-2xl bg-white shadow-sm border border-slate-100 hover:shadow-md transition-all text-left">
-                <span class="size-8 md:size-10 rounded-full flex items-center justify-center font-black shrink-0 text-white text-sm md:text-base" :class="i % 2 === 0 ? 'bg-primary' : 'bg-secondary'">{{ i + 1 }}</span>
-                <div>
-                  <h4 class="font-bold text-slate-900 text-lg md:text-xl uppercase italic">{{ punto.titulo }}</h4>
-                  <p class="text-slate-500 font-medium text-xs md:text-sm">{{ punto.desc }}</p>
+      <!-- ===== RUTA / RECORRIDO ===== -->
+      <section class="py-20 md:py-32 px-6 md:px-12 lg:px-24 bg-slate-50 relative overflow-hidden" id="ruta">
+        <div class="absolute top-0 right-0 w-1/2 h-full opacity-5 pointer-events-none">
+          <span class="material-symbols-outlined text-[400px] -mr-32 -mt-20">map</span>
+        </div>
+        
+        <div class="max-w-7xl mx-auto relative z-10">
+          <div class="text-center mb-16 md:mb-24 reveal reveal-left">
+            <h2 class="text-4xl md:text-6xl font-black text-slate-900 italic tracking-tighter uppercase mb-4">RECORRIDO <span class="text-primary">OFICIAL</span></h2>
+            <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Sigue la ruta de la entrada universitaria</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <!-- Timeline -->
+            <div class="space-y-12 relative">
+              <div class="absolute left-6 top-0 w-1 h-full bg-slate-200 rounded-full"></div>
+              
+              <div v-for="(item, idx) in ruta" :key="idx" class="relative pl-16 reveal reveal-left">
+                <div class="absolute left-0 top-0 size-12 bg-white rounded-2xl shadow-lg border border-slate-100 flex items-center justify-center z-10">
+                  <span class="text-primary font-black italic text-lg">{{ idx + 1 }}</span>
                 </div>
+                <h3 class="text-xl md:text-2xl font-black text-slate-800 italic uppercase mb-2">{{ item.titulo }}</h3>
+                <p class="text-slate-500 font-medium leading-relaxed max-w-md">{{ item.desc }}</p>
               </div>
             </div>
-          </div>
-          <div 
-            @click="mostrarMapa = true"
-            class="relative h-[350px] md:h-[600px] rounded-[2rem] md:rounded-[3rem] overflow-hidden border border-slate-200 shadow-2xl group cursor-pointer transition-all duration-500"
-          >
-            <img alt="Mapa Ruta" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-1000"
-              src="/src/assets/img/Maps.png" />
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent"></div>
-            <div class="absolute bottom-6 md:bottom-10 left-6 md:left-10 right-6 md:right-10 p-5 md:p-8 bg-white/95 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
-              <div class="text-center md:text-left">
-                <p class="text-[8px] md:text-[10px] text-secondary font-black uppercase tracking-widest mb-1">GPS Activo</p>
-                <span class="text-slate-900 font-black italic text-lg md:text-2xl uppercase">Ruta del Folklore</span>
+
+            <!-- Map Placeholder / Interactive Area -->
+            <div class="relative group reveal reveal-right" @click="mostrarMapa = true">
+              <div class="relative h-[350px] md:h-[600px] rounded-[2rem] md:rounded-[3rem] overflow-hidden border border-slate-200 shadow-2xl group cursor-pointer transition-all duration-500">
+                <img alt="Mapa Ruta" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-1000"
+                  src="/src/assets/img/Maps.png" />
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent"></div>
+                <div class="absolute bottom-6 md:bottom-10 left-6 md:left-10 right-6 md:right-10 p-5 md:p-8 bg-white/95 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
+                  <div class="text-center md:text-left">
+                    <p class="text-[8px] md:text-[10px] text-secondary font-black uppercase tracking-widest mb-1">GPS Activo</p>
+                    <span class="text-slate-900 font-black italic text-lg md:text-2xl uppercase">Ruta del Folklore</span>
+                  </div>
+                  <button 
+                    class="w-full md:w-auto bg-primary text-white px-6 py-3 rounded-full text-[10px] md:text-xs font-black uppercase shadow-lg shadow-primary/20 group-hover:bg-secondary transition-colors"
+                  >
+                    Ver el mapa aquí
+                  </button>
+                </div>
               </div>
-              <button 
-                class="w-full md:w-auto bg-primary text-white px-6 py-3 rounded-full text-[10px] md:text-xs font-black uppercase shadow-lg shadow-primary/20 group-hover:bg-secondary transition-colors"
-              >
-                Ver el mapa aquí
-              </button>
             </div>
           </div>
         </div>
@@ -289,13 +324,15 @@
 
       <!-- ===== ESTADÍSTICAS ===== -->
       <section class="py-16 md:py-24 px-6 md:px-12 lg:px-24 bg-white" id="estadisticas">
-        <div class="text-center mb-12 md:mb-16">
+        <div class="text-center mb-12 md:mb-16 reveal">
           <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">RANKING <span class="text-secondary">FRATERNIDADES</span></h2>
           <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">Puntuación en tiempo real</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-          <div v-for="(item, i) in rankingPublico" :key="i"
-            class="p-8 md:p-10 rounded-3xl bg-white border border-slate-100 shadow-lg shadow-slate-100/50 hover:shadow-xl hover:border-slate-200 transition-all relative text-left">
+          <div v-for="(item, i) in rankingPublico.slice(0, 3)" :key="item.nombre"
+            class="p-8 md:p-10 rounded-3xl bg-white border border-slate-100 shadow-lg shadow-slate-100/50 hover:shadow-xl hover:border-slate-200 transition-all relative text-left reveal"
+            :class="i % 2 === 0 ? 'reveal-left' : 'reveal-right'"
+          >
             <div class="flex justify-between items-start mb-6 md:mb-8 text-left">
               <div class="text-[9px] md:text-[10px] font-black px-3 py-1 rounded-full uppercase" :class="i === 0 ? 'bg-secondary/10 text-secondary' : 'bg-slate-100 text-slate-500'">
                 Top 0{{ i + 1 }}</div>
@@ -303,11 +340,11 @@
             </div>
             <h4 class="text-xl md:text-2xl font-bold text-slate-900 mb-6 uppercase italic">{{ item.nombre }}</h4>
             <div class="w-full h-2.5 md:h-3 bg-slate-100 rounded-full overflow-hidden">
-              <div class="h-full rounded-full" :class="i === 0 ? 'bg-secondary' : 'bg-primary'" :style="{ width: item.puntaje + '%' }"></div>
+              <div class="h-full rounded-full" :class="i === 0 ? 'bg-secondary' : 'bg-primary'" :style="{ width: Math.max(item.puntaje, 5) + '%' }"></div>
             </div>
             <div class="mt-8 flex justify-between text-[9px] md:text-[10px] font-bold text-slate-400 tracking-widest">
-              <span>COREO: {{ item.coreo }}</span>
-              <span>VESTIM: {{ item.vest }}</span>
+              <span>CATEGORÍA: {{ item.tipo }}</span>
+              <span>OFICIAL</span>
             </div>
           </div>
         </div>
@@ -326,15 +363,15 @@
             <v-card-title class="bg-slate-900 text-white d-flex align-center justify-space-between pa-6">
               <div class="d-flex align-center gap-3 font-black italic uppercase tracking-tighter text-xl">
                 <span class="material-symbols-outlined text-secondary text-3xl">leaderboard</span>
-                TOP 10 FRATERNIDADES
+                RANKING GENERAL DE FRATERNIDADES
               </div>
               <v-btn icon="close" variant="text" color="white" @click="mostrarRanking = false"></v-btn>
             </v-card-title>
             
             <v-card-text class="pa-0 bg-white">
-              <div class="divide-y divide-slate-100">
+              <div class="divide-y divide-slate-100 overflow-y-auto" style="max-height: 500px;">
                 <div 
-                  v-for="(f, i) in top10Completo" 
+                  v-for="(f, i) in rankingPublico" 
                   :key="i"
                   class="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors"
                 >
@@ -347,7 +384,7 @@
                     </span>
                     <div>
                       <p class="font-black text-slate-900 uppercase tracking-tight leading-none mb-1 text-sm">{{ f.nombre }}</p>
-                      <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{{ f.categoria }}</p>
+                      <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{{ f.tipo }}</p>
                     </div>
                   </div>
                   <div class="text-right">
@@ -381,32 +418,44 @@
             </div>
             <p class="text-slate-500 max-w-sm mb-6 md:mb-8 leading-relaxed font-medium text-xs md:text-base">Organizado por la Comisión de Cultura de la Universidad Mayor de San Andrés.</p>
             <div class="flex gap-4 justify-start">
-              <a v-for="icon in ['social_leaderboard','photo_camera','play_arrow']" :key="icon" href="#"
+              <a href="https://www.facebook.com/umsafp" target="_blank" title="Facebook UMSA"
                 class="size-10 md:size-11 rounded-full bg-white flex items-center justify-center text-slate-400 hover:text-primary transition-all border border-slate-200 shadow-sm">
-                <span class="material-symbols-outlined text-lg">{{ icon }}</span>
+                <span class="material-symbols-outlined text-lg">facebook</span>
+              </a>
+              <a href="https://www.facebook.com/FCPN.UMSA" target="_blank" title="Facebook FCPN"
+                class="size-10 md:size-11 rounded-full bg-white flex items-center justify-center text-slate-400 hover:text-primary transition-all border border-slate-200 shadow-sm">
+                <span class="material-symbols-outlined text-lg">groups</span>
+              </a>
+              <a href="https://www.youtube.com/@UMSA_Oficial" target="_blank" title="YouTube UMSA"
+                class="size-10 md:size-11 rounded-full bg-white flex items-center justify-center text-slate-400 hover:text-primary transition-all border border-slate-200 shadow-sm">
+                <span class="material-symbols-outlined text-lg">play_circle</span>
               </a>
             </div>
           </div>
           <div class="text-left">
             <h4 class="font-black text-slate-900 mb-6 md:mb-8 uppercase tracking-widest text-[9px] md:text-[10px]">Información</h4>
             <ul class="space-y-4 text-slate-500 text-[10px] md:text-xs font-bold uppercase">
-              <li><a class="hover:text-primary transition-colors" href="#">Fraternidades</a></li>
-              <li><a class="hover:text-primary transition-colors" href="#">Ruta Oficial</a></li>
-              <li><a class="hover:text-primary transition-colors" href="#">Reglamento</a></li>
-              <li><a class="hover:text-primary transition-colors" href="#">Prensa</a></li>
+              <li><a @click.prevent="scrollTo('fraternidades')" href="#fraternidades" class="hover:text-primary transition-colors cursor-pointer">Fraternidades</a></li>
+              <li><a @click.prevent="scrollTo('ruta')" href="#ruta" class="hover:text-primary transition-colors cursor-pointer">Ruta Oficial</a></li>
+              <li><a @click.prevent="scrollTo('estadisticas')" href="#estadisticas" class="hover:text-primary transition-colors cursor-pointer">Estadísticas</a></li>
             </ul>
           </div>
           <div class="text-left">
             <h4 class="font-black text-slate-900 mb-6 md:mb-8 uppercase tracking-widest text-[9px] md:text-[10px]">Contacto</h4>
             <ul class="space-y-4 md:space-y-5 text-slate-500 text-[10px] md:text-xs font-medium">
-              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">mail</span> cultura@umsa.bo</li>
-              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">call</span> +591 2 2441515</li>
-              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">location_on</span> Campus Central, LP</li>
+              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">mail</span> divisionculturayartesumsa@gmail.com</li>
+              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">call</span> (591 - 2) 2445499</li>
+              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">location_on</span> Av. Villazón N° 1995, Plaza del Bicentenario - Zona Central.
+              <br>Ciudad de La Paz. Bolivia</li>
             </ul>
           </div>
         </div>
-        <div class="pt-10 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-6 text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center md:text-left">
-          <p>© 2026 UMSA. Patrimonio Cultural de Bolivia.</p>
+        <div class="pt-10 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-6 text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center md:text-left group cursor-help overflow-visible">
+          <p class="relative">© 2026 UMSA. Patrimonio Cultural de Bolivia. 
+            <span class="developer-credit md:absolute md:left-full md:ml-4 text-primary opacity-0 select-none whitespace-nowrap transition-opacity duration-1000">
+              Desarrollado por D. Henry Aguilar Estrada
+            </span>
+          </p>
           <div class="flex gap-6 md:gap-8">
             <a class="hover:text-primary transition-colors" href="#">Privacidad</a>
             <a class="hover:text-primary transition-colors" href="#">Términos</a>
@@ -419,7 +468,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import api from '../services/api'
 
 import { getImageUrl } from '../utils/url'
@@ -428,22 +477,79 @@ const siteInfo = ref({})
 const mostrarMapa = ref(false)
 const mainRef = ref(null)
 
-onMounted(async () => {
+const aniosTradicion = computed(() => {
+  const currentYear = new Date().getFullYear()
+  return currentYear - 1988
+})
+
+const rankingPublico = ref([])
+const loadingRanking = ref(true)
+let refreshInterval = null
+
+const cargarDatos = async () => {
   try {
     const { data } = await api.get('/evaluaciones/gestion-activa')
     if (data) {
-       // Transformamos las URLs para que apunten al backend
        data.urlLogo = getImageUrl(data.urlLogo)
        data.urlBanner = getImageUrl(data.urlBanner)
        siteInfo.value = data
     }
+  } catch (err) {}
+
+  try {
+    const { data } = await api.get('/evaluaciones/estadisticas')
+    rankingPublico.value = data.rankingEfu || []
   } catch (err) {
-    console.warn('Usando valores por defecto')
+    console.error('Error al cargar ranking:', err)
+  } finally {
+    loadingRanking.value = false
   }
+}
+
+onMounted(() => {
+  cargarDatos()
+  // Actualizar cada 15 segundos para "tiempo real"
+  refreshInterval = setInterval(cargarDatos, 15000)
+
+  // Reveal Animations
+  const observerOptions = { threshold: 0.1 };
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('reveal-active');
+      }
+    });
+  }, observerOptions);
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // Watch for dynamic elements (ranking)
+  watch(rankingPublico, () => {
+    setTimeout(() => {
+      document.querySelectorAll('.reveal:not(.reveal-active)').forEach(el => observer.observe(el));
+    }, 500);
+  });
+
+  // Escuchar flechas del navegador para navegación por hash
+  window.addEventListener('popstate', () => {
+    const hash = window.location.hash.replace('#', '')
+    if (hash) {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
+    }
+  })
+})
+
+onUnmounted(() => {
+  if (refreshInterval) clearInterval(refreshInterval)
 })
 
 const scrollTo = (id) => {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  const el = document.getElementById(id)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
+    // Actualizar hash en URL para habilitar flechas del navegador
+    history.pushState(null, null, `#${id}`)
+  }
 }
 
 const ruta = [
@@ -453,25 +559,6 @@ const ruta = [
 ]
 
 const mostrarRanking = ref(false)
-
-const rankingPublico = [
-  { nombre: 'Morenada Derecho', puntaje: 98, coreo: '10', vest: '10' },
-  { nombre: 'Caporales Ingeniería', puntaje: 96, coreo: '10', vest: '9' },
-  { nombre: 'Diablada Medicina', puntaje: 94, coreo: '9', vest: '9' },
-]
-
-const top10Completo = [
-  { nombre: 'Morenada Derecho', puntaje: 98, categoria: 'Danza Pesada' },
-  { nombre: 'Caporales Ingeniería', puntaje: 96, categoria: 'Danza Liviana' },
-  { nombre: 'Diablada Medicina', puntaje: 94, categoria: 'Danza Liviana' },
-  { nombre: 'Tinkus Wistus Eco.', puntaje: 93, categoria: 'Autóctona' },
-  { nombre: 'Tobas Agronomía', puntaje: 91, categoria: 'Danza Liviana' },
-  { nombre: 'Kullawada Trabajo Social', puntaje: 89, categoria: 'Danza Liviana' },
-  { nombre: 'Llamerada Odontología', puntaje: 87, categoria: 'Danza Liviana' },
-  { nombre: "Ch'utas Arquitectura", puntaje: 85, categoria: 'Autóctona' },
-  { nombre: 'Saya Afroboliviana', puntaje: 84, categoria: 'Autóctona' },
-  { nombre: 'Doctorcitos Derecho', puntaje: 82, categoria: 'Danza Liviana' },
-]
 </script>
 
 <style scoped>
@@ -487,5 +574,61 @@ const top10Completo = [
 
 .paper-texture {
   background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCVoBK5Il_QGy-7Iy1Dq1wMTFeDcvRCKMMdPn_gGNcIVvrshsRu92LQo5SErct1KZ_e0rs9ENqLTeuDHbIQOLwvxsCx8cSz26YagoeKhKxaOR_YnGDs2l2Yvyo3fIIwScWj4biWfa4aLdg5OKodYaRcUhzXMnmU19N2JN1mUg5IPNc9iwQCshwKQHaxDALkB1ggXUF-GdVuTCeufIy47kd4bMpy7J5kV9zcXJR12QyqyASYLgtbt12gFTPk_DJSqK3jmkUSIGe-rqU');
+}
+
+/* Marquee Animation */
+.marquee-container {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.marquee-content {
+  display: inline-flex;
+  animation: marquee 25s linear infinite;
+  padding-left: 24px;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Pause on hover for better UX */
+.marquee-container:hover .marquee-content {
+  animation-play-state: paused;
+}
+
+/* Scroll Reveal Animations */
+.reveal {
+  opacity: 0;
+  transition: all 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform, opacity;
+}
+
+.reveal-left {
+  transform: translateX(-60px);
+}
+
+.reveal-right {
+  transform: translateX(60px);
+}
+
+.reveal-active {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+}
+
+/* Easter Egg Delay */
+.developer-credit {
+  transition-delay: 0s;
+}
+.group:hover .developer-credit {
+  opacity: 1 !important;
+  transition-delay: 2s;
+}
+/* For mobile tap */
+.group:active .developer-credit {
+  opacity: 1 !important;
+  transition-delay: 1s;
 }
 </style>

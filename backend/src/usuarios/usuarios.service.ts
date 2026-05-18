@@ -327,7 +327,7 @@ export class UsuariosService {
     return { message: 'Usuario eliminado con éxito' };
   }
 
-  async registerRepresentante(data: { ci: string; nombres: string; primerApellido: string; segundoApellido?: string; password: string }) {
+  async registerRepresentante(data: { ci: string; nombres: string; primerApellido: string; segundoApellido?: string; password?: string }) {
     // 1. Verificar si la inscripción pública está habilitada
     const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
     if (!gestionActiva || !gestionActiva.permiteInscripcionPublica) {
@@ -344,7 +344,8 @@ export class UsuariosService {
     }
 
     // 3. Crear el usuario
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const rawPassword = data.password || data.ci;
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const newUser = this.usuarioRepo.create({
         ...data,
         password: hashedPassword,

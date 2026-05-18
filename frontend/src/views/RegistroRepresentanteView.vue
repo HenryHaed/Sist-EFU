@@ -76,23 +76,6 @@
                   class="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:bg-white text-slate-900 transition-all outline-none text-base font-bold"
                 />
               </div>
-
-              <!-- Password -->
-              <div>
-                <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">Contraseña</label>
-                <div class="relative">
-                  <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">lock</span>
-                  <input
-                    v-model="form.password"
-                    :type="showPass ? 'text' : 'password'" required
-                    placeholder="••••••••"
-                    class="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:bg-white text-slate-900 transition-all outline-none text-base font-bold"
-                  />
-                  <button type="button" @click="showPass = !showPass" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
-                    <span class="material-symbols-outlined text-xl">{{ showPass ? 'visibility_off' : 'visibility' }}</span>
-                  </button>
-                </div>
-              </div>
             </div>
 
             <!-- Terms -->
@@ -131,6 +114,53 @@
         </div>
       </div>
 
+      <!-- Success Modal -->
+      <v-dialog v-model="showSuccessModal" max-width="500" persistent>
+        <v-card class="rounded-3xl border-4 border-emerald-500 overflow-hidden">
+          <div class="bg-emerald-500 p-8 text-white text-center">
+             <div class="size-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-white/40">
+                <span class="material-symbols-outlined text-5xl">check_circle</span>
+             </div>
+             <h3 class="text-3xl font-black italic uppercase tracking-tighter">¡Registro Exitoso!</h3>
+          </div>
+          
+          <v-card-text class="pa-10 text-center bg-white">
+            <p class="text-slate-800 text-lg font-bold mb-4">¡Bienvenido al Sistema EFU!</p>
+            <p class="text-slate-600 mb-6 leading-relaxed">
+              Tu cuenta ha sido creada correctamente. Tu **Carnet de Identidad (CI)** es tu contraseña inicial.
+            </p>
+            
+            <div class="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3 text-left mb-8">
+              <span class="material-symbols-outlined text-amber-600 mt-0.5">info</span>
+              <div>
+                <p class="text-[10px] font-black uppercase text-amber-600 tracking-widest mb-1">Nota importante</p>
+                <p class="text-[11px] text-amber-800 font-bold leading-relaxed">
+                  Por seguridad, el sistema te pedirá cambiar tu contraseña al ingresar por primera vez.
+                </p>
+              </div>
+            </div>
+
+            <div v-if="countdown > 0" class="flex flex-col items-center gap-2">
+              <div class="size-12 rounded-full border-4 border-slate-100 flex items-center justify-center">
+                <span class="text-xl font-black text-primary">{{ countdown }}</span>
+              </div>
+              <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Espera un momento...</p>
+            </div>
+          </v-card-text>
+
+          <v-card-actions class="pa-8 pt-0 bg-white">
+            <button 
+              @click="goToLogin"
+              :disabled="countdown > 0"
+              class="w-full py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl"
+              :class="countdown > 0 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-primary text-white hover:brightness-110 shadow-primary/20'"
+            >
+              Entendido, ir al Login
+            </button>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
       <!-- Right Side: Cinematic Image -->
       <div class="hidden md:flex md:w-1/2 lg:w-1/3 hero-image relative items-end p-12 order-first md:order-last">
         <div class="relative z-10">
@@ -167,15 +197,16 @@ import Swal from 'sweetalert2'
 
 const router = useRouter()
 const loading = ref(false)
-const showPass = ref(false)
 const siteInfo = ref({})
+
+const showSuccessModal = ref(false)
+const countdown = ref(5)
 
 const form = ref({
   ci: '',
   nombres: '',
   primerApellido: '',
   segundoApellido: '',
-  password: ''
 })
 
 onMounted(async () => {
@@ -187,20 +218,20 @@ onMounted(async () => {
   }
 })
 
+const startCountdown = () => {
+  countdown.value = 5
+  const timer = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) clearInterval(timer)
+  }, 1000)
+}
+
 const handleRegister = async () => {
   loading.value = true
   try {
     await api.post('/usuarios/registrar-representante', form.value)
-    
-    await Swal.fire({
-      title: '¡Registro Exitoso!',
-      text: 'Tu cuenta ha sido creada. Ahora puedes iniciar sesión para inscribir a tu fraternidad.',
-      icon: 'success',
-      confirmButtonText: 'Ir al Login',
-      confirmButtonColor: '#004a99'
-    })
-    
-    router.push('/login')
+    showSuccessModal.value = true
+    startCountdown()
   } catch (err) {
     console.error('Error en registro:', err)
     Swal.fire({
@@ -212,6 +243,11 @@ const handleRegister = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const goToLogin = () => {
+  showSuccessModal.value = false
+  router.push('/login')
 }
 
 const backgroundImg = computed(() => {

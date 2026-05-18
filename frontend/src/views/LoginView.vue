@@ -123,7 +123,7 @@
 
             <!-- Volver al inicio -->
             <router-link to="/"
-              class="mt-3 flex items-center justify-center gap-1 text-[11px] font-bold text-slate-400 hover:text-primary transition-colors mx-auto">
+              class="mt-3 flex items-center justify-center gap-1 text-[15px] font-bold text-slate-400 hover:text-primary transition-colors mx-auto">
               <span class="material-symbols-outlined text-sm">arrow_back</span>
               Volver al Inicio
             </router-link>
