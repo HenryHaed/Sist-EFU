@@ -41,6 +41,9 @@ export class SolicitudInscripcion {
     @Column({ name: 'nombre_fraternidad', length: 255 })
     nombreFraternidad: string;
 
+    @Column({ name: 'origen_fraternidad', length: 50, default: 'General' })
+    origenFraternidad: string;
+
     // 2. Instancia a la que representa
     @Column({ type: 'enum', enum: InstanciaRepresentacion, name: 'instancia_representacion' })
     instanciaRepresentacion: InstanciaRepresentacion;

@@ -6,6 +6,7 @@ import { Fase } from '../entities/Fase';
 import { Fraternidad } from '../entities/Fraternidad';
 import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
+import { Gestion } from '../entities/Gestion';
 
 @Injectable()
 export class ParticipantesService {
@@ -20,7 +21,15 @@ export class ParticipantesService {
     private facultadRepo: Repository<Facultad>,
     @InjectRepository(Carrera)
     private carreraRepo: Repository<Carrera>,
+    @InjectRepository(Gestion)
+    private gestionRepo: Repository<Gestion>,
   ) {}
+
+  async getGestionActiva() {
+    let g = await this.gestionRepo.findOne({ where: { activa: true } });
+    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
+    return g;
+  }
 
   async findAllByFase(idFase: number) {
     return this.participanteRepo.find({
@@ -36,13 +45,16 @@ export class ParticipantesService {
     const fase = await this.faseRepo.findOne({ where: { idFase } });
     if (!fase) throw new NotFoundException('Fase no encontrada');
 
+    const gestion = await this.getGestionActiva();
+
     const nuevo = this.participanteRepo.create({
       nombre,
       tipo,
       fase,
       esUmsa: !!esUmsa,
       institucionExterna,
-      perteneceFraternidad: !!perteneceFraternidad
+      perteneceFraternidad: !!perteneceFraternidad,
+      gestion: gestion ? { idGestion: gestion.idGestion } as any : null
     });
 
     if (idFraternidad) {

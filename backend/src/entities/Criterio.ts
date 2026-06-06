@@ -1,10 +1,15 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Gestion } from './Gestion';
 import { Fase } from './Fase';
 
 @Entity('criterios')
 export class Criterio {
     @PrimaryGeneratedColumn({ name: 'id_criterio' })
     idCriterio: number;
+
+    @ManyToOne(() => Gestion, (gestion) => gestion.criterios, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'id_gestion' })
+    gestion: Gestion;
 
     @ManyToOne(() => Fase, (fase) => fase.criterios)
     @JoinColumn({ name: 'id_fase' })

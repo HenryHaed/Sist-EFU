@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import * as fs from 'fs';
 import * as path from 'path';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not, In } from 'typeorm';
+import { Repository, Not, In, DataSource } from 'typeorm';
 import { Evaluacion } from '../entities/Evaluacion';
 import { Jurado } from '../entities/Jurado';
 import { Fase } from '../entities/Fase';
@@ -43,6 +43,7 @@ export class EvaluacionesService {
     private readonly infraccionRepo: Repository<Infraccion>,
     @InjectRepository(Usuario)
     private readonly usuarioRepo: Repository<Usuario>,
+    private readonly dataSource: DataSource,
   ) {}
 
   // 0. Obtener jurados para asignar fases
@@ -164,7 +165,7 @@ export class EvaluacionesService {
           mensajeBloqueo: adminAcceso ? null : (!isActivaGlobal ? 'Fase inactiva.' : (!isVigente ? 'Fuera de fecha.' : null))
         };
       });
-    } catch (e) {
+    } catch (e: any) {
       throw new Error("TRACE: " + e.message);
     }
   }
@@ -377,24 +378,6 @@ export class EvaluacionesService {
         };
     }).sort((a, b) => b.puntaje - a.puntaje);
 
-    const evsExt = await this.evaluacionRepo.find({
-      where: [
-        { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } },
-        { estado: 'EN_PROGRESO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } }
-      ],
-      relations: ['participante', 'fase', 'fraternidad']
-    });
-
-    const concMap = new Map<number, { nombre: string, parts: any[] }>();
-    evsExt.forEach(e => {
-        if (!e.fase || !e.participante) return;
-        let c = concMap.get(e.fase.idFase);
-        if (!c) { c = { nombre: e.fase.nombre, parts: [] }; concMap.set(e.fase.idFase, c); }
-        const p = c.parts.find(x => x.id === e.participante.idParticipante);
-        if (p) { p.sum += Number(e.puntajeTotal); p.count++; p.puntaje = Number((p.sum / p.count).toFixed(2)); }
-        else c.parts.push({ id: e.participante.idParticipante, nombre: e.participante.nombre, fraternidad: e.fraternidad?.nombre || 'Ext', puntaje: Number(e.puntajeTotal), sum: Number(e.puntajeTotal), count: 1 });
-    });
-
     return {
       basico: [
         { label: 'Total Fraternidades', valor: frats.length, badge: 'Habilitadas', progreso: 100 },
@@ -402,7 +385,7 @@ export class EvaluacionesService {
         { label: 'Ranking Top', valor: rankingSorted.length > 0 ? rankingSorted[0].nombre : '—', badge: 'Líder Actual', progreso: 100 }
       ],
       rankingEfu: rankingSorted,
-      concursos: Array.from(concMap.values()).map(c => ({ nombre: c.nombre, top: c.parts.sort((a,b) => b.puntaje - a.puntaje).slice(0,5) })),
+      concursos: [],
       gestion: { anio: gestion.anio, edicion: 'XXXV' }
     };
   }
@@ -457,6 +440,97 @@ export class EvaluacionesService {
       .map((p, idx) => ({ ...p, posicion: idx + 1 }));
 
     return { fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: fase.tipoConcurso }, finalistas };
+  }
+
+  async clonarGestion(idOrigen: number, idDestino: number, modules: string[]) {
+    const origen = await this.gestionRepo.findOne({ where: { idGestion: idOrigen } });
+    const destino = await this.gestionRepo.findOne({ where: { idGestion: idDestino } });
+    if (!origen || !destino) throw new NotFoundException('Gestión de origen o destino no encontrada');
+
+    const result = { fases: 0, criterios: 0, categorias: 0, infracciones: 0, fraternidadesExtra: 0 };
+
+    if (modules.includes('fases_criterios')) {
+      const fasesOrigen = await this.faseRepo.find({ where: { gestion: { idGestion: idOrigen } } });
+      for (const fase of fasesOrigen) {
+        const nf = this.faseRepo.create({
+          nombre: fase.nombre, pesoPorcentaje: fase.pesoPorcentaje,
+          urlImagen: fase.urlImagen, tipoConcurso: fase.tipoConcurso, gestion: { idGestion: idDestino } as any
+        });
+        const savedF = await this.faseRepo.save(nf);
+        result.fases++;
+
+        const criterios = await this.criterioRepo.find({ where: { fase: { idFase: fase.idFase } } });
+        for (const crit of criterios) {
+          const nc = this.criterioRepo.create({
+            nombre: crit.nombre, puntajeMaximo: crit.puntajeMaximo, 
+            urlImagen: crit.urlImagen, fase: { idFase: savedF.idFase } as any, gestion: { idGestion: idDestino } as any
+          });
+          await this.criterioRepo.save(nc);
+          result.criterios++;
+        }
+      }
+    }
+
+    if (modules.includes('categorias')) {
+      const cats = await this.dataSource.query(`SELECT * FROM categorias WHERE id_gestion = $1`, [idOrigen]);
+      for (const cat of cats) {
+        await this.dataSource.query(`INSERT INTO categorias(nombre, descripcion, requiere_institucion, id_gestion) VALUES($1, $2, $3, $4)`, 
+          [cat.nombre, cat.descripcion, cat.requiere_institucion || false, idDestino]);
+        result.categorias++;
+      }
+    }
+
+    if (modules.includes('infracciones')) {
+      const infrs = await this.infraccionRepo.find({ where: { gestion: { idGestion: idOrigen } } });
+      for (const infr of infrs) {
+        const ni = this.infraccionRepo.create({ nombre: infr.nombre, tipoImpacto: infr.tipoImpacto, valorImpacto: infr.valorImpacto, gestion: { idGestion: idDestino } as any });
+        await this.infraccionRepo.save(ni);
+        result.infracciones++;
+      }
+    }
+    
+    if (modules.includes('fraternidades_base')) {
+      // Clonar datos básicos (sin actas, logos_url es opcional pero se puede llevar el actual)
+      const frats = await this.fraternidadRepo.find({ 
+        where: { gestion: { idGestion: idOrigen } },
+        relations: ['facultad', 'carrera', 'institucionExterna', 'categoria']
+      });
+      
+      // Map categorias antiguas a nuevas
+      let mapCat = new Map();
+      if (modules.includes('categorias')) {
+        const destCats = await this.dataSource.query(`SELECT id_categoria, nombre FROM categorias WHERE id_gestion = $1`, [idDestino]);
+        for (const dc of destCats) mapCat.set(dc.nombre, dc.id_categoria);
+      }
+      
+      for (const fr of frats) {
+        let idCatNueva = null;
+        if (fr.categoria) {
+            // Re-obtener la categoría antigua
+            const oldCatData = await this.dataSource.query(`SELECT nombre FROM categorias WHERE id_categoria = $1`, [fr.categoria.idCategoria]);
+            if (oldCatData.length > 0) idCatNueva = mapCat.get(oldCatData[0].nombre);
+        }
+        
+        const nft = this.fraternidadRepo.create({
+          nombre: fr.nombre,
+          origenFraternidad: fr.origenFraternidad,
+          nivelRepresentacion: fr.nivelRepresentacion,
+          tipoOrganizacion: fr.tipoOrganizacion,
+          fechaFundacion: fr.fechaFundacion,
+          promedioBase: 0, 
+          habilitadoEfu: false, // se debe volver a habilitar mediante inscripción
+          gestion: { idGestion: idDestino } as any,
+          facultad: fr.facultad ? { idFacultad: fr.facultad.idFacultad } as any : null,
+          carrera: fr.carrera ? { idCarrera: fr.carrera.idCarrera } as any : null,
+          institucionExterna: fr.institucionExterna ? { idInstitucion: fr.institucionExterna.idInstitucion } as any : null,
+          categoria: idCatNueva ? { idCategoria: idCatNueva } as any : null,
+        });
+        await this.fraternidadRepo.save(nft);
+        result.fraternidadesExtra++;
+      }
+    }
+
+    return { success: true, message: 'Elementos clonados con éxito', result };
   }
 
   async createGestion(data: any) {
@@ -643,5 +717,387 @@ export class EvaluacionesService {
     }
 
     return this.incidenciaRepo.delete(idIncidencia);
+  }
+
+  // --- REPORTES HISTORICOS ---
+  async getReportesGestionesPublicas() {
+    return this.gestionRepo.find({
+      select: ['idGestion', 'anio', 'lema', 'activa'],
+      order: { anio: 'DESC' }
+    });
+  }
+
+  async getReporteHistorico(idGestion: number) {
+    const gestion = await this.gestionRepo.findOne({ where: { idGestion } });
+    if (!gestion) throw new NotFoundException('Gestión no encontrada');
+
+    // 1. Fraternidades y Ranking EFU
+    const frats = await this.fraternidadRepo.find({
+      where: { habilitadoEfu: true, gestion: { idGestion } },
+      relations: ['categoria', 'facultad', 'carrera', 'institucionExterna']
+    });
+
+    const evsEfu = await this.evaluacionRepo.find({
+      where: { estado: 'COMPLETADO', fase: { gestion: { idGestion }, tipoConcurso: 'EFU' } },
+      relations: ['fraternidad']
+    });
+
+    const incidencias = await this.incidenciaRepo.find({
+      where: { gestion: { idGestion } },
+      relations: ['fraternidad', 'infraccion']
+    });
+
+    const rankingMap = new Map<number, any>();
+    frats.forEach(f => {
+      let representacion = f.facultad?.nombre || f.carrera?.nombre || f.institucionExterna?.nombre || f.nivelRepresentacion || 'General';
+      rankingMap.set(f.idFraternidad, {
+        idFraternidad: f.idFraternidad,
+        nombre: f.nombre,
+        origenFraternidad: f.origenFraternidad || 'Danza Pesada',
+        categoria: f.categoria?.nombre || 'General',
+        representacion,
+        promedioJurado: 0,
+        sumJurado: 0,
+        countJurado: 0,
+        impactoSanciones: 0,
+        puntajeFinal: 0,
+        fechaHoraCalificacion: null
+      });
+    });
+
+    evsEfu.forEach(e => {
+      if (!e.fraternidad) return;
+      const ex = rankingMap.get(e.fraternidad.idFraternidad);
+      if (ex) {
+        ex.sumJurado += Number(e.puntajeTotal);
+        ex.countJurado++;
+        if (e.fechaCierre) {
+          const date = new Date(e.fechaCierre);
+          if (!ex.fechaHoraCalificacion || date > new Date(ex.fechaHoraCalificacion)) {
+            ex.fechaHoraCalificacion = e.fechaCierre;
+          }
+        }
+      }
+    });
+
+    incidencias.forEach(i => {
+      if (!i.fraternidad || !i.infraccion) return;
+      const ex = rankingMap.get(i.fraternidad.idFraternidad);
+      if (ex) {
+        ex.impactoSanciones += Number(i.infraccion.valorImpacto) || 0;
+      }
+    });
+
+    const rankingEfu = Array.from(rankingMap.values()).map(r => {
+      r.promedioJurado = r.countJurado > 0 ? Number((r.sumJurado / r.countJurado).toFixed(2)) : 0;
+      r.puntajeFinal = Math.max(0, Number((r.promedioJurado + r.impactoSanciones).toFixed(2)));
+      return r;
+    }).sort((a, b) => b.puntajeFinal - a.puntajeFinal)
+      .map((r, index) => ({ ...r, puesto: index + 1 }));
+
+    // 2. Concursos Externos (Chacha Warmi, etc.)
+    const evsExt = await this.evaluacionRepo.find({
+      where: { estado: 'COMPLETADO', fase: { gestion: { idGestion }, tipoConcurso: 'EXTERNO' } },
+      relations: ['participante', 'participante.fraternidad', 'fase']
+    });
+
+    const concursosMap = new Map<number, { nombreConcurso: string, participantesMap: Map<number, any> }>();
+
+    evsExt.forEach(e => {
+      if (!e.participante || !e.fase) return;
+      
+      const idFase = e.fase.idFase;
+      const nombreConcurso = e.fase.nombre;
+      
+      if (!concursosMap.has(idFase)) {
+        concursosMap.set(idFase, {
+          nombreConcurso,
+          participantesMap: new Map<number, any>()
+        });
+      }
+      
+      const concurso = concursosMap.get(idFase);
+      const idPart = e.participante.idParticipante;
+      const pts = Number(e.puntajeTotal) || 0;
+      
+      if (!concurso.participantesMap.has(idPart)) {
+        concurso.participantesMap.set(idPart, {
+          idParticipante: idPart,
+          nombre: e.participante.nombre,
+          tipo: e.participante.tipo || 'Participante',
+          fraternidad: e.participante.fraternidad?.nombre || e.participante.institucionExterna || 'Independiente',
+          sum: 0,
+          count: 0,
+          fechaHoraCalificacion: null
+        });
+      }
+      
+      const part = concurso.participantesMap.get(idPart);
+      part.sum += pts;
+      part.count++;
+      
+      if (e.fechaCierre) {
+        const date = new Date(e.fechaCierre);
+        if (!part.fechaHoraCalificacion || date > new Date(part.fechaHoraCalificacion)) {
+          part.fechaHoraCalificacion = e.fechaCierre;
+        }
+      }
+    });
+
+    const concursosExternos = Array.from(concursosMap.entries()).map(([idFase, data]) => {
+      const participantes = Array.from(data.participantesMap.values()).map(p => ({
+        nombre: p.nombre,
+        tipo: p.tipo,
+        fraternidad: p.fraternidad,
+        puntajeFinal: Number((p.sum / p.count).toFixed(2)),
+        fechaHoraCalificacion: p.fechaHoraCalificacion
+      })).sort((a, b) => b.puntajeFinal - a.puntajeFinal)
+        .map((p, index) => ({ ...p, puesto: index + 1 }));
+
+      return {
+        idFase,
+        nombreConcurso: data.nombreConcurso,
+        participantes
+      };
+    });
+
+    return {
+      gestion: {
+        idGestion: gestion.idGestion,
+        anio: gestion.anio,
+        lema: gestion.lema,
+        activa: gestion.activa,
+        fechaGeneracion: new Date()
+      },
+      rankingEfu,
+      concursosExternos
+    };
+  }
+
+  async generarPdfReporteHistorico(idGestion: number, res: any) {
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50, size: 'A4', autoFirstPage: true });
+
+    const reporte = await this.getReporteHistorico(idGestion);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=Reporte_EFU_${reporte.gestion.anio}.pdf`);
+    doc.pipe(res);
+
+    let logoPath = 'e:\\Entrada-Universitaria\\frontend\\src\\assets\\img\\Logo_Umsa.png';
+    if (!fs.existsSync(logoPath)) {
+      logoPath = path.join(process.cwd(), '..', 'frontend', 'src', 'assets', 'img', 'Logo_Umsa.png');
+    }
+    if (!fs.existsSync(logoPath)) {
+      logoPath = path.join(process.cwd(), 'frontend', 'src', 'assets', 'img', 'Logo_Umsa.png');
+    }
+
+    const formatDate = (d: any) => {
+      if (!d) return 'N/A';
+      const date = new Date(d);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    };
+
+    let pageCount = 1;
+
+    const drawFooter = (page: number) => {
+      doc.save();
+      doc.fontSize(8).fillColor('#64748b');
+      doc.moveTo(50, 765).lineTo(545, 765).lineWidth(0.5).strokeColor('#cbd5e1').stroke();
+      doc.text('UMSA - Entrada Universitaria - Reporte Oficial de Calificaciones', 50, 770, { width: 300 });
+      doc.text(`Página ${page}`, 450, 770, { width: 95, align: 'right' });
+      doc.restore();
+    };
+
+    // Cabecera con logo
+    const hasLogo = fs.existsSync(logoPath);
+    const headerX = hasLogo ? 110 : 50;
+
+    if (hasLogo) {
+      doc.image(logoPath, 50, 40, { width: 50 });
+    }
+
+    doc.fontSize(15).fillColor('#003399').font('Helvetica-Bold').text('UNIVERSIDAD MAYOR DE SAN ANDRÉS', headerX, 45);
+    doc.fontSize(10).fillColor('#0f172a').font('Helvetica').text('COMISIÓN ORGANIZADORA DE LA ENTRADA UNIVERSITARIA', headerX, 63);
+    doc.fontSize(10).fillColor('#c8102e').font('Helvetica-Bold').text(`REPORTE HISTÓRICO DE CALIFICACIONES - GESTIÓN ${reporte.gestion.anio}`, headerX, 76);
+    if (reporte.gestion.lema) {
+      doc.fontSize(8).fillColor('#475569').font('Helvetica-Oblique').text(`"${reporte.gestion.lema}"`, headerX, 89);
+    }
+
+    // Línea separadora
+    doc.moveTo(50, 105).lineTo(545, 105).lineWidth(1.5).strokeColor('#003399').stroke();
+    
+    let currentY = 120;
+
+    // Tabla Ranking EFU
+    doc.fontSize(12).fillColor('#003399').font('Helvetica-Bold').text('RANKING OFICIAL - ENTRADA FOLKLÓRICA', 50, currentY);
+    currentY += 18;
+
+    // Header Tabla EFU
+    const colWidths = {
+      puesto: 20,
+      frat: 125,
+      danza: 70,
+      cat: 45,
+      pert: 75,
+      prom: 35,
+      sanc: 30,
+      final: 35,
+      fecha: 60
+    };
+
+    const drawEfuTableHeader = (y: number) => {
+      doc.save();
+      doc.rect(50, y, 495, 18).fill('#003399');
+      doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold');
+      let curX = 52;
+      doc.text('#', curX, y + 5, { width: colWidths.puesto, align: 'center' }); curX += colWidths.puesto;
+      doc.text('Fraternidad', curX, y + 5, { width: colWidths.frat }); curX += colWidths.frat;
+      doc.text('Tipo Danza', curX, y + 5, { width: colWidths.danza }); curX += colWidths.danza;
+      doc.text('Cat.', curX, y + 5, { width: colWidths.cat }); curX += colWidths.cat;
+      doc.text('Pertenencia', curX, y + 5, { width: colWidths.pert }); curX += colWidths.pert;
+      doc.text('Jur.', curX, y + 5, { width: colWidths.prom, align: 'center' }); curX += colWidths.prom;
+      doc.text('Sanc.', curX, y + 5, { width: colWidths.sanc, align: 'center' }); curX += colWidths.sanc;
+      doc.text('Fin.', curX, y + 5, { width: colWidths.final, align: 'center' }); curX += colWidths.final;
+      doc.text('Fecha/Hora', curX, y + 5, { width: colWidths.fecha });
+      doc.restore();
+    };
+
+    drawEfuTableHeader(currentY);
+    currentY += 18;
+
+    reporte.rankingEfu.forEach((r, i) => {
+      // Paginación
+      if (currentY > 730) {
+        drawFooter(pageCount);
+        doc.addPage();
+        pageCount++;
+        // Draw small header on subsequent pages
+        doc.fontSize(9).fillColor('#003399').font('Helvetica-Bold').text(`REPORTE DE CALIFICACIONES GESTIÓN ${reporte.gestion.anio}`, 50, 40);
+        doc.moveTo(50, 52).lineTo(545, 52).lineWidth(0.5).strokeColor('#003399').stroke();
+        currentY = 65;
+        drawEfuTableHeader(currentY);
+        currentY += 18;
+      }
+
+      // Zebra striping
+      if (i % 2 === 0) {
+        doc.save().rect(50, currentY, 495, 16).fill('#f8fafc').restore();
+      }
+
+      doc.fontSize(7.5).fillColor('#0f172a').font('Helvetica');
+      let curX = 52;
+
+      // Puesto
+      doc.text(`${r.puesto}`, curX, currentY + 4, { width: colWidths.puesto, align: 'center' }); curX += colWidths.puesto;
+      // Nombre
+      doc.font('Helvetica-Bold').text(r.nombre, curX, currentY + 4, { width: colWidths.frat, height: 12, ellipsis: true }); curX += colWidths.frat;
+      doc.font('Helvetica');
+      // Danza
+      doc.text(r.origenFraternidad, curX, currentY + 4, { width: colWidths.danza, height: 12, ellipsis: true }); curX += colWidths.danza;
+      // Categoria
+      doc.text(r.categoria, curX, currentY + 4, { width: colWidths.cat, height: 12, ellipsis: true }); curX += colWidths.cat;
+      // Pertenencia
+      doc.text(r.representacion, curX, currentY + 4, { width: colWidths.pert, height: 12, ellipsis: true }); curX += colWidths.pert;
+      // Promedio jurado
+      doc.text(`${r.promedioJurado}`, curX, currentY + 4, { width: colWidths.prom, align: 'center' }); curX += colWidths.prom;
+      // Sanciones
+      doc.fillColor(r.impactoSanciones < 0 ? '#c8102e' : '#0f172a');
+      doc.text(`${r.impactoSanciones}`, curX, currentY + 4, { width: colWidths.sanc, align: 'center' }); curX += colWidths.sanc;
+      doc.fillColor('#0f172a');
+      // Puntaje final
+      doc.font('Helvetica-Bold').text(`${r.puntajeFinal}`, curX, currentY + 4, { width: colWidths.final, align: 'center' }); curX += colWidths.final;
+      // Fecha/Hora
+      doc.font('Helvetica').text(formatDate(r.fechaHoraCalificacion), curX, currentY + 4, { width: colWidths.fecha });
+
+      currentY += 16;
+    });
+
+    currentY += 20;
+
+    // Concursos Externos
+    if (reporte.concursosExternos && reporte.concursosExternos.length > 0) {
+      reporte.concursosExternos.forEach((conc) => {
+        // Chequeo si cabe el título y cabecera (aprox 60 pt)
+        if (currentY > 700) {
+          drawFooter(pageCount);
+          doc.addPage();
+          pageCount++;
+          doc.fontSize(9).fillColor('#003399').font('Helvetica-Bold').text(`REPORTE DE CALIFICACIONES GESTIÓN ${reporte.gestion.anio}`, 50, 40);
+          doc.moveTo(50, 52).lineTo(545, 52).lineWidth(0.5).strokeColor('#003399').stroke();
+          currentY = 65;
+          // drawExtTableHeader(currentY); // will be drawn below
+        }
+
+        doc.fontSize(12).fillColor('#003399').font('Helvetica-Bold').text(`CONCURSO: ${conc.nombreConcurso.toUpperCase()}`, 50, currentY);
+        currentY += 18;
+
+        const colWidthsExt = {
+          puesto: 25,
+          nombre: 155,
+          tipo: 80,
+          frat: 115,
+          puntaje: 50,
+          fecha: 70
+        };
+
+        const drawExtTableHeader = (y: number) => {
+          doc.save();
+          doc.rect(50, y, 495, 18).fill('#c8102e');
+          doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold');
+          let curX = 52;
+          doc.text('#', curX, y + 5, { width: colWidthsExt.puesto, align: 'center' }); curX += colWidthsExt.puesto;
+          doc.text('Participante', curX, y + 5, { width: colWidthsExt.nombre }); curX += colWidthsExt.nombre;
+          doc.text('Rol / Tipo', curX, y + 5, { width: colWidthsExt.tipo }); curX += colWidthsExt.tipo;
+          doc.text('Fraternidad / Institución', curX, y + 5, { width: colWidthsExt.frat }); curX += colWidthsExt.frat;
+          doc.text('Puntaje', curX, y + 5, { width: colWidthsExt.puntaje, align: 'center' }); curX += colWidthsExt.puntaje;
+          doc.text('Fecha/Hora', curX, y + 5, { width: colWidthsExt.fecha });
+          doc.restore();
+        };
+
+        drawExtTableHeader(currentY);
+        currentY += 18;
+
+        conc.participantes.forEach((p, idx) => {
+          if (currentY > 730) {
+            drawFooter(pageCount);
+            doc.addPage();
+            pageCount++;
+            doc.fontSize(9).fillColor('#003399').font('Helvetica-Bold').text(`REPORTE DE CALIFICACIONES GESTIÓN ${reporte.gestion.anio}`, 50, 40);
+            doc.moveTo(50, 52).lineTo(545, 52).lineWidth(0.5).strokeColor('#003399').stroke();
+            currentY = 65;
+            drawExtTableHeader(currentY);
+            currentY += 18;
+          }
+
+          if (idx % 2 === 0) {
+            doc.save().rect(50, currentY, 495, 16).fill('#f8fafc').restore();
+          }
+
+          doc.fontSize(7.5).fillColor('#0f172a').font('Helvetica');
+          let curX = 52;
+
+          doc.text(`${p.puesto}`, curX, currentY + 4, { width: colWidthsExt.puesto, align: 'center' }); curX += colWidthsExt.puesto;
+          doc.font('Helvetica-Bold').text(p.nombre, curX, currentY + 4, { width: colWidthsExt.nombre, height: 12, ellipsis: true }); curX += colWidthsExt.nombre;
+          doc.font('Helvetica');
+          doc.text(p.tipo, curX, currentY + 4, { width: colWidthsExt.tipo, height: 12, ellipsis: true }); curX += colWidthsExt.tipo;
+          doc.text(p.fraternidad, curX, currentY + 4, { width: colWidthsExt.frat, height: 12, ellipsis: true }); curX += colWidthsExt.frat;
+          doc.font('Helvetica-Bold').text(`${p.puntajeFinal}`, curX, currentY + 4, { width: colWidthsExt.puntaje, align: 'center' }); curX += colWidthsExt.puntaje;
+          doc.font('Helvetica').text(formatDate(p.fechaHoraCalificacion), curX, currentY + 4, { width: colWidthsExt.fecha });
+
+          currentY += 16;
+        });
+
+        currentY += 20;
+      });
+    }
+
+    drawFooter(pageCount);
+    doc.end();
   }
 }

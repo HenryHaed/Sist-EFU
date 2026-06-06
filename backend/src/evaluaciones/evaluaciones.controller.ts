@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, Query, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, Query, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException, Res } from '@nestjs/common';
 import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
@@ -157,6 +157,24 @@ export class EvaluacionesController {
     return this.evaluacionesService.getGestionActiva();
   }
 
+  @Public()
+  @Get('gestiones-publicas')
+  getGestionesPublicas() {
+    return this.evaluacionesService.getReportesGestionesPublicas();
+  }
+
+  @Public()
+  @Get('reporte/:idGestion')
+  getReporteHistorico(@Param('idGestion', ParseIntPipe) idGestion: number) {
+    return this.evaluacionesService.getReporteHistorico(idGestion);
+  }
+
+  @Public()
+  @Get('reporte/:idGestion/pdf')
+  async getReporteHistoricoPdf(@Param('idGestion', ParseIntPipe) idGestion: number, @Res() res: any) {
+    return this.evaluacionesService.generarPdfReporteHistorico(idGestion, res);
+  }
+
   @Get('fases/:idFase/finalistas')
   @Roles('superusuario', 'admin')
   getFinalistasFase(@Param('idFase', ParseIntPipe) idFase: number) {
@@ -174,6 +192,13 @@ export class EvaluacionesController {
   @Roles('superusuario', 'admin')
   getGestion(@Param('id', ParseIntPipe) id: number) {
     return this.evaluacionesService.getGestionById(id);
+  }
+
+  @Post('gestiones/:id/clonar')
+  @Roles('ADMIN')
+  clonarGestion(@Param('id') id: string, @Body() body: { idDestino: number, modules: string[] }) {
+    if (!body.idDestino || !body.modules) throw new BadRequestException('Se requiere idDestino y el array de modules');
+    return this.evaluacionesService.clonarGestion(+id, body.idDestino, body.modules);
   }
 
   @Post('gestiones')

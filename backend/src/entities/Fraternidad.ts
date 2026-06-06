@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Gestion } from './Gestion';
 import { Facultad } from './Facultad';
 import { Carrera } from './Carrera';
 import { InstitucionExterna } from './InstitucionExterna';
@@ -20,6 +21,10 @@ export class Fraternidad {
 
     @Column({ name: 'nivel_representacion', length: 100, nullable: true })
     nivelRepresentacion: string;
+
+    @ManyToOne(() => Gestion, (gestion) => gestion.fraternidades, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'id_gestion' })
+    gestion: Gestion;
 
     @ManyToOne(() => Facultad, (facultad) => facultad.fraternidades, { onDelete: 'SET NULL' })
     @JoinColumn({ name: 'id_facultad' })

@@ -5,6 +5,10 @@ import { Evaluacion } from './Evaluacion';
 import { Infraccion } from './Infraccion';
 import { Incidencia } from './Incidencia';
 import { Asistencia } from './Asistencia';
+import { Fraternidad } from './Fraternidad';
+import { Categoria } from './Categoria';
+import { Criterio } from './Criterio';
+import { Participante } from './Participante';
 
 @Entity('gestiones')
 export class Gestion {
@@ -73,4 +77,16 @@ export class Gestion {
 
     @OneToMany(() => Asistencia, (asistencia) => asistencia.gestion)
     asistencias: Asistencia[];
+
+    @OneToMany(() => Fraternidad, (fraternidad) => fraternidad.gestion)
+    fraternidades: Fraternidad[];
+
+    @OneToMany(() => Categoria, (categoria) => categoria.gestion)
+    categorias: Categoria[];
+
+    @OneToMany(() => Criterio, (criterio) => criterio.gestion)
+    criterios: Criterio[];
+
+    @OneToMany(() => Participante, (participante) => participante.gestion)
+    participantes: Participante[];
 }

@@ -9,7 +9,8 @@ import { Categoria } from '../entities/Categoria';
 import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { InstitucionExterna } from '../entities/InstitucionExterna';
-
+import { DataSource } from 'typeorm';
+import { Fraternidad } from '../entities/Fraternidad';
 @Injectable()
 export class InscripcionesService {
     constructor(
@@ -27,6 +28,7 @@ export class InscripcionesService {
         private readonly carreraRepo: Repository<Carrera>,
         @InjectRepository(InstitucionExterna)
         private readonly institucionRepo: Repository<InstitucionExterna>,
+        private readonly dataSource: DataSource,
     ) {}
 
     async createSolicitud(data: any, usuario: Usuario, files: any) {
@@ -71,6 +73,7 @@ export class InscripcionesService {
         // 4. Preparar la entidad
         const solicitud = this.solicitudRepo.create({
             nombreFraternidad: data.nombreFraternidad,
+            origenFraternidad: data.origenFraternidad || 'General',
             instanciaRepresentacion: data.instanciaRepresentacion,
             nombreInstitucionExterna: data.nombreInstitucionExterna,
             gestion,
@@ -193,5 +196,85 @@ export class InscripcionesService {
         }
 
         return await this.cronogramaRepo.save(cronograma);
+    }
+
+    // ── Inscripción Oficial Transaccional (Llamado por Administrador) ──────────────────────────────────
+    async inscribirDesdeSolicitud(idSolicitud: number, data?: any) {
+        const solicitud = await this.solicitudRepo.findOne({
+            where: { idSolicitud },
+            relations: ['representante', 'fraternidadCreada', 'categoria', 'facultad', 'carrera', 'institucionExterna']
+        });
+
+        if (!solicitud) {
+            throw new NotFoundException('Solicitud no encontrada.');
+        }
+
+        if (solicitud.estado !== EstadoSolicitud.APROBADO) {
+            throw new BadRequestException('La solicitud debe estar APROBADA para realizar la inscripción oficial.');
+        }
+
+        if (solicitud.fraternidadCreada) {
+            throw new BadRequestException('Esta solicitud ya fue utilizada para crear una fraternidad.');
+        }
+
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
+        try {
+            // 1. Crear la Fraternidad (Usando los datos enviados por el admin, o los de la solicitud por defecto)
+            const fraternidad = new Fraternidad();
+            fraternidad.nombre = data?.nombre || solicitud.nombreFraternidad;
+            fraternidad.origenFraternidad = data?.origenFraternidad || solicitud.origenFraternidad || 'General';
+            fraternidad.nivelRepresentacion = data?.nivelRepresentacion || solicitud.instanciaRepresentacion;
+            
+            if (data?.categoria?.idCategoria) {
+                fraternidad.categoria = { idCategoria: data.categoria.idCategoria } as any;
+            } else if (solicitud.categoria) {
+                fraternidad.categoria = solicitud.categoria;
+            }
+
+            if (data?.idFacultad) {
+                fraternidad.facultad = { idFacultad: data.idFacultad } as any;
+            } else if (solicitud.facultad) {
+                fraternidad.facultad = solicitud.facultad;
+            }
+
+            if (data?.idCarrera) {
+                fraternidad.carrera = { idCarrera: data.idCarrera } as any;
+            } else if (solicitud.carrera) {
+                fraternidad.carrera = solicitud.carrera;
+            }
+
+            if (data?.idInstitucionExterna) {
+                fraternidad.institucionExterna = { idInstitucion: data.idInstitucionExterna } as any;
+            }
+            
+            fraternidad.habilitadoEfu = data?.habilitadoEfu !== undefined ? data.habilitadoEfu : true; // Activa por defecto al inscribirse
+            
+            const savedFraternidad = await queryRunner.manager.save(Fraternidad, fraternidad);
+
+            // 2. Actualizar la Solicitud (Vincular)
+            solicitud.fraternidadCreada = savedFraternidad;
+            await queryRunner.manager.save(SolicitudInscripcion, solicitud);
+
+            // 3. Vincular al Representante
+            if (solicitud.representante) {
+                const rep = await queryRunner.manager.findOne(Usuario, { where: { idUsuario: solicitud.representante.idUsuario } });
+                if (rep) {
+                    rep.fraternidad = savedFraternidad;
+                    await queryRunner.manager.save(Usuario, rep);
+                }
+            }
+
+            await queryRunner.commitTransaction();
+            return { message: 'Inscripción Oficial completada exitosamente.', fraternidad: savedFraternidad };
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            console.error('Transaction Error:', error);
+            throw new BadRequestException('Error al procesar la inscripción oficial: ' + error.message);
+        } finally {
+            await queryRunner.release();
+        }
     }
 }

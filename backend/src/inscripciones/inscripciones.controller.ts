@@ -99,4 +99,15 @@ export class InscripcionesController {
   async upsertCronograma(@Body() data: any) {
     return this.inscripcionesService.upsertCronograma(data);
   }
+
+  // ── Inscripción Oficial (Fraternidad) ────────────────────────────────────
+
+  @Post('inscribir-desde-solicitud/:idSolicitud')
+  @Roles('superusuario', 'admin')
+  async inscribirDesdeSolicitud(
+    @Param('idSolicitud', ParseIntPipe) idSolicitud: number,
+    @Body() data: any
+  ) {
+    return this.inscripcionesService.inscribirDesdeSolicitud(idSolicitud, data);
+  }
 }

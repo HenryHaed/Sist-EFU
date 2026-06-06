@@ -191,6 +191,23 @@
                     <span class="material-symbols-outlined text-sm">history</span>
                     Marcar Pendiente
                   </button>
+                  <button
+                    v-if="solicitudActiva.estado === 'APROBADO' && !solicitudActiva.fraternidadCreada"
+                    @click="inscribirFraternidad"
+                    :disabled="actualizando"
+                    class="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 mt-4 w-full justify-center"
+                  >
+                    <span class="material-symbols-outlined text-sm">verified</span>
+                    Inscribir Oficialmente
+                  </button>
+
+                  <div v-if="solicitudActiva.fraternidadCreada" class="mt-4 w-full bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center gap-3">
+                    <span class="material-symbols-outlined text-indigo-600 text-2xl">task_alt</span>
+                    <div>
+                      <p class="text-xs font-black uppercase text-indigo-800">Fraternidad Inscrita</p>
+                      <p class="text-[11px] text-indigo-600 font-medium">Esta solicitud ya fue procesada y la fraternidad se encuentra registrada oficialmente.</p>
+                    </div>
+                  </div>
                 </div>
                 <p v-if="solicitudActiva.observaciones" class="text-xs text-slate-500 bg-amber-50 border border-amber-200 p-3 rounded-xl">
                   <span class="font-black text-amber-700">Última observación:</span> {{ solicitudActiva.observaciones }}
@@ -354,6 +371,7 @@ import api from '../services/api'
 import { getImageUrl } from '../utils/url'
 import Swal from 'sweetalert2'
 import { notify } from '../utils/notify'
+import { useRouter } from 'vue-router'
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 const solicitudes = ref([])
@@ -485,6 +503,30 @@ const estadoStyle = (estado) => {
     RECHAZADO: { badge: 'bg-red-50 text-red-700 border-red-300', bar: 'bg-secondary', iconBg: 'bg-red-50', iconColor: 'text-secondary' },
   }
   return map[estado] || map.PENDIENTE
+}
+
+const router = useRouter()
+
+const inscribirFraternidad = async () => {
+  if (!solicitudActiva.value || solicitudActiva.value.estado !== 'APROBADO') return
+
+  const result = await Swal.fire({
+    title: '¿Continuar Inscripción?',
+    text: `Serás redirigido a la gestión de fraternidades para revisar los datos heredados de ${solicitudActiva.value.nombreFraternidad} antes de oficializarla.`,
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonColor: '#4f46e5',
+    cancelButtonColor: '#64748b',
+    confirmButtonText: 'Sí, ir a revisar',
+    cancelButtonText: 'Cancelar'
+  })
+
+  if (result.isConfirmed) {
+    router.push({ 
+      path: '/dashboard', 
+      query: { v: 'fraternidades_crud', inscribirSolicitud: solicitudActiva.value.idSolicitud } 
+    })
+  }
 }
 
 onMounted(cargarSolicitudes)

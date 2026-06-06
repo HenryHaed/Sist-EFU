@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Fraternidad } from '../entities/Fraternidad';
+import { Gestion } from '../entities/Gestion';
 import { CreateFraternidadDto, UpdateFraternidadDto } from './dto/fraternidad.dto';
 
 @Injectable()
@@ -9,10 +10,20 @@ export class FraternidadesService {
   constructor(
     @InjectRepository(Fraternidad)
     private readonly fraternidadRepo: Repository<Fraternidad>,
+    @InjectRepository(Gestion)
+    private readonly gestionRepo: Repository<Gestion>,
   ) {}
 
+  async getGestionActiva() {
+    let g = await this.gestionRepo.findOne({ where: { activa: true } });
+    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
+    return g;
+  }
+
   async findAll() {
+    const gestion = await this.getGestionActiva();
     return this.fraternidadRepo.find({
+      where: gestion ? { gestion: { idGestion: gestion.idGestion } } : {},
       relations: ['facultad', 'carrera', 'institucionExterna', 'categoria'],
       order: { nombre: 'ASC' },
     });
@@ -32,6 +43,7 @@ export class FraternidadesService {
 
   async create(createDto: CreateFraternidadDto) {
     const { idFacultad, idCarrera, idInstitucionExterna, idCategoria, ...data } = createDto;
+    const gestion = await this.getGestionActiva();
     
     const fraternidad = this.fraternidadRepo.create({
       ...data,
@@ -39,6 +51,7 @@ export class FraternidadesService {
       carrera: idCarrera ? { idCarrera } as any : null,
       institucionExterna: idInstitucionExterna ? { idInstitucion: idInstitucionExterna } as any : null,
       categoria: { idCategoria } as any,
+      gestion: gestion ? { idGestion: gestion.idGestion } as any : null
     });
 
     return this.fraternidadRepo.save(fraternidad);

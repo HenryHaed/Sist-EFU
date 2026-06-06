@@ -166,59 +166,39 @@
                   <input v-model="form.nombre" type="text" placeholder="Ej. Morenada Central" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold" />
                 </div>
 
-                <div class="col-span-2">
-                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Logo de la Fraternidad (Imagen)</label>
-                  
-                  <div 
-                    @dragover.prevent="dragging = true" 
-                    @dragleave.prevent="dragging = false"
-                    @drop.prevent="onDrop"
-                    @click="$refs.fileInput.click()"
-                    :class="[
-                      'relative h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all gap-2 overflow-hidden',
-                      dragging ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                    ]"
-                  >
-                    <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelected" />
-                    
-                    <template v-if="form.logoUrl">
-                      <img :src="getFullUrl(form.logoUrl)" class="absolute inset-0 w-full h-full object-contain p-2 bg-white" />
-                      <div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <span class="text-white text-[10px] font-black uppercase">Cambiar Imagen</span>
-                      </div>
-                    </template>
-                    <template v-else>
-                      <span class="material-symbols-outlined text-slate-300 text-3xl">add_photo_alternate</span>
-                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center px-4">
-                        Arrastra una imagen o <span class="text-primary">haz clic para buscar</span>
-                      </p>
-                    </template>
-
-                    <div v-if="uploading" class="absolute inset-0 bg-white/80 flex flex-col items-center justify-center gap-2">
-                      <span class="material-symbols-outlined animate-spin text-primary">progress_activity</span>
-                      <span class="text-[9px] font-black text-primary uppercase">Subiendo...</span>
-                    </div>
-                  </div>
-                </div>
-                
                 <div>
-                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Origen (UMSA, Invitada...)</label>
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Tipo de Danza</label>
                   <select v-model="form.origenFraternidad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                    <option value="Interna (UMSA)">Interna (UMSA)</option>
-                    <option value="Externa">Externa / Invitada</option>
+                    <option value="Danza Pesada">Danza Pesada</option>
+                    <option value="Danza Liviana">Danza Liviana</option>
+                    <option value="Danza Autóctona">Danza Autóctona</option>
+                    <option value="Taller Cultural">Taller Cultural</option>
+                    <option value="General">General</option>
                   </select>
                 </div>
 
-                <template v-if="form.origenFraternidad === 'Interna (UMSA)'">
+                <div>
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Instancia (Nivel de Representación)</label>
+                  <select v-model="form.nivelRepresentacion" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                    <option value="Facultad">Facultad</option>
+                    <option value="Carrera">Carrera</option>
+                    <option value="UMSA">UMSA (Nivel Central)</option>
+                    <option value="FEDSIDUMSA">FEDSIDUMSA</option>
+                    <option value="STUMSA">STUMSA</option>
+                    <option value="Externo">Externo (Institución)</option>
+                  </select>
+                </div>
+
+                <template v-if="form.nivelRepresentacion === 'Facultad' || form.nivelRepresentacion === 'Carrera'">
                   <div class="col-span-2 md:col-span-1">
-                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Facultad (Opcional)</label>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Facultad</label>
                     <select v-model="form.idFacultad" @change="onFacultadChange" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                      <option :value="null">-- Ninguna (Institucional) --</option>
+                      <option :value="null">-- Ninguna --</option>
                       <option v-for="fac in listFacultades" :key="fac.idFacultad" :value="fac.idFacultad">{{ fac.nombre }}</option>
                     </select>
                   </div>
-                  <div class="col-span-2 md:col-span-1">
-                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Carrera (Opcional)</label>
+                  <div v-if="form.nivelRepresentacion === 'Carrera'" class="col-span-2 md:col-span-1">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Carrera</label>
                     <select v-model="form.idCarrera" :disabled="!form.idFacultad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold disabled:opacity-50">
                       <option :value="null">-- Ninguna --</option>
                       <option v-for="car in listCarreras" :key="car.idCarrera" :value="car.idCarrera">{{ car.nombre }}</option>
@@ -226,7 +206,7 @@
                   </div>
                 </template>
 
-                <template v-else>
+                <template v-if="form.nivelRepresentacion === 'Externo'">
                   <div class="col-span-2">
                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Institución de Procedencia</label>
                     <select v-model="form.idInstitucionExterna" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
@@ -274,9 +254,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import api from '../services/api'
 import { notify } from '../utils/notify'
+import { useRoute, useRouter } from 'vue-router'
+
+const route = useRoute()
+const router = useRouter()
 
 const fraternidades = ref([])
 const loading = ref(true)
@@ -285,9 +269,7 @@ const editando = ref(false)
 
 const categorias = ref([])
 const loadingCategorias = ref(true)
-const dragging = ref(false)
-const uploading = ref(false)
-const fileInput = ref(null)
+
 
 const listFacultades = ref([])
 const listCarreras = ref([])
@@ -299,49 +281,17 @@ const getFullUrl = (url) => {
   return `http://localhost:3000${url}`
 }
 
-const onDrop = (e) => {
-  dragging.value = false
-  const file = e.dataTransfer.files[0]
-  if (file && file.type.startsWith('image/')) {
-    uploadFile(file)
-  }
-}
-
-const onFileSelected = (e) => {
-  const file = e.target.files[0]
-  if (file) {
-    uploadFile(file)
-  }
-}
-
-const uploadFile = async (file) => {
-  uploading.value = true
-  const formData = new FormData()
-  formData.append('file', file)
-
-  try {
-    const response = await api.post('/fraternidades/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    form.value.logoUrl = response.data.url
-  } catch (error) {
-    console.error('Error al subir archivo:', error)
-    notify.error('Error al subir la imagen', 'Intenta con otro formato.')
-  } finally {
-    uploading.value = false
-  }
-}
-
 const form = ref({
   idFraternidad: null,
   nombre: '',
-  origenFraternidad: 'Interna (UMSA)',
+  origenFraternidad: 'Danza Pesada',
+  nivelRepresentacion: 'Facultad',
   idCategoria: 1,
   idFacultad: null,
   idCarrera: null,
   idInstitucionExterna: null,
   habilitadoEfu: true,
-  logoUrl: ''
+  idSolicitud: null // Para guardar si viene desde una preinscripción
 })
 
 const cargarCategorias = async () => {
@@ -381,11 +331,48 @@ const cargarDatos = async () => {
     listFacultades.value = resFac.data
     listInstituciones.value = resInst.data
     await cargarCategorias()
+
+    // Lógica para pre-llenar si viene desde "Inscribir Oficialmente"
+    if (route.query.inscribirSolicitud) {
+      const idSolicitud = route.query.inscribirSolicitud
+      try {
+        const { data: sol } = await api.get(`/inscripciones/admin/todas`)
+        const solicitud = sol.find(s => s.idSolicitud == idSolicitud)
+        if (solicitud) {
+          abrirModalInscribirSolicitud(solicitud)
+        }
+      } catch (err) {
+        console.error('Error al cargar solicitud', err)
+      }
+    }
   } catch (error) {
     console.error('Error al cargar fraternidades:', error)
   } finally {
     loading.value = false
   }
+}
+
+const abrirModalInscribirSolicitud = async (solicitud) => {
+  editando.value = false
+  form.value = {
+    idFraternidad: null,
+    nombre: solicitud.nombreFraternidad,
+    origenFraternidad: solicitud.origenFraternidad || 'Danza Pesada',
+    nivelRepresentacion: solicitud.instanciaRepresentacion,
+    idCategoria: solicitud.categoria ? solicitud.categoria.idCategoria : 1,
+    idFacultad: solicitud.facultad ? solicitud.facultad.idFacultad : null,
+    idCarrera: solicitud.carrera ? solicitud.carrera.idCarrera : null,
+    idInstitucionExterna: null,
+    habilitadoEfu: true,
+    idSolicitud: solicitud.idSolicitud
+  }
+  
+  if (form.value.idFacultad) {
+    await onFacultadChange() // Cargar carreras de esa facultad
+    form.value.idCarrera = solicitud.carrera ? solicitud.carrera.idCarrera : null
+  }
+
+  modalAbierto.value = true
 }
 
 const onFacultadChange = async () => {
@@ -401,11 +388,16 @@ const onFacultadChange = async () => {
 const abrirModalCrear = () => {
   editando.value = false
   form.value = {
+    idFraternidad: null,
     nombre: '',
-    origenFraternidad: 'Interna (UMSA)',
+    origenFraternidad: 'Danza Pesada',
+    nivelRepresentacion: 'Facultad',
     idCategoria: categorias.value.length > 0 ? categorias.value[0].idCategoria : 1,
+    idFacultad: null,
+    idCarrera: null,
+    idInstitucionExterna: null,
     habilitadoEfu: true,
-    logoUrl: ''
+    idSolicitud: null
   }
   modalAbierto.value = true
 }
@@ -437,22 +429,25 @@ const guardar = async () => {
   const payload = {
     nombre: form.value.nombre,
     origenFraternidad: form.value.origenFraternidad,
+    nivelRepresentacion: form.value.nivelRepresentacion,
     categoria: { idCategoria: form.value.idCategoria },
     idFacultad: form.value.idFacultad,
     idCarrera: form.value.idCarrera,
     idInstitucionExterna: form.value.idInstitucionExterna,
-    habilitadoEfu: form.value.habilitadoEfu,
-    logoUrl: form.value.logoUrl
+    habilitadoEfu: form.value.habilitadoEfu
   }
 
   try {
-    if (editando.value) {
+    if (form.value.idSolicitud) {
+      await api.post(`/inscripciones/inscribir-desde-solicitud/${form.value.idSolicitud}`, payload)
+      router.replace({ query: { v: 'fraternidades_crud' } })
+    } else if (editando.value) {
       await api.put(`/fraternidades/${form.value.idFraternidad}`, payload)
     } else {
       await api.post('/fraternidades', payload)
     }
     modalAbierto.value = false
-    notify.success('¡Guardado!', `Fraternidad ${editando.value ? 'actualizada' : 'registrada'} correctamente.`)
+    notify.success('¡Guardado!', `Fraternidad ${editando.value || form.value.idSolicitud ? 'actualizada e inscrita' : 'registrada'} correctamente.`)
     cargarDatos()
   } catch (error) {
     console.error('Error al guardar:', error)

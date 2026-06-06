@@ -39,6 +39,11 @@
             <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">leaderboard</span>
             <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Estadísticas</p>
           </a>
+          <a @click.prevent="scrollTo('historicos')" href="#historicos"
+            class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer">
+            <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">history</span>
+            <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Histórico</p>
+          </a>
         </nav>
       </div>
 
@@ -73,6 +78,10 @@
       <button @click="scrollTo('estadisticas')" class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
         <span class="material-symbols-outlined text-xl">leaderboard</span>
         <span class="text-[8px] font-black uppercase">Ranking</span>
+      </button>
+      <button @click="scrollTo('historicos')" class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-xl">history</span>
+        <span class="text-[8px] font-black uppercase">Histórico</span>
       </button>
     </nav>
 
@@ -404,6 +413,100 @@
         </v-dialog>
       </section>
 
+      <!-- ===== REPORTES HISTÓRICOS ===== -->
+      <section class="py-16 md:py-24 px-6 md:px-12 lg:px-24 bg-slate-50 border-t border-slate-100" id="historicos">
+        <div class="text-center mb-12 md:mb-16 reveal">
+          <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">ARCHIVO <span class="text-primary">HISTÓRICO</span></h2>
+          <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">Resultados oficiales por gestión</p>
+        </div>
+
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-8 reveal">
+          <!-- Sidebar: Selector de Gestión -->
+          <div class="w-full md:w-1/4 flex flex-col gap-4">
+            <h3 class="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Selecciona un año</h3>
+            <div class="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+              <button 
+                v-for="g in gestionesPublicas" :key="g.idGestion"
+                @click="cargarReporte(g.idGestion)"
+                class="text-left px-5 py-4 rounded-xl font-bold transition-all border"
+                :class="gestionSeleccionada === g.idGestion ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-white text-slate-600 border-slate-200 hover:border-primary hover:text-primary'"
+              >
+                <div class="flex items-center justify-between">
+                  <span>Gestión {{ g.anio }}</span>
+                  <span v-if="g.activa" class="text-[8px] bg-red-100 text-secondary px-2 py-1 rounded-full uppercase tracking-wider">Activa</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Contenido: Resultados -->
+          <div class="w-full md:w-3/4 bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 p-6 md:p-10 relative min-h-[400px]">
+            <div v-if="loadingReporte" class="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm z-10 rounded-3xl">
+              <span class="material-symbols-outlined text-4xl text-primary animate-spin mb-4">progress_activity</span>
+              <p class="text-sm font-bold text-slate-500 animate-pulse">Cargando resultados...</p>
+            </div>
+
+            <div v-else-if="reporteActual" class="flex flex-col gap-10">
+              <!-- Header Resultados -->
+              <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-8 border-b border-slate-100">
+                <div>
+                  <h3 class="text-2xl md:text-3xl font-black text-slate-900 italic uppercase">Gestión {{ reporteActual.gestion.anio }}</h3>
+                  <p v-if="reporteActual.gestion.lema" class="text-slate-500 font-medium italic mt-1">"{{ reporteActual.gestion.lema }}"</p>
+                </div>
+                <button 
+                  @click="descargarPdfReporte(reporteActual.gestion.idGestion, reporteActual.gestion.anio)"
+                  class="flex items-center gap-2 bg-secondary text-white hover:bg-red-700 px-6 py-3 rounded-xl font-black tracking-wider uppercase text-xs transition-all shadow-lg shadow-red-200"
+                >
+                  <span class="material-symbols-outlined text-base">picture_as_pdf</span>
+                  Descargar PDF Oficial
+                </button>
+              </div>
+
+              <!-- Ranking EFU -->
+              <div>
+                <h4 class="text-lg font-black text-slate-800 uppercase mb-4 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-primary">emoji_events</span>
+                  Ranking Entrada Folklórica
+                </h4>
+                <div class="overflow-x-auto rounded-2xl border border-slate-100 shadow-sm">
+                  <table class="w-full text-left border-collapse min-w-[600px]">
+                    <thead>
+                      <tr class="bg-slate-50 text-[10px] text-slate-400 font-black uppercase tracking-widest border-b border-slate-100">
+                        <th class="px-4 py-3 text-center">Puesto</th>
+                        <th class="px-4 py-3">Fraternidad</th>
+                        <th class="px-4 py-3">Categoría</th>
+                        <th class="px-4 py-3 text-center">Jurado</th>
+                        <th class="px-4 py-3 text-center text-red-500">Sanción</th>
+                        <th class="px-4 py-3 text-center text-primary">Final</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-50 text-sm">
+                      <tr v-for="r in reporteActual.rankingEfu" :key="r.idFraternidad" class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-4 py-3 text-center font-black" :class="r.puesto <= 3 ? 'text-secondary' : 'text-slate-400'">{{ r.puesto }}</td>
+                        <td class="px-4 py-3 font-bold text-slate-800 uppercase text-xs">{{ r.nombre }}<br><span class="text-[9px] text-slate-400 font-medium normal-case">{{ r.representacion }}</span></td>
+                        <td class="px-4 py-3 text-xs text-slate-600 font-medium">{{ r.categoria }}</td>
+                        <td class="px-4 py-3 text-center text-slate-500 font-bold">{{ r.promedioJurado }}</td>
+                        <td class="px-4 py-3 text-center text-red-500 font-bold">{{ r.impactoSanciones }}</td>
+                        <td class="px-4 py-3 text-center text-primary font-black text-base">{{ r.puntajeFinal }}</td>
+                      </tr>
+                      <tr v-if="!reporteActual.rankingEfu.length">
+                        <td colspan="6" class="px-4 py-8 text-center text-slate-400 font-medium">No hay resultados oficiales registrados aún.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+
+            <div v-else class="flex flex-col items-center justify-center h-full opacity-50 py-20">
+              <span class="material-symbols-outlined text-6xl text-slate-300 mb-4">history</span>
+              <p class="text-slate-500 font-medium">Selecciona un año para ver los resultados históricos</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== FOOTER ===== -->
       <footer class="bg-slate-50 border-t border-slate-200 py-16 md:py-24 px-6 md:px-12 lg:px-24">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-20 mb-12 md:mb-16">
@@ -438,6 +541,7 @@
               <li><a @click.prevent="scrollTo('fraternidades')" href="#fraternidades" class="hover:text-primary transition-colors cursor-pointer">Fraternidades</a></li>
               <li><a @click.prevent="scrollTo('ruta')" href="#ruta" class="hover:text-primary transition-colors cursor-pointer">Ruta Oficial</a></li>
               <li><a @click.prevent="scrollTo('estadisticas')" href="#estadisticas" class="hover:text-primary transition-colors cursor-pointer">Estadísticas</a></li>
+              <li><a @click.prevent="scrollTo('historicos')" href="#historicos" class="hover:text-primary transition-colors cursor-pointer">Archivo Histórico</a></li>
             </ul>
           </div>
           <div class="text-left">
@@ -506,8 +610,44 @@ const cargarDatos = async () => {
   }
 }
 
+const gestionesPublicas = ref([])
+const gestionSeleccionada = ref(null)
+const reporteActual = ref(null)
+const loadingReporte = ref(false)
+
+const cargarGestionesPublicas = async () => {
+  try {
+    const { data } = await api.get('/evaluaciones/gestiones-publicas')
+    gestionesPublicas.value = data
+    if (data.length > 0 && !gestionSeleccionada.value) {
+      cargarReporte(data[0].idGestion)
+    }
+  } catch (err) {
+    console.error('Error al cargar gestiones:', err)
+  }
+}
+
+const cargarReporte = async (idGestion) => {
+  if (gestionSeleccionada.value === idGestion && reporteActual.value) return
+  gestionSeleccionada.value = idGestion
+  loadingReporte.value = true
+  try {
+    const { data } = await api.get(`/evaluaciones/reporte/${idGestion}`)
+    reporteActual.value = data
+  } catch (err) {
+    console.error('Error al cargar reporte:', err)
+  } finally {
+    loadingReporte.value = false
+  }
+}
+
+const descargarPdfReporte = (idGestion, anio) => {
+  window.open(`http://localhost:3000/api/v1/evaluaciones/reporte/${idGestion}/pdf`, '_blank')
+}
+
 onMounted(() => {
   cargarDatos()
+  cargarGestionesPublicas()
   // Actualizar cada 15 segundos para "tiempo real"
   refreshInterval = setInterval(cargarDatos, 15000)
 

@@ -40,29 +40,76 @@
         <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">Verificando estado de inscripción...</p>
       </div>
 
-      <!-- SOLICITUD YA ENVIADA -->
+      <!-- SOLICITUD YA ENVIADA O APROBADA -->
       <div v-else-if="solicitudExistente" class="py-24 px-8 text-center flex flex-col items-center">
-        <div class="size-24 bg-indigo-50 text-primary rounded-full flex items-center justify-center mb-6">
-          <span class="material-symbols-outlined text-5xl">mark_email_read</span>
-        </div>
-        <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Solicitud en Revisión</h3>
-        <p class="max-w-md text-slate-500 font-medium mb-4">
-          Ya has enviado una solicitud de inscripción para la gestión {{ siteInfo.anio }}. 
-          Tu registro se encuentra actualmente en estado: 
-          <span class="px-3 py-1 bg-primary/10 text-primary rounded-full font-black text-[10px] uppercase ml-2">
-            {{ solicitudExistente.estado }}
-          </span>
-        </p>
-        <p class="max-w-sm text-slate-400 text-xs italic mb-8">
-          Por favor, espera a que el comité administrativo revise tu documentación. Serás notificado una vez se tome una decisión.
-        </p>
-        <div v-if="solicitudExistente.observaciones" class="bg-amber-50 border border-amber-100 p-4 rounded-xl mb-8 max-w-md">
-           <p class="text-[10px] font-black uppercase text-amber-600 mb-1">Observaciones del Admin:</p>
-           <p class="text-xs text-amber-800 font-medium">{{ solicitudExistente.observaciones }}</p>
-        </div>
-        <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-primary text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
-          Ir a Mi Panel
-        </button>
+        <!-- PENDIENTE / OBSERVADO -->
+        <template v-if="solicitudExistente.estado !== 'APROBADO' && solicitudExistente.estado !== 'RECHAZADO'">
+          <div class="size-24 bg-indigo-50 text-primary rounded-full flex items-center justify-center mb-6">
+            <span class="material-symbols-outlined text-5xl">mark_email_read</span>
+          </div>
+          <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Solicitud en Revisión</h3>
+          <p class="max-w-md text-slate-500 font-medium mb-4">
+            Ya has enviado una solicitud de inscripción para la gestión {{ siteInfo.anio }}. 
+            Tu registro se encuentra actualmente en estado: 
+            <span class="px-3 py-1 bg-primary/10 text-primary rounded-full font-black text-[10px] uppercase ml-2">
+              {{ solicitudExistente.estado }}
+            </span>
+          </p>
+          <p class="max-w-sm text-slate-400 text-xs italic mb-8">
+            Por favor, espera a que el comité administrativo revise tu documentación. Serás notificado una vez se tome una decisión.
+          </p>
+          <div v-if="solicitudExistente.observaciones" class="bg-amber-50 border border-amber-100 p-4 rounded-xl mb-8 max-w-md">
+             <p class="text-[10px] font-black uppercase text-amber-600 mb-1">Observaciones del Admin:</p>
+             <p class="text-xs text-amber-800 font-medium">{{ solicitudExistente.observaciones }}</p>
+          </div>
+          <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-primary text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+            Ir a Mi Panel
+          </button>
+        </template>
+
+        <!-- APROBADO PERO AUN SIN FRATERNIDAD CREADA -->
+        <template v-else-if="solicitudExistente.estado === 'APROBADO' && !solicitudExistente.fraternidadCreada">
+          <div class="size-24 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+            <span class="material-symbols-outlined text-5xl">task_alt</span>
+          </div>
+          <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">¡Preinscripción Aprobada!</h3>
+          <p class="text-slate-500 font-medium mb-6">
+            Tu solicitud para la fraternidad <b class="text-primary">{{ solicitudExistente.nombreFraternidad }}</b> ha sido revisada y aceptada por el comité.
+          </p>
+          <p class="text-slate-400 text-sm italic max-w-md mx-auto mb-8">
+            El comité administrativo ahora procederá a realizar tu Inscripción Oficial en el sistema. Serás notificado cuando este proceso termine.
+          </p>
+          <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
+            Ir a mi Panel
+          </button>
+        </template>
+
+        <!-- APROBADO Y YA INSCRITO OFICIALMENTE -->
+        <template v-else-if="solicitudExistente.estado === 'APROBADO' && solicitudExistente.fraternidadCreada">
+          <div class="size-24 bg-blue-50 text-primary rounded-full flex items-center justify-center mb-6 mx-auto">
+            <span class="material-symbols-outlined text-5xl">verified_user</span>
+          </div>
+          <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">¡Inscripción Oficial Exitosa!</h3>
+          <p class="text-slate-500 font-medium mb-6">
+            Tu preinscripción fue aceptada e inscrita con éxito. Tus datos registrados son los siguientes:
+          </p>
+          
+          <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-left mb-8 space-y-4 max-w-xl mx-auto w-full shadow-inner">
+            <p class="text-[10px] font-black uppercase text-slate-400 tracking-wider border-b border-slate-200 pb-2">Identificación Oficial de la Fraternidad:</p>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Nombre</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.nombre }}</span></div>
+              <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Categoría</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.categoria?.nombre || 'General' }}</span></div>
+              <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Tipo de Danza</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.origenFraternidad }}</span></div>
+              <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Instancia</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.nivelRepresentacion }}</span></div>
+              <div v-if="solicitudExistente.fraternidadCreada.facultad"><span class="font-bold text-slate-400 block text-[10px] uppercase">Facultad</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.facultad.nombre }}</span></div>
+              <div v-if="solicitudExistente.fraternidadCreada.carrera"><span class="font-bold text-slate-400 block text-[10px] uppercase">Carrera</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.carrera.nombre }}</span></div>
+            </div>
+          </div>
+
+          <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
+            Ir a mi Panel
+          </button>
+        </template>
       </div>
 
       <!-- NO ACTIVE CATEGORIES / EXPIRED STATE -->
@@ -96,9 +143,21 @@
               <input v-model="form.nombreFraternidad" @input="form.nombreFraternidad = form.nombreFraternidad.toUpperCase()" type="text" required class="form-input" placeholder="Ej. Caporales Ingeniería" />
             </div>
 
-            <!-- 2. Instancia -->
+            <!-- 2. Origen / Tipo de Danza -->
             <div>
-              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">2. Instancia a la que representa</label>
+              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">2. Origen / Tipo de Danza</label>
+              <select v-model="form.origenFraternidad" required class="form-input">
+                <option value="Danza Pesada">Danza Pesada</option>
+                <option value="Danza Liviana">Danza Liviana</option>
+                <option value="Danza Autóctona">Danza Autóctona</option>
+                <option value="Taller Cultural">Taller Cultural</option>
+                <option value="General">General</option>
+              </select>
+            </div>
+
+            <!-- 3. Instancia -->
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">3. Instancia a la que representa</label>
               <select v-model="form.instanciaRepresentacion" required class="form-input">
                 <option value="Facultad">Facultad</option>
                 <option value="Carrera">Carrera</option>
@@ -109,9 +168,9 @@
               </select>
             </div>
 
-            <!-- 3. Categoria -->
+            <!-- 4. Categoria -->
             <div>
-              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">3. Categoría</label>
+              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">4. Categoría</label>
               <select v-model="form.idCategoria" required class="form-input">
                 <option :value="null" disabled>Selecciona una categoría</option>
                 <option v-for="cat in activeCategories" :key="cat.idCategoria" :value="cat.idCategoria">
@@ -420,6 +479,7 @@ const steps = [
 
 const form = ref({
   nombreFraternidad: '',
+  origenFraternidad: 'Danza Pesada',
   instanciaRepresentacion: 'Facultad',
   nombreInstitucionExterna: '',
   idCategoria: null,
@@ -539,7 +599,7 @@ const nextStep = () => {
 const validateStep = (step) => {
   const f = form.value
   if (step === 1) {
-    if (!f.nombreFraternidad || !f.instanciaRepresentacion || !f.idCategoria) return false
+    if (!f.nombreFraternidad || !f.instanciaRepresentacion || !f.idCategoria || !f.origenFraternidad) return false
     if (f.instanciaRepresentacion === 'Facultad' && !f.idFacultad) return false
     if (f.instanciaRepresentacion === 'Carrera' && (!f.idFacultad || !f.idCarrera)) return false
     if (f.instanciaRepresentacion === 'Externo' && !f.nombreInstitucionExterna) return false

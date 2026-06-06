@@ -5,10 +5,11 @@ import { OrganizacionController } from './organizacion.controller';
 import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { InstitucionExterna } from '../entities/InstitucionExterna';
+import { Gestion } from '../entities/Gestion';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Facultad, Carrera, InstitucionExterna])
+    TypeOrmModule.forFeature([Facultad, Carrera, InstitucionExterna, Gestion])
   ],
   controllers: [OrganizacionController],
   providers: [OrganizacionService],

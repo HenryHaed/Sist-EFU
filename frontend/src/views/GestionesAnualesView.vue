@@ -6,10 +6,16 @@
         <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">Gestiones Anuales</h2>
         <p class="text-slate-500 text-sm mt-1">Selecciona una gestión para administrar sus fases de evaluación.</p>
       </div>
-      <button @click="abrirModalNuevaGestion" class="bg-primary text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-primary/20 hover:bg-blue-900 transition-all flex items-center gap-2">
-        <span class="material-symbols-outlined">add_circle</span>
-        NUEVA GESTIÓN
-      </button>
+      <div class="flex gap-2">
+        <button @click="abrirModalClonar" class="bg-indigo-50 text-indigo-700 px-4 py-3 rounded-xl font-black shadow-sm shadow-indigo-100 hover:bg-indigo-100 transition-all flex items-center gap-2">
+          <span class="material-symbols-outlined">content_copy</span>
+          CLONAR
+        </button>
+        <button @click="abrirModalNuevaGestion" class="bg-primary text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-primary/20 hover:bg-blue-900 transition-all flex items-center gap-2">
+          <span class="material-symbols-outlined">add_circle</span>
+          NUEVA GESTIÓN
+        </button>
+      </div>
     </div>
 
     <!-- Cargando -->
@@ -130,6 +136,73 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <!-- MODAL CLONAR GESTION -->
+    <v-dialog v-model="modalClonarOpen" max-width="500px">
+      <v-card class="rounded-3xl">
+        <v-card-title class="bg-indigo-900 text-white pa-6">
+          <h3 class="text-lg font-black italic uppercase tracking-tighter">Clonar Gestión</h3>
+          <p class="text-indigo-200 text-[10px] uppercase tracking-widest mt-0.5">Copia configuración básica</p>
+        </v-card-title>
+        <v-card-text class="pa-6 space-y-5">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">De Gestión (Origen)</label>
+              <select v-model="formClonar.idOrigen" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 outline-none font-bold text-sm">
+                <option value="">Seleccione...</option>
+                <option v-for="g in gestiones" :key="g.idGestion" :value="g.idGestion">{{ g.anio }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">A Gestión (Destino)</label>
+              <select v-model="formClonar.idDestino" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 outline-none font-bold text-sm">
+                <option value="">Seleccione...</option>
+                <option v-for="g in gestiones" :key="g.idGestion" :value="g.idGestion" :disabled="g.idGestion === formClonar.idOrigen">{{ g.anio }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="pt-2">
+            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">¿Qué desea clonar? (Checklist)</label>
+            <div class="space-y-2">
+              <label class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:bg-indigo-50 transition-colors">
+                <input type="checkbox" v-model="formClonar.modules" value="fases_criterios" class="size-4 accent-indigo-600" />
+                <div>
+                  <div class="text-sm font-bold text-slate-800">Fases y Criterios</div>
+                  <div class="text-[10px] text-slate-500 uppercase tracking-wider">Toda la estructura de calificación</div>
+                </div>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:bg-indigo-50 transition-colors">
+                <input type="checkbox" v-model="formClonar.modules" value="categorias" class="size-4 accent-indigo-600" />
+                <div>
+                  <div class="text-sm font-bold text-slate-800">Categorías de Participación</div>
+                  <div class="text-[10px] text-slate-500 uppercase tracking-wider">Danhz, Auqui, etc.</div>
+                </div>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:bg-indigo-50 transition-colors">
+                <input type="checkbox" v-model="formClonar.modules" value="infracciones" class="size-4 accent-indigo-600" />
+                <div>
+                  <div class="text-sm font-bold text-slate-800">Reglas de Infracción</div>
+                  <div class="text-[10px] text-slate-500 uppercase tracking-wider">Penalizaciones generales</div>
+                </div>
+              </label>
+              <label class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:bg-indigo-50 transition-colors">
+                <input type="checkbox" v-model="formClonar.modules" value="fraternidades_base" class="size-4 accent-indigo-600" />
+                <div>
+                  <div class="text-sm font-bold text-slate-800">Fraternidades - Listado Base</div>
+                  <div class="text-[10px] text-slate-500 uppercase tracking-wider">Nombres y facultad (Sin registros activos ni notas)</div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-4 border-t border-slate-100 bg-slate-50">
+          <v-spacer></v-spacer>
+          <button @click="modalClonarOpen = false" class="px-4 py-2 text-slate-500 font-bold text-sm hover:text-slate-800 transition-colors">Cancelar</button>
+          <button @click="guardarClonacion" :disabled="cloning || !formClonar.idOrigen || !formClonar.idDestino || formClonar.modules.length===0" class="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-sm shadow-lg shadow-indigo-600/20 hover:bg-indigo-800 transition-all disabled:opacity-50">
+            {{ cloning ? 'Clonando...' : 'Iniciar Clonación' }}
+          </button>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -149,6 +222,37 @@ const form = ref({
   lema: '',
   activa: true
 })
+
+const modalClonarOpen = ref(false)
+const cloning = ref(false)
+const formClonar = ref({
+  idOrigen: '',
+  idDestino: '',
+  modules: ['fases_criterios', 'categorias', 'infracciones', 'fraternidades_base']
+})
+
+const abrirModalClonar = () => {
+  formClonar.value = { idOrigen: '', idDestino: '', modules: ['fases_criterios', 'categorias', 'infracciones', 'fraternidades_base'] }
+  modalClonarOpen.value = true
+}
+
+const guardarClonacion = async () => {
+  if (formClonar.value.idOrigen === formClonar.value.idDestino) return notify.error('Error', 'El origen y destino no pueden ser iguales')
+  cloning.value = true
+  try {
+    await api.post(`/evaluaciones/gestiones/${formClonar.value.idOrigen}/clonar`, {
+      idDestino: formClonar.value.idDestino,
+      modules: formClonar.value.modules
+    })
+    modalClonarOpen.value = false
+    notify.success('Clonado', 'Configuración clonada correctamente')
+    cargar()
+  } catch (e) {
+    notify.error('Error', 'No se pudo clonar la configuración')
+  } finally {
+    cloning.value = false
+  }
+}
 
 const cargar = async () => {
   cargando.value = true

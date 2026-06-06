@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { InstitucionExterna } from '../entities/InstitucionExterna';
+import { Gestion } from '../entities/Gestion';
 
 @Injectable()
 export class OrganizacionService {
@@ -14,11 +15,21 @@ export class OrganizacionService {
     private readonly carreraRepo: Repository<Carrera>,
     @InjectRepository(InstitucionExterna)
     private readonly institucionRepo: Repository<InstitucionExterna>,
+    @InjectRepository(Gestion)
+    private readonly gestionRepo: Repository<Gestion>,
   ) {}
+
+  async getGestionActiva() {
+    let g = await this.gestionRepo.findOne({ where: { activa: true } });
+    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
+    return g;
+  }
 
   // --- FACULTADES ---
   async findAllFacultades() {
-    return this.facultadRepo.find({ order: { nombre: 'ASC' } });
+    return this.facultadRepo.find({ 
+      order: { nombre: 'ASC' } 
+    });
   }
 
   async createFacultad(data: { nombre: string, sigla?: string }) {
@@ -46,7 +57,9 @@ export class OrganizacionService {
 
   async findCarrerasByFacultad(idFacultad: number) {
     return this.carreraRepo.find({
-      where: { facultad: { idFacultad } },
+      where: { 
+        facultad: { idFacultad }
+      },
       order: { nombre: 'ASC' }
     });
   }
@@ -71,7 +84,9 @@ export class OrganizacionService {
 
   // --- INSTITUCIONES EXTERNAS ---
   async findAllInstituciones() {
-    return this.institucionRepo.find({ order: { nombre: 'ASC' } });
+    return this.institucionRepo.find({ 
+      order: { nombre: 'ASC' } 
+    });
   }
 
   async createInstitucion(data: { nombre: string, sigla?: string }) {

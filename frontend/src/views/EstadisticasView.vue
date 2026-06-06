@@ -145,55 +145,6 @@
         </div>
       </div>
 
-      <!-- EXTERNAL CONTESTS Dynamic Grid -->
-      <div v-if="concursos.length > 0" class="space-y-6">
-        <div class="flex items-center gap-4">
-           <h3 class="text-xl font-black text-slate-900 uppercase italic tracking-tighter">Concursos Externos</h3>
-           <div class="h-px flex-1 bg-slate-100"></div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <div 
-            v-for="concurso in concursos" :key="concurso.nombre"
-            class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500 group relative overflow-hidden"
-          >
-            <div class="absolute top-0 right-0 size-32 bg-slate-50 rounded-bl-full -mr-8 -mt-8 -z-10 group-hover:bg-primary/5 transition-colors"></div>
-            
-            <h4 class="text-md font-black text-primary uppercase tracking-tighter mb-6 pb-2 border-b-2 border-primary/10 group-hover:border-primary/30">{{ concurso.nombre }}</h4>
-            
-            <div v-if="concurso.top.length > 0" class="space-y-4">
-              <div 
-                v-for="(part, idx) in concurso.top.slice(0, 3)" :key="part.id"
-                class="flex justify-between items-center group/item p-3 rounded-2xl border transition-all duration-300"
-                :class="idx === 0 ? 'bg-amber-50 text-amber-900 border-amber-200 shadow-md shadow-amber-100/50' : 'bg-white border-slate-100 hover:border-amber-200 hover:bg-slate-50'"
-              >
-                <div class="flex items-center gap-4 overflow-hidden">
-                  <div 
-                    class="size-8 flex items-center justify-center text-xs font-black rounded-xl shrink-0 transition-transform group-hover/item:scale-110"
-                    :class="idx === 0 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : (idx === 1 ? 'bg-slate-300 text-white' : 'bg-amber-700/40 text-white')"
-                  >
-                    {{ idx + 1 }}
-                  </div>
-                  <div class="overflow-hidden">
-                    <p class="text-xs font-black truncate leading-tight">{{ part.nombre }}</p>
-                    <p class="text-[9px] uppercase font-bold opacity-60 truncate tracking-widest mt-0.5">{{ part.fraternidad }}</p>
-                  </div>
-                </div>
-                <div class="bg-white px-3 py-1.5 rounded-xl border border-slate-100 flex flex-col items-center shrink-0 shadow-sm">
-                  <span class="text-sm font-black text-slate-800 leading-none" :class="idx === 0 ? 'text-amber-600' : ''">{{ part.puntaje }}</span>
-                  <span class="text-[7px] font-black text-slate-400 uppercase mt-0.5">Pts</span>
-                </div>
-              </div>
-            </div>
-            
-            <div v-else class="py-12 text-center text-slate-300">
-               <span class="material-symbols-outlined text-4xl mb-2 opacity-50">hourglass_top</span>
-               <p class="text-[10px] font-black uppercase tracking-widest">En curso...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Institutional Footer -->
       <div class="bg-black text-white p-10 rounded-[32px] shadow-2xl relative overflow-hidden group">
         <div class="absolute top-0 right-0 w-1/3 h-full bg-primary opacity-20 skew-x-12 translate-x-1/2"></div>

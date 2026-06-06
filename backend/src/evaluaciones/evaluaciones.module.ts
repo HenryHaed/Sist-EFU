@@ -10,6 +10,7 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { DocumentoFraternidad } from '../entities/DocumentoFraternidad';
 import { Criterio } from '../entities/Criterio';
 import { Gestion } from '../entities/Gestion';
+import { Categoria } from '../entities/Categoria';
 
 import { Participante } from '../entities/Participante';
 import { DocumentoGestion } from '../entities/DocumentoGestion';
@@ -21,7 +22,7 @@ import { Usuario } from '../entities/Usuario';
   imports: [
     TypeOrmModule.forFeature([
       Evaluacion, Jurado, Fase, Fraternidad, DocumentoFraternidad, Criterio, Gestion, Participante, DocumentoGestion,
-      Incidencia, Infraccion, Usuario
+      Incidencia, Infraccion, Usuario, Categoria
     ])
   ],
   controllers: [EvaluacionesController, ArchivosController],
