@@ -185,7 +185,7 @@
           </div>
 
           <!-- FRATERNITY LOGIC -->
-          <div class="space-y-4 pt-2">
+          <div v-if="!esDelegado" class="space-y-4 pt-2">
             <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <div class="flex items-center gap-3">
                 <span class="material-symbols-outlined text-primary">groups</span>
@@ -225,9 +225,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import api from '../services/api'
 import Swal from 'sweetalert2'
+import { useAuthStore } from '../store/auth'
+
+const authStore = useAuthStore()
+const esDelegado = computed(() => authStore.userRole === 'delegado')
 
 const phases = ref([])
 const fasesExternas = ref([])
@@ -281,7 +285,8 @@ const cargarParticipantes = async () => {
     const { data } = await api.get(`/participantes/fase/${faseSeleccionada.value.idFase}`)
     participantes.value = data
   } catch (error) {
-    Swal.fire('Error', 'No se pudieron cargar los participantes', 'error')
+    const msg = error.response?.data?.message || 'No se pudieron cargar los participantes'
+    Swal.fire('Error', msg, 'error')
   } finally {
     loadingParticipantes.value = false
   }
@@ -384,7 +389,7 @@ const guardar = async () => {
     })
     cargarParticipantes()
   } catch (error) {
-    Swal.fire('Error', 'Error al procesar la inscripción.', 'error')
+    Swal.fire('Error', error.response?.data?.message || 'Error al procesar la inscripción.', 'error')
   } finally {
     guardando.value = false
   }

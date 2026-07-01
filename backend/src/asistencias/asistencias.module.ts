@@ -8,6 +8,7 @@ import { Incidencia } from '../entities/Incidencia';
 import { Infraccion } from '../entities/Infraccion';
 import { Gestion } from '../entities/Gestion';
 import { Fraternidad } from '../entities/Fraternidad';
+import { EventoControl } from '../entities/EventoControl';
 
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { Fraternidad } from '../entities/Fraternidad';
       Incidencia,
       Infraccion,
       Gestion,
-      Fraternidad
+      Fraternidad,
+      EventoControl,
     ]),
   ],
   controllers: [AsistenciasController],

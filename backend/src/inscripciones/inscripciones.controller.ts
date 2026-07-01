@@ -28,12 +28,12 @@ export class InscripcionesController {
   constructor(private readonly inscripcionesService: InscripcionesService) {}
 
   @Post()
-  @Roles('representante', 'superusuario', 'admin')
+  @Roles('delegado', 'superusuario', 'admin')
   @UseInterceptors(
     FileFieldsInterceptor(
       [
-        { name: 'ciRepresentante', maxCount: 1 },
-        { name: 'matriculaBoleta', maxCount: 1 },
+        { name: 'ciMatriculaPreViceDel', maxCount: 1 },
+        { name: 'ciMatriculaSecVocDel', maxCount: 1 },
         { name: 'cartaCompromiso', maxCount: 1 },
         { name: 'resolucion', maxCount: 1 },
         { name: 'actaDirectiva', maxCount: 1 },
@@ -57,13 +57,13 @@ export class InscripcionesController {
   }
 
   @Get('mis-solicitudes')
-  @Roles('representante', 'superusuario', 'admin')
+  @Roles('delegado', 'superusuario', 'admin')
   async getMisSolicitudes(@Request() req: any) {
     return this.inscripcionesService.getMisSolicitudes(req.user.idUsuario);
   }
 
   @Get(':id')
-  @Roles('representante', 'superusuario', 'admin')
+  @Roles('delegado', 'superusuario', 'admin')
   async getSolicitud(@Param('id', ParseIntPipe) id: number) {
     return this.inscripcionesService.getSolicitudById(id);
   }
@@ -82,14 +82,15 @@ export class InscripcionesController {
     @Param('id', ParseIntPipe) id: number,
     @Body('estado') estado: string,
     @Body('observaciones') observaciones?: string,
+    @Body('revisionChecklist') revisionChecklist?: any,
   ) {
-    return this.inscripcionesService.updateEstadoSolicitud(id, estado, observaciones);
+    return this.inscripcionesService.updateEstadoSolicitud(id, estado, observaciones, revisionChecklist);
   }
 
   // ── Cronogramas ──────────────────────────────────────────────────────────
 
   @Get('cronogramas/:idGestion')
-  @Roles('superusuario', 'admin', 'representante')
+  @Roles('superusuario', 'admin', 'delegado')
   async getCronogramas(@Param('idGestion', ParseIntPipe) idGestion: number) {
     return this.inscripcionesService.getCronogramasByGestion(idGestion);
   }

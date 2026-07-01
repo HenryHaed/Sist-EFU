@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Participante } from '../entities/Participante';
@@ -7,6 +7,7 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { Gestion } from '../entities/Gestion';
+import { Usuario } from '../entities/Usuario';
 
 @Injectable()
 export class ParticipantesService {
@@ -23,6 +24,8 @@ export class ParticipantesService {
     private carreraRepo: Repository<Carrera>,
     @InjectRepository(Gestion)
     private gestionRepo: Repository<Gestion>,
+    @InjectRepository(Usuario)
+    private usuarioRepo: Repository<Usuario>,
   ) {}
 
   async getGestionActiva() {
@@ -31,19 +34,56 @@ export class ParticipantesService {
     return g;
   }
 
-  async findAllByFase(idFase: number) {
+  private async getDelegadoFraternidad(user: { idUsuario: number; rol: string }) {
+    if (user.rol !== 'delegado') return null;
+
+    const usuario = await this.usuarioRepo.findOne({
+      where: { idUsuario: user.idUsuario },
+      relations: ['fraternidad'],
+    });
+
+    if (!usuario?.fraternidad) {
+      throw new ForbiddenException('No tienes una fraternidad asignada para gestionar participantes.');
+    }
+
+    return usuario.fraternidad;
+  }
+
+  private async assertDelegadoPuedeGestionar(participante: Participante, user?: { idUsuario: number; rol: string }) {
+    if (!user || user.rol !== 'delegado') return;
+
+    const frat = await this.getDelegadoFraternidad(user);
+    if (participante.fraternidad?.idFraternidad !== frat.idFraternidad) {
+      throw new ForbiddenException('No puedes gestionar participantes de otra fraternidad.');
+    }
+  }
+
+  async findAllByFase(idFase: number, user?: { idUsuario: number; rol: string }) {
+    const where: any = { fase: { idFase } };
+
+    if (user?.rol === 'delegado') {
+      const frat = await this.getDelegadoFraternidad(user);
+      where.fraternidad = { idFraternidad: frat.idFraternidad };
+    }
+
     return this.participanteRepo.find({
-      where: { fase: { idFase } },
+      where,
       relations: ['fraternidad', 'facultad', 'carrera'],
-      order: { nombre: 'ASC' }
+      order: { nombre: 'ASC' },
     });
   }
 
-  async create(data: any) {
+  async create(data: any, user?: { idUsuario: number; rol: string }) {
     const { nombre, tipo, idFase, idFraternidad, esUmsa, idFacultad, idCarrera, institucionExterna, perteneceFraternidad } = data;
 
     const fase = await this.faseRepo.findOne({ where: { idFase } });
     if (!fase) throw new NotFoundException('Fase no encontrada');
+
+    if (user?.rol === 'delegado') {
+      if (fase.tipoConcurso !== 'EXTERNO') {
+        throw new ForbiddenException('Solo puedes inscribir participantes en concursos externos.');
+      }
+    }
 
     const gestion = await this.getGestionActiva();
 
@@ -54,10 +94,14 @@ export class ParticipantesService {
       esUmsa: !!esUmsa,
       institucionExterna,
       perteneceFraternidad: !!perteneceFraternidad,
-      gestion: gestion ? { idGestion: gestion.idGestion } as any : null
+      gestion: gestion ? ({ idGestion: gestion.idGestion } as any) : null,
     });
 
-    if (idFraternidad) {
+    if (user?.rol === 'delegado') {
+      const frat = await this.getDelegadoFraternidad(user);
+      nuevo.fraternidad = frat;
+      nuevo.perteneceFraternidad = true;
+    } else if (idFraternidad) {
       const frat = await this.fratRepo.findOne({ where: { idFraternidad } });
       if (frat) nuevo.fraternidad = frat;
     }
@@ -75,17 +119,27 @@ export class ParticipantesService {
     return this.participanteRepo.save(nuevo);
   }
 
-  async update(id: number, data: any) {
-    const p = await this.participanteRepo.findOne({ where: { idParticipante: id } });
+  async update(id: number, data: any, user?: { idUsuario: number; rol: string }) {
+    const p = await this.participanteRepo.findOne({
+      where: { idParticipante: id },
+      relations: ['fraternidad', 'fase'],
+    });
     if (!p) throw new NotFoundException('Participante no encontrado');
+
+    await this.assertDelegadoPuedeGestionar(p, user);
 
     if (data.nombre !== undefined) p.nombre = data.nombre;
     if (data.tipo !== undefined) p.tipo = data.tipo;
     if (data.esUmsa !== undefined) p.esUmsa = !!data.esUmsa;
     if (data.institucionExterna !== undefined) p.institucionExterna = data.institucionExterna;
-    if (data.perteneceFraternidad !== undefined) p.perteneceFraternidad = !!data.perteneceFraternidad;
-    
-    if (data.idFraternidad !== undefined) {
+
+    if (user?.rol === 'delegado') {
+      p.perteneceFraternidad = true;
+    } else if (data.perteneceFraternidad !== undefined) {
+      p.perteneceFraternidad = !!data.perteneceFraternidad;
+    }
+
+    if (user?.rol !== 'delegado' && data.idFraternidad !== undefined) {
       if (data.idFraternidad === null) {
         p.fraternidad = null;
       } else {
@@ -115,9 +169,15 @@ export class ParticipantesService {
     return this.participanteRepo.save(p);
   }
 
-  async remove(id: number) {
-    const p = await this.participanteRepo.findOne({ where: { idParticipante: id } });
+  async remove(id: number, user?: { idUsuario: number; rol: string }) {
+    const p = await this.participanteRepo.findOne({
+      where: { idParticipante: id },
+      relations: ['fraternidad'],
+    });
     if (!p) throw new NotFoundException('Participante no encontrado');
+
+    await this.assertDelegadoPuedeGestionar(p, user);
+
     return this.participanteRepo.remove(p);
   }
 }

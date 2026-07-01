@@ -37,15 +37,59 @@
         <table class="w-full text-left">
           <thead>
             <tr class="bg-slate-50/50 border-b border-slate-100">
-              <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Nombre / Origen</th>
-              <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Categoría</th>
-              <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Pertenencia</th>
-              <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Estado</th>
+              <th
+                @click="toggleSort('nombre')"
+                class="px-6 py-4 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none transition-colors hover:text-primary"
+                :class="sortField === 'nombre' ? 'text-primary' : 'text-slate-400'"
+              >
+                <span class="inline-flex items-center gap-1">
+                  Nombre / Origen
+                  <span class="material-symbols-outlined text-[14px]" :class="sortField === 'nombre' ? 'text-primary' : 'text-slate-300'">
+                    {{ sortIcon('nombre') }}
+                  </span>
+                </span>
+              </th>
+              <th
+                @click="toggleSort('categoria')"
+                class="px-6 py-4 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none transition-colors hover:text-primary"
+                :class="sortField === 'categoria' ? 'text-primary' : 'text-slate-400'"
+              >
+                <span class="inline-flex items-center gap-1">
+                  Categoría
+                  <span class="material-symbols-outlined text-[14px]" :class="sortField === 'categoria' ? 'text-primary' : 'text-slate-300'">
+                    {{ sortIcon('categoria') }}
+                  </span>
+                </span>
+              </th>
+              <th
+                @click="toggleSort('pertenencia')"
+                class="px-6 py-4 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none transition-colors hover:text-primary"
+                :class="sortField === 'pertenencia' ? 'text-primary' : 'text-slate-400'"
+              >
+                <span class="inline-flex items-center gap-1">
+                  Pertenencia
+                  <span class="material-symbols-outlined text-[14px]" :class="sortField === 'pertenencia' ? 'text-primary' : 'text-slate-300'">
+                    {{ sortIcon('pertenencia') }}
+                  </span>
+                </span>
+              </th>
+              <th
+                @click="toggleSort('estado')"
+                class="px-6 py-4 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none transition-colors hover:text-primary"
+                :class="sortField === 'estado' ? 'text-primary' : 'text-slate-400'"
+              >
+                <span class="inline-flex items-center gap-1">
+                  Estado
+                  <span class="material-symbols-outlined text-[14px]" :class="sortField === 'estado' ? 'text-primary' : 'text-slate-300'">
+                    {{ sortIcon('estado') }}
+                  </span>
+                </span>
+              </th>
               <th class="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-for="f in fraternidades" :key="f.idFraternidad" class="hover:bg-slate-50/50 transition-colors group">
+            <tr v-for="f in fraternidadesOrdenadas" :key="f.idFraternidad" class="hover:bg-slate-50/50 transition-colors group">
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
                   <div v-if="f.logoUrl" class="size-10 rounded-lg overflow-hidden border border-slate-200">
@@ -98,7 +142,7 @@
 
       <!-- Vista Mobile (Tarjetas) -->
       <div class="md:hidden p-4 space-y-4">
-        <div v-for="f in fraternidades" :key="f.idFraternidad + '_mobile'" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden">
+        <div v-for="f in fraternidadesOrdenadas" :key="f.idFraternidad + '_mobile'" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden">
           
           <div class="absolute left-0 top-0 bottom-0 w-1.5" :class="f.habilitadoEfu ? 'bg-green-500' : 'bg-red-500'"></div>
 
@@ -266,6 +310,8 @@ const fraternidades = ref([])
 const loading = ref(true)
 const modalAbierto = ref(false)
 const editando = ref(false)
+const sortField = ref('nombre')
+const sortDir = ref('asc')
 
 const categorias = ref([])
 const loadingCategorias = ref(true)
@@ -317,6 +363,62 @@ const cargarCategorias = async () => {
 const selectedCategoryDescription = computed(() => {
   const cat = categorias.value.find(c => c.idCategoria === form.value.idCategoria)
   return cat ? cat.descripcion : ''
+})
+
+const getPertenenciaSortKey = (f) => {
+  const principal = f.facultad?.sigla || f.facultad?.nombre || f.institucionExterna?.sigla || f.institucionExterna?.nombre || ''
+  const secundario = f.carrera?.nombre || ''
+  return `${principal} ${secundario}`.trim().toLowerCase()
+}
+
+const toggleSort = (field) => {
+  if (sortField.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortDir.value = 'asc'
+  }
+}
+
+const sortIcon = (field) => {
+  if (sortField.value !== field) return 'unfold_more'
+  return sortDir.value === 'asc' ? 'arrow_upward' : 'arrow_downward'
+}
+
+const fraternidadesOrdenadas = computed(() => {
+  const list = [...fraternidades.value]
+  const dir = sortDir.value === 'asc' ? 1 : -1
+
+  const compareText = (a, b) => {
+    if (a < b) return -1 * dir
+    if (a > b) return 1 * dir
+    return 0
+  }
+
+  list.sort((a, b) => {
+    switch (sortField.value) {
+      case 'nombre': {
+        const byNombre = compareText((a.nombre || '').toLowerCase(), (b.nombre || '').toLowerCase())
+        if (byNombre !== 0) return byNombre
+        return compareText((a.origenFraternidad || '').toLowerCase(), (b.origenFraternidad || '').toLowerCase())
+      }
+      case 'categoria':
+        return compareText((a.categoria?.nombre || 'General').toLowerCase(), (b.categoria?.nombre || 'General').toLowerCase())
+      case 'pertenencia':
+        return compareText(getPertenenciaSortKey(a), getPertenenciaSortKey(b))
+      case 'estado': {
+        const valA = a.habilitadoEfu ? 1 : 0
+        const valB = b.habilitadoEfu ? 1 : 0
+        if (valA < valB) return -1 * dir
+        if (valA > valB) return 1 * dir
+        return compareText((a.nombre || '').toLowerCase(), (b.nombre || '').toLowerCase())
+      }
+      default:
+        return 0
+    }
+  })
+
+  return list
 })
 
 const cargarDatos = async () => {

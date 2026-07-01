@@ -8,7 +8,7 @@
         <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="cerrarDetalle"></div>
 
         <!-- Panel -->
-        <div class="relative ml-auto w-full max-w-3xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
+        <div class="relative ml-auto w-full max-w-5xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
 
           <!-- Header del panel -->
           <div class="shrink-0 bg-primary px-6 py-5 flex items-center justify-between">
@@ -38,25 +38,52 @@
           <!-- Contenido scrollable -->
           <div class="flex-1 overflow-y-auto custom-scrollbar">
 
-            <!-- === REPRESENTANTE === -->
+            <!-- === DELEGADO === -->
             <section class="px-6 py-5 border-b border-slate-100">
-              <h3 class="section-title">Representante</h3>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre Completo</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ `${solicitudActiva.representante?.nombres || ''} ${solicitudActiva.representante?.primerApellido || ''} ${solicitudActiva.representante?.segundoApellido || ''}` || '—' }}</p>
+              <h3 class="section-title">Delegado</h3>
+              <div class="space-y-3">
+                <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:flex-row md:items-end md:justify-between">
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre Completo</p>
+                    <p class="text-sm font-medium text-slate-800 break-words">{{ `${solicitudActiva.delegado?.nombres || ''} ${solicitudActiva.delegado?.primerApellido || ''} ${solicitudActiva.delegado?.segundoApellido || ''}` || '—' }}</p>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button @click.stop="setChecklistEstado({ key: 'delegadoNombre', label: 'Delegado - Nombre Completo', value: `${solicitudActiva.delegado?.nombres || ''} ${solicitudActiva.delegado?.primerApellido || ''} ${solicitudActiva.delegado?.segundoApellido || ''}` }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('delegadoNombre', 'OK')]" aria-label="Marcar correcto">✓</button>
+                    <button @click.stop="setChecklistEstado({ key: 'delegadoNombre', label: 'Delegado - Nombre Completo', value: `${solicitudActiva.delegado?.nombres || ''} ${solicitudActiva.delegado?.primerApellido || ''} ${solicitudActiva.delegado?.segundoApellido || ''}` }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('delegadoNombre', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                  </div>
                 </div>
-                <div>
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">CI Representante</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.representante?.ci || '—' }}</p>
-                </div>
-                <div>
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Fecha de Solicitud</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ formatFecha(solicitudActiva.createdAt) || '—' }}</p>
-                </div>
-                <div>
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Gestión</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.gestion?.anio || '—' }}</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">CI Delegado</p>
+                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.delegado?.ci || '—' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button @click.stop="setChecklistEstado({ key: 'delegadoCi', label: 'Delegado - CI', value: solicitudActiva.delegado?.ci || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('delegadoCi', 'OK')]" aria-label="Marcar correcto">✓</button>
+                      <button @click.stop="setChecklistEstado({ key: 'delegadoCi', label: 'Delegado - CI', value: solicitudActiva.delegado?.ci || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('delegadoCi', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Fecha de Solicitud</p>
+                      <p class="text-sm font-medium text-slate-800 break-words">{{ formatFecha(solicitudActiva.createdAt) || '—' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button @click.stop="setChecklistEstado({ key: 'fechaSolicitud', label: 'Fecha de Solicitud', value: formatFecha(solicitudActiva.createdAt) || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('fechaSolicitud', 'OK')]" aria-label="Marcar correcto">✓</button>
+                      <button @click.stop="setChecklistEstado({ key: 'fechaSolicitud', label: 'Fecha de Solicitud', value: formatFecha(solicitudActiva.createdAt) || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('fechaSolicitud', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between md:col-span-2">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Gestión</p>
+                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.gestion?.anio || '—' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button @click.stop="setChecklistEstado({ key: 'gestion', label: 'Gestión', value: String(solicitudActiva.gestion?.anio || '') }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('gestion', 'OK')]" aria-label="Marcar correcto">✓</button>
+                      <button @click.stop="setChecklistEstado({ key: 'gestion', label: 'Gestión', value: String(solicitudActiva.gestion?.anio || '') }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('gestion', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
@@ -64,30 +91,68 @@
             <!-- === IDENTIFICACIÓN FRATERNIDAD === -->
             <section class="px-6 py-5 border-b border-slate-100">
               <h3 class="section-title">Identificación de la Fraternidad</h3>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="col-span-2">
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre Fraternidad</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.nombreFraternidad || '—' }}</p>
+              <div class="space-y-3">
+                <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:flex-row md:items-end md:justify-between">
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre Fraternidad</p>
+                    <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.nombreFraternidad || '—' }}</p>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button @click.stop="setChecklistEstado({ key: 'nombreFraternidad', label: 'Nombre Fraternidad', value: solicitudActiva.nombreFraternidad || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('nombreFraternidad', 'OK')]" aria-label="Marcar correcto">✓</button>
+                    <button @click.stop="setChecklistEstado({ key: 'nombreFraternidad', label: 'Nombre Fraternidad', value: solicitudActiva.nombreFraternidad || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('nombreFraternidad', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                  </div>
                 </div>
-                <div>
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Categoría</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.categoria?.nombre || '—' }}</p>
-                </div>
-                <div>
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Instancia</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ instanciaLabel(solicitudActiva) || '—' }}</p>
-                </div>
-                <div v-if="solicitudActiva.facultad">
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Facultad</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.facultad?.nombre || '—' }}</p>
-                </div>
-                <div v-if="solicitudActiva.carrera">
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Carrera</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.carrera?.nombre || '—' }}</p>
-                </div>
-                <div v-if="solicitudActiva.nombreInstitucionExterna" class="col-span-2">
-                  <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Institución Externa</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.nombreInstitucionExterna || '—' }}</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Categoría</p>
+                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.categoria?.nombre || '—' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button @click.stop="setChecklistEstado({ key: 'categoria', label: 'Categoría', value: solicitudActiva.categoria?.nombre || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('categoria', 'OK')]" aria-label="Marcar correcto">✓</button>
+                      <button @click.stop="setChecklistEstado({ key: 'categoria', label: 'Categoría', value: solicitudActiva.categoria?.nombre || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('categoria', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Instancia</p>
+                      <p class="text-sm font-medium text-slate-800 break-words">{{ instanciaLabel(solicitudActiva) || '—' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button @click.stop="setChecklistEstado({ key: 'instancia', label: 'Instancia', value: instanciaLabel(solicitudActiva) || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('instancia', 'OK')]" aria-label="Marcar correcto">✓</button>
+                      <button @click.stop="setChecklistEstado({ key: 'instancia', label: 'Instancia', value: instanciaLabel(solicitudActiva) || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('instancia', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    </div>
+                  </div>
+                  <div v-if="solicitudActiva.facultad" class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Facultad</p>
+                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.facultad?.nombre || '—' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button @click.stop="setChecklistEstado({ key: 'facultad', label: 'Facultad', value: solicitudActiva.facultad?.nombre || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('facultad', 'OK')]" aria-label="Marcar correcto">✓</button>
+                      <button @click.stop="setChecklistEstado({ key: 'facultad', label: 'Facultad', value: solicitudActiva.facultad?.nombre || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('facultad', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    </div>
+                  </div>
+                  <div v-if="solicitudActiva.carrera" class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Carrera</p>
+                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.carrera?.nombre || '—' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button @click.stop="setChecklistEstado({ key: 'carrera', label: 'Carrera', value: solicitudActiva.carrera?.nombre || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('carrera', 'OK')]" aria-label="Marcar correcto">✓</button>
+                      <button @click.stop="setChecklistEstado({ key: 'carrera', label: 'Carrera', value: solicitudActiva.carrera?.nombre || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('carrera', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    </div>
+                  </div>
+                  <div v-if="solicitudActiva.nombreInstitucionExterna" class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between md:col-span-2">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Institución Externa</p>
+                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.nombreInstitucionExterna || '—' }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button @click.stop="setChecklistEstado({ key: 'institucionExterna', label: 'Institución Externa', value: solicitudActiva.nombreInstitucionExterna || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('institucionExterna', 'OK')]" aria-label="Marcar correcto">✓</button>
+                      <button @click.stop="setChecklistEstado({ key: 'institucionExterna', label: 'Institución Externa', value: solicitudActiva.nombreInstitucionExterna || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('institucionExterna', 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
@@ -98,18 +163,38 @@
               <div class="space-y-3">
                 <div v-for="cargo in directiva" :key="cargo.label" class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                   <p class="text-[9px] font-black uppercase tracking-widest text-primary mb-2">{{ cargo.label }}</p>
-                  <div class="grid grid-cols-3 gap-2">
-                    <div class="col-span-3 sm:col-span-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.nombre || '—' }}</p>
+                  <div class="space-y-3">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                      <div class="min-w-0 flex-1">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre</p>
+                        <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.nombre || '—' }}</p>
+                      </div>
+                      <div class="flex items-center gap-2 shrink-0">
+                        <button @click.stop="setChecklistEstado({ key: `${cargo.label}-nombre`, label: `${cargo.label} - Nombre`, value: cargo.nombre || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-nombre`, 'OK')]" aria-label="Marcar correcto">✓</button>
+                        <button @click.stop="setChecklistEstado({ key: `${cargo.label}-nombre`, label: `${cargo.label} - Nombre`, value: cargo.nombre || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-nombre`, 'X')]" aria-label="Marcar incorrecto">✕</button>
+                      </div>
                     </div>
-                    <div>
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">CI</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.ci || '—' }}</p>
-                    </div>
-                    <div v-if="cargo.celular !== undefined">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Celular</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.celular || '—' }}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
+                        <div class="min-w-0 flex-1">
+                          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">CI</p>
+                          <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.ci || '—' }}</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <button @click.stop="setChecklistEstado({ key: `${cargo.label}-ci`, label: `${cargo.label} - CI`, value: cargo.ci || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-ci`, 'OK')]" aria-label="Marcar correcto">✓</button>
+                          <button @click.stop="setChecklistEstado({ key: `${cargo.label}-ci`, label: `${cargo.label} - CI`, value: cargo.ci || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-ci`, 'X')]" aria-label="Marcar incorrecto">✕</button>
+                        </div>
+                      </div>
+                      <div v-if="cargo.celular !== undefined" class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
+                        <div class="min-w-0 flex-1">
+                          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Celular</p>
+                          <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.celular || '—' }}</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <button @click.stop="setChecklistEstado({ key: `${cargo.label}-celular`, label: `${cargo.label} - Celular`, value: cargo.celular || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-celular`, 'OK')]" aria-label="Marcar correcto">✓</button>
+                          <button @click.stop="setChecklistEstado({ key: `${cargo.label}-celular`, label: `${cargo.label} - Celular`, value: cargo.celular || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-celular`, 'X')]" aria-label="Marcar incorrecto">✕</button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -123,20 +208,27 @@
                 <div
                   v-for="doc in documentos"
                   :key="doc.label"
-                  class="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white hover:border-primary/30 transition-all group"
+                  class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:border-primary/30 transition-all group md:flex-row md:items-center md:justify-between"
                 >
                   <div class="flex items-center gap-3 min-w-0">
                     <div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <span class="material-symbols-outlined text-primary text-sm">picture_as_pdf</span>
                     </div>
-                    <span class="text-xs font-bold text-slate-700 truncate">{{ doc.label }}</span>
+                    <div class="min-w-0">
+                      <span class="text-xs font-bold text-slate-700 truncate block">{{ doc.label }}</span>
+                      <p class="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">{{ doc.url ? 'Documento adjunto' : 'Sin archivo' }}</p>
+                    </div>
                   </div>
-                  <button
-                    @click="verPdf(doc)"
-                    class="shrink-0 px-3 py-1.5 bg-slate-100 hover:bg-primary text-slate-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
-                  >
-                    Ver
-                  </button>
+                  <div class="flex items-center gap-2 shrink-0 flex-wrap">
+                    <button @click.stop="setChecklistEstado({ key: doc.key, label: doc.label, value: doc.url || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(doc.key, 'OK')]" aria-label="Marcar correcto">✓</button>
+                    <button @click.stop="setChecklistEstado({ key: doc.key, label: doc.label, value: doc.url || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(doc.key, 'X')]" aria-label="Marcar incorrecto">✕</button>
+                    <button
+                      @click="verPdf(doc)"
+                      class="shrink-0 px-3 py-2 bg-slate-100 hover:bg-primary text-slate-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      Ver
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>
@@ -158,21 +250,13 @@
                   <button
                     v-if="solicitudActiva.estado !== 'APROBADO'"
                     @click="cambiarEstado('APROBADO')"
-                    :disabled="actualizando"
+                    :disabled="actualizando || !puedeAprobarSolicitud"
                     class="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                   >
                     <span class="material-symbols-outlined text-sm">check_circle</span>
                     Aprobar Solicitud
                   </button>
-                  <button
-                    v-if="solicitudActiva.estado !== 'OBSERVADO'"
-                    @click="cambiarEstado('OBSERVADO')"
-                    :disabled="actualizando"
-                    class="flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50"
-                  >
-                    <span class="material-symbols-outlined text-sm">rate_review</span>
-                    Observar
-                  </button>
+
                   <button
                     v-if="solicitudActiva.estado !== 'RECHAZADO'"
                     @click="cambiarEstado('RECHAZADO')"
@@ -198,14 +282,16 @@
                     class="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 mt-4 w-full justify-center"
                   >
                     <span class="material-symbols-outlined text-sm">verified</span>
-                    Inscribir Oficialmente
+                    Completar Inscripción Manualmente
                   </button>
 
-                  <div v-if="solicitudActiva.fraternidadCreada" class="mt-4 w-full bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center gap-3">
+                  <div v-if="solicitudActiva.estado === 'APROBADO' && solicitudActiva.fraternidadCreada" class="mt-4 w-full bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center gap-3">
                     <span class="material-symbols-outlined text-indigo-600 text-2xl">task_alt</span>
                     <div>
-                      <p class="text-xs font-black uppercase text-indigo-800">Fraternidad Inscrita</p>
-                      <p class="text-[11px] text-indigo-600 font-medium">Esta solicitud ya fue procesada y la fraternidad se encuentra registrada oficialmente.</p>
+                      <p class="text-xs font-black uppercase text-indigo-800">Fraternidad Registrada</p>
+                      <p class="text-[11px] text-indigo-600 font-medium">
+                        {{ solicitudActiva.fraternidadCreada.nombre }} ya está disponible en fraternidades y evaluaciones.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -254,7 +340,7 @@
           <span class="h-1 w-10 bg-secondary inline-block"></span>
           <h2 class="text-3xl font-black tracking-tight text-primary uppercase italic">Solicitudes de Preinscripción</h2>
         </div>
-        <p class="text-slate-500 text-sm font-medium">Revisa las solicitudes enviadas por representantes de fraternidad.</p>
+        <p class="text-slate-500 text-sm font-medium">Revisa las solicitudes enviadas por delegados de fraternidad.</p>
       </div>
 
       <!-- Filtros y Stats -->
@@ -279,7 +365,7 @@
           <input
             v-model="busqueda"
             type="text"
-            placeholder="Buscar por nombre de fraternidad o representante..."
+            placeholder="Buscar por nombre de fraternidad o delegado..."
             class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
           />
         </div>
@@ -342,7 +428,7 @@
               <div class="flex items-center gap-4 mt-2 flex-wrap">
                 <span class="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
                   <span class="material-symbols-outlined text-[14px]">person</span>
-                  {{ sol.representante?.nombres }} {{ sol.representante?.primerApellido }}
+                  {{ sol.delegado?.nombres }} {{ sol.delegado?.primerApellido }}
                 </span>
                 <span class="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
                   <span class="material-symbols-outlined text-[14px]">schedule</span>
@@ -381,6 +467,7 @@ const filtroEstado = ref('')
 const busqueda = ref('')
 const solicitudActiva = ref(null)
 const obsForm = ref('')
+const revisionChecklistDraft = ref({})
 const pdfViewer = ref({ abierto: false, url: '', titulo: '' })
 
 // ── Carga de datos ─────────────────────────────────────────────────────────────
@@ -403,8 +490,8 @@ const solicitudesFiltradas = computed(() => {
     const q = busqueda.value.toLowerCase()
     const matchBusq = !q ||
       s.nombreFraternidad?.toLowerCase().includes(q) ||
-      s.representante?.nombres?.toLowerCase().includes(q) ||
-      s.representante?.primerApellido?.toLowerCase().includes(q)
+      s.delegado?.nombres?.toLowerCase().includes(q) ||
+      s.delegado?.primerApellido?.toLowerCase().includes(q)
     return matchEstado && matchBusq
   })
 })
@@ -413,7 +500,6 @@ const solicitudesFiltradas = computed(() => {
 const statsCards = computed(() => [
   { label: 'Total', filter: '', count: solicitudes.value.length, icon: 'inbox', color: 'bg-slate-100 text-slate-600 border-slate-200' },
   { label: 'Pendientes', filter: 'PENDIENTE', count: solicitudes.value.filter(s => s.estado === 'PENDIENTE').length, icon: 'hourglass_empty', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { label: 'Observadas', filter: 'OBSERVADO', count: solicitudes.value.filter(s => s.estado === 'OBSERVADO').length, icon: 'rate_review', color: 'bg-orange-50 text-orange-700 border-orange-200' },
   { label: 'Aprobadas', filter: 'APROBADO', count: solicitudes.value.filter(s => s.estado === 'APROBADO').length, icon: 'check_circle', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 ])
 
@@ -423,11 +509,89 @@ const abrirDetalle = async (sol) => {
     const { data } = await api.get(`/inscripciones/${sol.idSolicitud}`)
     solicitudActiva.value = data
     obsForm.value = data.observaciones || ''
+    revisionChecklistDraft.value = data.revisionChecklist ? JSON.parse(JSON.stringify(data.revisionChecklist)) : {}
   } catch {
     notify.error('Error', 'No se pudo cargar el detalle.')
   }
 }
 const cerrarDetalle = () => { solicitudActiva.value = null }
+
+const checklistItems = computed(() => {
+  if (!solicitudActiva.value) return []
+  const s = solicitudActiva.value
+  return [
+    { key: 'nombreFraternidad', label: 'Nombre de la fraternidad', value: s.nombreFraternidad },
+    { key: 'origenFraternidad', label: 'Origen / Tipo de Danza', value: s.origenFraternidad },
+    { key: 'categoria', label: 'Categoría', value: s.categoria?.nombre },
+    { key: 'instancia', label: 'Instancia de representación', value: instanciaLabel(s) },
+    { key: 'facultad', label: 'Facultad', value: s.facultad?.nombre },
+    { key: 'carrera', label: 'Carrera', value: s.carrera?.nombre },
+    { key: 'institucionExterna', label: 'Institución externa', value: s.nombreInstitucionExterna },
+    { key: 'presiNombre', label: 'Presidente - Nombre', value: s.presiNombre },
+    { key: 'presiCi', label: 'Presidente - CI', value: s.presiCi },
+    { key: 'presiCelular', label: 'Presidente - Celular', value: s.presiCelular },
+    { key: 'viceNombre', label: 'Vicepresidente - Nombre', value: s.viceNombre },
+    { key: 'viceCi', label: 'Vicepresidente - CI', value: s.viceCi },
+    { key: 'viceCelular', label: 'Vicepresidente - Celular', value: s.viceCelular },
+    { key: 'secGenNombre', label: 'Secretario General - Nombre', value: s.secGenNombre },
+    { key: 'secGenCi', label: 'Secretario General - CI', value: s.secGenCi },
+    { key: 'secHaciNombre', label: 'Secretario de Hacienda - Nombre', value: s.secHaciNombre },
+    { key: 'secHaciCi', label: 'Secretario de Hacienda - CI', value: s.secHaciCi },
+    { key: 'secActasNombre', label: 'Secretario de Actas - Nombre', value: s.secActasNombre },
+    { key: 'secActasCi', label: 'Secretario de Actas - CI', value: s.secActasCi },
+    { key: 'secPrensaNombre', label: 'Secretario de Prensa - Nombre', value: s.secPrensaNombre },
+    { key: 'secPrensaCi', label: 'Secretario de Prensa - CI', value: s.secPrensaCi },
+    { key: 'vocalNombre', label: 'Vocal - Nombre', value: s.vocalNombre },
+    { key: 'vocalCi', label: 'Vocal - CI', value: s.vocalCi },
+    { key: 'delCogobNombre', label: 'Delegado a Co-Gobierno - Nombre', value: s.delCogobNombre },
+    { key: 'delCogobCi', label: 'Delegado a Co-Gobierno - CI', value: s.delCogobCi },
+    { key: 'delCogobCelular', label: 'Delegado a Co-Gobierno - Celular', value: s.delCogobCelular },
+    { key: 'delTitularNombre', label: 'Delegado Titular - Nombre', value: s.delTitularNombre },
+    { key: 'delTitularCi', label: 'Delegado Titular - CI', value: s.delTitularCi },
+    { key: 'delTitularCelular', label: 'Delegado Titular - Celular', value: s.delTitularCelular },
+    { key: 'delSuplenteNombre', label: 'Delegado Suplente - Nombre', value: s.delSuplenteNombre },
+    { key: 'delSuplenteCi', label: 'Delegado Suplente - CI', value: s.delSuplenteCi },
+    { key: 'delSuplenteCelular', label: 'Delegado Suplente - Celular', value: s.delSuplenteCelular },
+    { key: 'ciMatriculaPreViceDel', label: 'Documento 29', value: s.urlCiMatriculaPreViceDel, isDoc: true },
+    { key: 'ciMatriculaSecVocDel', label: 'Documento 30', value: s.urlCiMatriculaSecVocDel, isDoc: true },
+    { key: 'cartaCompromiso', label: 'Documento 31', value: s.urlCartaCompromiso, isDoc: true },
+    { key: 'resolucion', label: 'Documento 32', value: s.urlResolucion, isDoc: true },
+    { key: 'actaDirectiva', label: 'Documento 33', value: s.urlActaDirectiva, isDoc: true },
+  ]
+})
+
+const checklistEstado = (key) => revisionChecklistDraft.value?.[key]?.estado || 'PENDIENTE'
+
+const checklistClase = (estado) => {
+  if (estado === 'OK') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (estado === 'X') return 'bg-red-50 text-secondary border-red-200'
+  return 'bg-slate-50 text-slate-500 border-slate-200'
+}
+
+const checklistBotonClase = (key, estadoEsperado) => {
+  const estadoActual = checklistEstado(key)
+  if (estadoActual === estadoEsperado) {
+    return estadoEsperado === 'OK'
+      ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/20'
+      : 'bg-secondary border-secondary text-white shadow-md shadow-red-500/20'
+  }
+
+  return estadoEsperado === 'OK'
+    ? 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+    : 'bg-white border-red-200 text-secondary hover:bg-red-50'
+}
+
+const setChecklistEstado = (item, estado) => {
+  revisionChecklistDraft.value = {
+    ...revisionChecklistDraft.value,
+    [item.key]: { estado, label: item.label, value: item.value || '' }
+  }
+}
+
+const puedeAprobarSolicitud = computed(() => {
+  const items = Object.values(revisionChecklistDraft.value || {})
+  return items.length > 0 && items.every(item => item?.estado === 'OK')
+})
 
 // ── Directiva computada ───────────────────────────────────────────────────────
 const directiva = computed(() => {
@@ -452,11 +616,11 @@ const documentos = computed(() => {
   if (!solicitudActiva.value) return []
   const s = solicitudActiva.value
   return [
-    { label: 'CI del Representante', url: s.urlCiRepresentante },
-    { label: 'Matrícula / Boleta', url: s.urlMatriculaBoleta },
-    { label: 'Carta de Compromiso', url: s.urlCartaCompromiso },
-    { label: 'Resolución HCU/HCF/HCC', url: s.urlResolucion },
-    { label: 'Acta de Conformación de Directiva', url: s.urlActaDirectiva },
+    { key: 'ciMatriculaPreViceDel', label: 'CI y Matrícula: Presidente, Vice, Delegados', url: s.urlCiMatriculaPreViceDel },
+    { key: 'ciMatriculaSecVocDel', label: 'CI y Matrícula: Secretarios, Vocal, Del. Cogobierno', url: s.urlCiMatriculaSecVocDel },
+    { key: 'cartaCompromiso', label: 'Carta de Compromiso', url: s.urlCartaCompromiso },
+    { key: 'resolucion', label: 'Resolución HCU/HCF/HCC', url: s.urlResolucion },
+    { key: 'actaDirectiva', label: 'Acta de Conformación de Directiva', url: s.urlActaDirectiva },
   ].filter(d => d.url)
 })
 
@@ -467,12 +631,15 @@ const cambiarEstado = async (nuevoEstado) => {
     const { data } = await api.put(`/inscripciones/${solicitudActiva.value.idSolicitud}/estado`, {
       estado: nuevoEstado,
       observaciones: obsForm.value || undefined,
+      revisionChecklist: revisionChecklistDraft.value,
     })
     solicitudActiva.value = { ...solicitudActiva.value, ...data }
-    // Actualizar en la lista
     const idx = solicitudes.value.findIndex(s => s.idSolicitud === data.idSolicitud)
-    if (idx !== -1) solicitudes.value[idx] = { ...solicitudes.value[idx], estado: data.estado }
-    notify.success('Estado actualizado', `La solicitud fue marcada como ${nuevoEstado}.`)
+    if (idx !== -1) solicitudes.value[idx] = { ...solicitudes.value[idx], ...data }
+    const msg = nuevoEstado === 'APROBADO' && data.fraternidadCreada
+      ? `La solicitud fue aprobada y la fraternidad "${data.fraternidadCreada.nombre}" quedó registrada oficialmente.`
+      : `La solicitud fue marcada como ${nuevoEstado}.`
+    notify.success('Estado actualizado', msg)
   } catch (e) {
     notify.error('Error', e.response?.data?.message || 'No se pudo actualizar el estado.')
   } finally {

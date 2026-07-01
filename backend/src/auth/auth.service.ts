@@ -20,7 +20,7 @@ export class AuthService {
     // 1. Buscar el usuario por CI, cargando la relacion con el rol
     const usuario = await this.usuarioRepo.findOne({
       where: { ci },
-      relations: ['rol'],
+      relations: ['rol', 'fraternidad', 'fraternidad.categoria', 'fraternidad.facultad', 'fraternidad.carrera', 'fraternidad.institucionExterna'],
     });
 
     if (!usuario) {
@@ -53,6 +53,16 @@ export class AuthService {
         segundoApellido: usuario.segundoApellido,
         rol: usuario.rol.nombre,
         primerLogin: usuario.primerLogin,
+        fraternidad: usuario.fraternidad ? {
+          idFraternidad: usuario.fraternidad.idFraternidad,
+          nombre: usuario.fraternidad.nombre,
+          origenFraternidad: usuario.fraternidad.origenFraternidad,
+          nivelRepresentacion: usuario.fraternidad.nivelRepresentacion,
+          categoria: usuario.fraternidad.categoria ? { idCategoria: usuario.fraternidad.categoria.idCategoria, nombre: usuario.fraternidad.categoria.nombre } : null,
+          facultad: usuario.fraternidad.facultad ? { idFacultad: usuario.fraternidad.facultad.idFacultad, nombre: usuario.fraternidad.facultad.nombre } : null,
+          carrera: usuario.fraternidad.carrera ? { idCarrera: usuario.fraternidad.carrera.idCarrera, nombre: usuario.fraternidad.carrera.nombre } : null,
+          institucionExterna: usuario.fraternidad.institucionExterna ? { idInstitucion: usuario.fraternidad.institucionExterna.idInstitucion, nombre: usuario.fraternidad.institucionExterna.nombre } : null,
+        } : null,
       },
     };
   }

@@ -5,10 +5,12 @@ import { FraternidadesController } from './fraternidades.controller';
 import { Fraternidad } from '../entities/Fraternidad';
 import { Categoria } from '../entities/Categoria';
 import { Gestion } from '../entities/Gestion';
+import { Usuario } from '../entities/Usuario';
+import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
 import { CategoriasController } from './categorias.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Fraternidad, Categoria, Gestion])],
+  imports: [TypeOrmModule.forFeature([Fraternidad, Categoria, Gestion, Usuario, SolicitudInscripcion])],
   controllers: [FraternidadesController, CategoriasController],
   providers: [FraternidadesService],
   exports: [FraternidadesService],

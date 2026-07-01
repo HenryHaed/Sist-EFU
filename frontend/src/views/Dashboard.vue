@@ -124,7 +124,7 @@
               <span class="text-sm">Reglamento</span>
             </button>
 
-            <!-- REPRESENTANTE: Inscripción -->
+            <!-- DELEGADO: Inscripción -->
             <button
               v-if="can('inscripcion_fraternidad')"
               @click="setVista('inscripcion_fraternidad')"
@@ -197,8 +197,8 @@
               :class="vistaActual === 'asistencias' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
               class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all"
             >
-              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'asistencias' ? 'text-secondary' : 'text-slate-400'">how_to_reg</span>
-              <span class="text-sm font-bold">Control Asistencia</span>
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'asistencias' ? 'text-secondary' : 'text-slate-400'">groups</span>
+              <span class="text-sm font-bold">Directorio Delegados</span>
             </button>
 
             <button
@@ -424,7 +424,7 @@
               :gestion-id="gestionParaAjustes"
             />
 
-            <!-- Vista: Inscripción de Fraternidad (Representante) -->
+            <!-- Vista: Inscripción de Fraternidad (Delegado) -->
             <InscribirFraternidadView 
               v-else-if="vistaActual === 'inscripcion_fraternidad'" 
               :key="`inscripcion-${currentUser?.idUsuario}`"
@@ -598,8 +598,7 @@ const can = (permission) => {
     admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
     jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
-    delegado: ['estadisticas', 'reglamento', 'informes', 'gestionar_participantes'],
-    representante: ['inscripcion_fraternidad', 'reglamento']
+    delegado: ['estadisticas', 'reglamento', 'informes', 'gestionar_participantes', 'inscripcion_fraternidad']
   }
   return permissions[role]?.includes(permission) || false
 }
@@ -662,7 +661,7 @@ onMounted(async () => {
   }
 
   // Vista inicial según rol (si no hay query)
-  if (!queryVista && authStore.userRole?.toLowerCase() === 'representante') {
+  if (!queryVista && authStore.userRole?.toLowerCase() === 'delegado') {
     vistaActual.value = 'inscripcion_fraternidad'
   }
 })
@@ -726,7 +725,7 @@ const tituloVista = computed(() => {
     inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad',
     reglamento: 'Reglamentos y Documentos Oficiales',
     solicitudes_inscripcion: 'Solicitudes de Preinscripción',
-    asistencias: 'Control de Asistencia Delegados',
+    asistencias: 'Directorio de Delegados',
     seleccionar_fase_disciplina: 'Control de Disciplina HCU'
   }
 

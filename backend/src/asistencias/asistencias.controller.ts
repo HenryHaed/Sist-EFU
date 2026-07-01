@@ -15,6 +15,21 @@ export class AsistenciasController {
     return this.asistenciasService.getDelegados();
   }
 
+  @Get('eventos')
+  @Roles('superusuario', 'admin', 'controladorhcu')
+  getEventos() {
+    return this.asistenciasService.getEventos();
+  }
+
+  @Post('registrar')
+  @Roles('superusuario', 'admin', 'controladorhcu')
+  registrarAsistencia(@Body() data: any, @Request() req) {
+    return this.asistenciasService.registrarAsistencia({
+      ...data,
+      usuarioId: req.user.idUsuario,
+    });
+  }
+
   @Post('inasistencia')
   @Roles('superusuario', 'admin', 'controladorhcu')
   registrarInasistencia(@Body() data: any, @Request() req) {

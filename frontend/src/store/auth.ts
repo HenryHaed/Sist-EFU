@@ -7,6 +7,16 @@ interface User {
   nombres: string;
   rol: string;
   primerLogin: boolean;
+  fraternidad?: {
+    idFraternidad: number;
+    nombre: string;
+    origenFraternidad?: string;
+    nivelRepresentacion?: string;
+    categoria?: { idCategoria: number; nombre: string } | null;
+    facultad?: { idFacultad: number; nombre: string } | null;
+    carrera?: { idCarrera: number; nombre: string } | null;
+    institucionExterna?: { idInstitucionExterna: number; nombre: string } | null;
+  } | null;
 }
 
 export const useAuthStore = defineStore('auth', {

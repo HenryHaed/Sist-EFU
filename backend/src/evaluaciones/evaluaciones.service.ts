@@ -217,10 +217,17 @@ export class EvaluacionesService {
     }
 
     let fraternidades: Fraternidad[];
+    const idGestionFase = fase.gestion?.idGestion || (await this.getGestionActiva())?.idGestion;
     if (jurado.fraternidadesHabilitadas && jurado.fraternidadesHabilitadas.length > 0) {
       fraternidades = jurado.fraternidadesHabilitadas;
     } else {
-      fraternidades = await this.fraternidadRepo.find({ where: { habilitadoEfu: true }, order: { nombre: 'ASC' } });
+      fraternidades = await this.fraternidadRepo.find({
+        where: {
+          habilitadoEfu: true,
+          ...(idGestionFase ? { gestion: { idGestion: idGestionFase } } : {}),
+        },
+        order: { nombre: 'ASC' },
+      });
     }
 
     const evaluadas = await this.evaluacionRepo.find({ where: { jurado: { idJurado: jurado.idJurado }, fase: { idFase } }, relations: ['fraternidad'] });
@@ -321,7 +328,7 @@ export class EvaluacionesService {
     const gestion = await this.getGestionActiva();
     if (!gestion) throw new NotFoundException('No hay gestión activa');
 
-    const frats = await this.fraternidadRepo.find({ where: { habilitadoEfu: true } });
+    const frats = await this.fraternidadRepo.find({ where: { habilitadoEfu: true, origenFraternidad: Not('Externo') } });
     const evsEfu = await this.evaluacionRepo.find({
       where: [
         { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } },
@@ -733,7 +740,7 @@ export class EvaluacionesService {
 
     // 1. Fraternidades y Ranking EFU
     const frats = await this.fraternidadRepo.find({
-      where: { habilitadoEfu: true, gestion: { idGestion } },
+      where: { habilitadoEfu: true, gestion: { idGestion }, origenFraternidad: Not('Externo') },
       relations: ['categoria', 'facultad', 'carrera', 'institucionExterna']
     });
 

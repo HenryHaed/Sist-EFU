@@ -16,10 +16,10 @@ export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 
   @Public()
-  @Post('registrar-representante')
-  @ApiOperation({ summary: 'Auto-registro para representantes de fraternidad' })
-  registerRepresentante(@Body() body: any) {
-    return this.usuariosService.registerRepresentante(body);
+  @Post('registrar-delegado')
+  @ApiOperation({ summary: 'Auto-registro para delegados de fraternidad' })
+  registerDelegado(@Body() body: any) {
+    return this.usuariosService.registerDelegado(body);
   }
 
   @Get('roles')

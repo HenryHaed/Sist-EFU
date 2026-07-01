@@ -110,7 +110,7 @@
              <div class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 flex items-center justify-between">
                 <div>
                    <p class="text-xs font-black text-indigo-800 uppercase leading-none mb-1">Inscripción Pública</p>
-                   <p class="text-[10px] text-indigo-600 font-bold">Habilita registro de representantes</p>
+                   <p class="text-[10px] text-indigo-600 font-bold">Habilita registro de delegados</p>
                 </div>
                 <input type="checkbox" v-model="gestion.permiteInscripcionPublica" class="toggle-checkbox" style="--checked-bg: #4f46e5" />
              </div>
@@ -308,7 +308,7 @@
             <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-start gap-3">
               <span class="material-symbols-outlined text-blue-600">info</span>
               <p class="text-xs text-blue-800 font-medium">
-                Define los periodos de tiempo en los que los representantes podrán enviar sus solicitudes de inscripción. 
+                Define los periodos de tiempo en los que los delegados podrán enviar sus solicitudes de inscripción. 
                 Los usuarios solo verán el formulario si están dentro del rango de fechas establecido para su categoría.
               </p>
             </div>

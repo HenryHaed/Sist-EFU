@@ -76,7 +76,7 @@ export class UsuariosService {
     fraternidadesIds?: number[];
     idFraternidad?: number;
   }) {
-    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, ...data } = createDto as any;
+    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, ...data } = createDto as any;
 
     const role = await this.roleRepo.findOne({ where: { idRol } });
     if (!role) throw new BadRequestException('Rol no válido');
@@ -88,9 +88,23 @@ export class UsuariosService {
     newUser.password = hashedPassword;
     newUser.rol = role;
 
-    if (role.nombre === 'delegado' && idFraternidad) {
-      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
-      if (frat) newUser.fraternidad = frat;
+    if (role.nombre === 'delegado') {
+      if (idFraternidad) {
+        const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
+        if (frat) newUser.fraternidad = frat;
+      } else if (nuevaFraternidad) {
+        const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
+        const frat = new Fraternidad();
+        frat.nombre = nuevaFraternidad;
+        frat.origenFraternidad = 'UMSA';
+        if (gestionActiva) frat.gestion = gestionActiva;
+        const savedFrat = await this.fraternidadRepo.save(frat);
+        newUser.fraternidad = savedFrat;
+      }
+    }
+
+    if (role.nombre === 'delegado' && !newUser.fraternidad) {
+      throw new BadRequestException('El delegado debe estar asociado a una fraternidad o proveer el nombre de una nueva.');
     }
 
     let savedUser: Usuario;
@@ -120,9 +134,10 @@ export class UsuariosService {
     fasesIds?: number[];
     fraternidadesIds?: number[];
     idFraternidad?: number;
+    nuevaFraternidad?: string;
   }) {
     const user = await this.findOne(id);
-    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, ...data } = updateDto as any;
+    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, ...data } = updateDto as any;
 
     let updateData: any = { ...data };
 
@@ -140,8 +155,21 @@ export class UsuariosService {
     if (idFraternidad) {
       const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
       if (frat) user.fraternidad = frat;
-    } else if (idFraternidad === null) {
+    } else if (nuevaFraternidad) {
+      const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
+      const frat = new Fraternidad();
+      frat.nombre = nuevaFraternidad;
+      frat.origenFraternidad = 'UMSA';
+      if (gestionActiva) frat.gestion = gestionActiva;
+      const savedFrat = await this.fraternidadRepo.save(frat);
+      user.fraternidad = savedFrat;
+    } else if (idFraternidad === null && !nuevaFraternidad) {
       user.fraternidad = null;
+    }
+
+    const rolEvaluado = rolActualizado || user.rol;
+    if (rolEvaluado?.nombre === 'delegado' && !user.fraternidad) {
+      throw new BadRequestException('El delegado debe estar asociado a una fraternidad o proveer el nombre de una nueva.');
     }
 
     Object.assign(user, updateData);
@@ -327,19 +355,19 @@ export class UsuariosService {
     return { message: 'Usuario eliminado con éxito' };
   }
 
-  async registerRepresentante(data: { ci: string; nombres: string; primerApellido: string; segundoApellido?: string; password?: string }) {
+  async registerDelegado(data: { ci: string; nombres: string; primerApellido: string; segundoApellido?: string; password?: string }) {
     // 1. Verificar si la inscripción pública está habilitada
     const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
     if (!gestionActiva || !gestionActiva.permiteInscripcionPublica) {
         throw new BadRequestException('El registro de fraternidades no está habilitado en este momento.');
     }
 
-    // 2. Buscar el rol 'representante'
-    let roleRepresentante = await this.roleRepo.findOne({ where: { nombre: 'representante' } });
-    if (!roleRepresentante) {
-        roleRepresentante = await this.roleRepo.save({
-            nombre: 'representante',
-            descripcion: 'Rol para inscripción de fraternidades'
+    // 2. Buscar el rol 'delegado'
+    let roleDelegado = await this.roleRepo.findOne({ where: { nombre: 'delegado' } });
+    if (!roleDelegado) {
+        roleDelegado = await this.roleRepo.save({
+            nombre: 'delegado',
+            descripcion: 'Rol para inscripción de fraternidades y delegados'
         });
     }
 
@@ -349,7 +377,7 @@ export class UsuariosService {
     const newUser = this.usuarioRepo.create({
         ...data,
         password: hashedPassword,
-        rol: roleRepresentante,
+        rol: roleDelegado,
         primerLogin: true
     });
 

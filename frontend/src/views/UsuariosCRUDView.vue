@@ -90,8 +90,9 @@
                 >
                   {{ user.rol?.nombre || 'Sin Rol' }}
                 </span>
-                <p v-if="user.rol?.nombre === 'delegado' && user.fraternidad" class="text-[9px] font-black text-slate-400 mt-1 uppercase tracking-tighter">
-                   {{ user.fraternidad.nombre }}
+                <p v-if="user.rol?.nombre === 'delegado'" class="text-[9px] font-black mt-1 uppercase tracking-tighter"
+                  :class="user.fraternidad ? 'text-slate-400' : 'text-amber-500'">
+                   {{ user.fraternidad?.nombre || 'Sin fraternidad asignada' }}
                 </p>
               </td>
               <!-- Columna perfil de jurado -->
@@ -166,8 +167,9 @@
             </span>
           </div>
 
-          <div v-if="user.rol?.nombre === 'delegado' && user.fraternidad" class="text-[10px] font-black text-slate-500 bg-white border border-slate-100 p-2 rounded-lg">
-            {{ user.fraternidad.nombre }}
+          <div v-if="user.rol?.nombre === 'delegado'" class="text-[10px] font-black bg-white border border-slate-100 p-2 rounded-lg"
+            :class="user.fraternidad ? 'text-slate-500' : 'text-amber-600'">
+            {{ user.fraternidad?.nombre || 'Sin fraternidad asignada' }}
           </div>
 
           <!-- Perfil Jurado -->
@@ -207,7 +209,7 @@
     </div>
 
     <!-- Modal Save User -->
-    <v-dialog v-model="modalOpen" max-width="600" persistent>
+    <v-dialog v-model="modalOpen" max-width="860" persistent>
       <v-card class="rounded-xl overflow-hidden border border-slate-200">
         <v-card-title class="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between">
           <h3 class="font-black text-slate-900">{{ editando ? (esRolJurado ? 'Editar Jurado' : 'Editar Usuario') : (esRolJurado ? 'Nuevo Jurado' : 'Nuevo Usuario') }}</h3>
@@ -356,14 +358,44 @@
                   Configuración de Delegado
                 </p>
                 <div>
-                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Fraternidad a la que pertenece</label>
-                  <select v-model="form.idFraternidad" required
-                    class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all">
-                    <option value="" disabled>Seleccione una fraternidad</option>
-                    <option v-for="frat in todasFraternidades" :key="frat.idFraternidad" :value="frat.idFraternidad">
-                      {{ frat.nombre }}
-                    </option>
-                  </select>
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Fraternidad a la que pertenece
+                    <span class="text-secondary font-medium normal-case">(Obligatoria para delegado)</span>
+                  </label>
+                  <v-combobox
+                    v-model="form.idFraternidad"
+                    v-model:search="fraternidadBusqueda"
+                    :items="fraternidadSugerencias"
+                    item-title="label"
+                    item-value="idFraternidad"
+                    :loading="cargandoFraternidades"
+                    :no-filter="true"
+                    clearable
+                    density="comfortable"
+                    variant="outlined"
+                    placeholder="Escribe el nombre de la fraternidad o crea una nueva"
+                    class="text-sm w-full"
+                    menu-icon="mdi-chevron-down"
+                    no-data-text="Escribe para buscar o añadir una nueva"
+                    :menu-props="{ maxWidth: 760, minWidth: 560, contentClass: 'fraternidad-menu-elevado' }"
+                  >
+                    <template #item="{ props, item }">
+                      <v-list-item
+                        v-bind="props"
+                        class="py-2"
+                      >
+                        <v-list-item-title class="font-bold text-slate-800">
+                          {{ item.raw?.nombre || item.title }}
+                        </v-list-item-title>
+                        <v-list-item-subtitle class="text-xs text-slate-500 whitespace-normal">
+                          {{ item.raw?.etiqueta || 'Coincidencia histórica' }}<span v-if="item.raw?.gestionAnio"> · Gestión {{ item.raw.gestionAnio }}</span><span v-if="item.raw?.gestionActiva"> · Activa</span>
+                        </v-list-item-subtitle>
+                      </v-list-item>
+                    </template>
+                  </v-combobox>
+                  <p class="text-[9px] text-slate-400 mt-1 italic">
+                    Puedes escribir para buscar coincidencias históricas de otras gestiones. Si no corresponde a ninguna, deja el campo vacío.
+                  </p>
                 </div>
               </div>
 
@@ -414,6 +446,10 @@ const usuarios = ref([])
 const roles = ref([])
 const todasFases = ref([])
 const todasFraternidades = ref([])
+const fraternidadBusqueda = ref('')
+const fraternidadSugerencias = ref([])
+const cargandoFraternidades = ref(false)
+let fraternidadBusquedaTimeout = null
 const loading = ref(true)
 const saving = ref(false)
 const searchQuery = ref('')
@@ -460,6 +496,50 @@ const filteredUsuarios = computed(() => {
     )
   }
   return list
+})
+
+const formatearSugerenciaFraternidad = (frat = {}) => ({
+  ...frat,
+  label: `${frat.nombre || ''}${frat.etiqueta ? ` (${frat.etiqueta})` : ''}`
+})
+
+const asegurarFraternidadSeleccionada = (frat) => {
+  if (!frat?.idFraternidad) return
+  const sugerencia = formatearSugerenciaFraternidad(frat)
+  if (!fraternidadSugerencias.value.some(item => item.idFraternidad === sugerencia.idFraternidad)) {
+    fraternidadSugerencias.value = [sugerencia, ...fraternidadSugerencias.value]
+  }
+}
+
+const buscarFraternidades = async (texto = '') => {
+  const consulta = texto.trim()
+
+  if (consulta.length < 2) {
+    fraternidadSugerencias.value = []
+    const actual = usuarios.value.find(u => u.idUsuario === form.value.idUsuario)?.fraternidad
+    if (actual) asegurarFraternidadSeleccionada(actual)
+    return
+  }
+
+  cargandoFraternidades.value = true
+  try {
+    const { data } = await api.get('/fraternidades/buscar', { params: { q: consulta } })
+    fraternidadSugerencias.value = Array.isArray(data) ? data.filter(Boolean).map(formatearSugerenciaFraternidad) : []
+    const actual = usuarios.value.find(u => u.idUsuario === form.value.idUsuario)?.fraternidad
+    if (actual) asegurarFraternidadSeleccionada(actual)
+  } catch (error) {
+    console.error('Error buscando fraternidades', error)
+    fraternidadSugerencias.value = []
+  } finally {
+    cargandoFraternidades.value = false
+  }
+}
+
+watch(fraternidadBusqueda, (valor) => {
+  clearTimeout(fraternidadBusquedaTimeout)
+  fraternidadBusquedaTimeout = setTimeout(() => {
+    buscarFraternidades(valor)
+  }, 250)
 })
 
 // ── Carga de datos ────────────────────────────────────────────────────────
@@ -514,6 +594,9 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       fraternidadesIds: usuario._perfil?.fraternidadesHabilitadas?.map(f => f.idFraternidad) || [],
       idFraternidad: usuario.fraternidad?.idFraternidad || null
     }
+    fraternidadBusqueda.value = usuario.fraternidad?.nombre || ''
+    fraternidadSugerencias.value = []
+    asegurarFraternidadSeleccionada(usuario.fraternidad)
   } else {
     const rolDefault = roles.value.find(r => r.nombre === props.rolFiltro)
     form.value = {
@@ -523,11 +606,17 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       fasesEfuIds: [], fasesExternasIds: [], fraternidadesIds: [],
       idFraternidad: null
     }
+    fraternidadBusqueda.value = ''
+    fraternidadSugerencias.value = []
   }
   modalOpen.value = true
 }
 
-const cerrarModal = () => { modalOpen.value = false }
+const cerrarModal = () => {
+  modalOpen.value = false
+  fraternidadBusqueda.value = ''
+  fraternidadSugerencias.value = []
+}
 
 // ── Guardar ───────────────────────────────────────────────────────────────
 const guardarUsuario = async () => {
@@ -546,6 +635,17 @@ const guardarUsuario = async () => {
       payload.password = payload.ci
     } else if (!payload.password) {
       delete payload.password
+    }
+
+    if (esRolDelegado.value) {
+      if (typeof form.value.idFraternidad === 'string') {
+        payload.nuevaFraternidad = form.value.idFraternidad
+        payload.idFraternidad = null
+      } else if (typeof form.value.idFraternidad === 'object' && form.value.idFraternidad !== null) {
+        payload.idFraternidad = form.value.idFraternidad.idFraternidad
+      } else {
+        payload.idFraternidad = form.value.idFraternidad || null
+      }
     }
 
     if (editando.value) {

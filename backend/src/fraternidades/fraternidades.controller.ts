@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, UseInterceptors, UploadedFile, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -47,6 +47,12 @@ export class FraternidadesController {
   @ApiOperation({ summary: 'Listar todas las fraternidades' })
   findAll() {
     return this.fraternidadesService.findAll();
+  }
+
+  @Get('buscar')
+  @ApiOperation({ summary: 'Buscar fraternidades activas e históricas para autocompletado' })
+  buscar(@Query('q') q?: string) {
+    return this.fraternidadesService.buscar(q || '');
   }
 
   @Get(':id')

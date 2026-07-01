@@ -41,6 +41,11 @@ export class CreateUsuarioDto {
   @IsNumber()
   @IsOptional()
   idFraternidad?: number;
+
+  @ApiProperty({ required: false, description: 'Si el delegado crea una nueva fraternidad, enviar su nombre' })
+  @IsString()
+  @IsOptional()
+  nuevaFraternidad?: string;
 }
 
 export class UpdateUsuarioDto {
@@ -83,4 +88,9 @@ export class UpdateUsuarioDto {
   @IsNumber()
   @IsOptional()
   idFraternidad?: number;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  nuevaFraternidad?: string;
 }

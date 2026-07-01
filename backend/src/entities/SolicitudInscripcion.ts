@@ -33,8 +33,8 @@ export class SolicitudInscripcion {
     gestion: Gestion;
 
     @ManyToOne(() => Usuario)
-    @JoinColumn({ name: 'id_usuario_representante' })
-    representante: Usuario;
+    @JoinColumn({ name: 'id_usuario_delegado' })
+    delegado: Usuario;
 
     // --- Datos de la Fraternidad (Puntos 1 al 3) ---
     // 1. Nombre de la Fraternidad
@@ -140,13 +140,13 @@ export class SolicitudInscripcion {
     delSuplenteCelular: string;
 
     // --- Documentos Requisitos (Puntos 29 al 33) ---
-    // 29. Fotocopia CI Representante
-    @Column({ name: 'url_ci_representante', length: 500, nullable: true })
-    urlCiRepresentante: string;
+    // 29. CI y Matrícula de Presidente, Vicepresidente, Delegado Titular, Delegado Suplente
+    @Column({ name: 'url_ci_matricula_pre_vice_del', length: 500, nullable: true })
+    urlCiMatriculaPreViceDel: string;
 
-    // 30. Matrícula o Boleta
-    @Column({ name: 'url_matricula_boleta', length: 500, nullable: true })
-    urlMatriculaBoleta: string;
+    // 30. CI y Matrícula de Secretarios, Vocal y Delegado Cogobierno
+    @Column({ name: 'url_ci_matricula_sec_voc_del', length: 500, nullable: true })
+    urlCiMatriculaSecVocDel: string;
 
     // 31. Carta de Compromiso
     @Column({ name: 'url_carta_compromiso', length: 500, nullable: true })
@@ -166,6 +166,9 @@ export class SolicitudInscripcion {
 
     @Column({ type: 'text', nullable: true })
     observaciones: string;
+
+    @Column({ name: 'revision_checklist', type: 'jsonb', nullable: true, default: {} })
+    revisionChecklist: Record<string, { estado: 'PENDIENTE' | 'OK' | 'X', comentario?: string }>;
 
     @ManyToOne(() => Fraternidad, { nullable: true })
     @JoinColumn({ name: 'id_fraternidad_creada' })

@@ -8,10 +8,11 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { Gestion } from '../entities/Gestion';
+import { Usuario } from '../entities/Usuario';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Participante, Fase, Fraternidad, Facultad, Carrera, Gestion])
+    TypeOrmModule.forFeature([Participante, Fase, Fraternidad, Facultad, Carrera, Gestion, Usuario])
   ],
   controllers: [ParticipantesController],
   providers: [ParticipantesService],

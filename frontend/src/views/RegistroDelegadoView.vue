@@ -14,13 +14,13 @@
               UMS<span class="text-secondary">A</span>
             </h1>
             <div class="h-8 w-[1px] bg-slate-200"></div>
-            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Registro de Representantes</p>
+            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Registro de Delegados</p>
           </div>
 
           <!-- Header -->
           <div class="mb-10">
             <h2 class="text-4xl font-black italic tracking-tight text-slate-900 uppercase">Comienza el registro</h2>
-            <p class="text-slate-500 text-base mt-2 font-medium">Crea tu cuenta para inscribir a tu fraternidad en la gestión {{ siteInfo.anio || 2026 }}.</p>
+            <p class="text-slate-500 text-base mt-2 font-medium">Crea tu cuenta como delegado para inscribir a tu fraternidad en la gestión {{ siteInfo.anio || 2026 }}.</p>
           </div>
 
           <!-- Form -->
@@ -229,7 +229,7 @@ const startCountdown = () => {
 const handleRegister = async () => {
   loading.value = true
   try {
-    await api.post('/usuarios/registrar-representante', form.value)
+    await api.post('/usuarios/registrar-delegado', form.value)
     showSuccessModal.value = true
     startCountdown()
   } catch (err) {
