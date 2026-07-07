@@ -1,8 +1,8 @@
 <template>
   <AuthSplitLayout
     :site-info="siteInfo"
-    :title="siteInfo.tituloPrincipal || 'Bienvenido'"
-    :subtitle="siteInfo.subtituloPrincipal || 'Ingresa tus credenciales para acceder al portal.'"
+    title="Bienvenido"
+    subtitle="Ingresa tus credenciales para acceder al portal."
   >
     <form @submit.prevent="handleLogin" class="space-y-4">
       <div>
@@ -78,6 +78,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import api from '../services/api'
+import { applySiteTitle } from '../utils/siteTitle'
 import AuthSplitLayout from '../components/auth/AuthSplitLayout.vue'
 
 const router = useRouter()
@@ -98,7 +99,10 @@ onMounted(async () => {
 
   try {
     const { data } = await api.get('/evaluaciones/gestion-activa')
-    if (data) siteInfo.value = data
+    if (data) {
+      siteInfo.value = data
+      applySiteTitle(data.nombreSitio)
+    }
   } catch {
     console.warn('Usando valores por defecto')
   }

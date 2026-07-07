@@ -36,10 +36,11 @@
           <!-- Site Name -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
              <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Nombre del Sitio / Entidad</label>
+             <p class="text-[10px] text-slate-400 font-medium mb-2">Solo cambia el título de la pestaña del navegador.</p>
              <input 
               v-model="gestion.nombreSitio" 
               type="text" 
-              placeholder="Ej. Entrada Universitaria UMSA"
+              placeholder="Ej. EFU UMSA 2026"
               class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-700 transition-all"
              />
           </div>
@@ -59,6 +60,7 @@
         <!-- Tagline / Moto -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
            <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Lema o Tenor oficial</label>
+           <p class="text-[10px] text-slate-400 font-medium mb-2">Solo visible en la página de inicio (landing).</p>
            <textarea 
             v-model="gestion.lema" 
             rows="3"
@@ -71,9 +73,11 @@
           <!-- Title Principal -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
              <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Título Banner Principal</label>
+             <p class="text-[10px] text-slate-400 font-medium mb-2">Solo visible en el banner de la página de inicio.</p>
              <input 
               v-model="gestion.tituloPrincipal" 
               type="text" 
+              placeholder="Ej. Entrada Folklórica Universitaria 2026"
               class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-700 transition-all"
              />
           </div>
@@ -81,6 +85,7 @@
           <!-- Subtitle -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
              <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Subtítulo Descriptivo</label>
+             <p class="text-[10px] text-slate-400 font-medium mb-2">Solo visible en la página de inicio, debajo del banner.</p>
              <input 
               v-model="gestion.subtituloPrincipal" 
               type="text" 
@@ -105,14 +110,6 @@
                    <p class="text-[10px] text-slate-400 font-bold">Público en dashboard public</p>
                 </div>
                 <input type="checkbox" v-model="gestion.mostrarRanking" class="toggle-checkbox" />
-             </div>
-
-             <div class="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                <div>
-                   <p class="text-xs font-black text-indigo-800 uppercase leading-none mb-1">Inscripción Pública</p>
-                   <p class="text-[10px] text-indigo-600 font-bold">Habilita registro de delegados</p>
-                </div>
-                <input type="checkbox" v-model="gestion.permiteInscripcionPublica" class="toggle-checkbox" style="--checked-bg: #4f46e5" />
              </div>
 
              <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-center justify-between">
@@ -415,6 +412,7 @@ const previews = ref({
 })
 
 import { getImageUrl } from '../utils/url'
+import { applySiteTitle } from '../utils/siteTitle'
 
 const loadGestion = async () => {
   loading.value = true
@@ -427,6 +425,7 @@ const loadGestion = async () => {
       data.urlBanner = getImageUrl(data.urlBanner)
       data.urlImagenLogin = getImageUrl(data.urlImagenLogin)
       gestion.value = data
+      applySiteTitle(data.nombreSitio)
     }
   } catch (err) {
     console.error('Error al cargar gestion:', err)

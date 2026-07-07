@@ -6,7 +6,8 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "seed": "ts-node src/seed.ts",
-    "reset:production": "ts-node src/seed.ts"
+    "reset:production": "ts-node src/seed.ts",
+    "seed:carreras": "ts-node src/seed-carreras-umsa.ts"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.3.7",

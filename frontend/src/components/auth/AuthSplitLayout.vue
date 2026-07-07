@@ -25,10 +25,10 @@
             <!-- Brand -->
             <div class="text-center mb-4 sm:mb-5 md:mb-8">
               <h1 class="font-black italic tracking-tighter uppercase text-[2.75rem] sm:text-5xl text-primary mb-1 leading-none">
-                {{ siteInfo.nombreSitio || 'UMS' }}<span v-if="!siteInfo.nombreSitio" class="text-secondary">A</span>
+                UMS<span class="text-secondary">A</span>
               </h1>
               <p class="text-[10px] font-bold uppercase tracking-[0.25em] sm:tracking-[0.3em] text-slate-500 mt-1">
-                {{ siteInfo.lema || 'Entrada Folclórica Universitaria' }}
+                Entrada Folklórica Universitaria
               </p>
             </div>
 
@@ -80,6 +80,7 @@
 <script setup>
 import { computed } from 'vue'
 import { getImageUrl } from '../../utils/url'
+import { defaultLoginImage } from '../../assets/defaultImages'
 
 const props = defineProps({
   siteInfo: { type: Object, default: () => ({}) },
@@ -90,7 +91,7 @@ const props = defineProps({
 
 const backgroundImg = computed(() => {
   const url = props.backgroundUrl || props.siteInfo?.urlImagenLogin
-  const fullUrl = getImageUrl(url) || '/src/assets/img/login.png'
+  const fullUrl = getImageUrl(url) || defaultLoginImage
   return `url('${fullUrl}')`
 })
 </script>

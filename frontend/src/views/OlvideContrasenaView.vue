@@ -188,6 +188,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
+import { applySiteTitle } from '../utils/siteTitle'
 import Swal from 'sweetalert2'
 import AuthSplitLayout from '../components/auth/AuthSplitLayout.vue'
 import { getPasswordStrength, isPasswordPolicyValid } from '../utils/passwordPolicy'
@@ -267,7 +268,10 @@ onMounted(async () => {
 
   try {
     const { data } = await api.get('/evaluaciones/gestion-activa')
-    if (data) siteInfo.value = data
+    if (data) {
+      siteInfo.value = data
+      applySiteTitle(data.nombreSitio)
+    }
   } catch {
     console.warn('Usando valores por defecto')
   }

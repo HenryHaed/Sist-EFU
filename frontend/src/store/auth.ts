@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { jwtDecode } from 'jwt-decode';
 import api from '../services/api';
+import { SESSION_DURATION_MS } from '../utils/session';
 
 interface User {
   id: number;
@@ -36,8 +37,7 @@ export const useAuthStore = defineStore('auth', {
     remainingSessionSeconds: () => {
       const loginAt = localStorage.getItem('loginAt');
       if (!loginAt) return 0;
-      const oneHour = 3600000;
-      const remaining = oneHour - (Date.now() - parseInt(loginAt));
+      const remaining = SESSION_DURATION_MS - (Date.now() - parseInt(loginAt));
       return Math.max(0, Math.floor(remaining / 1000));
     }
   },
@@ -50,9 +50,8 @@ export const useAuthStore = defineStore('auth', {
 
       const now = Date.now();
       const loginTime = parseInt(loginAt);
-      const oneHour = 3600000;
       const elapsed = now - loginTime;
-      const remaining = oneHour - elapsed;
+      const remaining = SESSION_DURATION_MS - elapsed;
 
       if (remaining <= 0) {
         if (this.isAuthenticated) this.triggerExpiry();
@@ -93,22 +92,24 @@ export const useAuthStore = defineStore('auth', {
     },
     async logout(clearModal = true) {
       const sessionId = this.sessionId;
-      if (sessionId && this.token) {
-        try {
-          await api.post('/auth/logout');
-        } catch {
-          // Ignorar si el token ya expiró
-        }
-      }
+      const hadToken = !!this.token;
+
+      // Limpiar de inmediato para que el router no redirija de vuelta al dashboard
       this.token = null;
       this.user = null;
       this.sessionId = null;
+      this.gestionContextId = null;
       if (this.sessionTimeout) clearTimeout(this.sessionTimeout);
       if (clearModal) this.showExpiryModal = false;
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('loginAt');
       localStorage.removeItem('sessionId');
+      localStorage.removeItem('gestionContextId');
+
+      if (sessionId && hadToken) {
+        api.post('/auth/logout').catch(() => undefined);
+      }
     },
     updatePrimerLogin(val: boolean) {
       if (this.user) {

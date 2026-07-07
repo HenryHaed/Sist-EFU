@@ -2,19 +2,23 @@
   <div class="flex h-[100dvh] w-full relative bg-[#fdfdfd] font-display overflow-hidden">
 
     <!-- Sidebar (Desktop) -->
-    <aside class="hidden md:flex w-64 flex-shrink-0 bg-white border-r border-slate-200 flex-col justify-between py-8 px-6 sticky top-0 h-screen z-50 shadow-sm">
+    <aside class="hidden md:flex w-72 flex-shrink-0 bg-white border-r border-slate-200 flex-col justify-between py-8 px-6 sticky top-0 h-screen z-50 shadow-sm">
       <div class="flex flex-col gap-10">
         <!-- Logo -->
-        <div class="flex items-center gap-3">
+        <div class="sidebar-brand flex flex-col gap-4">
           <img 
-            :src="siteInfo.urlLogo || '/src/assets/img/Logo_Umsa.png'" 
+            :src="siteInfo.urlLogo || defaultLogo" 
             alt="Logo Institucional" 
-            class="h-14 w-auto object-contain"
+            class="h-16 w-auto object-contain sidebar-brand-logo"
           />
-          <h1 class="text-xl font-bold leading-tight italic tracking-tight text-primary">
-            {{ siteInfo.nombreSitio?.split(' ')[0] || 'UMS' }}<span class="text-secondary">{{ siteInfo.nombreSitio?.split(' ')[1] || 'A' }}</span><br />
-            <span class="text-slate-900 leading-none">Entrada</span>
-          </h1>
+          <div>
+            <h1 class="text-3xl font-black leading-none italic tracking-tight text-primary sidebar-brand-umsa">
+              UMS<span class="text-secondary">A</span>
+            </h1>
+            <p class="mt-3 text-base font-black uppercase tracking-[0.14em] text-slate-900 leading-snug sidebar-brand-subtitle">
+              Entrada Folklórica Universitaria
+            </p>
+          </div>
         </div>
 
         <!-- Nav Desktop -->
@@ -90,7 +94,7 @@
           <!-- Hero Image: solo desktop -->
           <div
             class="hidden md:block absolute top-0 right-0 w-2/3 h-full bg-cover bg-center opacity-90 transition-all duration-1000 scale-105"
-            :style="{ backgroundImage: `url('${siteInfo.urlBanner || '/src/assets/img/img_backgroud.png'}')`, clipPath: 'polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)' }"
+            :style="{ backgroundImage: `url('${heroBannerUrl}')`, clipPath: 'polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)' }"
           ></div>
           <!-- Móvil: acento decorativo sin imagen recortada -->
           <div class="md:hidden absolute top-0 right-0 w-full h-56 bg-gradient-to-bl from-primary/8 via-secondary/5 to-transparent pointer-events-none"></div>
@@ -98,17 +102,28 @@
         </div>
 
         <!-- Content -->
-        <div class="relative z-10 flex flex-col md:min-h-screen">
+        <div class="relative z-10 flex flex-col">
+          <!-- Botón iniciar sesión (desktop, esquina superior derecha) -->
+          <header class="hidden md:flex justify-end px-8 lg:px-12 pt-6 lg:pt-8 w-full shrink-0">
+            <router-link
+              to="/login"
+              class="flex items-center gap-2 bg-secondary hover:bg-red-700 text-white px-7 py-3 rounded-full font-black tracking-widest uppercase text-sm transition-all shadow-lg shadow-red-200"
+            >
+              <span class="material-symbols-outlined text-base">login</span>
+              Iniciar Sesión
+            </router-link>
+          </header>
+
           <!-- Header móvil -->
           <header class="md:hidden flex items-center justify-between px-4 pt-4 pb-2">
             <div class="flex items-center gap-2.5 min-w-0">
               <img
-                :src="siteInfo.urlLogo || '/src/assets/img/Logo_Umsa.png'"
+                :src="siteInfo.urlLogo || defaultLogo"
                 alt="Logo UMSA"
                 class="h-10 w-auto object-contain shrink-0"
               />
               <p class="font-black italic text-primary text-sm leading-tight truncate">
-                {{ siteInfo.nombreSitio || 'UMSA' }}
+                UMS<span class="text-secondary">A</span>
               </p>
             </div>
             <router-link
@@ -120,43 +135,32 @@
             </router-link>
           </header>
 
-          <!-- Top header desktop -->
-          <header class="hidden md:flex justify-end p-8 w-full gap-4">
-            <router-link
-              to="/login"
-              class="flex items-center gap-2 bg-secondary hover:bg-red-700 text-white px-7 py-3 rounded-full font-black tracking-widest uppercase text-sm transition-all shadow-lg shadow-red-200"
-            >
-              <span class="material-symbols-outlined text-base">login</span>
-              <span>Iniciar Sesión</span>
-            </router-link>
-          </header>
-
           <!-- Hero Text -->
-          <div class="flex-1 flex items-center px-5 sm:px-6 md:px-12 lg:px-24 pt-4 pb-8 md:pb-32">
+          <div class="flex items-start px-5 sm:px-6 md:px-12 lg:px-24 pt-6 pb-6 md:pt-12 md:pb-8 lg:pt-16">
             <div class="max-w-4xl relative w-full">
-              <div class="flex flex-col gap-4 sm:gap-6 relative z-10">
+              <div class="flex flex-col gap-3 sm:gap-5 relative z-10">
                 <span class="text-primary font-black tracking-[0.2em] sm:tracking-[0.25em] uppercase text-[10px] sm:text-xs md:text-base flex items-center gap-3 sm:gap-4">
                   <span class="w-8 sm:w-12 md:w-16 h-[2px] sm:h-[3px] bg-secondary shadow-sm"></span>
-                  Patrimonio Cultural de Bolivia
+                  {{ siteInfo.lema || 'Patrimonio Cultural de Bolivia' }}
                 </span>
-                <h1 class="text-[2.1rem] leading-[0.9] sm:text-5xl md:text-8xl lg:text-9xl font-black italic tracking-tighter reveal reveal-left">
+                <h1
+                  v-if="siteInfo.tituloPrincipal"
+                  class="text-[2.1rem] leading-[0.95] sm:text-5xl md:text-7xl lg:text-8xl font-black italic tracking-tighter text-primary reveal reveal-left"
+                >
+                  {{ siteInfo.tituloPrincipal }}
+                </h1>
+                <h1
+                  v-else
+                  class="text-[2.1rem] leading-[0.9] sm:text-5xl md:text-8xl lg:text-9xl font-black italic tracking-tighter reveal reveal-left"
+                >
                   <span class="text-slate-900">ENTRADA FOLKLORICA</span><br />
                   <span class="text-primary">UNIVERSITARIA</span><br />
                   <span class="text-primary">UMS</span><span class="text-secondary">A</span>
                 </h1>
-                <p class="text-sm sm:text-lg md:text-2xl text-slate-600 max-w-xl font-medium leading-relaxed mt-2 sm:mt-6 border-l-4 border-secondary pl-3 sm:pl-4 md:pl-6 reveal reveal-left">
+                <p class="text-sm sm:text-lg md:text-2xl text-slate-600 max-w-xl font-medium leading-relaxed mt-1 sm:mt-3 border-l-4 border-secondary pl-3 sm:pl-4 md:pl-6 reveal reveal-left">
                   {{ siteInfo.subtituloPrincipal || 'Vive la majestuosidad de nuestras danzas tradicionales en la mayor expresión folklórica universitaria.' }}
                 </p>
-                <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 md:gap-6 mt-4 sm:mt-8 md:mt-10">
-                  <router-link 
-                    v-if="siteInfo.permiteInscripcionPublica"
-                    to="/registro-delegado" 
-                    class="w-full sm:w-auto bg-white text-primary font-black py-3.5 sm:py-4 px-8 sm:px-10 rounded-2xl shadow-xl hover:scale-[1.02] transition-all text-xs sm:text-sm uppercase tracking-widest inline-flex items-center justify-center gap-3 border border-slate-100"
-                  >
-                    <span class="material-symbols-outlined text-xl">app_registration</span>
-                    Inscribir Fraternidad
-                  </router-link>
-
+                <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 md:gap-6 mt-3 sm:mt-5 md:mt-6 md:hidden">
                   <router-link
                     to="/login"
                     class="w-full sm:w-auto bg-primary text-white hover:bg-blue-900 px-8 py-3.5 sm:py-4 rounded-full font-black tracking-wider uppercase text-xs sm:text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 reveal reveal-right"
@@ -170,7 +174,7 @@
           </div>
 
           <!-- Stats Bar -->
-          <div class="relative md:absolute md:bottom-0 left-0 w-full border-t border-slate-100 bg-white/90 md:bg-white/80 backdrop-blur-md z-20 overflow-hidden mt-2 md:mt-0">
+          <div class="relative w-full border-t border-slate-100 bg-white/90 md:bg-white/80 backdrop-blur-md z-20 overflow-hidden mt-4 md:mt-6 shrink-0">
             <div class="marquee-container py-4 sm:py-6 md:py-8">
               <div class="marquee-content flex items-center gap-10 md:gap-16">
                 <!-- Group 1 -->
@@ -600,6 +604,8 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import api from '../services/api'
 
 import { getImageUrl } from '../utils/url'
+import { applySiteTitle } from '../utils/siteTitle'
+import { defaultLogo, defaultHeroBanner } from '../assets/defaultImages'
 
 const siteInfo = ref({})
 const mostrarMapa = ref(false)
@@ -609,6 +615,8 @@ const aniosTradicion = computed(() => {
   const currentYear = new Date().getFullYear()
   return currentYear - 1988
 })
+
+const heroBannerUrl = computed(() => siteInfo.value.urlBanner || defaultHeroBanner)
 
 const rankingPublico = ref([])
 const loadingRanking = ref(true)
@@ -621,6 +629,7 @@ const cargarDatos = async () => {
        data.urlLogo = getImageUrl(data.urlLogo)
        data.urlBanner = getImageUrl(data.urlBanner)
        siteInfo.value = data
+       applySiteTitle(data.nombreSitio)
     }
   } catch (err) {}
 
@@ -727,6 +736,46 @@ const mostrarRanking = ref(false)
 
 <style scoped>
 .font-display { font-family: 'Inter', 'Be Vietnam Pro', sans-serif; }
+
+/* Sidebar brand */
+.sidebar-brand-logo {
+  animation: brandFadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.sidebar-brand-umsa {
+  animation: brandSlideIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s both;
+}
+
+.sidebar-brand-subtitle {
+  animation: brandSlideIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s both;
+  position: relative;
+}
+
+.sidebar-brand-subtitle::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -0.35rem;
+  height: 3px;
+  width: 0;
+  background: linear-gradient(90deg, #003399, #c8102e);
+  border-radius: 999px;
+  animation: brandUnderline 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.9s forwards;
+}
+
+@keyframes brandFadeIn {
+  from { opacity: 0; transform: scale(0.88) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes brandSlideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes brandUnderline {
+  to { width: 4.5rem; }
+}
 
 .andean-dots {
   background-color: transparent;

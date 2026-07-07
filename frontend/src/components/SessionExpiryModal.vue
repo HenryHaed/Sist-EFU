@@ -12,7 +12,7 @@
       <v-card-text class="pa-8 pt-4">
         <div class="bg-slate-50 border border-slate-200 rounded-lg pa-4 mb-6 text-center">
           <p class="text-xs text-slate-500 uppercase tracking-widest font-black mb-1">Motivo</p>
-          <p class="text-primary font-bold">Tiempo de inicio de sesión excedido (1 hora)</p>
+          <p class="text-primary font-bold">Tiempo de inicio de sesión excedido (4 horas)</p>
         </div>
         
         <p class="text-sm text-slate-500 text-center leading-relaxed">
@@ -59,7 +59,7 @@ const hasUnsavedChanges = computed(() => {
 
 const irALogin = () => {
   authStore.logout();
-  router.push('/login');
+  router.replace('/login');
 };
 </script>
 

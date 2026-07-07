@@ -18,10 +18,10 @@
             </div>
             <div>
               <h1 class="font-black text-lg leading-tight tracking-tight text-primary uppercase">
-                {{ siteInfo.nombreSitio?.split(' ')[0] || 'UMS' }}<span class="text-secondary">{{ siteInfo.nombreSitio?.split(' ')[1] || 'A' }}</span>
+                UMS<span class="text-secondary">A</span>
               </h1>
               <p class="text-[9px] text-slate-500 uppercase tracking-widest font-black leading-none mt-1">
-                {{ siteInfo.subtituloPrincipal || 'Entrada Folklórica Universitaria' }}
+                Entrada Folklórica Universitaria
               </p>
             </div>
           </div>
@@ -629,6 +629,7 @@ import AsistenciaView from './AsistenciaView.vue'
 import SubirMonografiaView from './SubirMonografiaView.vue'
 
 import { getImageUrl } from '../utils/url'
+import { applySiteTitle } from '../utils/siteTitle'
 import { isPasswordPolicyValid, getPasswordPolicyErrors, getPasswordStrength } from '../utils/passwordPolicy'
 import { useTheme } from 'vuetify'
 
@@ -735,6 +736,7 @@ onMounted(async () => {
       if (data.idGestion) {
         authStore.setGestionContext(data.idGestion)
       }
+      applySiteTitle(data.nombreSitio)
     }
   } catch (err) {
     console.warn('Error al cargar info del sitio')
@@ -887,7 +889,7 @@ const manejarFinalizacion = (resultados) => {
 
 const handleLogout = () => {
   authStore.logout()
-  router.push('/login')
+  router.replace('/login')
 }
 </script>
 
