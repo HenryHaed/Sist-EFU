@@ -1,15 +1,15 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto w-full">
+  <div class="dashboard-page max-w-7xl w-full">
     <!-- Page Title -->
-    <div class="flex justify-between items-end mb-8 flex-wrap gap-4">
-      <div>
+    <div class="dashboard-toolbar items-end mb-6 sm:mb-8 flex-wrap gap-4">
+      <div class="min-w-0">
         <div class="flex items-center gap-2 mb-1">
-          <span class="h-1 w-8 bg-secondary inline-block"></span>
-          <h2 class="text-3xl font-black tracking-tight text-primary uppercase">Panel de Estadísticas</h2>
+          <span class="h-1 w-8 bg-secondary inline-block shrink-0"></span>
+          <h2 class="dashboard-page-title text-primary uppercase">Panel de Estadísticas</h2>
         </div>
         <p class="text-slate-500 text-sm mt-1 font-medium">Monitoreo dinámico del desempeño institucional {{ gestionData.anio }}</p>
       </div>
-      <div class="flex gap-3">
+      <div class="flex flex-col xs:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
         <button
           @click="cargarEstadisticas"
           class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 shadow-sm hover:border-primary hover:text-primary transition-all active:scale-95"

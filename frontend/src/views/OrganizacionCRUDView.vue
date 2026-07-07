@@ -1,8 +1,8 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto min-h-[calc(100vh-4rem)]">
-    <div class="flex items-center justify-between mb-8 overflow-hidden">
-      <div>
-        <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">Gestión de Organización</h2>
+  <div class="dashboard-page max-w-7xl min-h-full">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+      <div class="min-w-0">
+        <h2 class="dashboard-page-title text-primary tracking-tighter uppercase italic">Gestión de Organización</h2>
         <p class="text-slate-500 font-medium text-sm mt-1">
           Administra las facultades, carreras e instituciones externas que participan en el evento.
         </p>

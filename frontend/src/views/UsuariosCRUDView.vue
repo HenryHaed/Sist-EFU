@@ -1,14 +1,14 @@
 <template>
-  <div class="px-6 py-8">
+  <div class="dashboard-page max-w-7xl">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
       <div>
-        <h2 class="text-3xl font-black text-primary tracking-tight capitalize">Gestión de {{ tituloVista }}</h2>
+        <h2 class="dashboard-page-title text-primary capitalize">Gestión de {{ tituloVista }}</h2>
         <p class="text-slate-500 font-medium text-sm mt-1">Administra los accesos de los usuarios con el rol {{ tituloVista }}.</p>
       </div>
       <button 
         @click="abrirModal(false)"
-        class="bg-primary hover:bg-red-800 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-primary/20 transition-all flex items-center gap-2"
+        class="w-full sm:w-auto bg-primary hover:bg-red-800 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2"
       >
         <span class="material-symbols-outlined text-xl">person_add</span>
         Nuevo {{ props.rolFiltro === 'jurado' ? 'Jurado' : 'Usuario' }}
@@ -30,16 +30,16 @@
 
     <!-- Table content -->
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mt-6">
-      <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+      <div class="p-3 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-slate-50">
         <h3 class="font-black text-slate-700 uppercase tracking-wider text-xs flex items-center gap-2">
           <span class="material-symbols-outlined text-slate-400">group</span> Listado Actual
         </h3>
-        <div class="relative w-64">
+        <div class="relative w-full sm:w-64">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
           <input 
             v-model="searchQuery"
             type="text" 
-            placeholder="Buscar por CI o nombre..." 
+            placeholder="Buscar por CI, nombre o correo..." 
             class="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm outline-none focus:border-primary transition-colors"
           />
         </div>
@@ -52,6 +52,7 @@
             <tr class="bg-slate-50 border-b border-slate-100 text-slate-600">
               <th class="p-4 font-bold text-xs uppercase tracking-wider">CI / Identidad</th>
               <th class="p-4 font-bold text-xs uppercase tracking-wider">Nombres y Apellidos</th>
+              <th class="p-4 font-bold text-xs uppercase tracking-wider">Correo</th>
               <th class="p-4 font-bold text-xs uppercase tracking-wider">Rol Asignado</th>
               <th v-if="props.rolFiltro === 'jurado'" class="p-4 font-bold text-xs uppercase tracking-wider">Perfil de Jurado</th>
               <th class="p-4 font-bold text-xs uppercase tracking-wider text-right">Acciones</th>
@@ -59,10 +60,10 @@
           </thead>
           <tbody class="divide-y divide-slate-100">
             <tr v-if="loading" class="text-center">
-              <td colspan="5" class="p-8 text-slate-500 font-medium">Cargando usuarios...</td>
+              <td colspan="6" class="p-8 text-slate-500 font-medium">Cargando usuarios...</td>
             </tr>
             <tr v-else-if="filteredUsuarios.length === 0" class="text-center">
-              <td colspan="5" class="p-8 text-slate-500 font-medium">No se encontraron resultados</td>
+              <td colspan="6" class="p-8 text-slate-500 font-medium">No se encontraron resultados</td>
             </tr>
             <tr 
               v-else
@@ -75,6 +76,13 @@
               </td>
               <td class="p-4">
                 <p class="font-bold text-slate-900">{{ user.nombres }} {{ user.primerApellido }} {{ user.segundoApellido || '' }}</p>
+              </td>
+              <td class="p-4">
+                <p v-if="user.correo" class="text-sm font-medium text-slate-700">{{ user.correo }}</p>
+                <span v-else class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-black uppercase tracking-wider">
+                  <span class="material-symbols-outlined text-[12px]">warning</span>
+                  Sin correo
+                </span>
               </td>
               <td class="p-4">
                 <span 
@@ -151,6 +159,8 @@
             <div>
               <p class="font-black text-slate-900 text-base leading-tight">{{ user.nombres }} {{ user.primerApellido }} {{ user.segundoApellido || '' }}</p>
               <p class="text-xs text-slate-500 mt-0.5"><span class="font-bold">CI:</span> {{ user.ci }}</p>
+              <p v-if="user.correo" class="text-xs text-slate-500 mt-0.5 truncate"><span class="font-bold">Correo:</span> {{ user.correo }}</p>
+              <p v-else class="text-[9px] font-black text-amber-600 uppercase tracking-wider mt-1">Sin correo registrado</p>
             </div>
             <!-- Rol badge -->
             <span class="px-2 py-1 text-[9px] font-black uppercase tracking-wider rounded-md border"
@@ -247,6 +257,19 @@
                   <input v-model="form.segundoApellido" type="text"
                     class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all" />
                 </div>
+              </div>
+
+              <!-- Correo -->
+              <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Correo electrónico
+                  <span v-if="!editando" class="text-secondary">*</span>
+                </label>
+                <input v-model="form.correo" :required="!editando" type="email" placeholder="usuario@ejemplo.com"
+                  class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all" />
+                <p v-if="editando && !form.correo" class="text-[9px] text-amber-600 mt-1 font-bold uppercase tracking-wider">
+                  Usuario legacy sin correo — complétalo para habilitar recuperación de contraseña.
+                </p>
               </div>
 
               <!-- Password (solo edición) -->
@@ -463,6 +486,7 @@ const form = ref({
   nombres: '',
   primerApellido: '',
   segundoApellido: '',
+  correo: '',
   password: '',
   idRol: '',
   fasesEfuIds: [],
@@ -492,7 +516,8 @@ const filteredUsuarios = computed(() => {
     list = list.filter(u =>
       u.ci.toLowerCase().includes(q) ||
       u.nombres.toLowerCase().includes(q) ||
-      u.primerApellido.toLowerCase().includes(q)
+      u.primerApellido.toLowerCase().includes(q) ||
+      (u.correo || '').toLowerCase().includes(q)
     )
   }
   return list
@@ -587,6 +612,7 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       nombres: usuario.nombres,
       primerApellido: usuario.primerApellido,
       segundoApellido: usuario.segundoApellido || '',
+      correo: usuario.correo || '',
       password: '',
       idRol: usuario.rol?.idRol || '',
       fasesEfuIds: usuario._perfil?.fasesEfu?.map(f => f.idFase) || [],
@@ -601,7 +627,7 @@ const abrirModal = async (modoEdicion, usuario = null) => {
     const rolDefault = roles.value.find(r => r.nombre === props.rolFiltro)
     form.value = {
       idUsuario: null,
-      ci: '', nombres: '', primerApellido: '', segundoApellido: '',
+      ci: '', nombres: '', primerApellido: '', segundoApellido: '', correo: '',
       password: '', idRol: rolDefault?.idRol || '',
       fasesEfuIds: [], fasesExternasIds: [], fraternidadesIds: [],
       idFraternidad: null
@@ -631,6 +657,12 @@ const guardarUsuario = async () => {
     }
     delete payload.idUsuario
 
+    if (!editando.value && !form.value.correo?.trim()) {
+      errorFormulario.value = 'El correo es obligatorio al crear un usuario.'
+      saving.value = false
+      return
+    }
+
     if (!editando.value) {
       payload.password = payload.ci
     } else if (!payload.password) {
@@ -653,7 +685,12 @@ const guardarUsuario = async () => {
       Swal.fire({ title: 'Actualizado', text: 'Usuario actualizado exitosamente', icon: 'success', confirmButtonColor: '#003399' })
     } else {
       await api.post('/usuarios', payload)
-      Swal.fire({ title: 'Creado', text: 'Usuario creado exitosamente', icon: 'success', confirmButtonColor: '#003399' })
+      Swal.fire({
+        title: 'Creado',
+        text: 'Usuario creado exitosamente. Se enviará un correo al usuario con sus datos de acceso al sistema.',
+        icon: 'success',
+        confirmButtonColor: '#003399',
+      })
     }
 
     cerrarModal()

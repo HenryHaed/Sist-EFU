@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Usuario } from '../entities/Usuario';
@@ -8,10 +8,14 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { Gestion } from '../entities/Gestion';
 import { Fase } from '../entities/Fase';
 import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
+import { normalizeEmail } from '../common/password-policy';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsuariosService {
+  private readonly logger = new Logger(UsuariosService.name);
+
   constructor(
     @InjectRepository(Usuario)
     private readonly usuarioRepo: Repository<Usuario>,
@@ -25,6 +29,7 @@ export class UsuariosService {
     private readonly faseRepo: Repository<Fase>,
     @InjectRepository(Fraternidad)
     private readonly fraternidadRepo: Repository<Fraternidad>,
+    private readonly mailService: MailService,
   ) { }
 
   async findAll() {
@@ -45,6 +50,84 @@ export class UsuariosService {
     });
     if (!user) throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     return user;
+  }
+
+  private async assertFraternidadDisponibleParaDelegado(idFraternidad: number, excludeUsuarioId?: number) {
+    const roleDelegado = await this.roleRepo.findOne({ where: { nombre: 'delegado' } });
+    if (!roleDelegado) return;
+
+    const qb = this.usuarioRepo.createQueryBuilder('u')
+      .innerJoin('u.rol', 'r')
+      .where('r.idRol = :idRol', { idRol: roleDelegado.idRol })
+      .andWhere('u.id_fraternidad = :idFrat', { idFrat: idFraternidad });
+
+    if (excludeUsuarioId) {
+      qb.andWhere('u.id_usuario != :exclude', { exclude: excludeUsuarioId });
+    }
+
+    const existente = await qb.getOne();
+    if (existente) {
+      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
+      throw new BadRequestException(
+        `Ya existe un delegado asignado a la fraternidad "${frat?.nombre || 'seleccionada'}". No se puede crear otro delegado para la misma fraternidad.`,
+      );
+    }
+  }
+
+  private async resolverFraternidadDelegado(opts: {
+    idFraternidad?: number;
+    nuevaFraternidad?: string;
+    excludeUsuarioId?: number;
+  }): Promise<Fraternidad | null> {
+    const { idFraternidad, nuevaFraternidad, excludeUsuarioId } = opts;
+
+    if (idFraternidad) {
+      await this.assertFraternidadDisponibleParaDelegado(idFraternidad, excludeUsuarioId);
+      return this.fraternidadRepo.findOne({ where: { idFraternidad } });
+    }
+
+    if (nuevaFraternidad?.trim()) {
+      const nombreNorm = nuevaFraternidad.trim().toUpperCase();
+      const existente = await this.fraternidadRepo
+        .createQueryBuilder('f')
+        .where('LOWER(TRIM(f.nombre)) = LOWER(:nombre)', { nombre: nombreNorm })
+        .getOne();
+
+      if (existente) {
+        await this.assertFraternidadDisponibleParaDelegado(existente.idFraternidad, excludeUsuarioId);
+        return existente;
+      }
+
+      const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
+      const frat = new Fraternidad();
+      frat.nombre = nombreNorm;
+      frat.origenFraternidad = 'UMSA';
+      if (gestionActiva) frat.gestion = gestionActiva;
+      return this.fraternidadRepo.save(frat);
+    }
+
+    return null;
+  }
+
+  private async assertCorreoUnico(correo: string | undefined | null, excludeUsuarioId?: number) {
+    if (!correo) return;
+    const normalized = normalizeEmail(correo);
+    const qb = this.usuarioRepo.createQueryBuilder('u')
+      .where('LOWER(TRIM(u.correo)) = :correo', { correo: normalized });
+    if (excludeUsuarioId) {
+      qb.andWhere('u.id_usuario != :exclude', { exclude: excludeUsuarioId });
+    }
+    const existente = await qb.getOne();
+    if (existente) {
+      throw new BadRequestException('El correo ya se encuentra registrado');
+    }
+  }
+
+  private prepareCorreo(correo?: string | null): string | undefined {
+    if (correo === undefined || correo === null) return undefined;
+    const trimmed = correo.trim();
+    if (!trimmed) return undefined;
+    return normalizeEmail(trimmed);
   }
 
   // Obtener perfil de jurado (incluye fases EFU y EXTERNAS separadas)
@@ -81,26 +164,21 @@ export class UsuariosService {
     const role = await this.roleRepo.findOne({ where: { idRol } });
     if (!role) throw new BadRequestException('Rol no válido');
 
+    const correoNorm = this.prepareCorreo(data.correo);
+    if (!correoNorm) {
+      throw new BadRequestException('El correo es obligatorio');
+    }
+    await this.assertCorreoUnico(correoNorm);
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new Usuario();
-    Object.assign(newUser, data);
+    Object.assign(newUser, { ...data, correo: correoNorm });
     newUser.password = hashedPassword;
     newUser.rol = role;
 
     if (role.nombre === 'delegado') {
-      if (idFraternidad) {
-        const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
-        if (frat) newUser.fraternidad = frat;
-      } else if (nuevaFraternidad) {
-        const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
-        const frat = new Fraternidad();
-        frat.nombre = nuevaFraternidad;
-        frat.origenFraternidad = 'UMSA';
-        if (gestionActiva) frat.gestion = gestionActiva;
-        const savedFrat = await this.fraternidadRepo.save(frat);
-        newUser.fraternidad = savedFrat;
-      }
+      newUser.fraternidad = await this.resolverFraternidadDelegado({ idFraternidad, nuevaFraternidad }) as any;
     }
 
     if (role.nombre === 'delegado' && !newUser.fraternidad) {
@@ -112,6 +190,9 @@ export class UsuariosService {
       savedUser = (await this.usuarioRepo.save(newUser as any)) as unknown as Usuario;
     } catch (error) {
       if (error.code === '23505' || error.errno === 1062) {
+        if (error.detail?.includes('correo') || error.constraint?.includes('correo')) {
+          throw new BadRequestException('El correo ya se encuentra registrado');
+        }
         throw new BadRequestException('El CI ya se encuentra registrado');
       }
       throw error;
@@ -124,7 +205,25 @@ export class UsuariosService {
       await this.crearOActualizarPerfilJurado(savedUser, resolvedTipo, allFasesIds, fraternidadesIds || []);
     }
 
+    await this.enviarCorreoCuentaCreada(savedUser, role.nombre);
+
     return savedUser;
+  }
+
+  private async enviarCorreoCuentaCreada(usuario: Usuario, rolNombre: string) {
+    if (!usuario.correo) return;
+
+    const nombre = `${usuario.nombres} ${usuario.primerApellido}`.trim();
+    try {
+      await this.mailService.sendAccountCreatedNotification(
+        usuario.correo,
+        nombre,
+        usuario.ci,
+        rolNombre,
+      );
+    } catch {
+      this.logger.warn(`No se pudo enviar correo de bienvenida al usuario CI ${usuario.ci}`);
+    }
   }
 
   async update(id: number, updateDto: UpdateUsuarioDto & {
@@ -141,6 +240,14 @@ export class UsuariosService {
 
     let updateData: any = { ...data };
 
+    if (data.correo !== undefined) {
+      const correoNorm = this.prepareCorreo(data.correo);
+      if (correoNorm) {
+        await this.assertCorreoUnico(correoNorm, id);
+        updateData.correo = correoNorm;
+      }
+    }
+
     let rolActualizado: Role | null = null;
     if (idRol) {
       rolActualizado = await this.roleRepo.findOne({ where: { idRol } });
@@ -152,17 +259,13 @@ export class UsuariosService {
       updateData.password = await bcrypt.hash(password, 10);
     }
 
-    if (idFraternidad) {
-      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
+    if (idFraternidad || nuevaFraternidad) {
+      const frat = await this.resolverFraternidadDelegado({
+        idFraternidad,
+        nuevaFraternidad,
+        excludeUsuarioId: id,
+      });
       if (frat) user.fraternidad = frat;
-    } else if (nuevaFraternidad) {
-      const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
-      const frat = new Fraternidad();
-      frat.nombre = nuevaFraternidad;
-      frat.origenFraternidad = 'UMSA';
-      if (gestionActiva) frat.gestion = gestionActiva;
-      const savedFrat = await this.fraternidadRepo.save(frat);
-      user.fraternidad = savedFrat;
     } else if (idFraternidad === null && !nuevaFraternidad) {
       user.fraternidad = null;
     }
@@ -179,6 +282,9 @@ export class UsuariosService {
       savedUser = await this.usuarioRepo.save(user);
     } catch (error) {
       if (error.code === '23505' || error.errno === 1062) {
+        if (error.detail?.includes('correo') || error.constraint?.includes('correo')) {
+          throw new BadRequestException('El correo ya se encuentra registrado');
+        }
         throw new BadRequestException('El CI ya se encuentra registrado por otro usuario');
       }
       throw error;
@@ -355,7 +461,7 @@ export class UsuariosService {
     return { message: 'Usuario eliminado con éxito' };
   }
 
-  async registerDelegado(data: { ci: string; nombres: string; primerApellido: string; segundoApellido?: string; password?: string }) {
+  async registerDelegado(data: { ci: string; nombres: string; primerApellido: string; segundoApellido?: string; correo: string; password?: string }) {
     // 1. Verificar si la inscripción pública está habilitada
     const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
     if (!gestionActiva || !gestionActiva.permiteInscripcionPublica) {
@@ -372,10 +478,18 @@ export class UsuariosService {
     }
 
     // 3. Crear el usuario
+    const correoNorm = this.prepareCorreo(data.correo);
+    if (!correoNorm) {
+      throw new BadRequestException('El correo es obligatorio');
+    }
+    await this.assertCorreoUnico(correoNorm);
+
     const rawPassword = data.password || data.ci;
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const { correo: _c, password: _p, ...rest } = data;
     const newUser = this.usuarioRepo.create({
-        ...data,
+        ...rest,
+        correo: correoNorm,
         password: hashedPassword,
         rol: roleDelegado,
         primerLogin: true
@@ -386,6 +500,9 @@ export class UsuariosService {
         const { password, ...result } = savedUser as any;
         return result;
     } catch (error) {
+        if (error.detail?.includes('correo') || error.constraint?.includes('correo')) {
+            throw new BadRequestException('El correo ya se encuentra registrado.');
+        }
         if (error.code === '23505' || error.errno === 1062) {
             throw new BadRequestException('El CI ya se encuentra registrado.');
         }

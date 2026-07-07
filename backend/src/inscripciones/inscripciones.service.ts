@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Brackets } from 'typeorm';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { Gestion } from '../entities/Gestion';
 import { CronogramaInscripcion } from '../entities/CronogramaInscripcion';
@@ -11,6 +11,81 @@ import { Carrera } from '../entities/Carrera';
 import { InstitucionExterna } from '../entities/InstitucionExterna';
 import { DataSource } from 'typeorm';
 import { Fraternidad } from '../entities/Fraternidad';
+
+const PERSONAS_DIRECTIVA = [
+    { prefix: 'presi', checklist: 'Presidente', hasCelular: true },
+    { prefix: 'vice', checklist: 'Vicepresidente', hasCelular: true },
+    { prefix: 'secGen', checklist: 'Secretario General', hasCelular: false },
+    { prefix: 'secHaci', checklist: 'Secretario de Hacienda', hasCelular: false },
+    { prefix: 'secActas', checklist: 'Secretario de Actas', hasCelular: false },
+    { prefix: 'secPrensa', checklist: 'Secretario de Prensa', hasCelular: false },
+    { prefix: 'vocal', checklist: 'Vocal', hasCelular: false },
+    { prefix: 'delCogob', checklist: 'Delegado a Co-Gobierno', hasCelular: true },
+    { prefix: 'delTitular', checklist: 'Delegado Titular', hasCelular: true },
+    { prefix: 'delSuplente', checklist: 'Delegado Suplente', hasCelular: true },
+] as const;
+
+const CAMPOS_NOMBRE_PERSONA = PERSONAS_DIRECTIVA.flatMap((p) => [
+    `${p.prefix}Nombres`,
+    `${p.prefix}PrimerApellido`,
+    `${p.prefix}SegundoApellido`,
+]);
+
+function buildMapDelegadoKeyToAdmin(): Record<string, string> {
+    const map: Record<string, string> = {};
+    for (const p of PERSONAS_DIRECTIVA) {
+        map[`${p.prefix}Nombres`] = `${p.checklist}-nombres`;
+        map[`${p.prefix}PrimerApellido`] = `${p.checklist}-paterno`;
+        map[`${p.prefix}SegundoApellido`] = `${p.checklist}-materno`;
+        map[`${p.prefix}Ci`] = `${p.checklist}-ci`;
+        if (p.hasCelular) map[`${p.prefix}Celular`] = `${p.checklist}-celular`;
+        map[`${p.prefix}Nombre`] = `${p.checklist}-nombre`;
+    }
+    return map;
+}
+
+function docFileKeyFromPrefix(prefix: string): string {
+    return `ciMatricula${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}`;
+}
+
+function docUrlFieldFromPrefix(prefix: string): string {
+    return `urlCiMatricula${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}`;
+}
+
+const DOCUMENTOS_CI_MATRICULA = PERSONAS_DIRECTIVA.map((p) => ({
+    prefix: p.prefix,
+    fileKey: docFileKeyFromPrefix(p.prefix),
+    urlField: docUrlFieldFromPrefix(p.prefix),
+}));
+
+const CAMPOS_CI_DIRECTIVA = PERSONAS_DIRECTIVA.map((p) => `${p.prefix}Ci`);
+
+function encontrarCargoPorCi(solicitud: SolicitudInscripcion, ci: string): string | null {
+    const ciNorm = ci.trim();
+    for (const p of PERSONAS_DIRECTIVA) {
+        const valor = String((solicitud as any)[`${p.prefix}Ci`] || '').trim();
+        if (valor && valor === ciNorm) return p.checklist;
+    }
+    return null;
+}
+
+const MAP_DELEGADO_KEY_TO_ADMIN = buildMapDelegadoKeyToAdmin();
+
+function campoEditableEnReedicion(clave: string, checklist: Record<string, any>): boolean {
+    const dbClave = MAP_DELEGADO_KEY_TO_ADMIN[clave] || clave;
+    if (checklist[dbClave]?.estado === 'X') return true;
+    for (const p of PERSONAS_DIRECTIVA) {
+        if (
+            clave === `${p.prefix}Nombres` ||
+            clave === `${p.prefix}PrimerApellido` ||
+            clave === `${p.prefix}SegundoApellido`
+        ) {
+            if (checklist[`${p.checklist}-nombre`]?.estado === 'X') return true;
+        }
+    }
+    return false;
+}
+
 @Injectable()
 export class InscripcionesService {
     constructor(
@@ -31,6 +106,94 @@ export class InscripcionesService {
         private readonly dataSource: DataSource,
     ) {}
 
+    private aMayusculas(valor: any): string | null | undefined {
+        if (valor === null || valor === undefined) return valor;
+        if (typeof valor !== 'string') return valor;
+        const trimmed = valor.trim();
+        return trimmed ? trimmed.toUpperCase() : trimmed;
+    }
+
+    private normalizarSolicitudInscripcion(solicitud: SolicitudInscripcion) {
+        const camposTexto = [
+            'nombreFraternidad',
+            'origenFraternidad',
+            'nombreInstitucionExterna',
+            ...CAMPOS_NOMBRE_PERSONA,
+        ] as const;
+
+        for (const campo of camposTexto) {
+            const valor = solicitud[campo];
+            if (typeof valor === 'string' && valor) {
+                (solicitud as any)[campo] = this.aMayusculas(valor);
+            }
+        }
+    }
+
+    async verificarCiDirectiva(ci: string, excludeSolicitudId?: number) {
+        const ciNorm = String(ci || '').trim();
+        if (!ciNorm) return { disponible: true };
+
+        const qb = this.solicitudRepo
+            .createQueryBuilder('s')
+            .leftJoinAndSelect('s.fraternidadCreada', 'fraternidadCreada')
+            .where('s.estado IN (:...estados)', {
+                estados: [EstadoSolicitud.APROBADO, EstadoSolicitud.PENDIENTE],
+            });
+
+        if (excludeSolicitudId) {
+            qb.andWhere('s.idSolicitud != :excludeId', { excludeId: excludeSolicitudId });
+        }
+
+        qb.andWhere(
+            new Brackets((sub) => {
+                for (const p of PERSONAS_DIRECTIVA) {
+                    sub.orWhere(`TRIM(s.${p.prefix}Ci) = :ciNorm`, { ciNorm });
+                }
+            }),
+        );
+
+        const conflicto = await qb.getOne();
+        if (!conflicto) return { disponible: true };
+
+        const cargo = encontrarCargoPorCi(conflicto, ciNorm);
+        const nombreFraternidad =
+            conflicto.fraternidadCreada?.nombre || conflicto.nombreFraternidad || 'Otra fraternidad';
+
+        return {
+            disponible: false,
+            nombreFraternidad,
+            cargo,
+            idSolicitud: conflicto.idSolicitud,
+            estado: conflicto.estado,
+        };
+    }
+
+    private async assertCisDirectivaUnicos(data: any, excludeSolicitudId?: number) {
+        const cisIngresados: { ci: string; cargo: string }[] = [];
+
+        for (const p of PERSONAS_DIRECTIVA) {
+            const ci = String(data[`${p.prefix}Ci`] || '').trim();
+            if (!ci) continue;
+
+            const duplicadoEnFormulario = cisIngresados.find((item) => item.ci === ci);
+            if (duplicadoEnFormulario) {
+                throw new BadRequestException(
+                    `El CI ${ci} está repetido en ${p.checklist} y ${duplicadoEnFormulario.cargo}. Una persona no puede ocupar dos cargos en la misma directiva.`,
+                );
+            }
+            cisIngresados.push({ ci, cargo: p.checklist });
+        }
+
+        for (const { ci, cargo } of cisIngresados) {
+            const resultado = await this.verificarCiDirectiva(ci, excludeSolicitudId);
+            if (!resultado.disponible) {
+                throw new BadRequestException(
+                    `El CI ${ci} (${cargo}) ya figura como ${resultado.cargo} en la fraternidad "${resultado.nombreFraternidad}". Una persona no puede integrar la directiva de más de una fraternidad.`,
+                );
+            }
+        }
+    }
+
     async createSolicitud(data: any, usuario: Usuario, files: any) {
         // 1. Obtener Gestión Activa
         const gestion = await this.gestionRepo.findOne({ where: { activa: true } });
@@ -49,43 +212,6 @@ export class InscripcionesService {
             throw new BadRequestException('Ya tienes una solicitud de inscripción en proceso para esta gestión.');
         }
 
-                const MAP_DELEGADO_KEY_TO_ADMIN = {
-            'presiNombre': 'Presidente-nombre',
-            'presiCi': 'Presidente-ci',
-            'presiCelular': 'Presidente-celular',
-            
-            'viceNombre': 'Vicepresidente-nombre',
-            'viceCi': 'Vicepresidente-ci',
-            'viceCelular': 'Vicepresidente-celular',
-            
-            'secGenNombre': 'Secretario General-nombre',
-            'secGenCi': 'Secretario General-ci',
-            
-            'secHaciNombre': 'Secretario de Hacienda-nombre',
-            'secHaciCi': 'Secretario de Hacienda-ci',
-            
-            'secActasNombre': 'Secretario de Actas-nombre',
-            'secActasCi': 'Secretario de Actas-ci',
-            
-            'secPrensaNombre': 'Secretario de Prensa-nombre',
-            'secPrensaCi': 'Secretario de Prensa-ci',
-            
-            'vocalNombre': 'Vocal-nombre',
-            'vocalCi': 'Vocal-ci',
-            
-            'delCogobNombre': 'Delegado a Co-Gobierno-nombre',
-            'delCogobCi': 'Delegado a Co-Gobierno-ci',
-            'delCogobCelular': 'Delegado a Co-Gobierno-celular',
-            
-            'delTitularNombre': 'Delegado Titular-nombre',
-            'delTitularCi': 'Delegado Titular-ci',
-            'delTitularCelular': 'Delegado Titular-celular',
-            
-            'delSuplenteNombre': 'Delegado Suplente-nombre',
-            'delSuplenteCi': 'Delegado Suplente-ci',
-            'delSuplenteCelular': 'Delegado Suplente-celular',
-        };
-
         const idCategoria = parseInt(data.idCategoria || existente?.categoria?.idCategoria);
         if (isNaN(idCategoria)) throw new BadRequestException('La categoría es requerida.');
 
@@ -96,15 +222,47 @@ export class InscripcionesService {
 
         const conservarSiNoRechazado = (clave: string, valorNuevo: any, valorExistente: any = undefined) => {
             if (!puedeReeditar || !existente) return valorNuevo;
-            const dbClave = MAP_DELEGADO_KEY_TO_ADMIN[clave] || clave;
-            
+
             // Si el campo estaba vacío originalmente en la solicitud, siempre aceptamos el nuevo valor
             if (valorExistente === null || valorExistente === undefined || valorExistente === '') {
                 return valorNuevo;
             }
-            
-            return checklistReedicion[dbClave]?.estado === 'X' ? valorNuevo : (valorExistente ?? valorNuevo);
+
+            return campoEditableEnReedicion(clave, checklistReedicion)
+                ? valorNuevo
+                : (valorExistente ?? valorNuevo);
         };
+
+        const camposDirectiva: Record<string, any> = {};
+        for (const p of PERSONAS_DIRECTIVA) {
+            camposDirectiva[`${p.prefix}Nombres`] = conservarSiNoRechazado(
+                `${p.prefix}Nombres`,
+                data[`${p.prefix}Nombres`],
+                existente?.[`${p.prefix}Nombres`],
+            );
+            camposDirectiva[`${p.prefix}PrimerApellido`] = conservarSiNoRechazado(
+                `${p.prefix}PrimerApellido`,
+                data[`${p.prefix}PrimerApellido`],
+                existente?.[`${p.prefix}PrimerApellido`],
+            );
+            camposDirectiva[`${p.prefix}SegundoApellido`] = conservarSiNoRechazado(
+                `${p.prefix}SegundoApellido`,
+                data[`${p.prefix}SegundoApellido`],
+                existente?.[`${p.prefix}SegundoApellido`],
+            );
+            camposDirectiva[`${p.prefix}Ci`] = conservarSiNoRechazado(
+                `${p.prefix}Ci`,
+                data[`${p.prefix}Ci`],
+                existente?.[`${p.prefix}Ci`],
+            );
+            if (p.hasCelular) {
+                camposDirectiva[`${p.prefix}Celular`] = conservarSiNoRechazado(
+                    `${p.prefix}Celular`,
+                    data[`${p.prefix}Celular`],
+                    existente?.[`${p.prefix}Celular`],
+                );
+            }
+        }
 
         // 3. Validar Cronograma según Categoría, salvo cuando se trata de una corrección de una solicitud ya rechazada/observada
         if (!puedeReeditar) {
@@ -142,32 +300,7 @@ export class InscripcionesService {
             instanciaRepresentacion: conservarSiNoRechazado('instancia', data.instanciaRepresentacion, existente?.instanciaRepresentacion),
             nombreInstitucionExterna: conservarSiNoRechazado('institucionExterna', data.nombreInstitucionExterna, existente?.nombreInstitucionExterna),
             categoria: { idCategoria: conservarSiNoRechazado('categoria', idCategoria, existente?.categoria?.idCategoria) } as any,
-            // Datos de la directiva
-            presiNombre: conservarSiNoRechazado('presiNombre', data.presiNombre, existente?.presiNombre),
-            presiCi: conservarSiNoRechazado('presiCi', data.presiCi, existente?.presiCi),
-            presiCelular: conservarSiNoRechazado('presiCelular', data.presiCelular, existente?.presiCelular),
-            viceNombre: conservarSiNoRechazado('viceNombre', data.viceNombre, existente?.viceNombre),
-            viceCi: conservarSiNoRechazado('viceCi', data.viceCi, existente?.viceCi),
-            viceCelular: conservarSiNoRechazado('viceCelular', data.viceCelular, existente?.viceCelular),
-            secGenNombre: conservarSiNoRechazado('secGenNombre', data.secGenNombre, existente?.secGenNombre),
-            secGenCi: conservarSiNoRechazado('secGenCi', data.secGenCi, existente?.secGenCi),
-            secHaciNombre: conservarSiNoRechazado('secHaciNombre', data.secHaciNombre, existente?.secHaciNombre),
-            secHaciCi: conservarSiNoRechazado('secHaciCi', data.secHaciCi, existente?.secHaciCi),
-            secActasNombre: conservarSiNoRechazado('secActasNombre', data.secActasNombre, existente?.secActasNombre),
-            secActasCi: conservarSiNoRechazado('secActasCi', data.secActasCi, existente?.secActasCi),
-            secPrensaNombre: conservarSiNoRechazado('secPrensaNombre', data.secPrensaNombre, existente?.secPrensaNombre),
-            secPrensaCi: conservarSiNoRechazado('secPrensaCi', data.secPrensaCi, existente?.secPrensaCi),
-            vocalNombre: conservarSiNoRechazado('vocalNombre', data.vocalNombre, existente?.vocalNombre),
-            vocalCi: conservarSiNoRechazado('vocalCi', data.vocalCi, existente?.vocalCi),
-            delCogobNombre: conservarSiNoRechazado('delCogobNombre', data.delCogobNombre, existente?.delCogobNombre),
-            delCogobCi: conservarSiNoRechazado('delCogobCi', data.delCogobCi, existente?.delCogobCi),
-            delCogobCelular: conservarSiNoRechazado('delCogobCelular', data.delCogobCelular, existente?.delCogobCelular),
-            delTitularNombre: conservarSiNoRechazado('delTitularNombre', data.delTitularNombre, existente?.delTitularNombre),
-            delTitularCi: conservarSiNoRechazado('delTitularCi', data.delTitularCi, existente?.delTitularCi),
-            delTitularCelular: conservarSiNoRechazado('delTitularCelular', data.delTitularCelular, existente?.delTitularCelular),
-            delSuplenteNombre: conservarSiNoRechazado('delSuplenteNombre', data.delSuplenteNombre, existente?.delSuplenteNombre),
-            delSuplenteCi: conservarSiNoRechazado('delSuplenteCi', data.delSuplenteCi, existente?.delSuplenteCi),
-            delSuplenteCelular: conservarSiNoRechazado('delSuplenteCelular', data.delSuplenteCelular, existente?.delSuplenteCelular),
+            ...camposDirectiva,
             gestion,
             delegado: usuario,
             estado: EstadoSolicitud.PENDIENTE,
@@ -203,11 +336,26 @@ export class InscripcionesService {
         };
 
         if (files) {
-            solicitud.urlCiMatriculaPreViceDel = conservarArchivo('ciMatriculaPreViceDel', files.ciMatriculaPreViceDel, existente?.urlCiMatriculaPreViceDel);
-            solicitud.urlCiMatriculaSecVocDel = conservarArchivo('ciMatriculaSecVocDel', files.ciMatriculaSecVocDel, existente?.urlCiMatriculaSecVocDel);
+            for (const doc of DOCUMENTOS_CI_MATRICULA) {
+                (solicitud as any)[doc.urlField] = conservarArchivo(
+                    doc.fileKey,
+                    files[doc.fileKey],
+                    (existente as any)?.[doc.urlField],
+                );
+            }
             solicitud.urlCartaCompromiso = conservarArchivo('cartaCompromiso', files.cartaCompromiso, existente?.urlCartaCompromiso);
             solicitud.urlResolucion = conservarArchivo('resolucion', files.resolucion, existente?.urlResolucion);
             solicitud.urlActaDirectiva = conservarArchivo('actaDirectiva', files.actaDirectiva, existente?.urlActaDirectiva);
+            solicitud.urlSinDeudasFraternidad = conservarArchivo(
+                'sinDeudasFraternidad',
+                files.sinDeudasFraternidad,
+                existente?.urlSinDeudasFraternidad,
+            );
+            solicitud.urlSinDeudasAreas = conservarArchivo(
+                'sinDeudasAreas',
+                files.sinDeudasAreas,
+                existente?.urlSinDeudasAreas,
+            );
         }
 
         if (puedeReeditar) {
@@ -229,6 +377,10 @@ export class InscripcionesService {
             }
             solicitud.revisionChecklist = updatedChecklist;
         }
+
+        await this.assertCisDirectivaUnicos(data, puedeReeditar ? existente?.idSolicitud : undefined);
+
+        this.normalizarSolicitudInscripcion(solicitud);
 
         return await this.solicitudRepo.save(solicitud);
     }
@@ -336,8 +488,8 @@ export class InscripcionesService {
         solicitud: SolicitudInscripcion,
         data?: any,
     ) {
-        fraternidad.nombre = (data?.nombre || solicitud.nombreFraternidad)?.trim();
-        fraternidad.origenFraternidad = data?.origenFraternidad || solicitud.origenFraternidad || 'General';
+        fraternidad.nombre = this.aMayusculas((data?.nombre || solicitud.nombreFraternidad)?.trim()) as string;
+        fraternidad.origenFraternidad = this.aMayusculas(data?.origenFraternidad || solicitud.origenFraternidad || 'General') as string;
         fraternidad.nivelRepresentacion = data?.nivelRepresentacion || solicitud.instanciaRepresentacion;
 
         if (data?.categoria?.idCategoria) {

@@ -1,7 +1,6 @@
 <template>
-  <div class="relative min-h-[calc(100vh-4rem)] flex flex-col bg-slate-50">
-    <!-- TIMER HEADER FIJO -->
-    <div class="sticky top-0 z-20 bg-white border-b border-slate-200 px-6 py-3 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+  <div class="relative min-h-full flex flex-col bg-slate-50">
+    <div class="dashboard-sticky-header flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
       <div class="flex items-center gap-4">
         <button @click="$emit('volver')" class="size-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-colors">
           <span class="material-symbols-outlined">arrow_back</span>
@@ -26,7 +25,7 @@
     </div>
 
     <!-- MAIN LISTING -->
-    <div class="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full">
+    <div class="flex-1 dashboard-page max-w-7xl">
       <div v-if="loading" class="flex justify-center py-20">
         <span class="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
       </div>

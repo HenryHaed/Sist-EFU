@@ -11,8 +11,8 @@
         <div class="relative ml-auto w-full max-w-5xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
 
           <!-- Header del panel -->
-          <div class="shrink-0 bg-primary px-6 py-5 flex items-center justify-between">
-            <div>
+          <div class="shrink-0 bg-primary px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="min-w-0">
               <p class="text-[10px] text-white/60 font-black uppercase tracking-widest">Solicitud #{{ solicitudActiva.idSolicitud }}</p>
               <h2 class="text-xl font-black text-white italic uppercase tracking-tighter leading-tight">
                 {{ solicitudActiva.nombreFraternidad }}
@@ -21,7 +21,7 @@
                 {{ solicitudActiva.categoria?.nombre }} · {{ instanciaLabel(solicitudActiva) }}
               </p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
               <!-- Badge estado -->
               <div
                 class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border"
@@ -164,14 +164,14 @@
                 <div v-for="cargo in directiva" :key="cargo.label" class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                   <p class="text-[9px] font-black uppercase tracking-widest text-primary mb-2">{{ cargo.label }}</p>
                   <div class="space-y-3">
-                    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div v-for="parte in cargo.partesNombre" :key="parte.key" class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                       <div class="min-w-0 flex-1">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre</p>
-                        <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.nombre || '—' }}</p>
+                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">{{ parte.label }}</p>
+                        <p class="text-sm font-medium text-slate-800 break-words">{{ parte.value || '—' }}</p>
                       </div>
                       <div class="flex items-center gap-2 shrink-0">
-                        <button @click.stop="setChecklistEstado({ key: `${cargo.label}-nombre`, label: `${cargo.label} - Nombre`, value: cargo.nombre || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-nombre`, 'OK')]" aria-label="Marcar correcto">✓</button>
-                        <button @click.stop="setChecklistEstado({ key: `${cargo.label}-nombre`, label: `${cargo.label} - Nombre`, value: cargo.nombre || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-nombre`, 'X')]" aria-label="Marcar incorrecto">✕</button>
+                        <button @click.stop="setChecklistEstado({ key: parte.checklistKey, label: `${cargo.label} - ${parte.label}`, value: parte.value || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(parte.checklistKey, 'OK')]" aria-label="Marcar correcto">✓</button>
+                        <button @click.stop="setChecklistEstado({ key: parte.checklistKey, label: `${cargo.label} - ${parte.label}`, value: parte.value || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(parte.checklistKey, 'X')]" aria-label="Marcar incorrecto">✕</button>
                       </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -223,8 +223,9 @@
                     <button @click.stop="setChecklistEstado({ key: doc.key, label: doc.label, value: doc.url || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(doc.key, 'OK')]" aria-label="Marcar correcto">✓</button>
                     <button @click.stop="setChecklistEstado({ key: doc.key, label: doc.label, value: doc.url || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(doc.key, 'X')]" aria-label="Marcar incorrecto">✕</button>
                     <button
-                      @click="verPdf(doc)"
-                      class="shrink-0 px-3 py-2 bg-slate-100 hover:bg-primary text-slate-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                      @click="verPdf({ url: doc.url, titulo: doc.label })"
+                      :disabled="!doc.url"
+                      class="shrink-0 px-3 py-2 bg-slate-100 hover:bg-primary text-slate-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Ver
                     </button>
@@ -249,7 +250,7 @@
                 <div class="flex flex-wrap gap-3">
                   <button
                     v-if="solicitudActiva.estado !== 'APROBADO'"
-                    @click="cambiarEstado('APROBADO')"
+                    @click="confirmarCambioEstado('APROBADO')"
                     :disabled="actualizando || !puedeAprobarSolicitud"
                     class="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                   >
@@ -259,7 +260,7 @@
 
                   <button
                     v-if="solicitudActiva.estado !== 'RECHAZADO'"
-                    @click="cambiarEstado('RECHAZADO')"
+                    @click="confirmarCambioEstado('RECHAZADO')"
                     :disabled="actualizando"
                     class="flex items-center gap-2 px-5 py-3 bg-secondary hover:bg-red-800 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-secondary/20 disabled:opacity-50"
                   >
@@ -268,7 +269,7 @@
                   </button>
                   <button
                     v-if="solicitudActiva.estado !== 'PENDIENTE'"
-                    @click="cambiarEstado('PENDIENTE')"
+                    @click="confirmarCambioEstado('PENDIENTE')"
                     :disabled="actualizando"
                     class="flex items-center gap-2 px-5 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
                   >
@@ -332,13 +333,13 @@
     </transition>
 
     <!-- ===== LISTADO PRINCIPAL ===== -->
-    <div class="p-6 md:p-8 max-w-7xl mx-auto w-full">
+    <div class="dashboard-page max-w-7xl w-full">
 
       <!-- Header -->
       <div class="mb-8">
         <div class="flex items-center gap-2 mb-1">
           <span class="h-1 w-10 bg-secondary inline-block"></span>
-          <h2 class="text-3xl font-black tracking-tight text-primary uppercase italic">Solicitudes de Preinscripción</h2>
+          <h2 class="dashboard-page-title tracking-tight text-primary uppercase italic truncate">Solicitudes de Preinscripción</h2>
         </div>
         <p class="text-slate-500 text-sm font-medium">Revisa las solicitudes enviadas por delegados de fraternidad.</p>
       </div>
@@ -458,6 +459,7 @@ import { getImageUrl } from '../utils/url'
 import Swal from 'sweetalert2'
 import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
+import { PERSONAS_DIRECTIVA, nombreCompletoPersona, DOCUMENTOS_CI_MATRICULA, DOCUMENTOS_DEUDA } from '../utils/personaDirectiva'
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 const solicitudes = ref([])
@@ -527,36 +529,33 @@ const checklistItems = computed(() => {
     { key: 'facultad', label: 'Facultad', value: s.facultad?.nombre },
     { key: 'carrera', label: 'Carrera', value: s.carrera?.nombre },
     { key: 'institucionExterna', label: 'Institución externa', value: s.nombreInstitucionExterna },
-    { key: 'presiNombre', label: 'Presidente - Nombre', value: s.presiNombre },
-    { key: 'presiCi', label: 'Presidente - CI', value: s.presiCi },
-    { key: 'presiCelular', label: 'Presidente - Celular', value: s.presiCelular },
-    { key: 'viceNombre', label: 'Vicepresidente - Nombre', value: s.viceNombre },
-    { key: 'viceCi', label: 'Vicepresidente - CI', value: s.viceCi },
-    { key: 'viceCelular', label: 'Vicepresidente - Celular', value: s.viceCelular },
-    { key: 'secGenNombre', label: 'Secretario General - Nombre', value: s.secGenNombre },
-    { key: 'secGenCi', label: 'Secretario General - CI', value: s.secGenCi },
-    { key: 'secHaciNombre', label: 'Secretario de Hacienda - Nombre', value: s.secHaciNombre },
-    { key: 'secHaciCi', label: 'Secretario de Hacienda - CI', value: s.secHaciCi },
-    { key: 'secActasNombre', label: 'Secretario de Actas - Nombre', value: s.secActasNombre },
-    { key: 'secActasCi', label: 'Secretario de Actas - CI', value: s.secActasCi },
-    { key: 'secPrensaNombre', label: 'Secretario de Prensa - Nombre', value: s.secPrensaNombre },
-    { key: 'secPrensaCi', label: 'Secretario de Prensa - CI', value: s.secPrensaCi },
-    { key: 'vocalNombre', label: 'Vocal - Nombre', value: s.vocalNombre },
-    { key: 'vocalCi', label: 'Vocal - CI', value: s.vocalCi },
-    { key: 'delCogobNombre', label: 'Delegado a Co-Gobierno - Nombre', value: s.delCogobNombre },
-    { key: 'delCogobCi', label: 'Delegado a Co-Gobierno - CI', value: s.delCogobCi },
-    { key: 'delCogobCelular', label: 'Delegado a Co-Gobierno - Celular', value: s.delCogobCelular },
-    { key: 'delTitularNombre', label: 'Delegado Titular - Nombre', value: s.delTitularNombre },
-    { key: 'delTitularCi', label: 'Delegado Titular - CI', value: s.delTitularCi },
-    { key: 'delTitularCelular', label: 'Delegado Titular - Celular', value: s.delTitularCelular },
-    { key: 'delSuplenteNombre', label: 'Delegado Suplente - Nombre', value: s.delSuplenteNombre },
-    { key: 'delSuplenteCi', label: 'Delegado Suplente - CI', value: s.delSuplenteCi },
-    { key: 'delSuplenteCelular', label: 'Delegado Suplente - Celular', value: s.delSuplenteCelular },
-    { key: 'ciMatriculaPreViceDel', label: 'Documento 29', value: s.urlCiMatriculaPreViceDel, isDoc: true },
-    { key: 'ciMatriculaSecVocDel', label: 'Documento 30', value: s.urlCiMatriculaSecVocDel, isDoc: true },
-    { key: 'cartaCompromiso', label: 'Documento 31', value: s.urlCartaCompromiso, isDoc: true },
-    { key: 'resolucion', label: 'Documento 32', value: s.urlResolucion, isDoc: true },
-    { key: 'actaDirectiva', label: 'Documento 33', value: s.urlActaDirectiva, isDoc: true },
+    ...PERSONAS_DIRECTIVA.flatMap(({ prefix, label, hasCelular }) => {
+      const items = [
+        { key: `${prefix}Nombres`, label: `${label} - Nombres`, value: s[`${prefix}Nombres`] },
+        { key: `${prefix}PrimerApellido`, label: `${label} - Paterno`, value: s[`${prefix}PrimerApellido`] },
+        { key: `${prefix}SegundoApellido`, label: `${label} - Materno`, value: s[`${prefix}SegundoApellido`] },
+        { key: `${prefix}Ci`, label: `${label} - CI`, value: s[`${prefix}Ci`] },
+      ]
+      if (hasCelular) {
+        items.push({ key: `${prefix}Celular`, label: `${label} - Celular`, value: s[`${prefix}Celular`] })
+      }
+      return items
+    }),
+    ...DOCUMENTOS_CI_MATRICULA.map(({ fileKey, urlField, label }) => ({
+      key: fileKey,
+      label: `CI y Matrícula — ${label}`,
+      value: s[urlField],
+      isDoc: true,
+    })),
+    { key: 'cartaCompromiso', label: 'Documento 31 — Carta de Compromiso', value: s.urlCartaCompromiso, isDoc: true },
+    { key: 'resolucion', label: 'Documento 32 — Resolución', value: s.urlResolucion, isDoc: true },
+    { key: 'actaDirectiva', label: 'Documento 33 — Acta Directiva', value: s.urlActaDirectiva, isDoc: true },
+    ...DOCUMENTOS_DEUDA.map(({ fileKey, urlField, label }) => ({
+      key: fileKey,
+      label,
+      value: s[urlField],
+      isDoc: true,
+    })),
   ]
 })
 
@@ -597,18 +596,17 @@ const puedeAprobarSolicitud = computed(() => {
 const directiva = computed(() => {
   if (!solicitudActiva.value) return []
   const s = solicitudActiva.value
-  return [
-    { label: 'Presidente', nombre: s.presiNombre, ci: s.presiCi, celular: s.presiCelular },
-    { label: 'Vicepresidente', nombre: s.viceNombre, ci: s.viceCi, celular: s.viceCelular },
-    { label: 'Secretario General', nombre: s.secGenNombre, ci: s.secGenCi },
-    { label: 'Secretario de Hacienda', nombre: s.secHaciNombre, ci: s.secHaciCi },
-    { label: 'Secretario de Actas', nombre: s.secActasNombre, ci: s.secActasCi },
-    { label: 'Secretario de Prensa', nombre: s.secPrensaNombre, ci: s.secPrensaCi },
-    { label: 'Vocal', nombre: s.vocalNombre, ci: s.vocalCi },
-    { label: 'Delegado a Co-Gobierno', nombre: s.delCogobNombre, ci: s.delCogobCi, celular: s.delCogobCelular },
-    { label: 'Delegado Titular', nombre: s.delTitularNombre, ci: s.delTitularCi, celular: s.delTitularCelular },
-    { label: 'Delegado Suplente', nombre: s.delSuplenteNombre, ci: s.delSuplenteCi, celular: s.delSuplenteCelular },
-  ].filter(d => d.nombre)
+  return PERSONAS_DIRECTIVA.map(({ prefix, label, hasCelular }) => ({
+    label,
+    nombreCompleto: nombreCompletoPersona(s, prefix),
+    ci: s[`${prefix}Ci`],
+    celular: hasCelular ? s[`${prefix}Celular`] : undefined,
+    partesNombre: [
+      { key: 'nombres', checklistKey: `${label}-nombres`, label: 'Nombres', value: s[`${prefix}Nombres`] },
+      { key: 'paterno', checklistKey: `${label}-paterno`, label: 'Paterno', value: s[`${prefix}PrimerApellido`] },
+      { key: 'materno', checklistKey: `${label}-materno`, label: 'Materno', value: s[`${prefix}SegundoApellido`] },
+    ],
+  })).filter((d) => d.nombreCompleto)
 })
 
 // ── Documentos adjuntos ───────────────────────────────────────────────────────
@@ -616,15 +614,95 @@ const documentos = computed(() => {
   if (!solicitudActiva.value) return []
   const s = solicitudActiva.value
   return [
-    { key: 'ciMatriculaPreViceDel', label: 'CI y Matrícula: Presidente, Vice, Delegados', url: s.urlCiMatriculaPreViceDel },
-    { key: 'ciMatriculaSecVocDel', label: 'CI y Matrícula: Secretarios, Vocal, Del. Cogobierno', url: s.urlCiMatriculaSecVocDel },
+    ...DOCUMENTOS_CI_MATRICULA.map(({ fileKey, urlField, label }) => ({
+      key: fileKey,
+      label: `CI y Matrícula — ${label}`,
+      url: s[urlField],
+    })),
     { key: 'cartaCompromiso', label: 'Carta de Compromiso', url: s.urlCartaCompromiso },
     { key: 'resolucion', label: 'Resolución HCU/HCF/HCC', url: s.urlResolucion },
     { key: 'actaDirectiva', label: 'Acta de Conformación de Directiva', url: s.urlActaDirectiva },
-  ].filter(d => d.url)
+    ...DOCUMENTOS_DEUDA.map(({ fileKey, urlField, label }) => ({
+      key: fileKey,
+      label,
+      url: s[urlField],
+    })),
+  ]
 })
 
 // ── Cambio de estado ───────────────────────────────────────────────────────────
+const confirmarCambioEstado = async (nuevoEstado) => {
+  if (!solicitudActiva.value) return
+
+  const nombre = solicitudActiva.value.nombreFraternidad || 'esta fraternidad'
+
+  if (nuevoEstado === 'APROBADO' && !puedeAprobarSolicitud.value) {
+    await Swal.fire({
+      title: 'Revisión incompleta',
+      text: 'Debes marcar todos los ítems del checklist como correctos (✓) antes de aprobar.',
+      icon: 'warning',
+      confirmButtonColor: '#003399',
+    })
+    return
+  }
+
+  if (nuevoEstado === 'RECHAZADO' && !obsForm.value?.trim()) {
+    const { value: motivo, isConfirmed } = await Swal.fire({
+      title: 'Motivo del rechazo',
+      text: 'Indica las observaciones para que el delegado sepa qué corregir.',
+      input: 'textarea',
+      inputPlaceholder: 'Escriba el motivo u observaciones...',
+      inputValue: obsForm.value || '',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'No',
+      confirmButtonColor: '#dc2626',
+      inputValidator: (value) => (!value?.trim() ? 'El motivo es obligatorio para rechazar.' : undefined),
+    })
+    if (!isConfirmed) return
+    obsForm.value = motivo
+  }
+
+  const configs = {
+    APROBADO: {
+      title: '¿Está seguro de aprobar?',
+      html: `Va a <strong>aprobar</strong> la preinscripción de <strong>${nombre}</strong>.<br><span class="text-sm text-slate-500">La fraternidad quedará registrada oficialmente si corresponde.</span>`,
+      icon: 'question',
+      confirmButtonColor: '#059669',
+      confirmButtonText: 'Sí, aprobar',
+      cancelButtonText: 'No',
+      focusCancel: false,
+    },
+    RECHAZADO: {
+      title: '¿Está seguro de rechazar?',
+      html: `Va a <strong>rechazar</strong> la preinscripción de <strong>${nombre}</strong>.<br><span class="text-sm text-slate-500">El delegado solo podrá corregir los campos marcados con ✕.</span>`,
+      icon: 'warning',
+      confirmButtonColor: '#dc2626',
+      confirmButtonText: 'Sí, rechazar',
+      cancelButtonText: 'No',
+      focusCancel: true,
+    },
+    PENDIENTE: {
+      title: '¿Está seguro?',
+      text: `La solicitud de ${nombre} volverá al estado PENDIENTE.`,
+      icon: 'question',
+      confirmButtonColor: '#64748b',
+      confirmButtonText: 'Sí',
+      cancelButtonText: 'No',
+    },
+  }
+
+  const cfg = configs[nuevoEstado]
+  const { isConfirmed } = await Swal.fire({
+    ...cfg,
+    showCancelButton: true,
+    cancelButtonColor: '#94a3b8',
+  })
+
+  if (!isConfirmed) return
+  await cambiarEstado(nuevoEstado)
+}
+
 const cambiarEstado = async (nuevoEstado) => {
   actualizando.value = true
   try {
@@ -636,10 +714,28 @@ const cambiarEstado = async (nuevoEstado) => {
     solicitudActiva.value = { ...solicitudActiva.value, ...data }
     const idx = solicitudes.value.findIndex(s => s.idSolicitud === data.idSolicitud)
     if (idx !== -1) solicitudes.value[idx] = { ...solicitudes.value[idx], ...data }
-    const msg = nuevoEstado === 'APROBADO' && data.fraternidadCreada
-      ? `La solicitud fue aprobada y la fraternidad "${data.fraternidadCreada.nombre}" quedó registrada oficialmente.`
-      : `La solicitud fue marcada como ${nuevoEstado}.`
-    notify.success('Estado actualizado', msg)
+
+    if (nuevoEstado === 'APROBADO') {
+      await Swal.fire({
+        title: '¡Preinscripción aprobada!',
+        html: data.fraternidadCreada
+          ? `La fraternidad <strong>${data.fraternidadCreada.nombre}</strong> quedó registrada oficialmente.`
+          : `La solicitud de <strong>${data.nombreFraternidad || 'la fraternidad'}</strong> fue aprobada correctamente.`,
+        icon: 'success',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#059669',
+      })
+    } else if (nuevoEstado === 'RECHAZADO') {
+      await Swal.fire({
+        title: 'Preinscripción rechazada',
+        html: 'La solicitud fue rechazada.<br><span class="text-sm text-slate-500">El delegado recibirá la solicitud para corregir únicamente los campos marcados con ✕.</span>',
+        icon: 'info',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#003399',
+      })
+    } else {
+      notify.success('Estado actualizado', `La solicitud fue marcada como ${nuevoEstado}.`)
+    }
   } catch (e) {
     notify.error('Error', e.response?.data?.message || 'No se pudo actualizar el estado.')
   } finally {

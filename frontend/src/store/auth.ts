@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia';
 import { jwtDecode } from 'jwt-decode';
+import api from '../services/api';
 
 interface User {
   id: number;
   ci: string;
+  correo?: string | null;
   nombres: string;
   rol: string;
   primerLogin: boolean;
@@ -23,6 +25,8 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || null,
     user: JSON.parse(localStorage.getItem('user') || 'null') as User | null,
+    sessionId: localStorage.getItem('sessionId') || null,
+    gestionContextId: localStorage.getItem('gestionContextId') || null,
     showExpiryModal: false,
     sessionTimeout: null as any,
   }),
@@ -60,7 +64,7 @@ export const useAuthStore = defineStore('auth', {
         }, remaining);
       }
     },
-    setAuth(token: string, user: User) {
+    setAuth(token: string, user: User, sessionId?: number | string | null) {
       this.token = token;
       this.user = user;
       this.showExpiryModal = false;
@@ -68,20 +72,43 @@ export const useAuthStore = defineStore('auth', {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('loginAt', now);
+      if (sessionId != null) {
+        this.sessionId = String(sessionId);
+        localStorage.setItem('sessionId', String(sessionId));
+      }
       this.startSessionTimer();
+    },
+    setGestionContext(idGestion: number | string | null) {
+      if (idGestion == null) {
+        this.gestionContextId = null;
+        localStorage.removeItem('gestionContextId');
+        return;
+      }
+      this.gestionContextId = String(idGestion);
+      localStorage.setItem('gestionContextId', String(idGestion));
     },
     triggerExpiry() {
       this.showExpiryModal = true;
       this.logout(false);
     },
-    logout(clearModal = true) {
+    async logout(clearModal = true) {
+      const sessionId = this.sessionId;
+      if (sessionId && this.token) {
+        try {
+          await api.post('/auth/logout');
+        } catch {
+          // Ignorar si el token ya expiró
+        }
+      }
       this.token = null;
       this.user = null;
+      this.sessionId = null;
       if (this.sessionTimeout) clearTimeout(this.sessionTimeout);
       if (clearModal) this.showExpiryModal = false;
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('loginAt');
+      localStorage.removeItem('sessionId');
     },
     updatePrimerLogin(val: boolean) {
       if (this.user) {

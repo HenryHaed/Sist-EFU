@@ -8,6 +8,7 @@ import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
+import { findGestionActivaOrLatest } from '../common/gestion.utils';
 
 @Injectable()
 export class ParticipantesService {
@@ -29,9 +30,7 @@ export class ParticipantesService {
   ) {}
 
   async getGestionActiva() {
-    let g = await this.gestionRepo.findOne({ where: { activa: true } });
-    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
-    return g;
+    return findGestionActivaOrLatest(this.gestionRepo);
   }
 
   private async getDelegadoFraternidad(user: { idUsuario: number; rol: string }) {

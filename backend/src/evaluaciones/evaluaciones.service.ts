@@ -15,6 +15,7 @@ import { DocumentoGestion } from '../entities/DocumentoGestion';
 import { Incidencia } from '../entities/Incidencia';
 import { Infraccion } from '../entities/Infraccion';
 import { Usuario } from '../entities/Usuario';
+import { findGestionActivaOrLatest } from '../common/gestion.utils';
 
 @Injectable()
 export class EvaluacionesService {
@@ -158,6 +159,7 @@ export class EvaluacionesService {
           urlImagen: fase.urlImagen,
           pesoPorcentaje: fase.pesoPorcentaje,
           tipoConcurso: fase.tipoConcurso || 'EFU',
+          categoriaEfu: fase.categoriaEfu || null,
           fechaInicio: fase.fechaInicio,
           fechaFin: fase.fechaFin,
           jurados: (fase as any).jurados || [],
@@ -208,7 +210,7 @@ export class EvaluacionesService {
       const mapEv = new Map(evaluaciones.map(ev => [ev.participante?.idParticipante, ev]));
 
       return {
-        fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: 'EXTERNO' },
+        fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: 'EXTERNO', categoriaEfu: fase.categoriaEfu || null },
         listado: participantes.map(p => {
           const ev = mapEv.get(p.idParticipante);
           return { idParticipante: p.idParticipante, nombre: p.nombre, tipo: p.tipo, fraternidad: p.fraternidad?.nombre || 'EXTERNO', estadoEvaluacion: ev ? ev.estado : 'PENDIENTE', idEvaluacion: ev ? ev.idEvaluacion : null, puntajeActual: ev ? ev.puntajeTotal : 0 };
@@ -256,7 +258,7 @@ export class EvaluacionesService {
     });
 
     return {
-      fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: 'EFU' },
+      fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: 'EFU', categoriaEfu: fase.categoriaEfu || null },
       listado: fraternidades.map(frat => {
         const ev = mapEv.get(frat.idFraternidad);
         const penalties = mapInc.get(frat.idFraternidad) || [];
@@ -399,9 +401,7 @@ export class EvaluacionesService {
 
   // --- GESTIONES (AJUSTES) ---
   async getGestionActiva() {
-    let g = await this.gestionRepo.findOne({ where: { activa: true } });
-    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
-    return g;
+    return findGestionActivaOrLatest(this.gestionRepo);
   }
 
   async getGestionById(id: number) {
@@ -541,13 +541,26 @@ export class EvaluacionesService {
   }
 
   async createGestion(data: any) {
-    if (data.activa) await this.gestionRepo.update({}, { activa: false });
+    if (data.activa) {
+      await this.gestionRepo
+        .createQueryBuilder()
+        .update(Gestion)
+        .set({ activa: false })
+        .execute();
+    }
     return this.gestionRepo.save(this.gestionRepo.create(data));
   }
 
   async updateGestion(id: number, data: any) {
-    if (data.activa) await this.gestionRepo.update({ idGestion: Not(id) }, { activa: false });
-    await this.gestionRepo.update(id, data);
+    if (data.activa) {
+      await this.gestionRepo
+        .createQueryBuilder()
+        .update(Gestion)
+        .set({ activa: false })
+        .where('id_gestion != :id', { id })
+        .execute();
+    }
+    await this.gestionRepo.update({ idGestion: id }, data);
     return this.gestionRepo.findOne({ where: { idGestion: id } });
   }
 

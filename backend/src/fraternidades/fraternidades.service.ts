@@ -6,6 +6,7 @@ import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
 import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
 import { CreateFraternidadDto, UpdateFraternidadDto } from './dto/fraternidad.dto';
+import { findGestionActivaOrLatest } from '../common/gestion.utils';
 
 @Injectable()
 export class FraternidadesService {
@@ -21,9 +22,7 @@ export class FraternidadesService {
   ) {}
 
   async getGestionActiva() {
-    let g = await this.gestionRepo.findOne({ where: { activa: true } });
-    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
-    return g;
+    return findGestionActivaOrLatest(this.gestionRepo);
   }
 
   async findAll() {

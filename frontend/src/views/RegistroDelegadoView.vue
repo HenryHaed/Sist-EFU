@@ -76,6 +76,23 @@
                   class="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:bg-white text-slate-900 transition-all outline-none text-base font-bold"
                 />
               </div>
+
+              <!-- Correo -->
+              <div class="md:col-span-2">
+                <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3" for="correo">
+                  Correo electrónico
+                </label>
+                <div class="relative">
+                  <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">mail</span>
+                  <input
+                    id="correo"
+                    v-model="form.correo"
+                    type="email" required
+                    placeholder="tu.correo@ejemplo.com"
+                    class="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:bg-white text-slate-900 placeholder:text-slate-400 transition-all duration-200 outline-none text-base font-bold"
+                  />
+                </div>
+              </div>
             </div>
 
             <!-- Terms -->
@@ -207,6 +224,7 @@ const form = ref({
   nombres: '',
   primerApellido: '',
   segundoApellido: '',
+  correo: '',
 })
 
 onMounted(async () => {

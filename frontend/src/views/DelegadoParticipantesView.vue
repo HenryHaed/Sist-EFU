@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto min-h-[calc(100vh-4rem)]">
+  <div class="dashboard-page max-w-7xl min-h-full">
     
     <!-- STEP 1: SELECT CONTEST (FASE) -->
     <div v-if="!faseSeleccionada" class="animate-in fade-in slide-in-from-bottom-4 duration-500">

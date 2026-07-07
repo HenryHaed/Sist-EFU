@@ -19,9 +19,9 @@ const vuetify = createVuetify({
       umsa: {
         dark: false,
         colors: {
-          primary: '#004a99',    // Azul UMSA
-          secondary: '#c8102e',  // Rojo UMSA
-          background: '#ffffff', // Fondo blanco puro
+          primary: '#004a99',
+          secondary: '#c8102e',
+          background: '#ffffff',
           surface: '#ffffff',
           'on-background': '#0f172a',
           'on-surface': '#0f172a',
@@ -31,6 +31,23 @@ const vuetify = createVuetify({
           info: '#004a99',
           success: '#16a34a',
           warning: '#d97706',
+        }
+      },
+      umsaDark: {
+        dark: true,
+        colors: {
+          primary: '#6eb3e8',
+          secondary: '#f07885',
+          background: '#0f172a',
+          surface: '#1e293b',
+          'on-background': '#f1f5f9',
+          'on-surface': '#f1f5f9',
+          'on-primary': '#ffffff',
+          'on-secondary': '#ffffff',
+          error: '#f07885',
+          info: '#6eb3e8',
+          success: '#4ade80',
+          warning: '#fbbf24',
         }
       }
     }

@@ -1,6 +1,6 @@
 <template>
   <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
       <!-- Header -->
       <div class="bg-slate-900 border-b border-slate-700 px-4 py-3 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3">
@@ -18,14 +18,18 @@
             <span class="material-symbols-outlined">download</span>
           </button>
           <div class="w-px h-6 bg-slate-700 mx-1"></div>
-          <button @click="$emit('cerrar')" class="text-slate-400 hover:text-secondary p-2 rounded-lg hover:bg-slate-800 transition-colors" title="Cerrar">
-            <span class="material-symbols-outlined">close</span>
+          <button
+            @click="$emit('cerrar')"
+            class="flex items-center justify-center size-9 rounded-lg bg-[#c8102e]/30 border-2 border-[#c8102e] text-[#ff6b6b] hover:bg-[#c8102e]/50 hover:text-white transition-colors shadow-sm"
+            title="Cerrar"
+          >
+            <span class="material-symbols-outlined text-[22px] font-bold">close</span>
           </button>
         </div>
       </div>
       
       <!-- Visor -->
-      <div class="flex-1 bg-slate-100 relative h-full w-full">
+      <div class="flex-1 bg-slate-100 dark:bg-slate-950 relative h-full w-full">
         <iframe 
           v-if="url"
           :src="url + '#toolbar=0&navpanes=0&scrollbar=1'" 

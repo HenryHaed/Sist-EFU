@@ -8,9 +8,10 @@ import { Fase } from '../entities/Fase';
 import { Fraternidad } from '../entities/Fraternidad';
 import { UsuariosService } from './usuarios.service';
 import { UsuariosController } from './usuarios.controller';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Usuario, Role, Jurado, Gestion, Fase, Fraternidad])],
+  imports: [TypeOrmModule.forFeature([Usuario, Role, Jurado, Gestion, Fase, Fraternidad]), MailModule],
   controllers: [UsuariosController],
   providers: [UsuariosService],
   exports: [UsuariosService],

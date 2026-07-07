@@ -9,6 +9,8 @@ import { ParticipantesModule } from './participantes/participantes.module';
 import { OrganizacionModule } from './organizacion/organizacion.module';
 import { InscripcionesModule } from './inscripciones/inscripciones.module';
 import { AsistenciasModule } from './asistencias/asistencias.module';
+import { MonografiasModule } from './monografias/monografias.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
@@ -44,6 +46,8 @@ import { join } from 'path';
     OrganizacionModule,
     InscripcionesModule,
     AsistenciasModule,
+    MonografiasModule,
+    AuditoriaModule,
   ],
 })
 export class AppModule {}

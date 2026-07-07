@@ -1,16 +1,16 @@
 <template>
-  <div class="andean-pattern min-h-screen font-display">
-    <div class="flex h-screen overflow-hidden">
+  <div class="andean-pattern min-h-[100dvh] font-display">
+    <div class="flex h-[100dvh] overflow-hidden">
 
       <!-- ===== SIDEBAR ===== -->
       <aside
         :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
-        class="fixed lg:relative z-40 w-72 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 transition-transform duration-300"
+        class="fixed lg:relative z-40 w-[min(100vw,18rem)] max-w-[85vw] lg:max-w-none lg:w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col h-full shrink-0 transition-transform duration-300"
       >
-        <div class="p-6 flex flex-col h-full overflow-y-auto">
+        <div class="p-4 sm:p-6 flex flex-col h-full overflow-y-auto">
           <!-- Logo/Brand -->
-          <div class="flex items-center gap-3 mb-10">
-            <div v-if="siteInfo.urlLogo" class="size-12 overflow-hidden rounded-lg flex items-center justify-center border-2 border-primary shadow-sm bg-white">
+          <div class="flex items-center gap-3 mb-6 sm:mb-10">
+            <div v-if="siteInfo.urlLogo" class="size-12 overflow-hidden rounded-lg flex items-center justify-center border-2 border-primary shadow-sm bg-white dark:bg-slate-800">
               <img :src="siteInfo.urlLogo" class="size-full object-contain" alt="Logo" />
             </div>
             <div v-else class="size-10 bg-primary rounded-lg flex items-center justify-center text-white font-black text-xl shadow-[2px_2px_0px_0px_rgba(200,16,46,1)] border-2 border-primary">
@@ -135,7 +135,7 @@
               <span class="text-sm font-bold">Inscribir Fraternidad</span>
             </button>
 
-            <p v-if="can('ajustes') || can('gestion_sistema')" class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-4 mt-6 mb-2">Configuración</p>
+            <p v-if="can('ajustes') || can('gestion_sistema') || can('auditoria')" class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-4 mt-6 mb-2">Configuración</p>
             
             <!-- Menú Acordeón: Gestión Usuarios -->
             <div v-if="can('gestion_usuarios')" class="w-full">
@@ -212,11 +212,33 @@
             </button>
 
             <button
-              v-if="can('informes')"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all"
+              v-if="can('subir_monografia')"
+              @click="setVista('subir_monografia')"
+              :class="vistaActual === 'subir_monografia' ? 'bg-slate-50 text-secondary border-l-4 border-l-primary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
             >
-              <span class="material-symbols-outlined text-[20px] text-slate-400">description</span>
-              <span class="text-sm font-bold">Enviar Informes</span>
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'subir_monografia' ? 'text-primary' : 'text-slate-400'">description</span>
+              <span class="text-sm font-bold">Subir Monografía</span>
+            </button>
+
+            <button
+              v-if="can('auditoria')"
+              @click="setVista('auditoria')"
+              :class="vistaActual === 'auditoria' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'auditoria' ? 'text-secondary' : 'text-slate-400'">history</span>
+              <span class="text-sm font-bold">Auditoría del Sistema</span>
+            </button>
+
+            <button
+              v-if="can('enviar_mensaje')"
+              @click="setVista('enviar_mensaje')"
+              :class="vistaActual === 'enviar_mensaje' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'enviar_mensaje' ? 'text-secondary' : 'text-slate-400'">mail</span>
+              <span class="text-sm font-bold">Enviar un Mensaje</span>
             </button>
 
             <button
@@ -239,8 +261,8 @@
           </nav>
 
           <!-- User Profile -->
-          <div class="mt-auto pt-6 border-t border-slate-100">
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-[2px_2px_0px_0px_#e2e8f0]">
+          <div class="mt-auto pt-6 border-t border-slate-100 dark:border-slate-700">
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-600 shadow-[2px_2px_0px_0px_#e2e8f0] dark:shadow-none">
               <div class="flex items-center gap-3 mb-3">
                 <div class="size-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border-2 border-slate-200">
                   <span class="material-symbols-outlined text-2xl">account_circle</span>
@@ -268,43 +290,33 @@
       <div class="flex-1 flex flex-col overflow-hidden min-w-0">
 
         <!-- Top Bar -->
-        <header class="h-16 flex items-center justify-between px-6 md:px-8 border-b border-slate-200 bg-white/95 shrink-0 z-20">
-          <div class="flex items-center gap-4">
-            <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden text-slate-600 hover:text-primary transition-colors">
-              <span class="material-symbols-outlined">menu</span>
+        <header class="h-14 sm:h-16 flex items-center justify-between px-4 sm:px-6 md:px-8 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 shrink-0 z-20 gap-2">
+          <div class="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+            <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden shrink-0 text-slate-600 hover:text-primary transition-colors p-1">
+              <span class="material-symbols-outlined text-2xl">menu</span>
             </button>
 
-            <!-- Breadcrumb / vista actual -->
-            <div class="flex items-center gap-2 text-sm">
-              <span class="text-secondary font-black uppercase tracking-wider text-xs bg-secondary/10 px-2 py-1 rounded">Evaluación</span>
-              <span class="text-slate-300">/</span>
-              <span class="font-bold text-primary text-sm">{{ tituloVista }}</span>
+            <div class="flex items-center gap-1.5 sm:gap-2 text-sm min-w-0 overflow-hidden">
+              <span class="hidden sm:inline text-secondary font-black uppercase tracking-wider text-[10px] bg-secondary/10 px-2 py-1 rounded shrink-0">Evaluación</span>
+              <span class="hidden sm:inline text-slate-300 shrink-0">/</span>
+              <span class="font-bold text-primary text-xs sm:text-sm truncate">{{ tituloVista }}</span>
               <template v-if="fraternidadSeleccionada">
-                <span class="text-slate-300">/</span>
-                <span class="font-medium text-slate-500 text-xs">{{ fraternidadSeleccionada.nombre }}</span>
+                <span class="hidden md:inline text-slate-300 shrink-0">/</span>
+                <span class="hidden md:inline font-medium text-slate-500 text-xs truncate">{{ fraternidadSeleccionada.nombre }}</span>
               </template>
             </div>
           </div>
 
-          <div class="flex items-center gap-3">
-            <!-- Dark Mode Toggle -->
-            <button 
-              @click="toggleDarkMode" 
-              class="size-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-primary hover:bg-slate-100 transition-colors border border-slate-200 bg-white shadow-sm"
-              :title="isDarkMode ? 'Modo Claro' : 'Modo Oscuro'"
-            >
-              <span class="material-symbols-outlined text-[20px]">{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</span>
-            </button>
-            <!-- Timer -->
-            <div class="hidden sm:flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200 shadow-sm">
-              <span class="material-symbols-outlined text-secondary text-[18px]">timer</span>
-              <span class="text-sm font-black text-slate-700 tracking-wider">{{ timer }}</span>
+          <div class="flex items-center gap-2 shrink-0">
+            <div class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <span class="material-symbols-outlined text-secondary text-base sm:text-[18px]">timer</span>
+              <span class="text-xs sm:text-sm font-black text-slate-700 tracking-wider tabular-nums">{{ timer }}</span>
             </div>
           </div>
         </header>
 
         <!-- Scroll Area -->
-        <main class="flex-1 overflow-y-auto bg-transparent">
+        <main class="flex-1 overflow-y-auto overflow-x-hidden bg-transparent min-w-0">
           <transition name="slide-fade" mode="out-in">
 
             <!-- Vista: Estadísticas -->
@@ -340,8 +352,8 @@
             <GestionesAnualesView
               v-else-if="vistaActual === 'gestion_fases'"
               key="gestion_fases_maestro"
-              @seleccionar-gestion="(g) => { gestionSeleccionada = g; vistaActual = 'gestion_fases_detalle' }"
-              @ir-ajustes-gestion="(id) => { gestionParaAjustes = id; vistaActual = 'ajustes' }"
+              @seleccionar-gestion="(g) => { gestionSeleccionada = g; authStore.setGestionContext(g.idGestion); vistaActual = 'gestion_fases_detalle' }"
+              @ir-ajustes-gestion="(id) => { gestionParaAjustes = id; authStore.setGestionContext(id); vistaActual = 'ajustes' }"
             />
 
             <!-- Vista: Fases de una Gestión (Admin) - Nivel Detalle -->
@@ -417,6 +429,18 @@
               :rol-filtro="vistaActual.replace('usuarios_', '')"
             />
 
+            <!-- Vista: Auditoría (Superusuario) -->
+            <AuditoriaView
+              v-else-if="vistaActual === 'auditoria'"
+              key="auditoria"
+            />
+
+            <!-- Vista: Enviar Mensaje (Admin) -->
+            <EnviarMensajeView
+              v-else-if="vistaActual === 'enviar_mensaje'"
+              key="enviar_mensaje"
+            />
+
             <!-- Vista: Ajustes del Sistema -->
             <AjustesView
               v-else-if="vistaActual === 'ajustes'"
@@ -442,6 +466,12 @@
               key="solicitudes_inscripcion"
             />
 
+            <!-- Vista: Subir Monografía (Delegado) -->
+            <SubirMonografiaView
+              v-else-if="vistaActual === 'subir_monografia'"
+              key="subir_monografia"
+            />
+
             <AsistenciaView
               v-else-if="vistaActual === 'asistencias'"
               key="asistencias"
@@ -453,20 +483,22 @@
         <!-- MODAL: CAMBIO DE CONTRASEÑA OBLIGATORIO (PRIMER LOGIN) -->
         <v-dialog 
           v-model="mostrarModalPass" 
-          max-width="450" 
+          max-width="520" 
+          max-height="90dvh"
+          scrollable
           persistent
           no-click-animation
         >
-          <v-card class="rounded-2xl overflow-hidden border-4 border-primary shadow-2xl">
-            <div class="bg-primary p-6 text-white text-center">
+          <v-card class="rounded-2xl overflow-hidden border-4 border-primary shadow-2xl flex flex-col max-h-[90dvh]">
+            <div class="bg-primary p-6 text-white text-center shrink-0">
               <div class="size-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/50">
                 <span class="material-symbols-outlined text-4xl">lock_reset</span>
               </div>
               <h3 class="text-2xl font-black italic uppercase tracking-tighter">Seguridad Requerida</h3>
-              <p class="text-white/80 text-sm font-medium mt-1">Este es tu primer inicio de sesión. Por favor, personaliza tu contraseña.</p>
+              <p class="text-white/80 text-sm font-medium mt-1">Este es tu primer inicio de sesión. Crea una contraseña segura para continuar.</p>
             </div>
 
-            <v-card-text class="pa-8 bg-white">
+            <v-card-text class="pa-8 bg-white overflow-y-auto flex-1 min-h-0">
               <div class="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
                 <span class="material-symbols-outlined text-amber-600">info</span>
                 <p class="text-xs text-amber-800 font-medium">
@@ -474,7 +506,7 @@
                 </p>
               </div>
 
-              <div class="space-y-4">
+              <div class="space-y-5">
                 <div>
                   <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Nueva Contraseña</label>
                   <div class="relative">
@@ -483,13 +515,39 @@
                       v-model="newPassword" 
                       :type="showNewPass ? 'text' : 'password'" 
                       placeholder="Mínimo 8 caracteres"
-                      class="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all font-bold"
+                      autocomplete="new-password"
+                      class="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm transition-all font-bold"
                     />
-                    <button @click="showNewPass = !showNewPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors">
+                    <button type="button" @click="showNewPass = !showNewPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors">
                       <span class="material-symbols-outlined text-lg">{{ showNewPass ? 'visibility_off' : 'visibility' }}</span>
                     </button>
                   </div>
+                  <div v-if="newPassword" class="mt-3">
+                    <div class="flex gap-1 mb-2">
+                      <div
+                        v-for="i in 4"
+                        :key="i"
+                        class="h-1.5 flex-1 rounded-full transition-colors duration-300"
+                        :class="i <= passStrength.level ? passStrengthBarClass : 'bg-slate-200'"
+                      />
+                    </div>
+                    <p v-if="passStrength.label" class="text-[10px] font-bold uppercase tracking-widest mb-2" :class="passStrengthTextClass">
+                      {{ passStrength.label }}
+                    </p>
+                    <ul class="space-y-1">
+                      <li
+                        v-for="rule in passPolicyRules"
+                        :key="rule.label"
+                        class="text-[10px] flex items-center gap-1.5 transition-colors"
+                        :class="rule.ok ? 'text-emerald-600' : 'text-slate-400'"
+                      >
+                        <span class="material-symbols-outlined text-[14px]">{{ rule.ok ? 'check_circle' : 'radio_button_unchecked' }}</span>
+                        {{ rule.label }}
+                      </li>
+                    </ul>
+                  </div>
                 </div>
+
                 <div>
                   <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Confirmar Contraseña</label>
                   <div class="relative">
@@ -498,29 +556,40 @@
                       v-model="confirmPassword" 
                       :type="showConfirmPass ? 'text' : 'password'" 
                       placeholder="Repite la contraseña"
-                      class="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all font-bold"
+                      autocomplete="new-password"
+                      class="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm transition-all font-bold"
                       :class="{'border-red-300 bg-red-50': confirmPassword && newPassword !== confirmPassword}"
                     />
-                    <button @click="showConfirmPass = !showConfirmPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors">
+                    <button type="button" @click="showConfirmPass = !showConfirmPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors">
                       <span class="material-symbols-outlined text-lg">{{ showConfirmPass ? 'visibility_off' : 'visibility' }}</span>
                     </button>
                   </div>
-                  <p v-if="confirmPassword && newPassword !== confirmPassword" class="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-widest">Las contraseñas no coinciden</p>
+                  <p v-if="confirmPassword && newPassword === confirmPassword" class="text-[10px] text-emerald-600 font-bold mt-2 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-sm">check_circle</span>
+                    Las contraseñas coinciden
+                  </p>
+                  <p v-else-if="confirmPassword && newPassword !== confirmPassword" class="text-[10px] text-red-500 font-bold mt-2 flex items-center gap-1 uppercase tracking-widest">
+                    <span class="material-symbols-outlined text-sm">error</span>
+                    Las contraseñas no coinciden
+                  </p>
                 </div>
               </div>
 
-              <p v-if="passError" class="text-secondary text-xs font-bold mt-4 flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">error</span> {{ passError }}
-              </p>
+              <transition name="fade">
+                <p v-if="passError" class="text-secondary text-xs font-bold mt-4 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">error</span> {{ passError }}
+                </p>
+              </transition>
             </v-card-text>
 
-            <v-card-actions class="pa-6 bg-slate-50 border-t border-slate-100">
+            <v-card-actions class="pa-6 bg-slate-50 border-t border-slate-100 shrink-0">
               <button 
                 @click="actualizarPassword"
-                :disabled="changingPass || !newPassword || newPassword.length < 8 || newPassword !== confirmPassword"
-                class="w-full bg-primary hover:bg-blue-900 text-white font-black py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
+                :disabled="changingPass || !canChangePassword"
+                class="w-full bg-primary hover:bg-blue-900 text-white font-black py-4 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale uppercase text-[10px] tracking-widest"
               >
                 <span v-if="changingPass" class="material-symbols-outlined animate-spin">progress_activity</span>
+                <span v-else class="material-symbols-outlined">lock_reset</span>
                 {{ changingPass ? 'Procesando...' : 'Cambiar y Empezar' }}
               </button>
             </v-card-actions>
@@ -550,16 +619,22 @@ import UsuariosCRUDView from './UsuariosCRUDView.vue'
 import ListadoCompetidoresView from './ListadoCompetidoresView.vue'
 import DelegadoParticipantesView from './DelegadoParticipantesView.vue'
 import OrganizacionCRUDView from './OrganizacionCRUDView.vue'
+import EnviarMensajeView from './EnviarMensajeView.vue'
+import AuditoriaView from './AuditoriaView.vue'
 import AjustesView from './AjustesView.vue'
 import InscribirFraternidadView from './InscribirFraternidadView.vue'
 import ReglamentoView from './ReglamentoView.vue'
 import SolicitudesInscripcionView from './SolicitudesInscripcionView.vue'
 import AsistenciaView from './AsistenciaView.vue'
+import SubirMonografiaView from './SubirMonografiaView.vue'
 
 import { getImageUrl } from '../utils/url'
+import { isPasswordPolicyValid, getPasswordPolicyErrors, getPasswordStrength } from '../utils/passwordPolicy'
+import { useTheme } from 'vuetify'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const vuetifyTheme = useTheme()
 
 // State
 const siteInfo = ref({})
@@ -590,31 +665,48 @@ const changingPass = ref(false)
 // User data from store
 const currentUser = computed(() => authStore.user)
 
+const canChangePassword = computed(() =>
+  isPasswordPolicyValid(newPassword.value, currentUser.value?.ci || '') &&
+  newPassword.value === confirmPassword.value
+)
+
+const passStrength = computed(() => getPasswordStrength(newPassword.value, currentUser.value?.ci || ''))
+
+const passStrengthBarClass = computed(() => {
+  if (passStrength.value.level >= 4) return 'bg-emerald-500'
+  if (passStrength.value.level >= 2) return 'bg-amber-500'
+  return 'bg-red-500'
+})
+
+const passStrengthTextClass = computed(() => {
+  if (passStrength.value.level >= 4) return 'text-emerald-600'
+  if (passStrength.value.level >= 2) return 'text-amber-600'
+  return 'text-red-500'
+})
+
+const passPolicyRules = computed(() => {
+  const pwd = newPassword.value
+  const ci = currentUser.value?.ci || ''
+  return [
+    { label: 'Mínimo 8 caracteres', ok: pwd.length >= 8 },
+    { label: 'Al menos una mayúscula', ok: /[A-Z]/.test(pwd) },
+    { label: 'Al menos una minúscula', ok: /[a-z]/.test(pwd) },
+    { label: 'Al menos un número', ok: /[0-9]/.test(pwd) },
+    { label: 'No igual al CI', ok: !ci || pwd.trim() !== ci.trim() },
+  ]
+})
+
 // Role-based permissions logic
 const can = (permission) => {
   const role = authStore.userRole?.toLowerCase()
   const permissions = {
-    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin'],
-    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
+    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin'],
+    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
     jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
-    delegado: ['estadisticas', 'reglamento', 'informes', 'gestionar_participantes', 'inscripcion_fraternidad']
+    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'gestionar_participantes', 'inscripcion_fraternidad']
   }
   return permissions[role]?.includes(permission) || false
-}
-
-// Dark Mode Toggle Logic
-const isDarkMode = ref(document.documentElement.classList.contains('dark'))
-const toggleDarkMode = () => {
-  if (isDarkMode.value) {
-    document.documentElement.classList.remove('dark')
-    localStorage.theme = 'light'
-    isDarkMode.value = false
-  } else {
-    document.documentElement.classList.add('dark')
-    localStorage.theme = 'dark'
-    isDarkMode.value = true
-  }
 }
 
 // Timer logic
@@ -628,13 +720,9 @@ const timer = computed(() => {
 })
 
 onMounted(async () => {
-  if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    document.documentElement.classList.add('dark')
-    isDarkMode.value = true
-  } else {
-    document.documentElement.classList.remove('dark')
-    isDarkMode.value = false
-  }
+  document.documentElement.classList.remove('dark')
+  localStorage.theme = 'light'
+  vuetifyTheme.global.name.value = 'umsa'
 
   timerInterval = setInterval(() => { timerSegundos.value-- }, 1000)
 
@@ -644,6 +732,9 @@ onMounted(async () => {
     if (data) {
       data.urlLogo = getImageUrl(data.urlLogo)
       siteInfo.value = data
+      if (data.idGestion) {
+        authStore.setGestionContext(data.idGestion)
+      }
     }
   } catch (err) {
     console.warn('Error al cargar info del sitio')
@@ -675,8 +766,9 @@ watch(() => router.currentRoute.value.query.v, (newV) => {
 
 const actualizarPassword = async () => {
   passError.value = ''
-  if (!newPassword.value || newPassword.value.length < 8) {
-    passError.value = 'La contraseña debe tener al menos 8 caracteres.'
+  const ci = currentUser.value?.ci || ''
+  if (!isPasswordPolicyValid(newPassword.value, ci)) {
+    passError.value = getPasswordPolicyErrors(newPassword.value, ci).join('. ') + '.'
     return
   }
   if (newPassword.value !== confirmPassword.value) {
@@ -691,7 +783,7 @@ const actualizarPassword = async () => {
     mostrarModalPass.value = false
     notify.success('¡Contraseña Actualizada!', 'Tu acceso ahora es seguro y privado.')
   } catch (error) {
-    passError.value = 'Error al cambiar la contraseña. Inténtalo de nuevo.'
+    passError.value = error.response?.data?.message || 'Error al cambiar la contraseña. Inténtalo de nuevo.'
   } finally {
     changingPass.value = false
   }
@@ -722,10 +814,13 @@ const tituloVista = computed(() => {
     gestion_fases_detalle: gestionSeleccionada.value ? `Gestión ${gestionSeleccionada.value.anio} — Fases` : 'Fases de Evaluación',
     gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
     ajustes: 'Ajustes del Sistema',
+    enviar_mensaje: 'Enviar un Mensaje',
+    auditoria: 'Auditoría del Sistema',
     inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad',
     reglamento: 'Reglamentos y Documentos Oficiales',
     solicitudes_inscripcion: 'Solicitudes de Preinscripción',
     asistencias: 'Directorio de Delegados',
+    subir_monografia: 'Subir Monografía',
     seleccionar_fase_disciplina: 'Control de Disciplina HCU'
   }
 
@@ -765,7 +860,9 @@ const entrarFaseConcurso = (fase) => {
 }
 
 const iniciarWizard = (data) => {
-  // data viene del emit de ListadoEvaluacionFaseView: { fase, fraternidad, ... }
+  if (data.fase) {
+    activeFaseJurado.value = { ...activeFaseJurado.value, ...data.fase }
+  }
   activeFraternidadJurado.value = data.fraternidad
   activeParticipanteNombre.value = null
   activeParticipanteTipo.value = null
@@ -804,6 +901,11 @@ const handleLogout = () => {
   background-attachment: fixed;
 }
 
+:global(html.dark) .andean-pattern {
+  background-color: #0f172a;
+  background-image: linear-gradient(rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.92)), url('@/assets/img/Textura-Andina.png');
+}
+
 .slide-fade-enter-active,
 .slide-fade-leave-active {
   transition: opacity 0.25s ease, transform 0.25s ease;
@@ -816,4 +918,7 @@ const handleLogout = () => {
   opacity: 0;
   transform: translateX(-16px);
 }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

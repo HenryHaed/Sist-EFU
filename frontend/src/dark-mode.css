@@ -1,0 +1,280 @@
+/* ===== Modo oscuro — Dashboard y vistas internas ===== */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html.dark {
+  color-scheme: dark;
+  transition: background-color 0.25s ease, color 0.25s ease;
+
+  /* Azul y rojo UMSA más suaves en oscuro */
+  --color-primary: #6eb3e8;
+  --color-secondary: #f07885;
+  --color-primary-umsa: #6eb3e8;
+  --color-secondary-umsa: #f07885;
+  --color-deep-blue: #a8d4f5;
+  --color-text-main: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-background-light: #0f172a;
+  --color-accent: #1e293b;
+
+  /* Blanco → superficie oscura; negro → texto claro */
+  --color-white: #1e293b;
+  --color-black: #f8fafc;
+
+  /* Escala slate invertida para fondos y textos comunes */
+  --color-slate-50: #1e293b;
+  --color-slate-100: #334155;
+  --color-slate-200: #475569;
+  --color-slate-300: #64748b;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #cbd5e1;
+  --color-slate-600: #e2e8f0;
+  --color-slate-700: #f1f5f9;
+  --color-slate-800: #f8fafc;
+  --color-slate-900: #ffffff;
+  --color-slate-950: #ffffff;
+}
+
+html.dark,
+html.dark body {
+  background-color: #0f172a !important;
+  color: #f1f5f9;
+}
+
+/* Patrón andino — overlay oscuro */
+html.dark .andean-pattern {
+  background-color: #0f172a;
+  background-image: linear-gradient(rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.92)),
+    url('/src/assets/img/Textura-Andina.png');
+}
+
+html.dark .glass {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .glow-blue {
+  box-shadow: 0 4px 15px rgba(110, 179, 232, 0.25);
+}
+
+html.dark .dashboard-sticky-header {
+  background: rgba(30, 41, 59, 0.95);
+  border-bottom-color: #334155;
+}
+
+html.dark .form-input {
+  background-color: #1e293b;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+html.dark .form-input::placeholder {
+  color: #64748b;
+}
+
+html.dark .label-xs {
+  color: #94a3b8;
+}
+
+/* Tarjetas y paneles que deben seguir siendo oscuros */
+html.dark .bg-slate-900 {
+  background-color: #0f172a !important;
+}
+
+html.dark .bg-slate-900 .text-slate-300,
+html.dark .bg-slate-900 .text-slate-400,
+html.dark .bg-slate-900 .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .bg-slate-900 .text-white {
+  color: #ffffff !important;
+}
+
+/* Botones primarios/secundarios — mantener texto blanco legible */
+html.dark .bg-primary,
+html.dark .bg-secondary {
+  color: #ffffff !important;
+}
+
+html.dark .text-primary {
+  color: var(--color-primary) !important;
+}
+
+html.dark .text-secondary {
+  color: var(--color-secondary) !important;
+}
+
+/* Estados semánticos en tablas y badges */
+html.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.12) !important; }
+html.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.18) !important; }
+html.dark .text-emerald-700 { color: #6ee7b7 !important; }
+html.dark .border-emerald-100,
+html.dark .border-emerald-200 { border-color: rgba(16, 185, 129, 0.35) !important; }
+
+html.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12) !important; }
+html.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.18) !important; }
+html.dark .text-amber-700,
+html.dark .text-amber-800 { color: #fcd34d !important; }
+html.dark .border-amber-100,
+html.dark .border-amber-200 { border-color: rgba(245, 158, 11, 0.35) !important; }
+
+html.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12) !important; }
+html.dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.18) !important; }
+html.dark .text-red-600,
+html.dark .text-red-700,
+html.dark .text-red-800 { color: #fca5a5 !important; }
+
+html.dark .bg-indigo-50 { background-color: rgba(99, 102, 241, 0.12) !important; }
+
+/* Sombras adaptadas */
+html.dark .shadow-sm,
+html.dark .shadow-xl,
+html.dark .shadow-2xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.45);
+}
+
+html.dark .shadow-\[2px_2px_0px_0px_\#e2e8f0\] {
+  box-shadow: 2px 2px 0 0 #334155 !important;
+}
+
+html.dark .shadow-\[2px_2px_0px_0px_rgba\(200\,16\,46\,1\)\] {
+  box-shadow: 2px 2px 0 0 rgba(240, 120, 133, 0.9) !important;
+}
+
+/* Wizard evaluación */
+html.dark .wizard-gradient {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%) !important;
+}
+
+html.dark .glass-panel {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border-color: #475569 !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Vuetify — variables globales en oscuro */
+html.dark {
+  --v-theme-primary: 110, 179, 232 !important;
+  --v-theme-secondary: 240, 120, 133 !important;
+  --v-theme-background: 15, 23, 42 !important;
+  --v-theme-surface: 30, 41, 59 !important;
+  --v-theme-on-background: 241, 245, 249 !important;
+  --v-theme-on-surface: 241, 245, 249 !important;
+}
+
+html.dark .v-card {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .v-overlay__scrim {
+  background: rgba(0, 0, 0, 0.65) !important;
+}
+
+/* SweetAlert2 en dashboard */
+html.dark .swal2-popup {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .swal2-title,
+html.dark .swal2-html-container {
+  color: #f1f5f9 !important;
+}
+
+/* ===== Dashboard — overrides globales para fondos blancos ===== */
+html.dark .bg-white {
+  background-color: #1e293b !important;
+}
+
+html.dark .bg-white\/95 {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+}
+
+html.dark .bg-white\/90,
+html.dark .bg-white\/80 {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+html.dark .bg-slate-50 {
+  background-color: #1e293b !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #334155 !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200 {
+  border-color: #475569 !important;
+}
+
+html.dark aside {
+  background-color: #0f172a !important;
+  border-right-color: #334155 !important;
+}
+
+html.dark aside nav button:hover {
+  background-color: #1e293b !important;
+}
+
+html.dark aside .bg-slate-50 {
+  background-color: #334155 !important;
+}
+
+html.dark header {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  border-bottom-color: #334155 !important;
+}
+
+html.dark .divide-slate-100 > :not(:last-child),
+html.dark .divide-y.divide-slate-100 > :not(:last-child) {
+  border-color: #334155 !important;
+}
+
+html.dark .rounded-3xl.bg-white,
+html.dark .rounded-2xl.bg-white,
+html.dark .rounded-xl.bg-white {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+html.dark table thead.bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+html.dark tr.hover\:bg-slate-50:hover {
+  background-color: #334155 !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .v-card-text.bg-white,
+html.dark .v-card-actions.bg-slate-50 {
+  background-color: #1e293b !important;
+}
+
+html.dark .hover\:bg-slate-50:hover {
+  background-color: #334155 !important;
+}
+
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #475569 !important;
+}
+
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #cbd5e1 !important;
+}

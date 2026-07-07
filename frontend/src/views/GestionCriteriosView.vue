@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto">
+  <div class="dashboard-page max-w-7xl">
     <!-- Botón Volver -->
     <button @click="$emit('volver')" class="flex items-center gap-2 text-slate-500 hover:text-primary font-bold text-xs mb-6 transition-all group uppercase tracking-widest">
       <span class="material-symbols-outlined text-[20px] group-hover:-translate-x-1 transition-transform">arrow_back</span>
@@ -12,14 +12,14 @@
           <span class="material-symbols-outlined text-[14px]">info</span>
           Configurando Criterios · Fase {{ fase?.nombre }}
         </p>
-        <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">Criterios de Evaluación</h2>
+        <h2 class="dashboard-page-title text-primary tracking-tighter uppercase italic">Criterios de Evaluación</h2>
         <p class="text-slate-500 font-medium text-sm mt-1">Define qué aspectos serán calificados específicamente para esta fase.</p>
       </div>
       <button 
         v-if="esActiva"
         @click="abrirModal()"
         :disabled="disponiblePuntaje <= 0"
-        class="bg-primary hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-black transition-all flex items-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="w-full sm:w-auto bg-primary hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span class="material-symbols-outlined">{{ disponiblePuntaje <= 0 ? 'lock' : 'playlist_add_check' }}</span>
         <span class="uppercase tracking-tighter">{{ disponiblePuntaje <= 0 ? (props.fase?.tipoConcurso === 'EFU' ? 'Fase al Límite' : '100% Alcanzado') : 'Nuevo Criterio' }}</span>
@@ -28,7 +28,7 @@
 
     <!-- Resumen Presupuesto de Criterios (Premium Style) -->
     <div class="mb-8 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-wrap items-center gap-10">
-      <div class="flex-1 min-w-[300px]">
+      <div class="flex-1 min-w-0 w-full sm:min-w-[280px]">
         <div class="flex justify-between items-end mb-2">
           <div>
             <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Puntaje Acumulado (Vs. Techo Fase)</p>

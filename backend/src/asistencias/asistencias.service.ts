@@ -8,6 +8,7 @@ import { Infraccion } from '../entities/Infraccion';
 import { Gestion } from '../entities/Gestion';
 import { Fraternidad } from '../entities/Fraternidad';
 import { EventoControl } from '../entities/EventoControl';
+import { findGestionActivaOrLatest } from '../common/gestion.utils';
 
 @Injectable()
 export class AsistenciasService {
@@ -29,9 +30,7 @@ export class AsistenciasService {
   ) {}
 
   private async getGestionActiva() {
-    let g = await this.gestionRepo.findOne({ where: { activa: true } });
-    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
-    return g;
+    return findGestionActivaOrLatest(this.gestionRepo);
   }
 
   async getEventos() {
@@ -70,16 +69,25 @@ export class AsistenciasService {
 
       const entry = fraternidadesMap.get(idFrat);
 
-      if (sol.delTitularNombre?.trim()) {
+      const nombreTitular = [sol.delTitularNombres, sol.delTitularPrimerApellido, sol.delTitularSegundoApellido]
+        .filter((part) => part?.trim())
+        .join(' ')
+        .trim();
+      const nombreSuplente = [sol.delSuplenteNombres, sol.delSuplentePrimerApellido, sol.delSuplenteSegundoApellido]
+        .filter((part) => part?.trim())
+        .join(' ')
+        .trim();
+
+      if (nombreTitular) {
         entry.titular = {
-          nombre: sol.delTitularNombre,
+          nombre: nombreTitular,
           ci: sol.delTitularCi,
           celular: sol.delTitularCelular,
         };
       }
-      if (sol.delSuplenteNombre?.trim()) {
+      if (nombreSuplente) {
         entry.suplente = {
-          nombre: sol.delSuplenteNombre,
+          nombre: nombreSuplente,
           ci: sol.delSuplenteCi,
           celular: sol.delSuplenteCelular,
         };

@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 md:p-8 max-w-5xl mx-auto w-full">
+  <div class="dashboard-page max-w-5xl w-full">
     <!-- Header -->
     <div class="mb-10">
       <div class="flex items-center gap-2 mb-2">

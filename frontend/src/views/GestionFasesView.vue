@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto">
+  <div class="dashboard-page max-w-7xl">
 
     <!-- Breadcrumb / volver -->
     <button v-if="gestionSeleccionada" @click="$emit('volver')" class="flex items-center gap-2 text-slate-500 hover:text-primary font-bold text-sm mb-6 transition-all group">
@@ -13,12 +13,12 @@
         <p class="text-[10px] uppercase font-black tracking-widest text-primary/60 mb-1">
           {{ gestionSeleccionada ? `Gestión ${gestionSeleccionada.anio}` : 'Fases de la Gestión Activa' }}
         </p>
-        <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">Fases de Evaluación</h2>
+        <h2 class="dashboard-page-title text-primary tracking-tighter uppercase italic">Fases de Evaluación</h2>
         <p class="text-slate-500 text-sm mt-1" v-if="resumen.gestion?.lema">"{{ resumen.gestion.lema }}"</p>
       </div>
       <button
         @click="abrirModal()"
-        class="bg-primary hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-black transition-all flex items-center gap-2 shadow-lg shadow-primary/20"
+        class="w-full sm:w-auto bg-primary hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
       >
         <span class="material-symbols-outlined">add_circle</span>
         Nueva Fase
@@ -26,7 +26,7 @@
     </div>
 
     <!-- Resumen Presupuesto EFU -->
-    <div class="mb-6 bg-white border border-slate-200 rounded-2xl px-6 py-5 flex flex-wrap items-center gap-8 shadow-sm">
+    <div class="mb-6 bg-white border border-slate-200 rounded-2xl px-4 sm:px-6 py-4 sm:py-5 flex flex-wrap items-center gap-6 sm:gap-8 shadow-sm">
       <div>
         <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Presupuesto EFU Total</p>
         <div class="flex items-end gap-2">

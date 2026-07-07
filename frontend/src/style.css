@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./dark-mode.css";
 
 @theme {
   --color-primary: #004a99;
@@ -70,4 +71,84 @@
   letter-spacing: 0.1em;
   color: var(--color-slate-400);
   margin-bottom: 0.5rem;
+}
+
+/* ===== Dashboard — utilidades responsivas ===== */
+@layer components {
+  .dashboard-page {
+    padding: 1rem;
+    width: 100%;
+    min-width: 0;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  @media (min-width: 640px) {
+    .dashboard-page {
+      padding: 1.5rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .dashboard-page {
+      padding: 2rem;
+    }
+  }
+
+  .dashboard-page-title {
+    font-size: 1.5rem;
+    line-height: 1.15;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+
+  @media (min-width: 640px) {
+    .dashboard-page-title {
+      font-size: 1.875rem;
+    }
+  }
+
+  .dashboard-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .dashboard-toolbar {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .dashboard-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .dashboard-sticky-header {
+      padding: 0.75rem 1.5rem;
+    }
+  }
+}
+
+@media (max-width: 639px) {
+  .v-dialog > .v-overlay__content {
+    max-width: calc(100vw - 1rem) !important;
+    width: calc(100vw - 1rem) !important;
+    margin: 0.5rem !important;
+  }
 }

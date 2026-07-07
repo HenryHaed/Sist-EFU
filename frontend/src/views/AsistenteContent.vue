@@ -2,13 +2,13 @@
   <div class="relative flex flex-col w-full h-full wizard-gradient overflow-y-auto">
     
     <!-- Wizard Header (replaces standard header) -->
-    <div class="sticky top-0 z-40 flex flex-col sm:flex-row items-center justify-between whitespace-nowrap border-b border-slate-100 px-6 py-4 bg-white/95 backdrop-blur-md shadow-sm">
-      <div class="flex items-center gap-4">
+    <div class="sticky top-0 z-40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 px-4 sm:px-6 py-3 sm:py-4 bg-white/95 backdrop-blur-md shadow-sm">
+      <div class="flex items-center gap-3 min-w-0">
         <button @click="$emit('volver')" class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-50 text-slate-500 hover:bg-slate-200 transition-colors border border-slate-200">
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
         <div class="flex flex-col">
-          <h2 class="text-primary text-xl font-black italic leading-tight tracking-tight uppercase">
+          <h2 class="text-primary text-base sm:text-xl font-black italic leading-tight tracking-tight uppercase truncate">
             <template v-if="participanteNombre">
               {{ participanteNombre }}
               <span v-if="fraternidad" class="text-slate-400 font-medium text-sm block sm:inline sm:ml-2">/ {{ fraternidad.nombre }}</span>
@@ -23,11 +23,20 @@
         </div>
       </div>
       
-      <div class="flex items-center gap-3 mt-4 sm:mt-0">
+      <div class="flex items-center gap-3 mt-4 sm:mt-0 flex-wrap justify-end">
         <div class="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg border border-slate-200" :class="urgenciaStatus.textClass">
           <span class="material-symbols-outlined animate-pulse text-sm">schedule</span>
           <span class="text-xs font-black">{{ countdownText }}</span>
         </div>
+        <button
+          v-if="esFaseMonografia && fraternidad"
+          @click="abrirMonografia"
+          :disabled="cargandoMonografia"
+          class="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-800 rounded-lg font-black text-[10px] uppercase tracking-widest border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+        >
+          <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+          Ver Monografía
+        </button>
         <div v-if="estadoOriginal === 'COMPLETADO'" class="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-black text-xs uppercase tracking-widest border border-emerald-200">
           <span class="material-symbols-outlined text-sm">verified_user</span> Sellada
         </div>
@@ -35,7 +44,7 @@
     </div>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col items-center p-4 md:p-8 w-full max-w-6xl mx-auto">
+    <main class="flex-1 flex flex-col items-center p-4 sm:p-6 md:p-8 w-full max-w-6xl mx-auto min-w-0">
       
       <!-- Loading State -->
       <div v-if="loading" class="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -342,6 +351,13 @@
       </v-card>
     </v-dialog>
 
+    <PdfViewerModal
+      v-if="visorMonografiaAbierto && monografiaFraternidad"
+      :url="getImageUrl(monografiaFraternidad.urlArchivo)"
+      :titulo="`Monografía —  ${fraternidad?.nombre || ''}`"
+      @cerrar="visorMonografiaAbierto = false"
+    />
+
   </div>
 </template>
 
@@ -352,7 +368,7 @@ import Swal from 'sweetalert2'
 import api from '../services/api'
 
 import { getImageUrl } from '../utils/url'
-
+import PdfViewerModal from '../components/PdfViewerModal.vue'
 
 const props = defineProps({
   faseSeleccionada: {
@@ -407,6 +423,34 @@ const criteriosLlenados = computed(() => {
 const modalResumen = ref(false)
 
 // Cronómetro
+// Monografía (fase MONOGRAFIA)
+const esFaseMonografia = computed(() => {
+  const f = props.faseSeleccionada
+  if (!f) return false
+  if (f.categoriaEfu === 'MONOGRAFIA') return true
+  return (f.nombre || '').toLowerCase().includes('monograf')
+})
+const monografiaFraternidad = ref(null)
+const visorMonografiaAbierto = ref(false)
+const cargandoMonografia = ref(false)
+
+const abrirMonografia = async () => {
+  if (!props.fraternidad?.idFraternidad) return
+  cargandoMonografia.value = true
+  try {
+    const res = await api.get(`/monografias/fraternidad/${props.fraternidad.idFraternidad}`)
+    monografiaFraternidad.value = res.data
+    visorMonografiaAbierto.value = true
+  } catch (error) {
+    notify.warning(
+      'Sin monografía',
+      error.response?.data?.message || 'Esta fraternidad aún no ha subido su monografía.',
+    )
+  } finally {
+    cargandoMonografia.value = false
+  }
+}
+
 const tiempoRestante = ref(0)
 let timerInterval = null
 

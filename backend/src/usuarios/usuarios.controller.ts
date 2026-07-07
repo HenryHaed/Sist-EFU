@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, ParseIntPip
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
+import { RegisterDelegadoDto } from './dto/register-delegado.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -18,7 +19,7 @@ export class UsuariosController {
   @Public()
   @Post('registrar-delegado')
   @ApiOperation({ summary: 'Auto-registro para delegados de fraternidad' })
-  registerDelegado(@Body() body: any) {
+  registerDelegado(@Body() body: RegisterDelegadoDto) {
     return this.usuariosService.registerDelegado(body);
   }
 

@@ -1,9 +1,9 @@
 <template>
-  <div class="min-h-screen bg-slate-50 font-display flex flex-col">
+  <div class="min-h-full bg-slate-50 font-display flex flex-col">
 
     <!-- ===== HEADER ===== -->
     <header class="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
-      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
         <div class="flex items-center gap-4">
           <div class="size-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
             <span class="material-symbols-outlined text-white text-xl">menu_book</span>

@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, MinLength, MaxLength, IsEmail } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateUsuarioDto {
@@ -26,10 +26,16 @@ export class CreateUsuarioDto {
   @MaxLength(100)
   segundoApellido?: string;
 
+  @ApiProperty({ example: 'juan.perez@mail.com' })
+  @IsEmail()
+  @IsNotEmpty()
+  @MaxLength(255)
+  correo: string;
+
   @ApiProperty({ example: 'password123' })
   @IsString()
   @IsNotEmpty()
-  @MinLength(6)
+  @MinLength(1)
   password: string;
 
   @ApiProperty({ example: 4, description: 'ID del Rol (e.g. 4 = delegado, 5 = jurado)' })
@@ -74,9 +80,15 @@ export class UpdateUsuarioDto {
   segundoApellido?: string;
 
   @ApiProperty({ required: false })
+  @IsEmail()
+  @IsOptional()
+  @MaxLength(255)
+  correo?: string;
+
+  @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
-  @MinLength(6)
+  @MinLength(8)
   password?: string;
 
   @ApiProperty({ required: false })

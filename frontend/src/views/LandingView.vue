@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-screen w-full relative bg-[#fdfdfd] font-display overflow-hidden">
+  <div class="flex h-[100dvh] w-full relative bg-[#fdfdfd] font-display overflow-hidden">
 
     <!-- Sidebar (Desktop) -->
     <aside class="hidden md:flex w-64 flex-shrink-0 bg-white border-r border-slate-200 flex-col justify-between py-8 px-6 sticky top-0 h-screen z-50 shadow-sm">
@@ -56,55 +56,71 @@
     </aside>
 
     <!-- Bottom Nav (Mobile) -->
-    <nav class="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] bg-white/90 backdrop-blur-lg border border-slate-200 h-16 rounded-2xl z-[100] shadow-2xl flex items-center justify-around px-2">
-      <button @click="scrollTo('inicio')" class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
-        <span class="material-symbols-outlined text-xl">home</span>
-        <span class="text-[8px] font-black uppercase">Inicio</span>
+    <nav class="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-white/95 backdrop-blur-lg border border-slate-200 h-[4.25rem] rounded-2xl z-[100] shadow-2xl flex items-center justify-around px-1">
+      <button @click="scrollTo('inicio')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[22px]">home</span>
+        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Inicio</span>
       </button>
-      <button @click="scrollTo('fraternidades')" class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
-        <span class="material-symbols-outlined text-xl">groups</span>
-        <span class="text-[8px] font-black uppercase">Danzas</span>
+      <button @click="scrollTo('fraternidades')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[22px]">groups</span>
+        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Danzas</span>
       </button>
-      
-      <!-- Central Login Circle -->
-      <router-link to="/login" class="bg-secondary size-14 rounded-full flex items-center justify-center text-white -mt-10 border-4 border-[#fdfdfd] shadow-lg shadow-red-200 active:scale-90 transition-transform">
-        <span class="material-symbols-outlined text-2xl">login</span>
-      </router-link>
-
-      <button @click="scrollTo('ruta')" class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
-        <span class="material-symbols-outlined text-xl">map</span>
-        <span class="text-[8px] font-black uppercase">Ruta</span>
+      <button @click="scrollTo('ruta')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[22px]">map</span>
+        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Ruta</span>
       </button>
-      <button @click="scrollTo('estadisticas')" class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
-        <span class="material-symbols-outlined text-xl">leaderboard</span>
-        <span class="text-[8px] font-black uppercase">Ranking</span>
+      <button @click="scrollTo('estadisticas')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[22px]">leaderboard</span>
+        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Ranking</span>
       </button>
-      <button @click="scrollTo('historicos')" class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
-        <span class="material-symbols-outlined text-xl">history</span>
-        <span class="text-[8px] font-black uppercase">Histórico</span>
+      <button @click="scrollTo('historicos')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[22px]">history</span>
+        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Histórico</span>
       </button>
     </nav>
 
     <!-- Main Content -->
-    <main ref="mainRef" class="flex-1 relative h-screen overflow-y-auto overflow-x-hidden bg-[#fdfdfd] scroll-smooth paper-texture pb-24 md:pb-0">
+    <main ref="mainRef" class="flex-1 relative h-full overflow-y-auto overflow-x-hidden bg-[#fdfdfd] scroll-smooth paper-texture pb-28 md:pb-0">
 
       <!-- ===== HERO SECTION ===== -->
-      <section class="relative min-h-screen flex flex-col" id="inicio">
+      <section class="relative flex flex-col md:min-h-screen" id="inicio">
         <!-- Background -->
         <div class="absolute inset-0 z-0 overflow-hidden">
           <div class="andean-dots absolute inset-0"></div>
-          <!-- Hero Image -->
+          <!-- Hero Image: solo desktop -->
           <div
-            class="absolute top-0 right-0 w-full md:w-2/3 h-full bg-cover bg-center opacity-90 transition-all duration-1000 scale-105"
-            :style="{ backgroundImage: `url('${siteInfo.urlBanner || '/src/assets/img/img_backgroud.png'}')`, clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)' }"
-            :class="{'md:[clip-path:polygon(25%_0%,_100%_0%,_100%_100%,_0%_100%)]': true}"
+            class="hidden md:block absolute top-0 right-0 w-2/3 h-full bg-cover bg-center opacity-90 transition-all duration-1000 scale-105"
+            :style="{ backgroundImage: `url('${siteInfo.urlBanner || '/src/assets/img/img_backgroud.png'}')`, clipPath: 'polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)' }"
           ></div>
-          <div class="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-[#fdfdfd] via-[#fdfdfd]/80 to-transparent"></div>
+          <!-- Móvil: acento decorativo sin imagen recortada -->
+          <div class="md:hidden absolute top-0 right-0 w-full h-56 bg-gradient-to-bl from-primary/8 via-secondary/5 to-transparent pointer-events-none"></div>
+          <div class="absolute inset-0 bg-gradient-to-b from-[#fdfdfd] via-[#fdfdfd]/95 to-[#fdfdfd]/80 md:bg-gradient-to-r md:from-[#fdfdfd] md:via-[#fdfdfd]/80 md:to-transparent"></div>
         </div>
 
         <!-- Content -->
-        <div class="relative z-10 flex flex-col h-full min-h-screen">
-          <!-- Top header with login button (Hidden on mobile as it's in bottom bar) -->
+        <div class="relative z-10 flex flex-col md:min-h-screen">
+          <!-- Header móvil -->
+          <header class="md:hidden flex items-center justify-between px-4 pt-4 pb-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <img
+                :src="siteInfo.urlLogo || '/src/assets/img/Logo_Umsa.png'"
+                alt="Logo UMSA"
+                class="h-10 w-auto object-contain shrink-0"
+              />
+              <p class="font-black italic text-primary text-sm leading-tight truncate">
+                {{ siteInfo.nombreSitio || 'UMSA' }}
+              </p>
+            </div>
+            <router-link
+              to="/login"
+              class="shrink-0 flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-full font-black tracking-wider uppercase text-[10px] shadow-lg shadow-primary/20"
+            >
+              <span class="material-symbols-outlined text-base">login</span>
+              Ingresar
+            </router-link>
+          </header>
+
+          <!-- Top header desktop -->
           <header class="hidden md:flex justify-end p-8 w-full gap-4">
             <router-link
               to="/login"
@@ -116,27 +132,26 @@
           </header>
 
           <!-- Hero Text -->
-          <div class="flex-1 flex items-center px-6 md:px-12 lg:px-24 pb-32">
-            <div class="max-w-4xl relative">
-              <div class="flex flex-col gap-6 relative z-10">
-                <span class="text-primary font-black tracking-[0.25em] uppercase text-xs md:text-base flex items-center gap-4">
-                  <span class="w-12 md:w-16 h-[3px] bg-secondary shadow-sm"></span>
+          <div class="flex-1 flex items-center px-5 sm:px-6 md:px-12 lg:px-24 pt-4 pb-8 md:pb-32">
+            <div class="max-w-4xl relative w-full">
+              <div class="flex flex-col gap-4 sm:gap-6 relative z-10">
+                <span class="text-primary font-black tracking-[0.2em] sm:tracking-[0.25em] uppercase text-[10px] sm:text-xs md:text-base flex items-center gap-3 sm:gap-4">
+                  <span class="w-8 sm:w-12 md:w-16 h-[2px] sm:h-[3px] bg-secondary shadow-sm"></span>
                   Patrimonio Cultural de Bolivia
                 </span>
-                <h1 class="text-4xl md:text-8xl lg:text-9xl font-black italic leading-[0.85] tracking-tighter text-slate-900 reveal reveal-left">
-                  {{ siteInfo.tituloPrincipal?.split(' ')[0] || 'ENTRADA' }}<br />
-                  <span class="text-primary">{{ siteInfo.tituloPrincipal?.split(' ').slice(1).join(' ') || 'UNIVERSITARIA' }}</span><br />
-                  <span>{{ siteInfo.nombreSitio || 'UMSA' }}</span>
+                <h1 class="text-[2.1rem] leading-[0.9] sm:text-5xl md:text-8xl lg:text-9xl font-black italic tracking-tighter reveal reveal-left">
+                  <span class="text-slate-900">ENTRADA FOLKLORICA</span><br />
+                  <span class="text-primary">UNIVERSITARIA</span><br />
+                  <span class="text-primary">UMS</span><span class="text-secondary">A</span>
                 </h1>
-                <p class="text-lg md:text-2xl text-slate-600 max-w-xl font-medium leading-relaxed mt-6 border-l-4 border-secondary pl-4 md:pl-6 reveal reveal-left">
+                <p class="text-sm sm:text-lg md:text-2xl text-slate-600 max-w-xl font-medium leading-relaxed mt-2 sm:mt-6 border-l-4 border-secondary pl-3 sm:pl-4 md:pl-6 reveal reveal-left">
                   {{ siteInfo.subtituloPrincipal || 'Vive la majestuosidad de nuestras danzas tradicionales en la mayor expresión folklórica universitaria.' }}
                 </p>
-                <div class="flex flex-wrap items-center gap-4 md:gap-6 mt-8 md:mt-10">
-                  <!-- Registration Primary Button -->
+                <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4 md:gap-6 mt-4 sm:mt-8 md:mt-10">
                   <router-link 
                     v-if="siteInfo.permiteInscripcionPublica"
                     to="/registro-delegado" 
-                    class="bg-white text-primary font-black py-4 px-10 rounded-2xl shadow-2xl hover:scale-105 transition-all text-sm uppercase tracking-widest inline-flex items-center gap-3 border-2 border-white/20"
+                    class="w-full sm:w-auto bg-white text-primary font-black py-3.5 sm:py-4 px-8 sm:px-10 rounded-2xl shadow-xl hover:scale-[1.02] transition-all text-xs sm:text-sm uppercase tracking-widest inline-flex items-center justify-center gap-3 border border-slate-100"
                   >
                     <span class="material-symbols-outlined text-xl">app_registration</span>
                     Inscribir Fraternidad
@@ -144,7 +159,7 @@
 
                   <router-link
                     to="/login"
-                    class="w-full md:w-auto bg-primary text-white hover:bg-blue-900 px-8 py-4 rounded-full font-black tracking-wider uppercase text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 reveal reveal-right"
+                    class="w-full sm:w-auto bg-primary text-white hover:bg-blue-900 px-8 py-3.5 sm:py-4 rounded-full font-black tracking-wider uppercase text-xs sm:text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 reveal reveal-right"
                   >
                     <span class="material-symbols-outlined text-base">login</span>
                     Iniciar Sesión
@@ -155,8 +170,8 @@
           </div>
 
           <!-- Stats Bar -->
-          <div class="absolute bottom-0 left-0 w-full border-t border-slate-100 bg-white/80 backdrop-blur-md z-20 overflow-hidden">
-            <div class="marquee-container py-6 md:py-8">
+          <div class="relative md:absolute md:bottom-0 left-0 w-full border-t border-slate-100 bg-white/90 md:bg-white/80 backdrop-blur-md z-20 overflow-hidden mt-2 md:mt-0">
+            <div class="marquee-container py-4 sm:py-6 md:py-8">
               <div class="marquee-content flex items-center gap-10 md:gap-16">
                 <!-- Group 1 -->
                 <div class="flex items-center gap-10 md:gap-16 shrink-0">
@@ -201,7 +216,7 @@
       </section>
 
       <!-- ===== FRATERNIDADES ===== -->
-      <section class="py-16 md:py-24 px-6 md:px-12 lg:px-24 bg-white" id="fraternidades">
+      <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-white" id="fraternidades">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-16 gap-6 reveal reveal-left">
           <div>
             <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic uppercase tracking-tighter">FRATERNIDADES <span class="text-secondary">ESTRELLA</span></h2>
@@ -216,7 +231,7 @@
         </div>
         <div class="grid grid-cols-12 gap-6 md:gap-8">
           <!-- Featured card -->
-          <div class="col-span-12 md:col-span-7 relative h-[400px] md:h-auto group overflow-hidden rounded-3xl bg-slate-100 shadow-xl shadow-slate-200/50">
+          <div class="col-span-12 md:col-span-7 relative h-[280px] sm:h-[340px] md:h-auto min-h-[280px] group overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-xl shadow-slate-200/50">
             <img alt="Caporales" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
               src="/src/assets/img/caporal.jpg" />
             <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent p-6 md:p-10 flex flex-col justify-end text-left">
@@ -226,14 +241,14 @@
           </div>
           <!-- Side cards -->
           <div class="col-span-12 md:col-span-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-6 md:gap-8">
-            <div class="relative h-[250px] md:h-auto group overflow-hidden rounded-3xl bg-slate-100 shadow-lg shadow-slate-200/50">
+            <div class="relative h-[220px] sm:h-[250px] md:h-auto min-h-[220px] group overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-lg shadow-slate-200/50">
               <img alt="Morenada" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
                 src="/src/assets/img/morenada.jpg" />
               <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent p-6 md:p-8 flex flex-col justify-end text-left">
                 <h3 class="text-xl md:text-2xl font-black text-white italic uppercase leading-tight">MORENADA <br class="sm:hidden lg:inline"/> <span class="text-secondary inline md:block lg:inline">DERECHO</span></h3>
               </div>
             </div>
-            <div class="relative h-[250px] md:h-auto group overflow-hidden rounded-3xl bg-slate-100 shadow-lg shadow-slate-200/50">
+            <div class="relative h-[220px] sm:h-[250px] md:h-auto min-h-[220px] group overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-lg shadow-slate-200/50">
               <img alt="Tinkus" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
                 src="/src/assets/img/tinkus.jpg" />
               <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent p-6 md:p-8 flex flex-col justify-end text-left">
@@ -245,7 +260,7 @@
       </section>
 
       <!-- ===== RUTA / RECORRIDO ===== -->
-      <section class="py-20 md:py-32 px-6 md:px-12 lg:px-24 bg-slate-50 relative overflow-hidden" id="ruta">
+      <section class="py-14 sm:py-20 md:py-32 px-5 sm:px-6 md:px-12 lg:px-24 bg-slate-50 relative overflow-hidden" id="ruta">
         <div class="absolute top-0 right-0 w-1/2 h-full opacity-5 pointer-events-none">
           <span class="material-symbols-outlined text-[400px] -mr-32 -mt-20">map</span>
         </div>
@@ -272,7 +287,7 @@
 
             <!-- Map Placeholder / Interactive Area -->
             <div class="relative group reveal reveal-right" @click="mostrarMapa = true">
-              <div class="relative h-[350px] md:h-[600px] rounded-[2rem] md:rounded-[3rem] overflow-hidden border border-slate-200 shadow-2xl group cursor-pointer transition-all duration-500">
+              <div class="relative h-[260px] sm:h-[350px] md:h-[600px] rounded-2xl sm:rounded-[2rem] md:rounded-[3rem] overflow-hidden border border-slate-200 shadow-2xl group cursor-pointer transition-all duration-500">
                 <img alt="Mapa Ruta" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-1000"
                   src="/src/assets/img/Maps.png" />
                 <div class="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent"></div>
@@ -322,7 +337,7 @@
       </section>
 
       <!-- ===== ESTADÍSTICAS ===== -->
-      <section class="py-16 md:py-24 px-6 md:px-12 lg:px-24 bg-white" id="estadisticas">
+      <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-white" id="estadisticas">
         <div class="text-center mb-12 md:mb-16 reveal">
           <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">RANKING <span class="text-secondary">FRATERNIDADES</span></h2>
           <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">Puntuación en tiempo real</p>
@@ -404,33 +419,39 @@
       </section>
 
       <!-- ===== REPORTES HISTÓRICOS ===== -->
-      <section class="py-16 md:py-24 px-6 md:px-12 lg:px-24 bg-slate-50 border-t border-slate-100" id="historicos">
+      <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-slate-50 border-t border-slate-100" id="historicos">
         <div class="text-center mb-12 md:mb-16 reveal">
           <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">ARCHIVO <span class="text-primary">HISTÓRICO</span></h2>
           <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">Resultados oficiales por gestión</p>
         </div>
 
-        <div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-8 reveal">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-6 sm:gap-8 reveal">
           <!-- Sidebar: Selector de Gestión -->
-          <div class="w-full md:w-1/4 flex flex-col gap-4">
-            <h3 class="font-black text-slate-900 uppercase tracking-widest text-xs mb-2">Selecciona un año</h3>
-            <div class="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+          <div class="w-full md:w-1/4 flex flex-col gap-3">
+            <h3 class="font-black text-slate-900 uppercase tracking-widest text-xs">Selecciona un año</h3>
+            <div class="flex flex-col border border-slate-200 rounded-2xl overflow-hidden bg-white divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
               <button 
                 v-for="g in gestionesPublicas" :key="g.idGestion"
                 @click="cargarReporte(g.idGestion)"
-                class="text-left px-5 py-4 rounded-xl font-bold transition-all border"
-                :class="gestionSeleccionada === g.idGestion ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-white text-slate-600 border-slate-200 hover:border-primary hover:text-primary'"
+                class="w-full text-left px-5 py-4 font-bold transition-all flex items-center justify-between gap-3"
+                :class="gestionSeleccionada === g.idGestion
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
               >
-                <div class="flex items-center justify-between">
-                  <span>Gestión {{ g.anio }}</span>
-                  <span v-if="g.activa" class="text-[8px] bg-red-100 text-secondary px-2 py-1 rounded-full uppercase tracking-wider">Activa</span>
-                </div>
+                <span class="text-sm uppercase tracking-wide">Gestión {{ g.anio }}</span>
+                <span
+                  v-if="g.activa"
+                  class="text-[8px] px-2 py-1 rounded-full uppercase tracking-wider shrink-0"
+                  :class="gestionSeleccionada === g.idGestion ? 'bg-white/15 text-white' : 'bg-red-50 text-secondary'"
+                >
+                  Activa
+                </span>
               </button>
             </div>
           </div>
 
           <!-- Contenido: Resultados -->
-          <div class="w-full md:w-3/4 bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 p-6 md:p-10 relative min-h-[400px]">
+          <div class="w-full md:w-3/4 bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 p-5 sm:p-6 md:p-10 relative min-h-[320px] sm:min-h-[400px]">
             <div v-if="loadingReporte" class="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm z-10 rounded-3xl">
               <span class="material-symbols-outlined text-4xl text-primary animate-spin mb-4">progress_activity</span>
               <p class="text-sm font-bold text-slate-500 animate-pulse">Cargando resultados...</p>
@@ -498,7 +519,7 @@
       </section>
 
       <!-- ===== FOOTER ===== -->
-      <footer class="bg-slate-50 border-t border-slate-200 py-16 md:py-24 px-6 md:px-12 lg:px-24">
+      <footer class="bg-slate-50 border-t border-slate-200 py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-20 mb-12 md:mb-16">
           <div class="col-span-1 md:col-span-2 text-left">
             <div class="flex items-center gap-4 mb-6 md:mb-8 justify-start">
@@ -507,21 +528,34 @@
                 alt="Logo UMSA" 
                 class="h-16 w-auto object-contain"
               />
-              <h3 class="text-xl md:text-3xl font-black italic text-slate-900 tracking-tighter uppercase">ENTRADA <span class="text-primary">UMS<span class="text-secondary">A</span></span></h3>
+              <h3 class="text-xl md:text-3xl font-black italic tracking-tighter uppercase">
+                <span class="text-slate-900">ENTRADA FOLKLORICA</span>
+                <span class="text-primary"> UNIVERSITARIA </span>
+                <span class="text-primary">UMS</span><span class="text-secondary">A</span>
+              </h3>
             </div>
             <p class="text-slate-500 max-w-sm mb-6 md:mb-8 leading-relaxed font-medium text-xs md:text-base">Organizado por la Comisión de Cultura de la Universidad Mayor de San Andrés.</p>
-            <div class="flex gap-4 justify-start">
-              <a href="https://www.facebook.com/umsafp" target="_blank" title="Facebook UMSA"
-                class="size-10 md:size-11 rounded-full bg-white flex items-center justify-center text-slate-400 hover:text-primary transition-all border border-slate-200 shadow-sm">
-                <span class="material-symbols-outlined text-lg">facebook</span>
+            <div class="flex gap-3 justify-start">
+              <!-- Facebook relleno -->
+              <a href="https://www.facebook.com/share/1EVU9hh1jj/" target="_blank" rel="noopener noreferrer" title="Facebook UMSA"
+                class="social-icon social-icon--filled group">
+                <svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true">
+                  <path fill="currentColor" d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073c0 6.02 4.388 11.013 10.125 11.91v-8.385H7.078v-3.525h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.525h-2.796v8.385C19.612 23.086 24 18.093 24 12.073z"/>
+                </svg>
               </a>
-              <a href="https://www.facebook.com/FCPN.UMSA" target="_blank" title="Facebook FCPN"
-                class="size-10 md:size-11 rounded-full bg-white flex items-center justify-center text-slate-400 hover:text-primary transition-all border border-slate-200 shadow-sm">
-                <span class="material-symbols-outlined text-lg">groups</span>
+              <!-- Facebook fondo blanco -->
+              <a href="https://www.facebook.com/share/1D2BCRgsCN/" target="_blank" rel="noopener noreferrer" title="Facebook FCPN"
+                class="social-icon social-icon--outline group">
+                <svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true">
+                  <path fill="currentColor" d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073c0 6.02 4.388 11.013 10.125 11.91v-8.385H7.078v-3.525h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.525h-2.796v8.385C19.612 23.086 24 18.093 24 12.073z"/>
+                </svg>
               </a>
-              <a href="https://www.youtube.com/@UMSA_Oficial" target="_blank" title="YouTube UMSA"
-                class="size-10 md:size-11 rounded-full bg-white flex items-center justify-center text-slate-400 hover:text-primary transition-all border border-slate-200 shadow-sm">
-                <span class="material-symbols-outlined text-lg">play_circle</span>
+              <!-- YouTube -->
+              <a href="https://www.youtube.com/@UMSAinformacion" target="_blank" rel="noopener noreferrer" title="YouTube UMSA"
+                class="social-icon social-icon--youtube group">
+                <svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true">
+                  <path fill="currentColor" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                </svg>
               </a>
             </div>
           </div>
@@ -547,7 +581,7 @@
         <div class="pt-10 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-6 text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center md:text-left group cursor-help overflow-visible">
           <p class="relative">© 2026 UMSA. Patrimonio Cultural de Bolivia. 
             <span class="developer-credit md:absolute md:left-full md:ml-4 text-primary opacity-0 select-none whitespace-nowrap transition-opacity duration-1000">
-              Desarrollado por D. Henry Aguilar Estrada
+              Desarrollado por Dai Henry Aguilar Estrada
             </span>
           </p>
           <div class="flex gap-6 md:gap-8">
@@ -760,5 +794,39 @@ const mostrarRanking = ref(false)
 .group:active .developer-credit {
   opacity: 1 !important;
   transition-delay: 1s;
+}
+
+/* Redes sociales — minimalista B/N */
+.social-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+@media (min-width: 768px) {
+  .social-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+.social-icon:hover {
+  transform: scale(1.06);
+  opacity: 0.88;
+}
+.social-icon--filled {
+  background: #0f172a;
+  color: #ffffff;
+}
+.social-icon--outline {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1.5px solid #0f172a;
+}
+.social-icon--youtube {
+  background: #0f172a;
+  color: #ffffff;
 }
 </style>

@@ -52,4 +52,13 @@ export class ArchivosController {
     }
     return res.sendFile(filePath);
   }
+
+  @Get('doc-monografia/:filename')
+  serveDocMonografia(@Param('filename') filename: string, @Res() res: Response) {
+    const filePath = join(process.cwd(), 'uploads', 'Doc_Monografia', filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send('Documento no encontrado');
+    }
+    return res.sendFile(filePath);
+  }
 }

@@ -1,11 +1,11 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto w-full">
+  <div class="dashboard-page max-w-7xl w-full">
     <!-- Header -->
     <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
       <div>
         <div class="flex items-center gap-2 mb-1">
           <span class="h-1 w-8 bg-secondary inline-block"></span>
-          <h2 class="text-3xl font-black tracking-tight text-primary uppercase italic">Gestión de Fraternidades</h2>
+          <h2 class="dashboard-page-title tracking-tight text-primary uppercase italic">Gestión de Fraternidades</h2>
         </div>
         <p class="text-slate-500 text-sm mt-1 font-medium">
           Administración completa del listado oficial de fraternidades para la Entrada 2026.
@@ -14,7 +14,7 @@
 
       <button
         @click="abrirModalCrear"
-        class="bg-primary text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
+        class="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
       >
         <span class="material-symbols-outlined">add_circle</span>
         Nueva Fraternidad

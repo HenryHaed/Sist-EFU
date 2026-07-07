@@ -1,5 +1,5 @@
 ﻿<template>
-  <div class="animate-in fade-in duration-500">
+  <div class="dashboard-page max-w-7xl animate-in fade-in duration-500">
     <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <h2 class="text-2xl font-black italic uppercase tracking-tighter text-primary flex items-center gap-2">
@@ -14,7 +14,7 @@
       <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
         <select
           v-model="eventoSeleccionado"
-          class="px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-primary shadow-sm min-w-[220px]"
+          class="w-full sm:min-w-[220px] px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-primary shadow-sm"
         >
           <option :value="null" disabled>Seleccionar evento</option>
           <option v-for="ev in eventos" :key="ev.idEvento" :value="ev.idEvento">

@@ -30,11 +30,18 @@ onMounted(() => {
    ============================================ */
 
 html, body {
-  background-color: #ffffff !important;
+  background-color: #ffffff;
   font-family: 'Inter', sans-serif;
   color: #0f172a;
   margin: 0;
   padding: 0;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+html.dark,
+html.dark body {
+  background-color: #0f172a !important;
+  color: #f1f5f9;
 }
 
 .v-application {

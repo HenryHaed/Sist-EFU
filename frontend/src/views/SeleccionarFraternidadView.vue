@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto w-full">
+  <div class="dashboard-page max-w-7xl w-full">
     <!-- Page Title -->
     <div class="mb-8">
       <div class="flex items-center gap-2 mb-1">

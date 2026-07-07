@@ -5,6 +5,7 @@ import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { InstitucionExterna } from '../entities/InstitucionExterna';
 import { Gestion } from '../entities/Gestion';
+import { findGestionActivaOrLatest } from '../common/gestion.utils';
 
 @Injectable()
 export class OrganizacionService {
@@ -20,9 +21,7 @@ export class OrganizacionService {
   ) {}
 
   async getGestionActiva() {
-    let g = await this.gestionRepo.findOne({ where: { activa: true } });
-    if (!g) g = await this.gestionRepo.findOne({ order: { anio: 'DESC' } });
-    return g;
+    return findGestionActivaOrLatest(this.gestionRepo);
   }
 
   // --- FACULTADES ---

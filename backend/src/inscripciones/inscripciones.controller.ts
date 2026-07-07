@@ -22,6 +22,19 @@ const storage = diskStorage({
   },
 });
 
+const CI_MATRICULA_FILE_FIELDS = [
+  { name: 'ciMatriculaPresi', maxCount: 1 },
+  { name: 'ciMatriculaVice', maxCount: 1 },
+  { name: 'ciMatriculaSecGen', maxCount: 1 },
+  { name: 'ciMatriculaSecHaci', maxCount: 1 },
+  { name: 'ciMatriculaSecActas', maxCount: 1 },
+  { name: 'ciMatriculaSecPrensa', maxCount: 1 },
+  { name: 'ciMatriculaVocal', maxCount: 1 },
+  { name: 'ciMatriculaDelCogob', maxCount: 1 },
+  { name: 'ciMatriculaDelTitular', maxCount: 1 },
+  { name: 'ciMatriculaDelSuplente', maxCount: 1 },
+];
+
 @Controller('inscripciones')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class InscripcionesController {
@@ -32,17 +45,18 @@ export class InscripcionesController {
   @UseInterceptors(
     FileFieldsInterceptor(
       [
-        { name: 'ciMatriculaPreViceDel', maxCount: 1 },
-        { name: 'ciMatriculaSecVocDel', maxCount: 1 },
+        ...CI_MATRICULA_FILE_FIELDS,
         { name: 'cartaCompromiso', maxCount: 1 },
         { name: 'resolucion', maxCount: 1 },
         { name: 'actaDirectiva', maxCount: 1 },
+        { name: 'sinDeudasFraternidad', maxCount: 1 },
+        { name: 'sinDeudasAreas', maxCount: 1 },
       ],
       {
         storage,
         fileFilter: (req, file, cb) => {
-          if (!file.originalname.match(/\.(pdf|jpg|jpeg|png)$/)) {
-            return cb(new BadRequestException('Solo se permiten archivos PDF o imágenes (JPG, PNG).'), false);
+          if (!file.originalname.match(/\.pdf$/i)) {
+            return cb(new BadRequestException('Solo se permiten archivos PDF.'), false);
           }
           cb(null, true);
         },
@@ -54,6 +68,16 @@ export class InscripcionesController {
     // Parsear data si viene como string JSON (común en FormData)
     const data = typeof body.data === 'string' ? JSON.parse(body.data) : body;
     return this.inscripcionesService.createSolicitud(data, req.user, files);
+  }
+
+  @Get('verificar-ci-directiva')
+  @Roles('delegado', 'superusuario', 'admin')
+  async verificarCiDirectiva(
+    @Query('ci') ci: string,
+    @Query('excludeSolicitudId') excludeSolicitudId?: string,
+  ) {
+    const excludeId = excludeSolicitudId ? parseInt(excludeSolicitudId, 10) : undefined;
+    return this.inscripcionesService.verificarCiDirectiva(ci, Number.isNaN(excludeId) ? undefined : excludeId);
   }
 
   @Get('mis-solicitudes')

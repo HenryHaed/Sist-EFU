@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 md:p-8 max-w-7xl mx-auto min-h-[calc(100vh-4rem)]">
+  <div class="dashboard-page max-w-7xl min-h-full">
     <div class="mb-8">
       <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">
         {{ tipoConcurso === 'EFU' ? 'Calificar Fases EFU' : 'Concursos Externos' }}
