@@ -46,11 +46,15 @@ npm run build
 npm run seed:prod
 ```
 
-`npm run seed:prod` hace automáticamente:
+> Si `seed:prod` no existe, actualizar el código del repositorio y volver a `npm run build`.
+> Alternativa en desarrollo: `npm run seed` (requiere `ts-node`).
 
-1. **Crea todas las tablas** (`dataSource.synchronize()` desde las entidades)
+`npm run seed` / `seed:prod` hace automáticamente:
+
+1. **Crea todas las tablas** (sin arrancar Nest ni `onModuleInit`)
 2. Inserta roles, superusuario y catálogos UMSA
-3. No requiere `TYPEORM_SYNCHRONIZE=true` en el `.env` de la API
+
+**No usa** `TYPEORM_SYNCHRONIZE=true` en el `.env` de la API.
 
 **Superusuario inicial:** CI `12512405`, contraseña inicial = el mismo CI. Debe cambiarla en el primer login.
 

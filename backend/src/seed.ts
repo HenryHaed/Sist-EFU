@@ -1,5 +1,3 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
@@ -32,6 +30,58 @@ const SUPERUSUARIO = {
   correo: 'culturas@fcpn.edu.bo',
 };
 
+/**
+ * Carga .env con la misma convención que Nest (sin arrancar AppModule).
+ * Importante: no usar NestFactory aquí — onModuleInit consulta tablas antes de crearlas.
+ */
+function cargarVariablesEntorno() {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const candidatos = [
+    `.env.${nodeEnv}.local`,
+    `.env.${nodeEnv}`,
+    '.env.local',
+    '.env',
+  ];
+
+  for (const archivo of candidatos) {
+    const ruta = path.join(process.cwd(), archivo);
+    if (!fs.existsSync(ruta)) continue;
+
+    const lineas = fs.readFileSync(ruta, 'utf8').split(/\r?\n/);
+    for (const linea of lineas) {
+      const trimmed = linea.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx <= 0) continue;
+
+      const clave = trimmed.slice(0, idx).trim();
+      let valor = trimmed.slice(idx + 1).trim();
+      if (
+        (valor.startsWith('"') && valor.endsWith('"')) ||
+        (valor.startsWith("'") && valor.endsWith("'"))
+      ) {
+        valor = valor.slice(1, -1);
+      }
+      if (process.env[clave] === undefined) {
+        process.env[clave] = valor;
+      }
+    }
+  }
+}
+
+function crearDataSource(): DataSource {
+  return new DataSource({
+    type: 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT || 5432),
+    username: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'root',
+    database: process.env.DB_NAME || 'efu_db',
+    entities: [path.join(__dirname, 'entities', '*.{ts,js}')],
+    synchronize: false,
+  });
+}
+
 function limpiarArchivosSubidos() {
   const uploadsRoot = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsRoot)) {
@@ -56,7 +106,6 @@ function limpiarArchivosSubidos() {
     }
   }
 
-  // Archivos sueltos en uploads/ (si los hubiera)
   for (const entry of fs.readdirSync(uploadsRoot)) {
     const fullPath = path.join(uploadsRoot, entry);
     if (fs.statSync(fullPath).isFile()) {
@@ -67,17 +116,6 @@ function limpiarArchivosSubidos() {
 
   console.log(`[SEED] Archivos eliminados de uploads/: ${eliminados}`);
 }
-
-/**
- * Seed / reset inicial del sistema EFU.
- *
- * 1. Crea el esquema (tablas) con TypeORM si la BD está vacía — no depende de TYPEORM_SYNCHRONIZE del .env.
- * 2. Vacía datos y archivos subidos (reset).
- * 3. Inserta roles, superusuario y catálogos base.
- *
- * Uso primera vez en producción (BD vacía): npm run seed
- * ¡No ejecutar de nuevo si ya hay datos reales!
- */
 
 async function asegurarEsquemaBaseDeDatos(dataSource: DataSource) {
   console.log('[SEED] Creando/sincronizando estructura de tablas desde entidades TypeORM...');
@@ -226,8 +264,13 @@ async function sembrarProduccion(dataSource: DataSource) {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(AppModule);
-  const dataSource = app.get(DataSource);
+  cargarVariablesEntorno();
+
+  console.log('[SEED] Conectando a PostgreSQL...');
+  console.log(`[SEED]   host=${process.env.DB_HOST || 'localhost'} db=${process.env.DB_NAME || 'efu_db'}`);
+
+  const dataSource = crearDataSource();
+  await dataSource.initialize();
 
   try {
     await asegurarEsquemaBaseDeDatos(dataSource);
@@ -239,7 +282,7 @@ async function bootstrap() {
     console.error('[SEED] Error durante el seed:', error);
     process.exitCode = 1;
   } finally {
-    await app.close();
+    await dataSource.destroy();
   }
 }
 
