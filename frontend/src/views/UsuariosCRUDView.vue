@@ -219,15 +219,15 @@
     </div>
 
     <!-- Modal Save User -->
-    <v-dialog v-model="modalOpen" max-width="860" persistent>
-      <v-card class="rounded-xl overflow-hidden border border-slate-200">
-        <v-card-title class="bg-slate-50 border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-          <h3 class="font-black text-slate-900">{{ editando ? (esRolJurado ? 'Editar Jurado' : 'Editar Usuario') : (esRolJurado ? 'Nuevo Jurado' : 'Nuevo Usuario') }}</h3>
-          <button @click="cerrarModal" class="text-slate-400 hover:text-slate-600"><span class="material-symbols-outlined">close</span></button>
+    <v-dialog v-model="modalOpen" max-width="860" max-height="90dvh" scrollable persistent>
+      <v-card class="rounded-xl overflow-hidden border border-slate-200 flex flex-col max-h-[90dvh]">
+        <v-card-title class="bg-slate-50 border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between shrink-0">
+          <h3 class="font-black text-slate-900 text-base sm:text-lg pr-2">{{ editando ? (esRolJurado ? 'Editar Jurado' : 'Editar Usuario') : (esRolJurado ? 'Nuevo Jurado' : 'Nuevo Usuario') }}</h3>
+          <button type="button" @click="cerrarModal" class="text-slate-400 hover:text-slate-600 shrink-0"><span class="material-symbols-outlined">close</span></button>
         </v-card-title>
 
-        <form @submit.prevent="guardarUsuario">
-          <v-card-text class="px-6 py-6 border-b border-slate-100 bg-white max-h-[70vh] overflow-y-auto">
+        <form @submit.prevent="guardarUsuario" class="flex flex-col flex-1 min-h-0">
+          <v-card-text class="px-4 sm:px-6 py-5 sm:py-6 bg-white overflow-y-auto flex-1 min-h-0 custom-scrollbar">
             <div class="space-y-5">
               
               <!-- CI -->
@@ -256,7 +256,7 @@
               </div>
 
               <!-- Apellidos -->
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Primer Apellido</label>
                   <input v-model="form.primerApellido" required type="text"
@@ -440,18 +440,25 @@
             </p>
           </v-card-text>
 
-          <v-card-actions class="bg-slate-50 px-6 py-4">
-            <v-spacer></v-spacer>
-            <button type="button" @click="cerrarModal" class="px-5 py-2 font-bold text-slate-500 hover:text-slate-800 transition-colors text-sm">
-              Cancelar
-            </button>
-            <button type="submit" :disabled="saving"
-              class="px-5 py-2 bg-primary hover:bg-blue-900 text-white font-bold rounded-lg shadow-sm transition-all text-sm flex items-center gap-2"
-              :class="{'opacity-75 cursor-wait': saving}"
-            >
-              <span v-if="saving" class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
-              {{ saving ? 'Guardando...' : (editando ? (esRolJurado ? 'Actualizar Jurado' : 'Actualizar Usuario') : (esRolJurado ? 'Crear Jurado' : 'Crear Usuario')) }}
-            </button>
+          <v-card-actions class="bg-slate-50 border-t border-slate-100 px-4 sm:px-6 py-4 shrink-0">
+            <div class="flex flex-col-reverse sm:flex-row gap-3 w-full sm:justify-end">
+              <button
+                type="button"
+                @click="cerrarModal"
+                class="w-full sm:w-auto px-5 py-2.5 font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                :disabled="saving"
+                class="w-full sm:w-auto px-5 py-2.5 bg-primary hover:bg-blue-900 text-white font-bold rounded-lg shadow-sm transition-all text-sm flex items-center justify-center gap-2"
+                :class="{'opacity-75 cursor-wait': saving}"
+              >
+                <span v-if="saving" class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                {{ saving ? 'Guardando...' : (editando ? (esRolJurado ? 'Actualizar Jurado' : 'Actualizar Usuario') : (esRolJurado ? 'Crear Jurado' : 'Crear Usuario')) }}
+              </button>
+            </div>
           </v-card-actions>
         </form>
       </v-card>
@@ -793,17 +800,25 @@ const confirmarEliminacion = async (usuario) => {
 .animate-spin { animation: spin 1s linear infinite; }
 
 /* Custom Scrollbar for the modal content */
-::-webkit-scrollbar {
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
-::-webkit-scrollbar-thumb {
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 10px;
 }
-::-webkit-scrollbar-thumb:hover {
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 </style>

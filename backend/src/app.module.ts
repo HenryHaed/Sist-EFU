@@ -19,12 +19,21 @@ import { join } from 'path';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      // Convención Node/Nest: .env por entorno; el admin del servidor solo edita .env (o .env.production)
+      envFilePath: [
+        `.env.${process.env.NODE_ENV || 'development'}.local`,
+        `.env.${process.env.NODE_ENV || 'development'}`,
+        '.env.local',
+        '.env',
+      ],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => {
+        const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+        const synchronizeDefault = nodeEnv === 'production' ? 'false' : 'true';
+        return {
         type: 'postgres',
         host: configService.get<string>('DB_HOST', 'localhost'),
         port: configService.get<number>('DB_PORT', 5432),
@@ -32,8 +41,8 @@ import { join } from 'path';
         password: configService.get<string>('DB_PASSWORD', 'root'),
         database: configService.get<string>('DB_NAME', 'efu_db'),
         entities: [__dirname + '/entities/*{.ts,.js}'],
-        synchronize: true,
-      }),
+        synchronize: configService.get<string>('TYPEORM_SYNCHRONIZE', synchronizeDefault) === 'true',
+      }},
     }),
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),

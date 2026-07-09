@@ -1,4 +1,4 @@
-import api from '../services/api';
+import { API_BASE_URL } from '../config/env';
 
 /**
  * Convierte una URL relativa almacenada en la base de datos (ej: /api/v1/archivos/...)
@@ -7,17 +7,19 @@ import api from '../services/api';
 export const getImageUrl = (url: string): string => {
   if (!url) return '';
   if (url.startsWith('http')) return url;
-  
-  // El host del backend es http://localhost:3000
-  const host = 'http://localhost:3000';
-  
-  // Si la URL empieza con /api o /uploads, concatenamos el host
+
+  const host = API_BASE_URL.replace(/\/$/, '');
+
   if (url.startsWith('/api') || url.startsWith('/uploads')) {
     return `${host}${url}`;
   }
-  
-  // Caso de respaldo para URLs que solo contienen el nombre del archivo (antiguo comportamiento)
-  // Intentamos adivinar basándonos en el contexto si es posible, 
-  // pero lo ideal es que todas las URLs nuevas guarden la ruta completa.
+
   return url;
+};
+
+/** URL absoluta a un endpoint de la API (ej. descarga de PDF). */
+export const getApiUrl = (path: string): string => {
+  const base = API_BASE_URL.replace(/\/$/, '');
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${normalized}`;
 };

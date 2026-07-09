@@ -27,14 +27,14 @@
     </div>
 
     <!-- Resumen Presupuesto de Criterios (Premium Style) -->
-    <div class="mb-8 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-wrap items-center gap-10">
+    <div class="mb-8 bg-white border border-slate-200 rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4 sm:gap-10">
       <div class="flex-1 min-w-0 w-full sm:min-w-[280px]">
-        <div class="flex justify-between items-end mb-2">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 mb-2">
           <div>
             <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Puntaje Acumulado (Vs. Techo Fase)</p>
-            <p class="text-4xl font-black text-primary">{{ puntajeUsado }}% <span class="text-sm text-slate-400 font-bold tracking-normal italic">/ {{ limiteFase }}%</span></p>
+            <p class="text-3xl sm:text-4xl font-black text-primary">{{ puntajeUsado }}% <span class="text-sm text-slate-400 font-bold tracking-normal italic">/ {{ limiteFase }}%</span></p>
           </div>
-          <div class="text-right">
+          <div class="text-left sm:text-right">
              <p class="text-[10px] font-black uppercase tracking-widest mb-1" :class="disponiblePuntaje <= 0 ? 'text-emerald-500' : 'text-slate-400'">
                {{ disponiblePuntaje <= 0 ? 'Cerrado' : 'Disponible en Fase' }}
              </p>
@@ -49,12 +49,12 @@
            ></div>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-3 shrink-0">
-        <div class="size-20 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center">
+      <div class="grid grid-cols-2 gap-3 shrink-0 w-full sm:w-auto">
+        <div class="h-20 sm:size-20 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center">
           <p class="text-2xl font-black text-primary leading-none">{{ criterios.length }}</p>
           <p class="text-[9px] font-black uppercase tracking-tighter text-slate-400 mt-1">Criterios</p>
         </div>
-        <div class="size-20 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center">
+        <div class="h-20 sm:size-20 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col items-center justify-center">
           <p class="text-2xl font-black text-secondary leading-none">{{ (100 - disponiblePuntaje).toFixed(0) }}</p>
           <p class="text-[9px] font-black uppercase tracking-tighter text-slate-400 mt-1">Total Puntos</p>
         </div>
@@ -158,11 +158,13 @@
 
           <!-- Acciones -->
           <div v-if="esActiva" class="flex items-center gap-2 pt-2 border-t border-slate-200 mt-1">
-            <button @click="abrirModal(c)" class="flex-1 py-2 bg-white text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 flex justify-center shadow-sm">
+            <button @click="abrirModal(c)" class="flex-1 py-2.5 bg-white text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center gap-2 shadow-sm font-bold text-[10px] uppercase tracking-widest">
               <span class="material-symbols-outlined text-[18px]">edit_note</span>
+              Editar
             </button>
-            <button @click="eliminar(c)" class="flex-1 py-2 bg-white text-slate-400 hover:text-secondary hover:bg-red-50 rounded-xl border border-slate-200 flex justify-center shadow-sm">
+            <button @click="eliminar(c)" class="flex-1 py-2.5 bg-white text-slate-400 hover:text-secondary hover:bg-red-50 rounded-xl border border-slate-200 flex items-center justify-center gap-2 shadow-sm font-bold text-[10px] uppercase tracking-widest">
               <span class="material-symbols-outlined text-[18px]">delete</span>
+              Eliminar
             </button>
           </div>
         </div>
@@ -175,17 +177,17 @@
     </div>
 
     <!-- MODAL CRITERIO (Premium Design) -->
-    <v-dialog v-model="modalOpen" max-width="480px">
-      <v-card class="rounded-3xl border border-slate-100 shadow-2xl overflow-hidden">
-        <v-card-title class="bg-primary text-white p-8">
+    <v-dialog v-model="modalOpen" max-width="480px" max-height="90dvh" scrollable>
+      <v-card class="rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[90dvh]">
+        <v-card-title class="bg-primary text-white p-5 sm:p-8 shrink-0">
           <div class="flex items-center gap-3">
              <span class="material-symbols-outlined text-2xl opacity-50">data_thresholding</span>
-             <h3 class="text-2xl font-black italic uppercase tracking-tighter">{{ editandoId ? 'Editar Criterio' : 'Nuevo Criterio' }}</h3>
+             <h3 class="text-xl sm:text-2xl font-black italic uppercase tracking-tighter">{{ editandoId ? 'Editar Criterio' : 'Nuevo Criterio' }}</h3>
           </div>
           <p class="text-blue-200 text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">Configurando parámetros de calificación</p>
         </v-card-title>
 
-        <v-card-text class="p-8 bg-white overflow-y-auto max-h-[60vh] custom-scrollbar">
+        <v-card-text class="p-5 sm:p-8 bg-white overflow-y-auto flex-1 min-h-0 custom-scrollbar">
           <div class="space-y-6">
             <div>
               <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fase de Aplicación</label>
@@ -263,16 +265,24 @@
           </div>
         </v-card-text>
 
-        <v-card-actions class="p-8 border-t border-slate-50 bg-slate-50/50">
-          <v-spacer></v-spacer>
-          <button @click="modalOpen = false" class="px-8 py-3 text-slate-400 font-black uppercase tracking-widest text-[10px] hover:text-slate-600 transition-colors">Cancelar</button>
-          <button 
-            @click="guardar" 
-            :disabled="puntajeUsadoConActual > 100"
-            class="bg-primary hover:bg-blue-900 text-white px-10 py-3 rounded-2xl font-black uppercase tracking-tighter shadow-xl shadow-primary/30 transition-all disabled:bg-slate-300 disabled:shadow-none disabled:cursor-not-allowed"
-          >
-            {{ editandoId ? 'Actualizar Criterio' : 'Guardar Criterio' }}
-          </button>
+        <v-card-actions class="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 shrink-0">
+          <div class="flex flex-col-reverse sm:flex-row gap-3 w-full">
+            <button
+              type="button"
+              @click="modalOpen = false"
+              class="w-full sm:flex-1 py-3 px-6 rounded-xl border-2 border-slate-200 bg-white text-slate-600 font-black uppercase tracking-widest text-[10px] hover:bg-slate-100 hover:border-slate-300 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              @click="guardar"
+              :disabled="puntajeUsadoConActual > 100"
+              class="w-full sm:flex-[2] py-3 px-6 rounded-xl bg-primary hover:bg-blue-900 text-white font-black uppercase tracking-tighter shadow-lg shadow-primary/20 transition-all disabled:bg-slate-300 disabled:shadow-none disabled:cursor-not-allowed"
+            >
+              {{ editandoId ? 'Actualizar Criterio' : 'Guardar Criterio' }}
+            </button>
+          </div>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -284,14 +294,16 @@ import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
 import { notify } from '../utils/notify'
 import Swal from 'sweetalert2'
+import { getImageUrl as resolveAssetUrl, getApiUrl } from '../utils/url'
 
 const getImageUrl = (url) => {
   if (!url) return ''
-  if (url.startsWith('http')) return url
+  if (url.startsWith('http') || url.startsWith('/api') || url.startsWith('/uploads')) {
+    return resolveAssetUrl(url)
+  }
   const filename = url.split('/').pop()
-  return `${api.defaults.baseURL}/archivos/criterios/${filename}`
+  return getApiUrl(`/api/v1/archivos/criterios/${filename}`)
 }
-
 
 const props = defineProps({
   fase: { type: Object, required: true },
@@ -442,6 +454,24 @@ onMounted(cargarDatos)
 .v-card-text {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 #f1f1f1;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
 }
 
 input[type=number]::-webkit-inner-spin-button, 

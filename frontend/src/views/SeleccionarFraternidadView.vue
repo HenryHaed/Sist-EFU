@@ -88,6 +88,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '../services/api'
+import { getImageUrl } from '../utils/url'
 
 const emit = defineEmits(['seleccionar-fraternidad'])
 
@@ -108,8 +109,7 @@ const tabs = [
 
 const getFullUrl = (url) => {
   if (!url) return FALLBACK_IMAGE
-  if (url.startsWith('http')) return url
-  return `http://localhost:3000${url}`
+  return getImageUrl(url) || FALLBACK_IMAGE
 }
 
 const cargarFraternidades = async () => {

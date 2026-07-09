@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-[100dvh] w-full relative bg-[#fdfdfd] font-display overflow-hidden">
+  <div class="flex h-[100dvh] w-full relative bg-white md:bg-[#fdfdfd] font-display overflow-hidden">
 
     <!-- Sidebar (Desktop) -->
     <aside class="hidden md:flex w-72 flex-shrink-0 bg-white border-r border-slate-200 flex-col justify-between py-8 px-6 sticky top-0 h-screen z-50 shadow-sm">
@@ -60,7 +60,8 @@
     </aside>
 
     <!-- Bottom Nav (Mobile) -->
-    <nav class="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-white/95 backdrop-blur-lg border border-slate-200 h-[4.25rem] rounded-2xl z-[100] shadow-2xl flex items-center justify-around px-1">
+    <div class="md:hidden fixed inset-x-0 bottom-0 z-[100] bg-white border-t border-slate-100 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] px-4 shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+      <nav class="w-full max-w-md mx-auto bg-white border border-slate-200 h-[4.25rem] rounded-2xl shadow-lg flex items-center justify-around px-1">
       <button @click="scrollTo('inicio')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
         <span class="material-symbols-outlined text-[22px]">home</span>
         <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Inicio</span>
@@ -81,10 +82,11 @@
         <span class="material-symbols-outlined text-[22px]">history</span>
         <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Histórico</span>
       </button>
-    </nav>
+      </nav>
+    </div>
 
     <!-- Main Content -->
-    <main ref="mainRef" class="flex-1 relative h-full overflow-y-auto overflow-x-hidden bg-[#fdfdfd] scroll-smooth paper-texture pb-28 md:pb-0">
+    <main ref="mainRef" class="flex-1 relative h-full overflow-y-auto overflow-x-hidden bg-white md:bg-[#fdfdfd] scroll-smooth paper-texture pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0">
 
       <!-- ===== HERO SECTION ===== -->
       <section class="relative flex flex-col md:min-h-screen" id="inicio">
@@ -423,7 +425,7 @@
       </section>
 
       <!-- ===== REPORTES HISTÓRICOS ===== -->
-      <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-slate-50 border-t border-slate-100" id="historicos">
+      <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-white border-t border-slate-100" id="historicos">
         <div class="text-center mb-12 md:mb-16 reveal">
           <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">ARCHIVO <span class="text-primary">HISTÓRICO</span></h2>
           <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">Resultados oficiales por gestión</p>
@@ -523,7 +525,7 @@
       </section>
 
       <!-- ===== FOOTER ===== -->
-      <footer class="bg-slate-50 border-t border-slate-200 py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24">
+      <footer class="bg-white border-t border-slate-200 py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-20 mb-12 md:mb-16">
           <div class="col-span-1 md:col-span-2 text-left">
             <div class="flex items-center gap-4 mb-6 md:mb-8 justify-start">
@@ -603,7 +605,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import api from '../services/api'
 
-import { getImageUrl } from '../utils/url'
+import { getImageUrl, getApiUrl } from '../utils/url'
 import { applySiteTitle } from '../utils/siteTitle'
 import { defaultLogo, defaultHeroBanner } from '../assets/defaultImages'
 
@@ -675,7 +677,7 @@ const cargarReporte = async (idGestion) => {
 }
 
 const descargarPdfReporte = (idGestion, anio) => {
-  window.open(`http://localhost:3000/api/v1/evaluaciones/reporte/${idGestion}/pdf`, '_blank')
+  window.open(getApiUrl(`/api/v1/evaluaciones/reporte/${idGestion}/pdf`), '_blank')
 }
 
 onMounted(() => {
@@ -786,7 +788,13 @@ const mostrarRanking = ref(false)
 }
 
 .paper-texture {
-  background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCVoBK5Il_QGy-7Iy1Dq1wMTFeDcvRCKMMdPn_gGNcIVvrshsRu92LQo5SErct1KZ_e0rs9ENqLTeuDHbIQOLwvxsCx8cSz26YagoeKhKxaOR_YnGDs2l2Yvyo3fIIwScWj4biWfa4aLdg5OKodYaRcUhzXMnmU19N2JN1mUg5IPNc9iwQCshwKQHaxDALkB1ggXUF-GdVuTCeufIy47kd4bMpy7J5kV9zcXJR12QyqyASYLgtbt12gFTPk_DJSqK3jmkUSIGe-rqU');
+  background-image: none;
+}
+
+@media (min-width: 768px) {
+  .paper-texture {
+    background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCVoBK5Il_QGy-7Iy1Dq1wMTFeDcvRCKMMdPn_gGNcIVvrshsRu92LQo5SErct1KZ_e0rs9ENqLTeuDHbIQOLwvxsCx8cSz26YagoeKhKxaOR_YnGDs2l2Yvyo3fIIwScWj4biWfa4aLdg5OKodYaRcUhzXMnmU19N2JN1mUg5IPNc9iwQCshwKQHaxDALkB1ggXUF-GdVuTCeufIy47kd4bMpy7J5kV9zcXJR12QyqyASYLgtbt12gFTPk_DJSqK3jmkUSIGe-rqU');
+  }
 }
 
 /* Marquee Animation */

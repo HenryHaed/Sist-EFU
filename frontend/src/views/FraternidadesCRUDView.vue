@@ -306,6 +306,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import api from '../services/api'
 import { notify } from '../utils/notify'
 import { useRoute, useRouter } from 'vue-router'
+import { getImageUrl } from '../utils/url'
 
 const route = useRoute()
 const router = useRouter()
@@ -325,11 +326,7 @@ const listFacultades = ref([])
 const listCarreras = ref([])
 const listInstituciones = ref([])
 
-const getFullUrl = (url) => {
-  if (!url) return ''
-  if (url.startsWith('http')) return url
-  return `http://localhost:3000${url}`
-}
+const getFullUrl = (url) => getImageUrl(url)
 
 const verDirectiva = (f) => {
   router.push({

@@ -259,9 +259,9 @@
     />
 
     <!-- MODAL DE SANCIONES GRAVES -->
-    <v-dialog v-model="modalSanciones" max-width="600" persistent>
-      <v-card class="rounded-2xl overflow-hidden border-4 border-slate-900">
-        <div class="bg-slate-900 p-6 text-white text-center relative">
+    <v-dialog v-model="modalSanciones" max-width="600" max-height="90dvh" scrollable persistent>
+      <v-card class="rounded-2xl overflow-hidden border-4 border-slate-900 flex flex-col max-h-[90dvh]">
+        <div class="bg-slate-900 p-6 text-white text-center relative shrink-0">
           <button @click="modalSanciones = false" class="absolute right-4 top-4 size-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
             <span class="material-symbols-outlined text-xl text-white">close</span>
           </button>
@@ -272,7 +272,7 @@
           <p class="text-white/60 text-xs font-bold mt-1">{{ fraternidadParaSancion?.nombre }}</p>
         </div>
 
-        <v-card-text class="pa-8 bg-white">
+        <v-card-text class="pa-6 sm:pa-8 bg-white overflow-y-auto flex-1 min-h-0 custom-scrollbar">
           <p class="text-slate-500 text-sm mb-6">Seleccione una sanción grave según el reglamento de disciplina. <b>Estas acciones son irreversibles</b> y afectan directamente la participación de la fraternidad.</p>
           
           <div class="grid gap-3">
@@ -280,19 +280,19 @@
               @click="preconfirmarSancion(s)"
               class="w-full p-4 rounded-xl border border-slate-200 hover:border-red-500 hover:bg-red-50 text-left transition-all flex items-center gap-4 group"
             >
-              <div class="size-10 rounded-lg bg-slate-100 group-hover:bg-red-100 flex items-center justify-center text-slate-400 group-hover:text-red-600">
+              <div class="size-10 rounded-lg bg-slate-100 group-hover:bg-red-100 flex items-center justify-center text-slate-400 group-hover:text-red-600 shrink-0">
                 <span class="material-symbols-outlined">{{ s.icono }}</span>
               </div>
-              <div class="flex-1">
+              <div class="flex-1 min-w-0">
                 <p class="text-sm font-black text-slate-800">{{ s.titulo }}</p>
                 <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{{ s.penalidad }}</p>
               </div>
-              <span class="material-symbols-outlined text-slate-300 group-hover:text-red-400">chevron_right</span>
+              <span class="material-symbols-outlined text-slate-300 group-hover:text-red-400 shrink-0">chevron_right</span>
             </button>
           </div>
         </v-card-text>
 
-        <v-card-actions class="pa-6 bg-slate-50 border-t border-slate-100">
+        <v-card-actions class="pa-4 sm:pa-6 bg-slate-50 border-t border-slate-100 shrink-0">
           <v-btn block height="48" variant="tonal" color="slate" class="rounded-xl font-bold" @click="modalSanciones = false">Cancelar</v-btn>
         </v-card-actions>
       </v-card>
@@ -598,3 +598,23 @@ onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval)
 })
 </script>
+
+<style scoped>
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+</style>

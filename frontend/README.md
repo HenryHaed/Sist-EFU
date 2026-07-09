@@ -1,51 +1,70 @@
 # 🎨 Entrada Universitaria - Dashboard (Frontend)
 
-Este es el cliente del sistema de gestión de la **Entrada Universitaria UMSA**, desarrollado con **Vue 3**, **Vite** y **Vuetify 3**.
+Cliente Vue 3 + Vite + Vuetify para la **Entrada Universitaria UMSA**.
 
-## 🛠️ Tecnologías
+## Instalación
 
-- **Vue 3**: Framework de JavaScript progresivo.
-- **Vite**: Herramienta de construcción ultrarrápida.
-- **Vuetify 3**: Framework de componentes UI basado en Material Design.
-- **Pinia**: Gestión de estado centralizada.
-- **Axios**: Cliente HTTP para conectar con la API del backend.
-- **Typescript**: Tipado estático para mayor seguridad en el código.
+```bash
+cd frontend
+npm install
+```
 
-## ⚙️ Instalación y Configuración
+## Variables de entorno (Vite)
 
-1.  Navega a esta carpeta:
-    ```bash
-    cd frontend
-    ```
-2.  Instala las dependencias necesarias:
-    ```bash
-    npm install
-    ```
-3.  Crea un archivo `.env` si es necesario configurar la URL del backend (por defecto configurado para `http://localhost:3000/api/v1`).
+Todas las variables expuestas al cliente deben llevar prefijo **`VITE_`**.
 
-## 🏃‍♂️ Ejecución
+| Archivo | Cuándo se usa | En Git |
+|---------|---------------|--------|
+| `.env.development` | `npm run dev` | ✅ Sí (localhost por defecto) |
+| `.env.production` | `npm run build` | ❌ No (lo crea el admin en el servidor) |
+| `.env.example` | Referencia | ✅ Sí |
+| `.env.production.example` | Plantilla producción | ✅ Sí |
 
-Para iniciar el servidor de desarrollo:
+### Desarrollo
+
+No hace falta copiar nada: `frontend/.env.development` ya apunta a `http://localhost:3000`.
+
 ```bash
 npm run dev
 ```
 
-El Dashboard estará disponible en: `http://localhost:5173` (o la URL que indique tu terminal).
+App: `http://localhost:5173`
 
-## 🚀 Despliegue (Build)
+### Producción (administrador del servidor)
 
-Para generar la versión para producción lista para ser servida:
 ```bash
+cp .env.production.example .env.production
+# Editar VITE_API_BASE_URL, VITE_API_URL, VITE_APP_URL con el dominio real
+npm ci
 npm run build
 ```
 
-Los archivos generados se encontrarán en la carpeta `/dist`.
+Servir la carpeta `dist/` con Nginx u otro servidor estático.
 
-## 📂 Estructura del Proyecto
+| Variable | Ejemplo producción |
+|----------|-------------------|
+| `VITE_API_BASE_URL` | `https://api.efu.umsa.bo` |
+| `VITE_API_URL` | `https://api.efu.umsa.bo/api/v1` |
+| `VITE_APP_URL` | `https://efu.umsa.bo` |
 
-- `src/assets/`: Imágenes, iconos y estilos globales.
-- `src/components/`: Componentes Vue reutilizables.
-- `src/views/`: Páginas principales del sistema.
-- `src/store/`: Definiciones de Pinia para el estado global (p. ej. el usuario logueado).
-- `src/router/`: Configuración de navegación.
-- `src/services/`: Clientes de API orientados a servicios para conectar con el backend.
+> Los valores se **compilan** en el bundle. Si cambia el dominio, hay que volver a ejecutar `npm run build`.
+
+## Código
+
+- `src/config/env.ts` — lectura centralizada de `import.meta.env`
+- `src/services/api.ts` — cliente Axios (`VITE_API_URL`)
+- `src/utils/url.ts` — URLs de archivos y PDFs (`VITE_API_BASE_URL`)
+
+## Build y preview
+
+```bash
+npm run build      # Salida en dist/
+npm run preview    # Probar el build localmente
+```
+
+## Estructura
+
+- `src/views/` — pantallas del dashboard y landing
+- `src/components/` — componentes reutilizables
+- `src/store/` — Pinia (auth, etc.)
+- `src/router/` — rutas Vue Router

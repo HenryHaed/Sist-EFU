@@ -1,70 +1,80 @@
 # 🚀 Entrada Universitaria - API (Backend)
 
-Este es el servidor principal para la gestión de la **Entrada Universitaria de la UMSA**, desarrollado con **NestJS** y **TypeORM**. La base de datos es **PostgreSQL**.
+API NestJS + TypeORM + PostgreSQL para la **Entrada Universitaria UMSA**.
 
-## 🛠️ Tecnologías y Requisitos
+## Requisitos
 
-- **Node.js**: v18 o superior.
-- **NestJS**: v11+.
-- **Database**: PostgreSQL (pgAdmin 4 recomendado).
-- **ORM**: TypeORM.
+- Node.js 18+
+- PostgreSQL
 
-## ⚙️ Configuración del Entorno
+## Configuración (`.env`)
 
-1.  Asegúrate de tener instaladas las dependencias:
-    ```bash
-    npm install
-    ```
-2.  Crea un archivo `.env` en este directorio (`backend/`) basándote en el archivo `.env.example`. Asegúrate de que las credenciales de PostgreSQL coincidan con tu servidor local.
-    ```env
-    DB_HOST=localhost
-    DB_PORT=5432
-    DB_USER=postgres
-    DB_PASSWORD=tu_password  # <-- Cambia esto
-    DB_NAME=efu_db
-    ```
-3.  Crea la base de datos `efu_db` en pgAdmin o vía SQL si no existe.
+El backend usa la **convención estándar de Node/NestJS** para cargar variables:
 
-## 🏃‍♂️ Ejecución
-
-Inicia el servidor en modo desarrollo con recarga automática:
-```bash
-npm run start:dev
+```
+.env.{NODE_ENV}.local  →  .env.{NODE_ENV}  →  .env.local  →  .env
 ```
 
-El servidor estará disponible en: `http://localhost:3000/api/v1`.
+### Desarrollo
 
-## 📜 Documentación de la API (Swagger)
+```bash
+cd backend
+npm install
+cp .env.example .env
+# Editar DB_PASSWORD, JWT_SECRET, etc.
+```
 
-Una vez que el servidor esté en ejecución, puedes acceder a la documentación interactiva en:
-👉 [http://localhost:3000/api](http://localhost:3000/api)
+### Producción (administrador del servidor)
 
-Allí podrás probar todos los endpoints disponibles.
+```bash
+cp .env.production.example .env.production
+# o bien: cp .env.production.example .env
+```
 
-## 🌱 Semilla de Datos (Seeding)
+Editar **todos** los valores marcados como `cambiar` / `GENERAR` antes de arrancar.
 
-Para cargar los datos iniciales necesarios (Roles, Categorías, Facultades, etc.), ejecuta el siguiente comando:
+| Variable | Desarrollo | Producción |
+|----------|------------|------------|
+| `NODE_ENV` | `development` | `production` |
+| `TYPEORM_SYNCHRONIZE` | `true` | **`false`** |
+| `SWAGGER_ENABLED` | `true` | `false` (recomendado) |
+| `CORS_ORIGINS` | `http://localhost:5173` | dominio HTTPS del frontend |
+| `FRONTEND_URL` | `http://localhost:5173` | `https://tu-dominio.bo` |
+| `JWT_SECRET` | cualquiera en local | **generar** (`openssl rand -base64 64`) |
+
+Plantillas: `.env.example` · `.env.production.example`
+
+## Ejecución
+
+```bash
+# Desarrollo (recarga automática)
+npm run start:dev
+
+# Producción
+npm run build
+NODE_ENV=production npm run start:prod
+```
+
+Por defecto escucha en `PORT=3000`. API: `/api/v1` · Swagger (si habilitado): `/api`
+
+## Semilla de datos
+
 ```bash
 npm run seed
 ```
 
-Esto poblará la base de datos con la información base para que el sistema funcione correctamente desde el inicio.
+Solo en **base de datos vacía** (desarrollo o primer despliegue). **No ejecutar** en producción con datos reales.
 
-### 👥 Usuarios de Prueba
-El script de semilla crea automáticamente los siguientes usuarios para pruebas (todos con la contraseña `password123`):
+## Estructura `src/`
 
-| Rol | CI (Usuario) | Password |
-| :--- | :--- | :--- |
-| **Superusuario** | `1000000` | `password123` |
-| **Admin** | `2000000` | `password123` |
-| **Controlador HCU** | `3000000` | `password123` |
-| **Delegado** | `4000000` | `password123` |
-| **Jurado** | `5000000` | `password123` |
+- `auth/` — JWT y sesiones
+- `entities/` — modelos TypeORM
+- `inscripciones/`, `evaluaciones/`, `fraternidades/` — módulos de negocio
+- `main.ts` — puerto, CORS, Swagger
+- `app.module.ts` — base de datos y configuración global
 
-## 📂 Organización de Archivos (`src/`)
+## Seguridad
 
-- `auth/`: Lógica de autenticación y generación de JWT.
-- `entities/`: Modelos de base de datos definidos con TypeORM.
-- `fraternidades/`: Gestión de las fraternidades participantes.
-- `main.ts`: Punto de entrada del servidor.
-- `app.module.ts`: Módulo raíz y configuración de la base de datos.
+- No commitear `backend/.env` ni `backend/.env.production`
+- Contraseñas de BD y `JWT_SECRET` únicos por entorno
+- En producción: `TYPEORM_SYNCHRONIZE=false` y migraciones controladas
