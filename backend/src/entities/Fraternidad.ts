@@ -4,6 +4,7 @@ import { Facultad } from './Facultad';
 import { Carrera } from './Carrera';
 import { InstitucionExterna } from './InstitucionExterna';
 import { Categoria } from './Categoria';
+import { TipoDanza } from './TipoDanza';
 import { Evaluacion } from './Evaluacion';
 import { Incidencia } from './Incidencia';
 import { Asistencia } from './Asistencia';
@@ -15,9 +16,6 @@ export class Fraternidad {
 
     @Column({ length: 255, unique: true })
     nombre: string;
-
-    @Column({ name: 'origen_fraternidad', length: 50 })
-    origenFraternidad: string;
 
     @Column({ name: 'nivel_representacion', length: 100, nullable: true })
     nivelRepresentacion: string;
@@ -41,6 +39,10 @@ export class Fraternidad {
     @ManyToOne(() => Categoria, (categoria) => categoria.fraternidades)
     @JoinColumn({ name: 'id_categoria' })
     categoria: Categoria;
+
+    @ManyToOne(() => TipoDanza, { nullable: true })
+    @JoinColumn({ name: 'id_tipo_danza' })
+    tipoDanza: TipoDanza;
 
     @Column({ name: 'tipo_organizacion', length: 100, nullable: true })
     tipoOrganizacion: string;

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not, IsNull } from 'typeorm';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
@@ -8,10 +8,18 @@ import { Infraccion } from '../entities/Infraccion';
 import { Gestion } from '../entities/Gestion';
 import { Fraternidad } from '../entities/Fraternidad';
 import { EventoControl } from '../entities/EventoControl';
+import { Usuario } from '../entities/Usuario';
+import { MailService } from '../mail/mail.service';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { CrearEventoDto } from './dto/crear-evento.dto';
+
+/** 10% de la nota máxima de disciplina (30 pts) */
+const PENALIZACION_INASISTENCIA_DEFAULT = 3;
 
 @Injectable()
 export class AsistenciasService {
+  private readonly logger = new Logger(AsistenciasService.name);
+
   constructor(
     @InjectRepository(SolicitudInscripcion)
     private readonly solicitudRepo: Repository<SolicitudInscripcion>,
@@ -27,6 +35,9 @@ export class AsistenciasService {
     private readonly fraternidadRepo: Repository<Fraternidad>,
     @InjectRepository(EventoControl)
     private readonly eventoRepo: Repository<EventoControl>,
+    @InjectRepository(Usuario)
+    private readonly usuarioRepo: Repository<Usuario>,
+    private readonly mailService: MailService,
   ) {}
 
   private async getGestionActiva() {
@@ -35,6 +46,76 @@ export class AsistenciasService {
 
   async getEventos() {
     return this.eventoRepo.find({ order: { fechaHora: 'DESC' } });
+  }
+
+  async crearEventoYCitarDelegados(dto: CrearEventoDto, remitenteNombre: string) {
+    const nombre = dto.nombre?.trim();
+    const ubicacion = dto.ubicacion?.trim();
+    if (!nombre) throw new BadRequestException('Indica el nombre del evento.');
+    if (!ubicacion) throw new BadRequestException('Indica la ubicación del evento.');
+
+    const fechaHora = new Date(dto.fechaHora);
+    if (Number.isNaN(fechaHora.getTime())) {
+      throw new BadRequestException('Fecha y hora no válidas.');
+    }
+
+    const evento = await this.eventoRepo.save(
+      this.eventoRepo.create({
+        nombre,
+        ubicacion,
+        fechaHora,
+        puntosPenalizacion: PENALIZACION_INASISTENCIA_DEFAULT,
+      }),
+    );
+
+    const delegados = await this.usuarioRepo
+      .createQueryBuilder('u')
+      .innerJoin('u.rol', 'rol')
+      .leftJoinAndSelect('u.fraternidad', 'fraternidad')
+      .where('rol.nombre = :rol', { rol: 'delegado' })
+      .andWhere('u.correo IS NOT NULL')
+      .andWhere("TRIM(u.correo) != ''")
+      .getMany();
+
+    const elegibles = delegados.filter(
+      (d) => !d.fraternidad || d.fraternidad.habilitadoEfu !== false,
+    );
+
+    if (elegibles.length === 0) {
+      throw new BadRequestException(
+        'No hay delegados con correo registrado en el sistema para enviar la citación.',
+      );
+    }
+
+    let enviados = 0;
+    const fallidos: string[] = [];
+
+    for (const delegado of elegibles) {
+      const nombreCompleto = [delegado.nombres, delegado.primerApellido, delegado.segundoApellido]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      try {
+        await this.mailService.sendConvocatoriaEventoDelegados(
+          delegado.correo.trim(),
+          nombreCompleto || 'Delegado',
+          evento,
+          remitenteNombre,
+        );
+        enviados++;
+      } catch (error) {
+        this.logger.warn(`Fallo citación a ${delegado.correo}: ${error?.message}`);
+        fallidos.push(delegado.correo);
+      }
+    }
+
+    return {
+      evento,
+      totalDestinatarios: elegibles.length,
+      enviados,
+      fallidos: fallidos.length,
+      correosFallidos: fallidos.slice(0, 10),
+    };
   }
 
   async getDelegados() {
@@ -178,6 +259,11 @@ export class AsistenciasService {
 
     if (yaExiste) return yaExiste;
 
+    const evento = await this.eventoRepo.findOne({ where: { idEvento: data.idEvento } });
+    const penalizacion = -Math.abs(
+      Number(evento?.puntosPenalizacion ?? PENALIZACION_INASISTENCIA_DEFAULT),
+    );
+
     let infraccion = await this.infraccionRepo.findOne({
       where: { nombre: 'INASISTENCIA DE DELEGADO', gestion: { idGestion: gestion.idGestion } },
     });
@@ -186,9 +272,12 @@ export class AsistenciasService {
       infraccion = await this.infraccionRepo.save({
         nombre: 'INASISTENCIA DE DELEGADO',
         tipoImpacto: 'DESCUENTO_DISCIPLINA',
-        valorImpacto: -10,
+        valorImpacto: penalizacion,
         gestion,
       });
+    } else if (Number(infraccion.valorImpacto) !== penalizacion) {
+      infraccion.valorImpacto = penalizacion;
+      infraccion = await this.infraccionRepo.save(infraccion);
     }
 
     return this.incidenciaRepo.save(

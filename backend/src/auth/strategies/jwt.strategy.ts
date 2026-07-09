@@ -46,7 +46,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       fraternidad: usuario.fraternidad ? {
         idFraternidad: usuario.fraternidad.idFraternidad,
         nombre: usuario.fraternidad.nombre,
-        origenFraternidad: usuario.fraternidad.origenFraternidad,
         nivelRepresentacion: usuario.fraternidad.nivelRepresentacion,
         categoria: usuario.fraternidad.categoria ? { idCategoria: usuario.fraternidad.categoria.idCategoria, nombre: usuario.fraternidad.categoria.nombre } : null,
         facultad: usuario.fraternidad.facultad ? { idFacultad: usuario.fraternidad.facultad.idFacultad, nombre: usuario.fraternidad.facultad.nombre } : null,

@@ -10,12 +10,15 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { DocumentoFraternidad } from '../entities/DocumentoFraternidad';
 import { Criterio } from '../entities/Criterio';
 import { Gestion } from '../entities/Gestion';
+import { Categoria } from '../entities/Categoria';
 import { Participante } from '../entities/Participante';
 import { DocumentoGestion } from '../entities/DocumentoGestion';
 import { Incidencia } from '../entities/Incidencia';
 import { Infraccion } from '../entities/Infraccion';
 import { Usuario } from '../entities/Usuario';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { ensureCategoriasDefault } from '../common/categorias-default';
+import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 
 @Injectable()
 export class EvaluacionesService {
@@ -34,6 +37,8 @@ export class EvaluacionesService {
     private readonly criterioRepo: Repository<Criterio>,
     @InjectRepository(Gestion)
     private readonly gestionRepo: Repository<Gestion>,
+    @InjectRepository(Categoria)
+    private readonly categoriaRepo: Repository<Categoria>,
     @InjectRepository(Participante)
     private readonly participanteRepo: Repository<Participante>,
     @InjectRepository(DocumentoGestion)
@@ -114,7 +119,16 @@ export class EvaluacionesService {
       const ahora = new Date();
 
       if (rol === 'superusuario' || rol === 'admin') {
-        fases = await this.faseRepo.find({ order: { idFase: 'ASC' }, relations: ['gestion'] });
+        const gestionActiva = await this.getGestionActiva();
+        const whereFases: any = { estaActiva: true };
+        if (gestionActiva) {
+          whereFases.gestion = { idGestion: gestionActiva.idGestion };
+        }
+        fases = await this.faseRepo.find({
+          where: whereFases,
+          order: { idFase: 'ASC' },
+          relations: ['gestion'],
+        });
         const todosJurados = await this.juradoRepo.find({ 
           relations: ['fasesHabilitadas', 'usuario', 'usuario.rol'] 
         });
@@ -140,12 +154,17 @@ export class EvaluacionesService {
           });
         }
       } else if (rol === 'jurado' || rol === 'controladorhcu') {
+        const gestionActiva = await this.getGestionActiva();
         const jurado = await this.juradoRepo.findOne({
           where: { usuario: { idUsuario } },
-          relations: ['fasesHabilitadas'],
+          relations: ['fasesHabilitadas', 'fasesHabilitadas.gestion'],
         });
-        if (!jurado) return []; // Retornar vacío si no tiene perfil aún, en lugar de error
-        fases = jurado.fasesHabilitadas;
+        if (!jurado) return [];
+        fases = jurado.fasesHabilitadas.filter((f) => {
+          if (!f.estaActiva) return false;
+          if (!gestionActiva) return true;
+          return f.gestion?.idGestion === gestionActiva.idGestion;
+        });
       }
 
       return fases.map(fase => {
@@ -221,7 +240,7 @@ export class EvaluacionesService {
     let fraternidades: Fraternidad[];
     const idGestionFase = fase.gestion?.idGestion || (await this.getGestionActiva())?.idGestion;
     if (jurado.fraternidadesHabilitadas && jurado.fraternidadesHabilitadas.length > 0) {
-      fraternidades = jurado.fraternidadesHabilitadas;
+      fraternidades = jurado.fraternidadesHabilitadas.filter((f) => f.habilitadoEfu);
     } else {
       fraternidades = await this.fraternidadRepo.find({
         where: {
@@ -287,6 +306,12 @@ export class EvaluacionesService {
 
   async getEvaluacionActual(idUsuario: number, rol: string, idFase: number, args: { idFraternidad?: number, idParticipante?: number }) {
     const jurado = await this.getValidadorJurado(idUsuario, rol, idFase);
+    if (args.idFraternidad) {
+      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad: args.idFraternidad } });
+      if (!frat?.habilitadoEfu) {
+        throw new ForbiddenException('Esta fraternidad aún no está habilitada para calificación.');
+      }
+    }
     const where: any = { jurado: { idJurado: jurado.idJurado }, fase: { idFase } };
     if (args.idParticipante) where.participante = { idParticipante: args.idParticipante };
     else if (args.idFraternidad) where.fraternidad = { idFraternidad: args.idFraternidad };
@@ -298,6 +323,13 @@ export class EvaluacionesService {
     const jurado = await this.getValidadorJurado(idUsuario, rol, idFase);
     const fase = await this.faseRepo.findOne({ where: { idFase } });
     if (!fase || !fase.estaActiva) throw new ForbiddenException('Fase inactiva.');
+
+    if (idFraternidad) {
+      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
+      if (!frat?.habilitadoEfu) {
+        throw new ForbiddenException('Esta fraternidad aún no está habilitada para calificación (inscripción pendiente de aprobación).');
+      }
+    }
 
     const where: any = { jurado: { idJurado: jurado.idJurado }, fase: { idFase } };
     if (idParticipante) where.participante = { idParticipante };
@@ -330,7 +362,14 @@ export class EvaluacionesService {
     const gestion = await this.getGestionActiva();
     if (!gestion) throw new NotFoundException('No hay gestión activa');
 
-    const frats = await this.fraternidadRepo.find({ where: { habilitadoEfu: true, origenFraternidad: Not('Externo') } });
+    const frats = await this.fraternidadRepo.find({
+      where: {
+        habilitadoEfu: true,
+        gestion: { idGestion: gestion.idGestion },
+        nivelRepresentacion: Not('Externo'),
+      },
+      relations: ['categoria'],
+    });
     const evsEfu = await this.evaluacionRepo.find({
       where: [
         { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } },
@@ -387,6 +426,62 @@ export class EvaluacionesService {
         };
     }).sort((a, b) => b.puntaje - a.puntaje);
 
+    const evsExt = await this.evaluacionRepo.find({
+      where: [
+        { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } },
+        { estado: 'EN_PROGRESO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } },
+      ],
+      relations: ['participante', 'participante.fraternidad', 'fase'],
+    });
+
+    const concursosMap = new Map<number, { nombreConcurso: string; participantesMap: Map<number, any> }>();
+
+    evsExt.forEach((e) => {
+      if (!e.participante || !e.fase) return;
+
+      const idFase = e.fase.idFase;
+      if (!concursosMap.has(idFase)) {
+        concursosMap.set(idFase, {
+          nombreConcurso: e.fase.nombre,
+          participantesMap: new Map<number, any>(),
+        });
+      }
+
+      const concurso = concursosMap.get(idFase)!;
+      const idPart = e.participante.idParticipante;
+      const pts = Number(e.puntajeTotal) || 0;
+
+      if (!concurso.participantesMap.has(idPart)) {
+        concurso.participantesMap.set(idPart, {
+          nombre: e.participante.nombre,
+          tipo: e.participante.tipo || 'Participante',
+          fraternidad: e.participante.fraternidad?.nombre || e.participante.institucionExterna || 'Independiente',
+          sum: 0,
+          count: 0,
+        });
+      }
+
+      const participante = concurso.participantesMap.get(idPart);
+      participante.sum += pts;
+      participante.count++;
+    });
+
+    const concursos = Array.from(concursosMap.values())
+      .map((concurso) => ({
+        nombreConcurso: concurso.nombreConcurso,
+        participantes: Array.from(concurso.participantesMap.values())
+          .map((p) => ({
+            nombre: p.nombre,
+            tipo: p.tipo,
+            fraternidad: p.fraternidad,
+            puntajeFinal: Number((p.sum / p.count).toFixed(2)),
+          }))
+          .sort((a, b) => b.puntajeFinal - a.puntajeFinal)
+          .slice(0, 3)
+          .map((p, index) => ({ ...p, puesto: index + 1 })),
+      }))
+      .sort((a, b) => a.nombreConcurso.localeCompare(b.nombreConcurso, 'es'));
+
     return {
       basico: [
         { label: 'Total Fraternidades', valor: frats.length, badge: 'Habilitadas', progreso: 100 },
@@ -394,7 +489,7 @@ export class EvaluacionesService {
         { label: 'Ranking Top', valor: rankingSorted.length > 0 ? rankingSorted[0].nombre : '—', badge: 'Líder Actual', progreso: 100 }
       ],
       rankingEfu: rankingSorted,
-      concursos: [],
+      concursos,
       gestion: { anio: gestion.anio, edicion: 'XXXV' }
     };
   }
@@ -453,15 +548,30 @@ export class EvaluacionesService {
     const origen = await this.gestionRepo.findOne({ where: { idGestion: idOrigen } });
     const destino = await this.gestionRepo.findOne({ where: { idGestion: idDestino } });
     if (!origen || !destino) throw new NotFoundException('Gestión de origen o destino no encontrada');
+    if (idOrigen === idDestino) throw new BadRequestException('El origen y destino no pueden ser la misma gestión');
 
     const result = { fases: 0, criterios: 0, categorias: 0, infracciones: 0, fraternidadesExtra: 0 };
 
     if (modules.includes('fases_criterios')) {
+      const fasesDestino = await this.faseRepo.find({ where: { gestion: { idGestion: idDestino } } });
+      for (const fase of fasesDestino) {
+        await this.criterioRepo.delete({ fase: { idFase: fase.idFase } });
+      }
+      await this.faseRepo.delete({ gestion: { idGestion: idDestino } });
+
       const fasesOrigen = await this.faseRepo.find({ where: { gestion: { idGestion: idOrigen } } });
       for (const fase of fasesOrigen) {
         const nf = this.faseRepo.create({
-          nombre: fase.nombre, pesoPorcentaje: fase.pesoPorcentaje,
-          urlImagen: fase.urlImagen, tipoConcurso: fase.tipoConcurso, gestion: { idGestion: idDestino } as any
+          nombre: fase.nombre,
+          pesoPorcentaje: fase.pesoPorcentaje,
+          urlImagen: fase.urlImagen,
+          tipoConcurso: fase.tipoConcurso,
+          categoriaEfu: fase.categoriaEfu,
+          esPrecalificacion: fase.esPrecalificacion,
+          fechaInicio: fase.fechaInicio,
+          fechaFin: fase.fechaFin,
+          estaActiva: false,
+          gestion: { idGestion: idDestino } as any,
         });
         const savedF = await this.faseRepo.save(nf);
         result.fases++;
@@ -469,8 +579,11 @@ export class EvaluacionesService {
         const criterios = await this.criterioRepo.find({ where: { fase: { idFase: fase.idFase } } });
         for (const crit of criterios) {
           const nc = this.criterioRepo.create({
-            nombre: crit.nombre, puntajeMaximo: crit.puntajeMaximo, 
-            urlImagen: crit.urlImagen, fase: { idFase: savedF.idFase } as any, gestion: { idGestion: idDestino } as any
+            nombre: crit.nombre,
+            puntajeMaximo: crit.puntajeMaximo,
+            urlImagen: crit.urlImagen,
+            fase: { idFase: savedF.idFase } as any,
+            gestion: { idGestion: idDestino } as any,
           });
           await this.criterioRepo.save(nc);
           result.criterios++;
@@ -479,61 +592,86 @@ export class EvaluacionesService {
     }
 
     if (modules.includes('categorias')) {
-      const cats = await this.dataSource.query(`SELECT * FROM categorias WHERE id_gestion = $1`, [idOrigen]);
-      for (const cat of cats) {
-        await this.dataSource.query(`INSERT INTO categorias(nombre, descripcion, requiere_institucion, id_gestion) VALUES($1, $2, $3, $4)`, 
-          [cat.nombre, cat.descripcion, cat.requiere_institucion || false, idDestino]);
+      const catsOrigen = await this.categoriaRepo.find({ where: { gestion: { idGestion: idOrigen } } });
+      const catsDestino = await this.categoriaRepo.find({ where: { gestion: { idGestion: idDestino } } });
+      const destByName = new Map(catsDestino.map((c) => [c.nombre.trim().toUpperCase(), c]));
+
+      for (const cat of catsOrigen) {
+        const key = cat.nombre.trim().toUpperCase();
+        const existing = destByName.get(key);
+        if (existing) {
+          existing.descripcion = cat.descripcion;
+          await this.categoriaRepo.save(existing);
+        } else {
+          const nueva = await this.categoriaRepo.save(
+            this.categoriaRepo.create({
+              nombre: cat.nombre,
+              descripcion: cat.descripcion,
+              gestion: { idGestion: idDestino } as any,
+            }),
+          );
+          destByName.set(key, nueva);
+        }
         result.categorias++;
       }
     }
 
     if (modules.includes('infracciones')) {
+      await this.infraccionRepo.delete({ gestion: { idGestion: idDestino } });
       const infrs = await this.infraccionRepo.find({ where: { gestion: { idGestion: idOrigen } } });
       for (const infr of infrs) {
-        const ni = this.infraccionRepo.create({ nombre: infr.nombre, tipoImpacto: infr.tipoImpacto, valorImpacto: infr.valorImpacto, gestion: { idGestion: idDestino } as any });
+        const ni = this.infraccionRepo.create({
+          nombre: infr.nombre,
+          tipoImpacto: infr.tipoImpacto,
+          valorImpacto: infr.valorImpacto,
+          gestion: { idGestion: idDestino } as any,
+        });
         await this.infraccionRepo.save(ni);
         result.infracciones++;
       }
     }
-    
+
     if (modules.includes('fraternidades_base')) {
-      // Clonar datos básicos (sin actas, logos_url es opcional pero se puede llevar el actual)
-      const frats = await this.fraternidadRepo.find({ 
-        where: { gestion: { idGestion: idOrigen } },
-        relations: ['facultad', 'carrera', 'institucionExterna', 'categoria']
-      });
-      
-      // Map categorias antiguas a nuevas
-      let mapCat = new Map();
-      if (modules.includes('categorias')) {
-        const destCats = await this.dataSource.query(`SELECT id_categoria, nombre FROM categorias WHERE id_gestion = $1`, [idDestino]);
-        for (const dc of destCats) mapCat.set(dc.nombre, dc.id_categoria);
-      }
-      
-      for (const fr of frats) {
-        let idCatNueva = null;
-        if (fr.categoria) {
-            // Re-obtener la categoría antigua
-            const oldCatData = await this.dataSource.query(`SELECT nombre FROM categorias WHERE id_categoria = $1`, [fr.categoria.idCategoria]);
-            if (oldCatData.length > 0) idCatNueva = mapCat.get(oldCatData[0].nombre);
-        }
-        
-        const nft = this.fraternidadRepo.create({
-          nombre: fr.nombre,
-          origenFraternidad: fr.origenFraternidad,
-          nivelRepresentacion: fr.nivelRepresentacion,
-          tipoOrganizacion: fr.tipoOrganizacion,
-          fechaFundacion: fr.fechaFundacion,
-          promedioBase: 0, 
-          habilitadoEfu: false, // se debe volver a habilitar mediante inscripción
-          gestion: { idGestion: idDestino } as any,
-          facultad: fr.facultad ? { idFacultad: fr.facultad.idFacultad } as any : null,
-          carrera: fr.carrera ? { idCarrera: fr.carrera.idCarrera } as any : null,
-          institucionExterna: fr.institucionExterna ? { idInstitucion: fr.institucionExterna.idInstitucion } as any : null,
-          categoria: idCatNueva ? { idCategoria: idCatNueva } as any : null,
+      const existentesDestino = await this.fraternidadRepo.count({ where: { gestion: { idGestion: idDestino } } });
+      if (existentesDestino > 0) {
+        // Evita duplicar fraternidades si la gestión destino ya fue clonada o configurada
+      } else {
+        const frats = await this.fraternidadRepo.find({
+          where: { gestion: { idGestion: idOrigen } },
+          relations: ['facultad', 'carrera', 'institucionExterna', 'categoria'],
         });
-        await this.fraternidadRepo.save(nft);
-        result.fraternidadesExtra++;
+
+        const mapCat = new Map<string, number>();
+        const destCats = await this.categoriaRepo.find({ where: { gestion: { idGestion: idDestino } } });
+        for (const dc of destCats) mapCat.set(dc.nombre.trim().toUpperCase(), dc.idCategoria);
+
+        for (const fr of frats) {
+          let idCatNueva: number | null = null;
+          if (fr.categoria) {
+            const catOrigen = await this.categoriaRepo.findOne({ where: { idCategoria: fr.categoria.idCategoria } });
+            if (catOrigen) idCatNueva = mapCat.get(catOrigen.nombre.trim().toUpperCase()) ?? null;
+          }
+
+          const nombreClone = `${fr.nombre} (${destino.anio})`;
+          const existeNombre = await this.fraternidadRepo.findOne({ where: { nombre: nombreClone } });
+          if (existeNombre) continue;
+
+          const nft = this.fraternidadRepo.create({
+            nombre: nombreClone,
+            nivelRepresentacion: fr.nivelRepresentacion,
+            tipoOrganizacion: fr.tipoOrganizacion,
+            fechaFundacion: fr.fechaFundacion,
+            promedioBase: 0,
+            habilitadoEfu: false,
+            gestion: { idGestion: idDestino } as any,
+            facultad: fr.facultad ? ({ idFacultad: fr.facultad.idFacultad } as any) : null,
+            carrera: fr.carrera ? ({ idCarrera: fr.carrera.idCarrera } as any) : null,
+            institucionExterna: fr.institucionExterna ? ({ idInstitucion: fr.institucionExterna.idInstitucion } as any) : null,
+            categoria: idCatNueva ? ({ idCategoria: idCatNueva } as any) : null,
+          });
+          await this.fraternidadRepo.save(nft);
+          result.fraternidadesExtra++;
+        }
       }
     }
 
@@ -548,7 +686,11 @@ export class EvaluacionesService {
         .set({ activa: false })
         .execute();
     }
-    return this.gestionRepo.save(this.gestionRepo.create(data));
+    const nuevaGestion = this.gestionRepo.create(data);
+    const saved = await this.gestionRepo.save(nuevaGestion);
+    const gestion = Array.isArray(saved) ? saved[0] : saved;
+    await ensureCategoriasDefault(this.categoriaRepo, gestion.idGestion);
+    return gestion;
   }
 
   async updateGestion(id: number, data: any) {
@@ -567,11 +709,89 @@ export class EvaluacionesService {
   async deleteGestion(id: number) {
     const g = await this.gestionRepo.findOne({ where: { idGestion: id } });
     if (!g) throw new NotFoundException('Gestión no encontrada');
+    if (g.activa) {
+      throw new BadRequestException('No se puede eliminar la gestión activa. Activa otra gestión primero.');
+    }
+
     // Eliminar imágenes asociadas
     if (g.urlLogo) this.eliminarImagenSiExiste(g.urlLogo);
     if (g.urlBanner) this.eliminarImagenSiExiste(g.urlBanner);
     if (g.urlImagenLogin) this.eliminarImagenSiExiste(g.urlImagenLogin);
-    return this.gestionRepo.delete(id);
+
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
+    try {
+      // 1. Evaluaciones e incidencias / asistencias de la gestión
+      await qr.query(`DELETE FROM evaluaciones WHERE id_gestion = $1`, [id]);
+      await qr.query(`DELETE FROM incidencias WHERE id_gestion = $1`, [id]);
+      await qr.query(`DELETE FROM asistencias WHERE id_gestion = $1`, [id]);
+
+      // 2. Participantes de concursos
+      await qr.query(`DELETE FROM participantes_concurso WHERE id_gestion = $1`, [id]);
+
+      // 3. Criterios de la gestión
+      await qr.query(`DELETE FROM criterios WHERE id_gestion = $1`, [id]);
+
+      // 4. Desligar jurados de fases/fraternidades de esta gestión
+      await qr.query(`
+        DELETE FROM jurado_fases
+        WHERE id_fase IN (SELECT id_fase FROM fases WHERE id_gestion = $1)
+      `, [id]);
+      await qr.query(`
+        DELETE FROM jurado_fraternidades
+        WHERE id_fraternidad IN (SELECT id_fraternidad FROM fraternidades WHERE id_gestion = $1)
+      `, [id]);
+
+      // 5. Fases de la gestión
+      await qr.query(`DELETE FROM fases WHERE id_gestion = $1`, [id]);
+
+      // 6. Monografías y documentos de fraternidades de la gestión
+      await qr.query(`
+        DELETE FROM monografias
+        WHERE id_fraternidad IN (SELECT id_fraternidad FROM fraternidades WHERE id_gestion = $1)
+      `, [id]);
+      await qr.query(`
+        DELETE FROM documentos_fraternidad
+        WHERE id_fraternidad IN (SELECT id_fraternidad FROM fraternidades WHERE id_gestion = $1)
+      `, [id]);
+
+      // 7. Solicitudes y cronogramas
+      await qr.query(`UPDATE usuarios SET id_fraternidad = NULL WHERE id_fraternidad IN (
+        SELECT id_fraternidad FROM fraternidades WHERE id_gestion = $1
+      )`, [id]);
+      await qr.query(`UPDATE solicitudes_inscripcion SET id_fraternidad_creada = NULL WHERE id_gestion = $1`, [id]);
+      await qr.query(`DELETE FROM solicitudes_inscripcion WHERE id_gestion = $1`, [id]);
+      await qr.query(`DELETE FROM cronograma_inscripciones WHERE id_gestion = $1`, [id]);
+
+      // 8. Fraternidades, infracciones, categorías, documentos
+      await qr.query(`DELETE FROM fraternidades WHERE id_gestion = $1`, [id]);
+      await qr.query(`DELETE FROM infracciones WHERE id_gestion = $1`, [id]);
+      await qr.query(`DELETE FROM categorias WHERE id_gestion = $1`, [id]);
+      await qr.query(`DELETE FROM documentos_gestion WHERE id_gestion = $1`, [id]);
+
+      // 9. Jurados de la gestión (si no tienen más vínculo crítico)
+      await qr.query(`DELETE FROM jurados WHERE id_gestion = $1`, [id]);
+
+      // 10. Desligar auditoría/sesiones (opcional)
+      try {
+        await qr.query(`UPDATE sesiones_usuario SET id_gestion = NULL WHERE id_gestion = $1`, [id]);
+      } catch { /* ignore */ }
+      try {
+        await qr.query(`UPDATE auditoria_acciones SET id_gestion = NULL WHERE id_gestion = $1`, [id]);
+      } catch { /* ignore */ }
+
+      await qr.query(`DELETE FROM gestiones WHERE id_gestion = $1`, [id]);
+
+      await qr.commitTransaction();
+      return { success: true, message: `Gestión ${g.anio} eliminada correctamente` };
+    } catch (err: any) {
+      await qr.rollbackTransaction();
+      const detail = err?.driverError?.detail || err?.message || 'Error desconocido';
+      throw new BadRequestException(`No se pudo eliminar la gestión: ${detail}`);
+    } finally {
+      await qr.release();
+    }
   }
 
   // --- CRUD HELPERS ---
@@ -659,6 +879,9 @@ export class EvaluacionesService {
 
     const fraternidad = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
     if (!fraternidad) throw new NotFoundException('Fraternidad no encontrada.');
+    if (!fraternidad.habilitadoEfu) {
+      throw new ForbiddenException('Esta fraternidad aún no está habilitada para sanciones o calificación.');
+    }
 
     const usuario = await this.usuarioRepo.findOne({ where: { idUsuario } });
 
@@ -753,7 +976,7 @@ export class EvaluacionesService {
 
     // 1. Fraternidades y Ranking EFU
     const frats = await this.fraternidadRepo.find({
-      where: { habilitadoEfu: true, gestion: { idGestion }, origenFraternidad: Not('Externo') },
+      where: { habilitadoEfu: true, gestion: { idGestion }, nivelRepresentacion: Not('Externo') },
       relations: ['categoria', 'facultad', 'carrera', 'institucionExterna']
     });
 
@@ -773,7 +996,6 @@ export class EvaluacionesService {
       rankingMap.set(f.idFraternidad, {
         idFraternidad: f.idFraternidad,
         nombre: f.nombre,
-        origenFraternidad: f.origenFraternidad || 'Danza Pesada',
         categoria: f.categoria?.nombre || 'General',
         representacion,
         promedioJurado: 0,
@@ -904,14 +1126,6 @@ export class EvaluacionesService {
     res.setHeader('Content-Disposition', `attachment; filename=Reporte_EFU_${reporte.gestion.anio}.pdf`);
     doc.pipe(res);
 
-    let logoPath = 'e:\\Entrada-Universitaria\\frontend\\src\\assets\\img\\Logo_Umsa.png';
-    if (!fs.existsSync(logoPath)) {
-      logoPath = path.join(process.cwd(), '..', 'frontend', 'src', 'assets', 'img', 'Logo_Umsa.png');
-    }
-    if (!fs.existsSync(logoPath)) {
-      logoPath = path.join(process.cwd(), 'frontend', 'src', 'assets', 'img', 'Logo_Umsa.png');
-    }
-
     const formatDate = (d: any) => {
       if (!d) return 'N/A';
       const date = new Date(d);
@@ -934,25 +1148,14 @@ export class EvaluacionesService {
       doc.restore();
     };
 
-    // Cabecera con logo
-    const hasLogo = fs.existsSync(logoPath);
-    const headerX = hasLogo ? 110 : 50;
+    const lemaSubtitle = reporte.gestion.lema ? `"${reporte.gestion.lema}"` : undefined;
+    const { contentStartY } = drawPdfInstitutionalHeader(
+      doc,
+      `REPORTE HISTÓRICO DE CALIFICACIONES - GESTIÓN ${reporte.gestion.anio}`,
+      lemaSubtitle,
+    );
 
-    if (hasLogo) {
-      doc.image(logoPath, 50, 40, { width: 50 });
-    }
-
-    doc.fontSize(15).fillColor('#003399').font('Helvetica-Bold').text('UNIVERSIDAD MAYOR DE SAN ANDRÉS', headerX, 45);
-    doc.fontSize(10).fillColor('#0f172a').font('Helvetica').text('COMISIÓN ORGANIZADORA DE LA ENTRADA UNIVERSITARIA', headerX, 63);
-    doc.fontSize(10).fillColor('#c8102e').font('Helvetica-Bold').text(`REPORTE HISTÓRICO DE CALIFICACIONES - GESTIÓN ${reporte.gestion.anio}`, headerX, 76);
-    if (reporte.gestion.lema) {
-      doc.fontSize(8).fillColor('#475569').font('Helvetica-Oblique').text(`"${reporte.gestion.lema}"`, headerX, 89);
-    }
-
-    // Línea separadora
-    doc.moveTo(50, 105).lineTo(545, 105).lineWidth(1.5).strokeColor('#003399').stroke();
-    
-    let currentY = 120;
+    let currentY = contentStartY;
 
     // Tabla Ranking EFU
     doc.fontSize(12).fillColor('#003399').font('Helvetica-Bold').text('RANKING OFICIAL - ENTRADA FOLKLÓRICA', 50, currentY);
@@ -961,10 +1164,9 @@ export class EvaluacionesService {
     // Header Tabla EFU
     const colWidths = {
       puesto: 20,
-      frat: 125,
-      danza: 70,
-      cat: 45,
-      pert: 75,
+      frat: 170,
+      cat: 55,
+      pert: 95,
       prom: 35,
       sanc: 30,
       final: 35,
@@ -978,7 +1180,6 @@ export class EvaluacionesService {
       let curX = 52;
       doc.text('#', curX, y + 5, { width: colWidths.puesto, align: 'center' }); curX += colWidths.puesto;
       doc.text('Fraternidad', curX, y + 5, { width: colWidths.frat }); curX += colWidths.frat;
-      doc.text('Tipo Danza', curX, y + 5, { width: colWidths.danza }); curX += colWidths.danza;
       doc.text('Cat.', curX, y + 5, { width: colWidths.cat }); curX += colWidths.cat;
       doc.text('Pertenencia', curX, y + 5, { width: colWidths.pert }); curX += colWidths.pert;
       doc.text('Jur.', curX, y + 5, { width: colWidths.prom, align: 'center' }); curX += colWidths.prom;
@@ -1018,9 +1219,6 @@ export class EvaluacionesService {
       // Nombre
       doc.font('Helvetica-Bold').text(r.nombre, curX, currentY + 4, { width: colWidths.frat, height: 12, ellipsis: true }); curX += colWidths.frat;
       doc.font('Helvetica');
-      // Danza
-      doc.text(r.origenFraternidad, curX, currentY + 4, { width: colWidths.danza, height: 12, ellipsis: true }); curX += colWidths.danza;
-      // Categoria
       doc.text(r.categoria, curX, currentY + 4, { width: colWidths.cat, height: 12, ellipsis: true }); curX += colWidths.cat;
       // Pertenencia
       doc.text(r.representacion, curX, currentY + 4, { width: colWidths.pert, height: 12, ellipsis: true }); curX += colWidths.pert;

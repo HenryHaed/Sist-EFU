@@ -3,6 +3,7 @@ import { AsistenciasService } from './asistencias.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CrearEventoDto } from './dto/crear-evento.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('asistencias')
@@ -19,6 +20,15 @@ export class AsistenciasController {
   @Roles('superusuario', 'admin', 'controladorhcu')
   getEventos() {
     return this.asistenciasService.getEventos();
+  }
+
+  @Post('eventos')
+  @Roles('superusuario', 'admin', 'controladorhcu')
+  crearEvento(@Body() dto: CrearEventoDto, @Request() req) {
+    const remitente = [req.user?.nombres, req.user?.primerApellido].filter(Boolean).join(' ').trim()
+      || req.user?.ci
+      || 'Administración EFU';
+    return this.asistenciasService.crearEventoYCitarDelegados(dto, remitente);
   }
 
   @Post('registrar')

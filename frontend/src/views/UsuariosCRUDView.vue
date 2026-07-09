@@ -233,9 +233,19 @@
               <!-- CI -->
               <div>
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Carnet de Identidad</label>
-                <input v-model="form.ci" required type="text" placeholder="Ej. 1234567"
-                  class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all" />
-                <p v-if="!editando" class="text-[9px] text-slate-400 mt-1 italic">La contraseña inicial será el CI del usuario.</p>
+                <input
+                  v-model="form.ci"
+                  required
+                  type="text"
+                  inputmode="numeric"
+                  minlength="5"
+                  maxlength="20"
+                  pattern="[0-9]{5,20}"
+                  placeholder="Ej. 1234567"
+                  class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all"
+                />
+                <p class="text-[9px] text-slate-400 mt-1">Mínimo 5 dígitos numéricos.</p>
+                <p v-if="!editando" class="text-[9px] text-slate-400 mt-0.5 italic">La contraseña inicial será el CI del usuario.</p>
               </div>
 
               <!-- Nombres -->
@@ -454,6 +464,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import api from '../services/api'
 import Swal from 'sweetalert2'
+import { validarCiUsuario, normalizarCiUsuario } from '../utils/ciUsuario'
 
 const props = defineProps({
   rolFiltro: { type: String, required: true }
@@ -475,6 +486,7 @@ const cargandoFraternidades = ref(false)
 let fraternidadBusquedaTimeout = null
 const loading = ref(true)
 const saving = ref(false)
+const ciOriginalAlAbrir = ref('')
 const searchQuery = ref('')
 const modalOpen = ref(false)
 const editando = ref(false)
@@ -606,6 +618,7 @@ const abrirModal = async (modoEdicion, usuario = null) => {
   errorFormulario.value = ''
   
   if (modoEdicion && usuario) {
+    ciOriginalAlAbrir.value = usuario.ci || ''
     form.value = {
       idUsuario: usuario.idUsuario,
       ci: usuario.ci,
@@ -624,6 +637,7 @@ const abrirModal = async (modoEdicion, usuario = null) => {
     fraternidadSugerencias.value = []
     asegurarFraternidadSeleccionada(usuario.fraternidad)
   } else {
+    ciOriginalAlAbrir.value = ''
     const rolDefault = roles.value.find(r => r.nombre === props.rolFiltro)
     form.value = {
       idUsuario: null,
@@ -661,6 +675,20 @@ const guardarUsuario = async () => {
       errorFormulario.value = 'El correo es obligatorio al crear un usuario.'
       saving.value = false
       return
+    }
+
+    const ciCambio = !editando.value || form.value.ci !== ciOriginalAlAbrir.value
+    if (ciCambio) {
+      const errorCi = validarCiUsuario(form.value.ci)
+      if (errorCi) {
+        errorFormulario.value = errorCi
+        saving.value = false
+        return
+      }
+      form.value.ci = normalizarCiUsuario(form.value.ci)
+      payload.ci = form.value.ci
+    } else if (editando.value) {
+      delete payload.ci
     }
 
     if (!editando.value) {
@@ -703,24 +731,55 @@ const guardarUsuario = async () => {
 }
 
 const confirmarEliminacion = async (usuario) => {
+  let timerInterval
   const result = await Swal.fire({
-    title: '¿Eliminar Usuario?',
-    text: `Se eliminará a ${usuario.nombres} ${usuario.primerApellido} (${usuario.ci}). Esta acción no se puede deshacer.`,
+    title: '¿Estás absolutamente seguro?',
+    html: `Se eliminará permanentemente a <strong>${usuario.nombres} ${usuario.primerApellido}</strong> (${usuario.ci}).<br/><br/>También se eliminarán sus solicitudes de inscripción, perfiles de jurado y registros ligados. Esta acción <strong>NO</strong> se puede deshacer.`,
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: '#d33',
     cancelButtonColor: '#64748b',
-    confirmButtonText: 'Sí, eliminar',
-    cancelButtonText: 'Cancelar'
+    confirmButtonText: 'Eliminar (5s)',
+    cancelButtonText: 'Cancelar',
+    reverseButtons: true,
+    focusCancel: true,
+    didOpen: () => {
+      const confirmBtn = Swal.getConfirmButton()
+      if (!confirmBtn) return
+      confirmBtn.disabled = true
+      let seconds = 5
+      timerInterval = setInterval(() => {
+        seconds--
+        confirmBtn.innerText = `Eliminar (${seconds}s)`
+        if (seconds <= 0) {
+          confirmBtn.disabled = false
+          confirmBtn.innerText = 'Sí, eliminar permanentemente'
+          clearInterval(timerInterval)
+        }
+      }, 1000)
+    },
+    willClose: () => {
+      clearInterval(timerInterval)
+    },
   })
 
   if (result.isConfirmed) {
     try {
       await api.delete(`/usuarios/${usuario.idUsuario}`)
       await cargarDatos()
-      Swal.fire('Eliminado', 'El usuario ha sido eliminado.', 'success')
-    } catch {
-      Swal.fire('Error', 'No se pudo eliminar al usuario. Es posible que tenga dependencias.', 'error')
+      Swal.fire({
+        title: 'Eliminado',
+        text: 'El usuario ha sido eliminado.',
+        icon: 'success',
+        confirmButtonColor: '#003399',
+      })
+    } catch (e) {
+      Swal.fire({
+        title: 'Error',
+        text: e.response?.data?.message || 'No se pudo eliminar al usuario.',
+        icon: 'error',
+        confirmButtonColor: '#003399',
+      })
     }
   }
 }

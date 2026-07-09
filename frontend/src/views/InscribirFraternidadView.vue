@@ -44,26 +44,41 @@
 
       <!-- SOLICITUD YA ENVIADA O APROBADA -->
       <div v-else-if="solicitudExistente && !solicitudEditable" class="py-24 px-8 text-center flex flex-col items-center">
-        <!-- PENDIENTE / OBSERVADO -->
-        <template v-if="solicitudExistente.estado !== 'APROBADO' && solicitudExistente.estado !== 'RECHAZADO'">
+        <!-- RECHAZADO: anulada, sin derecho a corregir -->
+        <template v-if="solicitudExistente.estado === 'RECHAZADO'">
+          <div class="size-24 bg-red-50 text-secondary rounded-full flex items-center justify-center mb-6">
+            <span class="material-symbols-outlined text-5xl">block</span>
+          </div>
+          <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Inscripción anulada</h3>
+          <p class="max-w-md text-slate-500 font-medium mb-4">
+            La Comisión ha rechazado y anulado tu solicitud de inscripción para la gestión {{ siteInfo.anio }}.
+            <strong class="text-secondary">No tienes derecho a corregir ni reenviar</strong> esta inscripción.
+          </p>
+          <div v-if="solicitudExistente.observaciones" class="bg-red-50 border border-red-100 p-4 rounded-xl mb-8 max-w-md text-left">
+            <p class="text-[10px] font-black uppercase text-red-600 mb-1">Motivo del rechazo (La Comisión):</p>
+            <p class="text-xs text-red-800 font-medium">{{ solicitudExistente.observaciones }}</p>
+          </div>
+          <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
+            Ir a Mi Panel
+          </button>
+        </template>
+
+        <!-- PENDIENTE: en revisión -->
+        <template v-else-if="solicitudExistente.estado === 'PENDIENTE'">
           <div class="size-24 bg-indigo-50 text-primary rounded-full flex items-center justify-center mb-6">
             <span class="material-symbols-outlined text-5xl">mark_email_read</span>
           </div>
           <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Solicitud en Revisión</h3>
           <p class="max-w-md text-slate-500 font-medium mb-4">
-            Ya has enviado una solicitud de inscripción para la gestión {{ siteInfo.anio }}. 
-            Tu registro se encuentra actualmente en estado: 
+            Ya has enviado una solicitud de inscripción para la gestión {{ siteInfo.anio }}.
+            Tu registro se encuentra actualmente en estado:
             <span class="px-3 py-1 bg-primary/10 text-primary rounded-full font-black text-[10px] uppercase ml-2">
-              {{ solicitudExistente.estado }}
+              PENDIENTE
             </span>
           </p>
           <p class="max-w-sm text-slate-400 text-xs italic mb-8">
-            Por favor, espera a que el comité administrativo revise tu documentación. Serás notificado una vez se tome una decisión.
+            Por favor, espera a que <strong>La Comisión</strong> revise tu documentación. Serás notificado una vez se tome una decisión.
           </p>
-          <div v-if="solicitudExistente.observaciones" class="bg-amber-50 border border-amber-100 p-4 rounded-xl mb-8 max-w-md">
-             <p class="text-[10px] font-black uppercase text-amber-600 mb-1">Observaciones del Admin:</p>
-             <p class="text-xs text-amber-800 font-medium">{{ solicitudExistente.observaciones }}</p>
-          </div>
           <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-primary text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
             Ir a Mi Panel
           </button>
@@ -76,10 +91,10 @@
           </div>
           <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">¡Preinscripción Aprobada!</h3>
           <p class="text-slate-500 font-medium mb-6">
-            Tu solicitud para la fraternidad <b class="text-primary">{{ solicitudExistente.nombreFraternidad }}</b> ha sido revisada y aceptada por el comité.
+            Tu solicitud para la fraternidad <b class="text-primary">{{ solicitudExistente.nombreFraternidad }}</b> ha sido revisada y aceptada por <strong>La Comisión</strong>.
           </p>
           <p class="text-slate-400 text-sm italic max-w-md mx-auto mb-8">
-            El registro oficial de tu fraternidad está pendiente de completarse en el sistema. Contacta al comité si este estado persiste.
+            El registro oficial de tu fraternidad está pendiente de completarse en el sistema. Contacta a La Comisión si este estado persiste.
           </p>
           <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
             Ir a mi Panel
@@ -101,7 +116,6 @@
             <div class="grid grid-cols-2 gap-4 text-sm">
               <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Nombre</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.nombre }}</span></div>
               <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Categoría</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.categoria?.nombre || 'General' }}</span></div>
-              <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Tipo de Danza</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.origenFraternidad }}</span></div>
               <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Instancia</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.nivelRepresentacion }}</span></div>
               <div v-if="solicitudExistente.fraternidadCreada.facultad"><span class="font-bold text-slate-400 block text-[10px] uppercase">Facultad</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.facultad.nombre }}</span></div>
               <div v-if="solicitudExistente.fraternidadCreada.carrera"><span class="font-bold text-slate-400 block text-[10px] uppercase">Carrera</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.carrera.nombre }}</span></div>
@@ -122,7 +136,7 @@
         <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Periodo de Inscripción Cerrado</h3>
         <p class="max-w-md text-slate-500 font-medium mb-8">
           Actualmente no existen categorías con periodos de inscripción habilitados. 
-          Por favor, consulta el cronograma oficial o contacta con el comité administrativo.
+          Por favor, consulta el cronograma oficial o contacta con <strong>La Comisión</strong>.
         </p>
         <button @click="$router.push('/')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all">
           Volver al Inicio
@@ -130,22 +144,29 @@
       </div>
 
       <form v-else @submit.prevent="handleSubmit" novalidate class="form-inscripcion p-8 md:p-12">
+        <div ref="wizardAnchor" class="scroll-mt-4" aria-hidden="true"></div>
 
         <div v-if="solicitudEditable" class="mb-8 p-6 rounded-3xl border border-amber-300 bg-amber-50">
-          <p class="text-[10px] font-black uppercase tracking-[0.2em] text-amber-800 mb-2">Solicitud con correcciones</p>
+          <p class="text-[10px] font-black uppercase tracking-[0.2em] text-amber-800 mb-2">Solicitud observada por La Comisión</p>
           <p class="text-sm text-slate-800 font-semibold leading-relaxed">
-            Esta solicitud fue observada y rechazada. Corrija los datos ingresados anteriormente.
-            Los datos aprobados por el Comité quedarán guardados y no se pueden modificar.
+            La Comisión observó tu solicitud. Corrige únicamente los datos señalados a continuación.
+            Los datos ya aprobados por La Comisión quedarán guardados y no se pueden modificar.
           </p>
-          <div v-if="correccionesSolicitadas.length" class="mt-4 flex flex-wrap gap-2">
-            <span v-for="item in correccionesSolicitadas" :key="item.key" class="px-3 py-1 rounded-full bg-white border border-red-200 text-red-800 text-[10px] font-black uppercase tracking-widest">
-              {{ item.label }}
-            </span>
+          <div v-if="correccionesSolicitadas.length" class="mt-4 space-y-2 text-left">
+            <p class="text-[10px] font-black uppercase text-amber-700">Corregir lo siguiente:</p>
+            <div
+              v-for="item in correccionesSolicitadas"
+              :key="item.key"
+              class="p-3 rounded-xl bg-white border border-red-200"
+            >
+              <p class="text-[10px] font-black uppercase text-red-800 tracking-widest">{{ item.label }}</p>
+              <p v-if="item.comentario" class="text-xs text-red-700 font-medium mt-1">{{ item.comentario }}</p>
+            </div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5 text-[11px] font-semibold">
             <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-100/80 border border-emerald-300 text-emerald-900">
               <span class="size-3 rounded bg-emerald-400 shrink-0"></span>
-              Datos aprobados por el comité (bloqueados)
+              Datos aprobados por La Comisión (bloqueados)
             </div>
             <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-100/80 border border-red-300 text-red-900">
               <span class="size-3 rounded bg-red-400 shrink-0"></span>
@@ -168,22 +189,10 @@
               <input v-model="form.nombreFraternidad" @input="form.nombreFraternidad = form.nombreFraternidad.toUpperCase()" type="text" required placeholder="Ej. Caporales Ingeniería" :disabled="!puedeEditarNombreFraternidad" :class="claseInputCampo('nombreFraternidad')" />
             </div>
 
-            <!-- 2. Origen / Tipo de Danza -->
+            <!-- 2. Instancia -->
             <div>
-              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">2. Origen / Tipo de Danza</label>
-              <select v-model="form.origenFraternidad" required :disabled="!puedeEditarCampo('origenFraternidad')" :class="claseInputCampo('origenFraternidad')">
-                <option value="Danza Pesada">Danza Pesada</option>
-                <option value="Danza Liviana">Danza Liviana</option>
-                <option value="Danza Autóctona">Danza Autóctona</option>
-                <option value="Taller Cultural">Taller Cultural</option>
-                <option value="General">General</option>
-              </select>
-            </div>
-
-            <!-- 3. Instancia -->
-            <div>
-              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">3. Instancia a la que representa</label>
-              <select v-model="form.instanciaRepresentacion" required :disabled="!puedeEditarCampo('instancia')" :class="claseInputCampo('instanciaRepresentacion')">
+              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">2. Instancia a la que representa</label>
+              <select v-model="form.instanciaRepresentacion" required :disabled="!puedeEditarCampo('instancia')" :class="claseInputCampo('instanciaRepresentacion')" @change="marcarCampoEditado('instanciaRepresentacion')">
                 <option value="Facultad">Facultad</option>
                 <option value="Carrera">Carrera</option>
                 <option value="UMSA">UMSA (Nivel Central)</option>
@@ -193,10 +202,10 @@
               </select>
             </div>
 
-            <!-- 4. Categoria -->
+            <!-- 3. Categoria -->
             <div>
-              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">4. Categoría</label>
-              <select v-model="form.idCategoria" required :disabled="!puedeEditarCampo('categoria')" :class="claseInputCampo('idCategoria')">
+              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">3. Categoría</label>
+              <select v-model="form.idCategoria" required :disabled="!puedeEditarCampo('categoria')" :class="claseInputCampo('idCategoria')" @change="marcarCampoEditado('idCategoria')">
                 <option :value="null" disabled>Selecciona una categoría</option>
                 <option v-for="cat in activeCategories" :key="cat.idCategoria" :value="cat.idCategoria">
                   {{ cat.nombre }}
@@ -207,17 +216,28 @@
               </p>
             </div>
 
+            <!-- Tipo de danza -->
+            <div class="md:col-span-2">
+              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Tipo de danza de la fraternidad</label>
+              <select v-model="form.idTipoDanza" required :disabled="!puedeEditarCampo('tipoDanza')" :class="claseInputCampo('idTipoDanza')" @change="marcarCampoEditado('idTipoDanza')">
+                <option :value="null" disabled>Selecciona el tipo de danza</option>
+                <option v-for="td in tiposDanza" :key="td.idTipoDanza" :value="td.idTipoDanza">
+                  {{ td.nombre }}
+                </option>
+              </select>
+            </div>
+
             <!-- Conditional Selects based on Instancia -->
             <div v-if="form.instanciaRepresentacion === 'Facultad' || form.instanciaRepresentacion === 'Carrera'" class="md:col-span-1">
               <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Seleccionar Facultad</label>
-              <select v-model="form.idFacultad" required :disabled="!puedeEditarCampo('facultad')" :class="claseInputCampo('idFacultad')">
+              <select v-model="form.idFacultad" required :disabled="!puedeEditarCampo('facultad')" :class="claseInputCampo('idFacultad')" @change="marcarCampoEditado('idFacultad')">
                 <option v-for="fac in facultades" :key="fac.idFacultad" :value="fac.idFacultad">{{ fac.nombre }}</option>
               </select>
             </div>
 
             <div v-if="form.instanciaRepresentacion === 'Carrera'" class="md:col-span-1">
               <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Seleccionar Carrera</label>
-              <select v-model="form.idCarrera" required :disabled="!puedeEditarCampo('carrera')" :class="claseInputCampo('idCarrera')">
+              <select v-model="form.idCarrera" required :disabled="!puedeEditarCampo('carrera')" :class="claseInputCampo('idCarrera')" @change="marcarCampoEditado('idCarrera')">
                 <option v-for="car in filteredCarreras" :key="car.idCarrera" :value="car.idCarrera">{{ car.nombre }}</option>
               </select>
             </div>
@@ -242,6 +262,7 @@
                <div class="flex items-center gap-2 mb-6">
                  <span class="material-symbols-outlined text-primary">person</span>
                  <p class="text-xs font-black uppercase tracking-widest">Presidente de la Fraternidad</p>
+                 <span class="ml-auto text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary">Obligatorio</span>
                </div>
                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
                  <div class="md:col-span-4">
@@ -257,10 +278,18 @@
                     <input v-model="form.presiSegundoApellido" @input="upperCase('presiSegundoApellido')" type="text" placeholder="MATERNO" :disabled="!puedeEditarCampo('presiSegundoApellido')" :class="claseInputCampo('presiSegundoApellido')" />
                  </div>
                  <div class="md:col-span-6">
-                    <label class="label-xs">5. Carnet CI</label>
-                    <input v-model="form.presiCi" @input="onCiChange('presiCi', 'Presidente')" @keypress="onlyNumbers" type="text" required placeholder="CI" :disabled="!puedeEditarCampo('presiCi')" :class="claseInputCampo('presiCi')" />
-                    <p v-if="mensajeCi('presiCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('presiCi') }}</p>
-                    <p v-else-if="ciValidacion.presiCi?.estado === 'checking'" class="text-[10px] text-slate-400 font-bold mt-1">Verificando CI...</p>
+                    <CiConComplemento
+                      v-model:ci="form.presiCi"
+                      v-model:complemento="form.presiCiComplemento"
+                      v-model:activo="ciComplementoActivo.presi"
+                      label="5. Carnet CI"
+                      required
+                      :disabled="!puedeEditarCampo('presiCi')"
+                      :clase-input="claseInputCampo('presiCi')"
+                      :mensaje-error="mensajeCi('presiCi')"
+                      :estado-validacion="ciValidacion.presiCi"
+                      @ci-change="onCiChange('presiCi', 'Presidente')"
+                    />
                  </div>
                  <div class="md:col-span-6">
                     <label class="label-xs">6. Celular</label>
@@ -274,6 +303,7 @@
                <div class="flex items-center gap-2 mb-6">
                  <span class="material-symbols-outlined text-slate-400">group</span>
                  <p class="text-xs font-black uppercase tracking-widest">Vicepresidente</p>
+                 <span class="ml-auto text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary">Obligatorio</span>
                </div>
                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
                  <div class="md:col-span-4">
@@ -289,10 +319,18 @@
                     <input v-model="form.viceSegundoApellido" @input="upperCase('viceSegundoApellido')" type="text" placeholder="MATERNO" :disabled="!puedeEditarCampo('viceSegundoApellido')" :class="claseInputCampo('viceSegundoApellido')" />
                  </div>
                  <div class="md:col-span-6">
-                    <label class="label-xs">8. Carnet CI</label>
-                    <input v-model="form.viceCi" @input="onCiChange('viceCi', 'Vicepresidente')" @keypress="onlyNumbers" type="text" required placeholder="CI" :disabled="!puedeEditarCampo('viceCi')" :class="claseInputCampo('viceCi')" />
-                    <p v-if="mensajeCi('viceCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('viceCi') }}</p>
-                    <p v-else-if="ciValidacion.viceCi?.estado === 'checking'" class="text-[10px] text-slate-400 font-bold mt-1">Verificando CI...</p>
+                    <CiConComplemento
+                      v-model:ci="form.viceCi"
+                      v-model:complemento="form.viceCiComplemento"
+                      v-model:activo="ciComplementoActivo.vice"
+                      label="8. Carnet CI"
+                      required
+                      :disabled="!puedeEditarCampo('viceCi')"
+                      :clase-input="claseInputCampo('viceCi')"
+                      :mensaje-error="mensajeCi('viceCi')"
+                      :estado-validacion="ciValidacion.viceCi"
+                      @ci-change="onCiChange('viceCi', 'Vicepresidente')"
+                    />
                  </div>
                  <div class="md:col-span-6">
                     <label class="label-xs">9. Celular</label>
@@ -304,38 +342,63 @@
             <!-- SECRETARIOS -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                <div class="p-6 rounded-3xl border border-slate-100">
-                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Secretario General</p>
+                  <div class="flex items-center justify-between mb-4">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Secretario General</p>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-400">Opcional</span>
+                  </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
-                       <input v-model="form.secGenNombres" @input="upperCase('secGenNombres')" placeholder="10. Nombres" type="text" required :disabled="!puedeEditarCampo('secGenNombres')" :class="claseInputCampo('secGenNombres')" />
+                       <input v-model="form.secGenNombres" @input="upperCase('secGenNombres')" placeholder="10. Nombres" type="text" :disabled="!puedeEditarCampo('secGenNombres')" :class="claseInputCampo('secGenNombres')" />
                     </div>
                     <div class="md:col-span-4">
-                       <input v-model="form.secGenPrimerApellido" @input="upperCase('secGenPrimerApellido')" placeholder="Paterno" type="text" required :disabled="!puedeEditarCampo('secGenPrimerApellido')" :class="claseInputCampo('secGenPrimerApellido')" />
+                       <input v-model="form.secGenPrimerApellido" @input="upperCase('secGenPrimerApellido')" placeholder="Paterno" type="text" :disabled="!puedeEditarCampo('secGenPrimerApellido')" :class="claseInputCampo('secGenPrimerApellido')" />
                     </div>
                     <div class="md:col-span-4">
                        <input v-model="form.secGenSegundoApellido" @input="upperCase('secGenSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('secGenSegundoApellido')" :class="claseInputCampo('secGenSegundoApellido')" />
                     </div>
                     <div class="md:col-span-12">
-                       <input v-model="form.secGenCi" @input="onCiChange('secGenCi', 'Secretario General')" @keypress="onlyNumbers" placeholder="11. CI" type="text" required :disabled="!puedeEditarCampo('secGenCi')" :class="claseInputCampo('secGenCi')" />
-                       <p v-if="mensajeCi('secGenCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('secGenCi') }}</p>
+                       <CiConComplemento
+                         v-model:ci="form.secGenCi"
+                         v-model:complemento="form.secGenCiComplemento"
+                         v-model:activo="ciComplementoActivo.secGen"
+                         label="11. Carnet CI"
+                         :disabled="!puedeEditarCampo('secGenCi')"
+                         :clase-input="claseInputCampo('secGenCi')"
+                         :mensaje-error="mensajeCi('secGenCi')"
+                         :estado-validacion="ciValidacion.secGenCi"
+                         @ci-change="onCiChange('secGenCi', 'Secretario General')"
+                       />
                     </div>
                   </div>
                </div>
-               <div class="p-6 rounded-3xl border border-slate-100">
-                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Secretario de Hacienda</p>
+               <div class="p-6 rounded-3xl border border-primary/20 bg-primary/[0.02]">
+                  <div class="flex items-center justify-between mb-4">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-700">Secretario de Hacienda</p>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary">Obligatorio</span>
+                  </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
-                       <input v-model="form.secHaciNombres" @input="upperCase('secHaciNombres')" placeholder="12. Nombres" type="text" required :disabled="!puedeEditarCampo('secHaciNombres')" :class="claseInputCampo('secHaciNombres')" />
+                       <input v-model="form.secHaciNombres" @input="upperCase('secHaciNombres')" placeholder="12. Nombres *" type="text" required :disabled="!puedeEditarCampo('secHaciNombres')" :class="claseInputCampo('secHaciNombres')" />
                     </div>
                     <div class="md:col-span-4">
-                       <input v-model="form.secHaciPrimerApellido" @input="upperCase('secHaciPrimerApellido')" placeholder="Paterno" type="text" required :disabled="!puedeEditarCampo('secHaciPrimerApellido')" :class="claseInputCampo('secHaciPrimerApellido')" />
+                       <input v-model="form.secHaciPrimerApellido" @input="upperCase('secHaciPrimerApellido')" placeholder="Paterno *" type="text" required :disabled="!puedeEditarCampo('secHaciPrimerApellido')" :class="claseInputCampo('secHaciPrimerApellido')" />
                     </div>
                     <div class="md:col-span-4">
                        <input v-model="form.secHaciSegundoApellido" @input="upperCase('secHaciSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('secHaciSegundoApellido')" :class="claseInputCampo('secHaciSegundoApellido')" />
                     </div>
                     <div class="md:col-span-12">
-                       <input v-model="form.secHaciCi" @input="onCiChange('secHaciCi', 'Secretario de Hacienda')" @keypress="onlyNumbers" placeholder="13. CI" type="text" required :disabled="!puedeEditarCampo('secHaciCi')" :class="claseInputCampo('secHaciCi')" />
-                       <p v-if="mensajeCi('secHaciCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('secHaciCi') }}</p>
+                       <CiConComplemento
+                         v-model:ci="form.secHaciCi"
+                         v-model:complemento="form.secHaciCiComplemento"
+                         v-model:activo="ciComplementoActivo.secHaci"
+                         label="13. Carnet CI *"
+                         required
+                         :disabled="!puedeEditarCampo('secHaciCi')"
+                         :clase-input="claseInputCampo('secHaciCi')"
+                         :mensaje-error="mensajeCi('secHaciCi')"
+                         :estado-validacion="ciValidacion.secHaciCi"
+                         @ci-change="onCiChange('secHaciCi', 'Secretario de Hacienda')"
+                       />
                     </div>
                   </div>
                </div>
@@ -354,7 +417,10 @@
             <div class="space-y-6">
               <!-- Sec Actas -->
                <div class="p-6 rounded-3xl border border-slate-100">
-                  <p class="label-xs mb-3">Secretario de Actas (14-15)</p>
+                  <div class="flex items-center justify-between mb-3">
+                    <p class="label-xs mb-0">Secretario de Actas (14-15)</p>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-400">Opcional</span>
+                  </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
                       <input v-model="form.secActasNombres" @input="upperCase('secActasNombres')" placeholder="14. Nombres" type="text" :disabled="!puedeEditarCampo('secActasNombres')" :class="claseInputCampo('secActasNombres')" />
@@ -366,14 +432,26 @@
                       <input v-model="form.secActasSegundoApellido" @input="upperCase('secActasSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('secActasSegundoApellido')" :class="claseInputCampo('secActasSegundoApellido')" />
                     </div>
                     <div class="md:col-span-12">
-                      <input v-model="form.secActasCi" @input="onCiChange('secActasCi', 'Secretario de Actas')" @keypress="onlyNumbers" placeholder="15. CI" type="text" :disabled="!puedeEditarCampo('secActasCi')" :class="claseInputCampo('secActasCi')" />
-                      <p v-if="mensajeCi('secActasCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('secActasCi') }}</p>
+                      <CiConComplemento
+                        v-model:ci="form.secActasCi"
+                        v-model:complemento="form.secActasCiComplemento"
+                        v-model:activo="ciComplementoActivo.secActas"
+                        label="15. Carnet CI"
+                        :disabled="!puedeEditarCampo('secActasCi')"
+                        :clase-input="claseInputCampo('secActasCi')"
+                        :mensaje-error="mensajeCi('secActasCi')"
+                        :estado-validacion="ciValidacion.secActasCi"
+                        @ci-change="onCiChange('secActasCi', 'Secretario de Actas')"
+                      />
                     </div>
                   </div>
                </div>
                <!-- Sec Prensa -->
                <div class="p-6 rounded-3xl border border-slate-100">
-                  <p class="label-xs mb-3">Secretario de Prensa y Propaganda (16-17)</p>
+                  <div class="flex items-center justify-between mb-3">
+                    <p class="label-xs mb-0">Secretario de Prensa y Propaganda (16-17)</p>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-400">Opcional</span>
+                  </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
                       <input v-model="form.secPrensaNombres" @input="upperCase('secPrensaNombres')" placeholder="16. Nombres" type="text" :disabled="!puedeEditarCampo('secPrensaNombres')" :class="claseInputCampo('secPrensaNombres')" />
@@ -385,14 +463,26 @@
                       <input v-model="form.secPrensaSegundoApellido" @input="upperCase('secPrensaSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('secPrensaSegundoApellido')" :class="claseInputCampo('secPrensaSegundoApellido')" />
                     </div>
                     <div class="md:col-span-12">
-                      <input v-model="form.secPrensaCi" @input="onCiChange('secPrensaCi', 'Secretario de Prensa')" @keypress="onlyNumbers" placeholder="17. CI" type="text" :disabled="!puedeEditarCampo('secPrensaCi')" :class="claseInputCampo('secPrensaCi')" />
-                      <p v-if="mensajeCi('secPrensaCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('secPrensaCi') }}</p>
+                      <CiConComplemento
+                        v-model:ci="form.secPrensaCi"
+                        v-model:complemento="form.secPrensaCiComplemento"
+                        v-model:activo="ciComplementoActivo.secPrensa"
+                        label="17. Carnet CI"
+                        :disabled="!puedeEditarCampo('secPrensaCi')"
+                        :clase-input="claseInputCampo('secPrensaCi')"
+                        :mensaje-error="mensajeCi('secPrensaCi')"
+                        :estado-validacion="ciValidacion.secPrensaCi"
+                        @ci-change="onCiChange('secPrensaCi', 'Secretario de Prensa')"
+                      />
                     </div>
                   </div>
                </div>
                <!-- Vocal -->
                <div class="p-6 rounded-3xl border border-slate-100">
-                  <p class="label-xs mb-3">Vocal (18-19)</p>
+                  <div class="flex items-center justify-between mb-3">
+                    <p class="label-xs mb-0">Vocal (18-19)</p>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-400">Opcional</span>
+                  </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
                       <input v-model="form.vocalNombres" @input="upperCase('vocalNombres')" placeholder="18. Nombres" type="text" :disabled="!puedeEditarCampo('vocalNombres')" :class="claseInputCampo('vocalNombres')" />
@@ -404,8 +494,17 @@
                       <input v-model="form.vocalSegundoApellido" @input="upperCase('vocalSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('vocalSegundoApellido')" :class="claseInputCampo('vocalSegundoApellido')" />
                     </div>
                     <div class="md:col-span-12">
-                      <input v-model="form.vocalCi" @input="onCiChange('vocalCi', 'Vocal')" @keypress="onlyNumbers" placeholder="19. CI" type="text" :disabled="!puedeEditarCampo('vocalCi')" :class="claseInputCampo('vocalCi')" />
-                      <p v-if="mensajeCi('vocalCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('vocalCi') }}</p>
+                      <CiConComplemento
+                        v-model:ci="form.vocalCi"
+                        v-model:complemento="form.vocalCiComplemento"
+                        v-model:activo="ciComplementoActivo.vocal"
+                        label="19. Carnet CI"
+                        :disabled="!puedeEditarCampo('vocalCi')"
+                        :clase-input="claseInputCampo('vocalCi')"
+                        :mensaje-error="mensajeCi('vocalCi')"
+                        :estado-validacion="ciValidacion.vocalCi"
+                        @ci-change="onCiChange('vocalCi', 'Vocal')"
+                      />
                     </div>
                   </div>
                </div>
@@ -415,67 +514,106 @@
              <div class="space-y-6">
                 <!-- Co-gobierno -->
                 <div class="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100/50">
-                  <p class="text-[10px] font-black uppercase text-indigo-800 mb-4">Delegado a Co-Gobierno HCF o HCC (20-22)</p>
+                  <div class="flex items-center justify-between mb-4">
+                    <p class="text-[10px] font-black uppercase text-indigo-800">Delegado a Co-Gobierno HCF o HCC (20-22)</p>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary">Obligatorio</span>
+                  </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
-                      <input v-model="form.delCogobNombres" @input="upperCase('delCogobNombres')" placeholder="20. Nombres" type="text" :disabled="!puedeEditarCampo('delCogobNombres')" :class="claseInputCampo('delCogobNombres')" />
+                      <input v-model="form.delCogobNombres" @input="upperCase('delCogobNombres')" placeholder="20. Nombres *" type="text" required :disabled="!puedeEditarCampo('delCogobNombres')" :class="claseInputCampo('delCogobNombres')" />
                     </div>
                     <div class="md:col-span-4">
-                      <input v-model="form.delCogobPrimerApellido" @input="upperCase('delCogobPrimerApellido')" placeholder="Paterno" type="text" :disabled="!puedeEditarCampo('delCogobPrimerApellido')" :class="claseInputCampo('delCogobPrimerApellido')" />
+                      <input v-model="form.delCogobPrimerApellido" @input="upperCase('delCogobPrimerApellido')" placeholder="Paterno *" type="text" required :disabled="!puedeEditarCampo('delCogobPrimerApellido')" :class="claseInputCampo('delCogobPrimerApellido')" />
                     </div>
                     <div class="md:col-span-4">
                       <input v-model="form.delCogobSegundoApellido" @input="upperCase('delCogobSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('delCogobSegundoApellido')" :class="claseInputCampo('delCogobSegundoApellido')" />
                     </div>
                     <div class="md:col-span-6">
-                      <input v-model="form.delCogobCi" @input="onCiChange('delCogobCi', 'Delegado a Co-Gobierno')" @keypress="onlyNumbers" placeholder="21. CI" type="text" :disabled="!puedeEditarCampo('delCogobCi')" :class="claseInputCampo('delCogobCi')" />
-                      <p v-if="mensajeCi('delCogobCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('delCogobCi') }}</p>
+                      <CiConComplemento
+                        v-model:ci="form.delCogobCi"
+                        v-model:complemento="form.delCogobCiComplemento"
+                        v-model:activo="ciComplementoActivo.delCogob"
+                        label="21. Carnet CI *"
+                        required
+                        :disabled="!puedeEditarCampo('delCogobCi')"
+                        :clase-input="claseInputCampo('delCogobCi')"
+                        :mensaje-error="mensajeCi('delCogobCi')"
+                        :estado-validacion="ciValidacion.delCogobCi"
+                        @ci-change="onCiChange('delCogobCi', 'Delegado a Co-Gobierno')"
+                      />
                     </div>
                     <div class="md:col-span-6">
-                      <input v-model="form.delCogobCelular" @keypress="onlyNumbers" placeholder="22. Celular" type="text" :disabled="!puedeEditarCampo('delCogobCelular')" :class="claseInputCampo('delCogobCelular')" />
+                      <input v-model="form.delCogobCelular" @keypress="onlyNumbers" placeholder="22. Celular *" type="text" required :disabled="!puedeEditarCampo('delCogobCelular')" :class="claseInputCampo('delCogobCelular')" />
                     </div>
                   </div>
                 </div>
                 <!-- Titular -->
                 <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                  <p class="text-[10px] font-black uppercase text-slate-800 mb-4">Delegado Titular (23-25)</p>
+                  <div class="flex items-center justify-between mb-4">
+                    <p class="text-[10px] font-black uppercase text-slate-800">Delegado Titular (23-25)</p>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary">Obligatorio</span>
+                  </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
-                      <input v-model="form.delTitularNombres" @input="upperCase('delTitularNombres')" placeholder="23. Nombres" type="text" :disabled="!puedeEditarCampo('delTitularNombres')" :class="claseInputCampo('delTitularNombres')" />
+                      <input v-model="form.delTitularNombres" @input="upperCase('delTitularNombres')" placeholder="23. Nombres *" type="text" required :disabled="!puedeEditarCampo('delTitularNombres')" :class="claseInputCampo('delTitularNombres')" />
                     </div>
                     <div class="md:col-span-4">
-                      <input v-model="form.delTitularPrimerApellido" @input="upperCase('delTitularPrimerApellido')" placeholder="Paterno" type="text" :disabled="!puedeEditarCampo('delTitularPrimerApellido')" :class="claseInputCampo('delTitularPrimerApellido')" />
+                      <input v-model="form.delTitularPrimerApellido" @input="upperCase('delTitularPrimerApellido')" placeholder="Paterno *" type="text" required :disabled="!puedeEditarCampo('delTitularPrimerApellido')" :class="claseInputCampo('delTitularPrimerApellido')" />
                     </div>
                     <div class="md:col-span-4">
                       <input v-model="form.delTitularSegundoApellido" @input="upperCase('delTitularSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('delTitularSegundoApellido')" :class="claseInputCampo('delTitularSegundoApellido')" />
                     </div>
                     <div class="md:col-span-6">
-                      <input v-model="form.delTitularCi" @input="onCiChange('delTitularCi', 'Delegado Titular')" @keypress="onlyNumbers" placeholder="24. CI" type="text" :disabled="!puedeEditarCampo('delTitularCi')" :class="claseInputCampo('delTitularCi')" />
-                      <p v-if="mensajeCi('delTitularCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('delTitularCi') }}</p>
+                      <CiConComplemento
+                        v-model:ci="form.delTitularCi"
+                        v-model:complemento="form.delTitularCiComplemento"
+                        v-model:activo="ciComplementoActivo.delTitular"
+                        label="24. Carnet CI *"
+                        required
+                        :disabled="!puedeEditarCampo('delTitularCi')"
+                        :clase-input="claseInputCampo('delTitularCi')"
+                        :mensaje-error="mensajeCi('delTitularCi')"
+                        :estado-validacion="ciValidacion.delTitularCi"
+                        @ci-change="onCiChange('delTitularCi', 'Delegado Titular')"
+                      />
                     </div>
                     <div class="md:col-span-6">
-                      <input v-model="form.delTitularCelular" @keypress="onlyNumbers" placeholder="25. Celular" type="text" :disabled="!puedeEditarCampo('delTitularCelular')" :class="claseInputCampo('delTitularCelular')" />
+                      <input v-model="form.delTitularCelular" @keypress="onlyNumbers" placeholder="25. Celular *" type="text" required :disabled="!puedeEditarCampo('delTitularCelular')" :class="claseInputCampo('delTitularCelular')" />
                     </div>
                   </div>
                 </div>
                 <!-- Suplente -->
                 <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                  <p class="text-[10px] font-black uppercase text-slate-800 mb-4">Delegado Suplente (26-28)</p>
+                  <div class="flex items-center justify-between mb-4">
+                    <p class="text-[10px] font-black uppercase text-slate-800">Delegado Suplente (26-28)</p>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary">Obligatorio</span>
+                  </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
-                      <input v-model="form.delSuplenteNombres" @input="upperCase('delSuplenteNombres')" placeholder="26. Nombres" type="text" :disabled="!puedeEditarCampo('delSuplenteNombres')" :class="claseInputCampo('delSuplenteNombres')" />
+                      <input v-model="form.delSuplenteNombres" @input="upperCase('delSuplenteNombres')" placeholder="26. Nombres *" type="text" required :disabled="!puedeEditarCampo('delSuplenteNombres')" :class="claseInputCampo('delSuplenteNombres')" />
                     </div>
                     <div class="md:col-span-4">
-                      <input v-model="form.delSuplentePrimerApellido" @input="upperCase('delSuplentePrimerApellido')" placeholder="Paterno" type="text" :disabled="!puedeEditarCampo('delSuplentePrimerApellido')" :class="claseInputCampo('delSuplentePrimerApellido')" />
+                      <input v-model="form.delSuplentePrimerApellido" @input="upperCase('delSuplentePrimerApellido')" placeholder="Paterno *" type="text" required :disabled="!puedeEditarCampo('delSuplentePrimerApellido')" :class="claseInputCampo('delSuplentePrimerApellido')" />
                     </div>
                     <div class="md:col-span-4">
                       <input v-model="form.delSuplenteSegundoApellido" @input="upperCase('delSuplenteSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('delSuplenteSegundoApellido')" :class="claseInputCampo('delSuplenteSegundoApellido')" />
                     </div>
                     <div class="md:col-span-6">
-                      <input v-model="form.delSuplenteCi" @input="onCiChange('delSuplenteCi', 'Delegado Suplente')" @keypress="onlyNumbers" placeholder="27. CI" type="text" :disabled="!puedeEditarCampo('delSuplenteCi')" :class="claseInputCampo('delSuplenteCi')" />
-                      <p v-if="mensajeCi('delSuplenteCi')" class="text-[10px] text-red-600 font-bold mt-1">{{ mensajeCi('delSuplenteCi') }}</p>
+                      <CiConComplemento
+                        v-model:ci="form.delSuplenteCi"
+                        v-model:complemento="form.delSuplenteCiComplemento"
+                        v-model:activo="ciComplementoActivo.delSuplente"
+                        label="27. Carnet CI *"
+                        required
+                        :disabled="!puedeEditarCampo('delSuplenteCi')"
+                        :clase-input="claseInputCampo('delSuplenteCi')"
+                        :mensaje-error="mensajeCi('delSuplenteCi')"
+                        :estado-validacion="ciValidacion.delSuplenteCi"
+                        @ci-change="onCiChange('delSuplenteCi', 'Delegado Suplente')"
+                      />
                     </div>
                     <div class="md:col-span-6">
-                      <input v-model="form.delSuplenteCelular" @keypress="onlyNumbers" placeholder="28. Celular" type="text" :disabled="!puedeEditarCampo('delSuplenteCelular')" :class="claseInputCampo('delSuplenteCelular')" />
+                      <input v-model="form.delSuplenteCelular" @keypress="onlyNumbers" placeholder="28. Celular *" type="text" required :disabled="!puedeEditarCampo('delSuplenteCelular')" :class="claseInputCampo('delSuplenteCelular')" />
                     </div>
                   </div>
                 </div>
@@ -487,50 +625,61 @@
         <div v-if="currentStep === 4" class="animate-in fade-in slide-in-from-bottom-4 duration-500">
            <div class="mb-8">
             <h3 class="text-xl font-black italic uppercase text-slate-800">Documentación de Respaldo</h3>
-            <p class="text-step-subtitle text-xs font-bold uppercase tracking-widest mt-1">Documentación de respaldo · Solo archivos PDF</p>
+            <p class="text-step-subtitle text-xs font-bold uppercase tracking-widest mt-1">4 PDFs por cargo · Solo archivos PDF</p>
           </div>
 
-          <div class="mb-10">
-            <h4 class="text-sm font-black uppercase tracking-widest text-slate-700 mb-1">29. CI y Matrícula por integrante</h4>
-            <p class="text-[11px] text-slate-400 font-medium mb-6">Sube un PDF escaneado por cada miembro de la directiva (CI y matrícula).</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div v-for="doc in ciMatriculaFields" :key="doc.key" class="p-5 rounded-3xl border-2 border-dashed transition-colors group" :class="[claseDocumentoRevision(doc.key) || 'border-slate-200 hover:border-primary/30']">
-                <div class="flex items-center justify-between mb-3">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span class="material-symbols-outlined text-slate-400 group-hover:text-primary shrink-0">badge</span>
-                    <p class="text-[10px] font-black uppercase text-slate-600 truncate">{{ doc.label }}</p>
+          <div class="mb-10 space-y-6">
+            <p class="text-[11px] text-slate-400 font-medium">
+              Por cada integrante: CI, Matrícula, No deudas fraternidad y No deudas áreas.
+              Obligatorios solo en cargos obligatorios; en opcionales los PDFs siguen opcionales.
+            </p>
+
+            <div
+              v-for="seccion in seccionesDocsPorCargo"
+              :key="seccion.prefix"
+              class="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h4 class="text-sm font-black uppercase tracking-widest text-slate-800">{{ seccion.label }}</h4>
+                    <span
+                      class="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded"
+                      :class="seccion.required ? 'bg-secondary/10 text-secondary' : 'bg-slate-100 text-slate-400'"
+                    >
+                      {{ seccion.required ? 'Obligatorio' : 'Opcional' }}
+                    </span>
                   </div>
-                  <span v-if="tieneArchivo(doc.key)" class="material-symbols-outlined text-green-500 shrink-0">check_circle</span>
+                  <p class="text-sm font-medium text-slate-700 mt-2">{{ seccion.nombreCompleto || '—' }}</p>
+                  <p class="text-xs text-slate-500 font-bold mt-0.5">CI: {{ seccion.ciDisplay }}</p>
+                  <p v-if="seccion.faltanDatos" class="text-[10px] font-bold text-amber-600 mt-2">
+                    Faltan datos de este cargo — vuelve a los pasos anteriores.
+                  </p>
                 </div>
-                <label class="cursor-pointer block">
-                  <div class="py-3 bg-slate-50 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-slate-400 group-hover:text-primary transition-colors">
-                    <span class="material-symbols-outlined text-sm">upload_file</span>
-                    {{ etiquetaArchivo(doc.key) }}
-                  </div>
-                  <input type="file" @change="handleFile($event, doc.key)" class="hidden" accept=".pdf,application/pdf" :disabled="!puedeEditarCampo(doc.key)" />
-                </label>
               </div>
-            </div>
-          </div>
 
-          <div>
-            <h4 class="text-sm font-black uppercase tracking-widest text-slate-700 mb-6">Certificados de no adeudar</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-              <div v-for="doc in documentosDeudaFields" :key="doc.key" class="p-6 rounded-3xl border-2 border-dashed transition-colors group" :class="[claseDocumentoRevision(doc.key) || 'border-slate-200 hover:border-primary/30']">
-                <div class="flex items-center justify-between mb-4">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-slate-400 group-hover:text-primary">{{ doc.icon }}</span>
-                    <p class="text-[10px] font-black uppercase text-slate-600">{{ doc.point }}. {{ doc.label }}</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div
+                  v-for="doc in seccion.docs"
+                  :key="doc.fileKey"
+                  class="p-4 rounded-2xl border-2 border-dashed transition-colors group"
+                  :class="[claseDocumentoRevision(doc.fileKey) || (seccion.required ? 'border-slate-300 hover:border-primary/30' : 'border-slate-200 hover:border-slate-300')]"
+                >
+                  <div class="flex items-center justify-between mb-3 gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="material-symbols-outlined text-slate-400 group-hover:text-primary shrink-0 text-lg">{{ doc.icon }}</span>
+                      <p class="text-[10px] font-black uppercase text-slate-600 truncate">{{ doc.shortLabel }}</p>
+                    </div>
+                    <span v-if="tieneArchivo(doc.fileKey)" class="material-symbols-outlined text-green-500 shrink-0 text-lg">check_circle</span>
                   </div>
-                  <span v-if="tieneArchivo(doc.key)" class="material-symbols-outlined text-green-500">check_circle</span>
+                  <label class="cursor-pointer block">
+                    <div class="py-2.5 bg-slate-50 rounded-xl flex items-center justify-center gap-2 text-[11px] font-bold text-slate-400 group-hover:text-primary transition-colors">
+                      <span class="material-symbols-outlined text-sm">upload_file</span>
+                      {{ etiquetaArchivo(doc.fileKey) }}
+                    </div>
+                    <input type="file" @change="handleFile($event, doc.fileKey)" class="hidden" accept=".pdf,application/pdf" :disabled="!puedeEditarCampo(doc.fileKey)" />
+                  </label>
                 </div>
-                <label class="cursor-pointer block">
-                  <div class="py-4 bg-slate-50 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-slate-400 group-hover:text-primary transition-colors">
-                    <span class="material-symbols-outlined text-sm">upload_file</span>
-                    {{ etiquetaArchivo(doc.key) }}
-                  </div>
-                  <input type="file" @change="handleFile($event, doc.key)" class="hidden" accept=".pdf,application/pdf" :disabled="!puedeEditarCampo(doc.key)" />
-                </label>
               </div>
             </div>
           </div>
@@ -573,7 +722,7 @@
         <div class="mt-16 flex items-center justify-between pt-8 border-t border-slate-100">
            <button 
             v-if="currentStep > 1"
-            type="button" @click="currentStep--"
+            type="button" @click="prevStep"
             class="px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all flex items-center gap-2"
            >
              <span class="material-symbols-outlined text-base">arrow_back_ios</span>
@@ -603,24 +752,72 @@
 
       </form>
     </div>
+
+    <!-- Modal: solicitud observada -->
+    <teleport to="body">
+      <div
+        v-if="modalObservacionesVisible"
+        class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm"
+      >
+        <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="material-symbols-outlined text-4xl text-orange-500">warning</span>
+            <h3 class="text-xl font-black text-slate-900 uppercase leading-tight">Solicitud observada</h3>
+          </div>
+          <p class="text-sm text-slate-600 mb-4 font-medium">
+            La Comisión señaló los siguientes datos que debes corregir antes de reenviar tu solicitud:
+          </p>
+          <ul class="space-y-3 mb-6">
+            <li
+              v-for="(item, idx) in itemsObservadosDetalle"
+              :key="idx"
+              class="p-3 rounded-xl bg-red-50 border border-red-200"
+            >
+              <p class="text-[10px] font-black uppercase text-red-800 tracking-widest">{{ item.label }}</p>
+              <p v-if="item.comentario" class="text-xs text-red-700 font-medium mt-1.5">{{ item.comentario }}</p>
+            </li>
+          </ul>
+          <p v-if="!modalObservacionesHabilitado" class="text-center text-xs text-slate-500 font-bold mb-4 uppercase tracking-widest">
+            Lee el mensaje — continúa en {{ segundosRestantesModal }} s
+          </p>
+          <button
+            type="button"
+            :disabled="!modalObservacionesHabilitado"
+            @click="cerrarModalObservaciones"
+            class="w-full py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
+          >
+            OK, corregir observaciones
+          </button>
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useAuthStore } from '../store/auth'
 import api from '../services/api'
 import Swal from 'sweetalert2'
+import CiConComplemento from '../components/inscripcion/CiConComplemento.vue'
 import {
   CAMPOS_NOMBRE_PERSONA,
   MAP_ADMIN_KEY_TO_DELEGADO,
   crearEstadoVacioPersonas,
   hidratarPersonasDesdeSolicitud,
-  DOCUMENTOS_CI_MATRICULA,
-  DOCUMENTOS_DEUDA,
+  crearEstadoVacioComplementoActivo,
+  hidratarComplementoActivoDesdeSolicitud,
+  ciIdentificador,
+  limpiarComplementosInactivos,
+  DOCUMENTOS_POR_PERSONA,
+  DOCUMENTOS_INSTITUCIONALES,
+  TIPOS_DOCUMENTO_PERSONA,
   PERSONAS_DIRECTIVA,
-  crearEstadoVacioArchivosCi,
-  hidratarArchivosCiDesdeSolicitud,
+  PERSONAS_OBLIGATORIAS,
+  crearEstadoVacioArchivosPersona,
+  hidratarArchivosPersonaDesdeSolicitud,
+  nombreCompletoPersona,
+  formatCiDisplay,
 } from '../utils/personaDirectiva'
 
 const authStore = useAuthStore()
@@ -633,9 +830,15 @@ const solicitudExistente = ref(null)
 const solicitudEditandoId = ref(null)
 const documentosExistentes = ref({})
 const hidratandoFormulario = ref(false)
+const modalObservacionesVisible = ref(false)
+const modalObservacionesHabilitado = ref(false)
+const segundosRestantesModal = ref(5)
+const camposEditados = ref(new Set())
+let modalObservacionesTimer = null
+let modalObservacionesInterval = null
 
 const solicitudEditable = computed(() => {
-  return solicitudExistente.value?.estado === 'RECHAZADO'
+  return solicitudExistente.value?.estado === 'OBSERVADO'
 })
 
 const steps = [
@@ -647,46 +850,58 @@ const steps = [
 
 const form = ref({
   nombreFraternidad: '',
-  origenFraternidad: 'Danza Pesada',
   instanciaRepresentacion: 'Facultad',
   nombreInstitucionExterna: '',
   idCategoria: null,
+  idTipoDanza: null,
   idFacultad: null,
   idCarrera: null,
   ...crearEstadoVacioPersonas(),
 })
 
 const files = ref({
-  ...crearEstadoVacioArchivosCi(),
-  cartaCompromiso: null,
-  resolucion: null,
-  actaDirectiva: null,
-  sinDeudasFraternidad: null,
-  sinDeudasAreas: null,
+  ...crearEstadoVacioArchivosPersona(),
 })
 
-const ciMatriculaFields = DOCUMENTOS_CI_MATRICULA.map((doc) => ({
-  key: doc.fileKey,
-  label: `CI y Matrícula — ${doc.label}`,
-}))
-
-const otrosDocumentFields = [
-  { key: 'cartaCompromiso', label: 'Carta de Compromiso Firmada', point: 31, icon: 'contract' },
-  { key: 'resolucion', label: 'Resolución HCU/HCF/HCC', point: 32, icon: 'gavel' },
-  { key: 'actaDirectiva', label: 'Acta Conformación Directiva', point: 33, icon: 'assignment' },
-]
-
-const documentosDeudaFields = DOCUMENTOS_DEUDA.map((doc) => ({
+const otrosDocumentFields = DOCUMENTOS_INSTITUCIONALES.map((doc) => ({
   key: doc.fileKey,
   label: doc.label,
   point: doc.point,
   icon: doc.icon,
+  required: !!doc.required,
 }))
 
-const documentFields = computed(() => [
-  ...ciMatriculaFields,
+const seccionesDocsPorCargo = computed(() => {
+  const f = form.value
+  return PERSONAS_DIRECTIVA.map(({ prefix, label, required }) => {
+    const nombreCompleto = nombreCompletoPersona(f, prefix)
+    const ci = String(f[`${prefix}Ci`] || '').trim()
+    const complemento = f[`${prefix}CiComplemento`]
+    return {
+      prefix,
+      label,
+      required: !!required,
+      nombreCompleto,
+      ciDisplay: formatCiDisplay(ci, complemento),
+      faltanDatos: required && (!nombreCompleto || !ci),
+      docs: TIPOS_DOCUMENTO_PERSONA.map((tipo) => {
+        const meta = DOCUMENTOS_POR_PERSONA.find((d) => d.prefix === prefix && d.type === tipo.type)
+        return {
+          ...tipo,
+          fileKey: meta?.fileKey,
+          required: !!required,
+        }
+      }),
+    }
+  })
+})
+
+const documentFieldsObligatorios = computed(() => [
+  ...DOCUMENTOS_POR_PERSONA.filter((d) => d.required).map((d) => ({
+    key: d.fileKey,
+    label: `${d.shortLabel} — ${d.cargoLabel}`,
+  })),
   ...otrosDocumentFields,
-  ...documentosDeudaFields,
 ])
 
 const tieneArchivo = (key) => Boolean(files.value[key] || documentosExistentes.value[key])
@@ -698,24 +913,41 @@ const etiquetaArchivo = (key) => {
 }
 
 const upperCase = (field) => {
+  marcarCampoEditado(field)
   form.value[field] = form.value[field].toUpperCase()
+}
+
+const marcarCampoEditado = (key) => {
+  if (!key || !solicitudEditable.value || hidratandoFormulario.value) return
+  if (!camposEditados.value.has(key)) {
+    camposEditados.value = new Set([...camposEditados.value, key])
+  }
 }
 
 const ciValidacion = ref({})
 const ciTimers = {}
+const wizardAnchor = ref(null)
+const ciComplementoActivo = ref(crearEstadoVacioComplementoActivo())
 
-const encontrarDuplicadoEnFormulario = (ciField, ci) => {
-  const ciNorm = String(ci || '').trim()
-  if (!ciNorm) return null
-  for (const p of PERSONAS_DIRECTIVA) {
-    const field = `${p.prefix}Ci`
-    if (field === ciField) continue
-    if (String(form.value[field] || '').trim() === ciNorm) return p.label
-  }
-  return null
+const scrollToWizardTop = () => {
+  nextTick(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    wizardAnchor.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
+const prefixFromCiField = (ciField) => PERSONAS_DIRECTIVA.find((p) => `${p.prefix}Ci` === ciField)?.prefix
+
+const getComplementoForField = (ciField) => {
+  const prefix = prefixFromCiField(ciField)
+  if (!prefix || !ciComplementoActivo.value[prefix]) return ''
+  return form.value[`${prefix}CiComplemento`] || ''
+}
+
+const encontrarDuplicadoEnFormulario = () => null
+
 const onCiChange = (ciField, cargoLabel) => {
+  marcarCampoEditado(ciField)
   clearTimeout(ciTimers[ciField])
   const ci = String(form.value[ciField] || '').trim()
 
@@ -724,19 +956,14 @@ const onCiChange = (ciField, cargoLabel) => {
     return
   }
 
-  const duplicado = encontrarDuplicadoEnFormulario(ciField, ci)
-  if (duplicado) {
-    ciValidacion.value = {
-      ...ciValidacion.value,
-      [ciField]: { estado: 'error', mensaje: `Este CI ya está asignado a ${duplicado} en este formulario.` },
-    }
-    return
-  }
-
+  // Se permite el mismo CI en varios cargos de ESTA fraternidad.
+  // Solo se valida que no figure en OTRA fraternidad.
   ciValidacion.value = { ...ciValidacion.value, [ciField]: { estado: 'checking', mensaje: 'Verificando...' } }
   ciTimers[ciField] = setTimeout(async () => {
     try {
+      const complemento = getComplementoForField(ciField)
       const params = { ci }
+      if (complemento) params.complemento = complemento
       if (solicitudEditandoId.value) params.excludeSolicitudId = solicitudEditandoId.value
       const { data } = await api.get('/inscripciones/verificar-ci-directiva', { params })
       if (!data.disponible) {
@@ -750,7 +977,7 @@ const onCiChange = (ciField, cargoLabel) => {
       } else {
         ciValidacion.value = {
           ...ciValidacion.value,
-          [ciField]: { estado: 'ok', mensaje: 'CI disponible para inscripción.' },
+          [ciField]: { estado: 'ok', mensaje: 'CI disponible (puede repetirse en otro cargo de esta fraternidad).' },
         }
       }
     } catch {
@@ -764,6 +991,43 @@ const mensajeCi = (field) => {
   return estado?.estado === 'error' ? estado.mensaje : ''
 }
 
+const itemsObservadosDetalle = computed(() => {
+  const checklist = revisionChecklistParsed.value
+  return Object.entries(checklist)
+    .filter(([, item]) => item?.estado === 'X')
+    .map(([, item]) => ({
+      label: item?.label || 'Dato observado',
+      comentario: item?.comentario?.trim() || '',
+    }))
+})
+
+const abrirModalObservaciones = () => {
+  if (!itemsObservadosDetalle.value.length) return
+  modalObservacionesVisible.value = true
+  modalObservacionesHabilitado.value = false
+  segundosRestantesModal.value = 5
+  clearTimeout(modalObservacionesTimer)
+  clearInterval(modalObservacionesInterval)
+  modalObservacionesTimer = setTimeout(() => {
+    modalObservacionesHabilitado.value = true
+  }, 5000)
+  modalObservacionesInterval = setInterval(() => {
+    if (segundosRestantesModal.value > 0) segundosRestantesModal.value -= 1
+  }, 1000)
+}
+
+const cerrarModalObservaciones = () => {
+  modalObservacionesVisible.value = false
+  clearTimeout(modalObservacionesTimer)
+  clearInterval(modalObservacionesInterval)
+  scrollToWizardTop()
+}
+
+onUnmounted(() => {
+  clearTimeout(modalObservacionesTimer)
+  clearInterval(modalObservacionesInterval)
+})
+
 const revisionChecklistParsed = computed(() => {
   let checklist = solicitudExistente.value?.revisionChecklist || {}
   if (typeof checklist === 'string') {
@@ -776,6 +1040,7 @@ const normalizarKeyRevision = (key) => {
   if (key === 'idFacultad') return 'facultad'
   if (key === 'idCarrera') return 'carrera'
   if (key === 'idCategoria') return 'categoria'
+  if (key === 'idTipoDanza') return 'tipoDanza'
   if (key === 'instanciaRepresentacion') return 'instancia'
   if (key === 'nombreInstitucionExterna') return 'institucionExterna'
   return key
@@ -793,6 +1058,7 @@ const checklistKeysForCampo = (key) => {
 
 const estadoRevisionCampo = (key) => {
   if (!solicitudEditable.value) return 'neutral'
+  if (camposEditados.value.has(key)) return 'neutral'
   if (correccionesSolicitadas.value.some((item) => item.key === key)) return 'corregir'
 
   const checklist = revisionChecklistParsed.value
@@ -849,7 +1115,11 @@ const correccionesSolicitadas = computed(() => {
         }
       }
       const normalizedKey = MAP_ADMIN_KEY_TO_DELEGADO[key] || key
-      return [{ key: normalizedKey, label: item?.label || key }]
+      return [{
+        key: normalizedKey,
+        label: item?.label || key,
+        comentario: item?.comentario?.trim() || '',
+      }]
     })
 })
 
@@ -860,6 +1130,7 @@ const isOriginalValueEmpty = (key) => {
   if (key === 'idFacultad') realKey = 'facultad'
   if (key === 'idCarrera') realKey = 'carrera'
   if (key === 'idCategoria') realKey = 'categoria'
+  if (key === 'idTipoDanza') realKey = 'tipoDanza'
   if (key === 'instancia') realKey = 'instanciaRepresentacion'
   
   if (realKey === 'institucionExterna') {
@@ -878,7 +1149,7 @@ const isOriginalValueEmpty = (key) => {
 
 const fraternidadHeredada = computed(() => authStore.user?.fraternidad || null)
 const puedeEditarCampo = (key) => {
-  // Si la solicitud NO está en modo edición (RECHAZADO), el formulario está libre
+  // Si la solicitud NO está en modo edición (OBSERVADO), el formulario está libre
   if (!solicitudEditable.value) return true
 
   // Si el campo estaba vacío originalmente, permitimos llenarlo por primera vez
@@ -898,22 +1169,25 @@ const puedeEditarNombreFraternidad = computed(() => {
 
 // Data for selects
 const categorias = ref([])
+const tiposDanza = ref([])
 const facultades = ref([])
 const carreras = ref([])
 
 onMounted(async () => {
   loadingForm.value = true
   try {
-    const [cfg, cats, facs, cars] = await Promise.all([
+    const [cfg, cats, facs, cars, tipos] = await Promise.all([
       api.get('/evaluaciones/gestion-activa'),
       api.get('/categorias'),
       api.get('/organizacion/facultades'),
-      api.get('/organizacion/carreras')
+      api.get('/organizacion/carreras'),
+      api.get('/reportes/tipos-danza'),
     ])
     siteInfo.value = cfg.data
     categorias.value = cats.data
     facultades.value = facs.data
     carreras.value = cars.data
+    tiposDanza.value = tipos.data
 
     // Cargar cronogramas
     if (siteInfo.value.idGestion) {
@@ -930,8 +1204,10 @@ onMounted(async () => {
         // Cargar el detalle completo para asegurar que revisionChecklist y todos los campos estén disponibles
         const { data: detalleSol } = await api.get(`/inscripciones/${actual.idSolicitud}`)
         solicitudExistente.value = detalleSol
-        if (detalleSol.estado === 'RECHAZADO') {
+        if (detalleSol.estado === 'OBSERVADO') {
           hidratarFormularioDesdeSolicitud(detalleSol)
+          await nextTick()
+          abrirModalObservaciones()
         }
       }
     }
@@ -974,6 +1250,7 @@ const onlyNumbers = (e) => {
 const nextStep = () => {
   if (validateStep(currentStep.value)) {
     currentStep.value++
+    scrollToWizardTop()
   } else {
     Swal.fire({
       icon: 'warning',
@@ -987,16 +1264,87 @@ const nextStep = () => {
   }
 }
 
+const prevStep = () => {
+  if (currentStep.value > 1) {
+    currentStep.value--
+    scrollToWizardTop()
+  }
+}
+
 const validateStep = (step) => {
   const f = form.value
   if (step === 1) {
-    if (!f.nombreFraternidad || !f.instanciaRepresentacion || !f.idCategoria || !f.origenFraternidad) return false
+    if (!f.nombreFraternidad || !f.instanciaRepresentacion || !f.idCategoria || !f.idTipoDanza) return false
     if (f.instanciaRepresentacion === 'Facultad' && !f.idFacultad) return false
     if (f.instanciaRepresentacion === 'Carrera' && (!f.idFacultad || !f.idCarrera)) return false
     if (f.instanciaRepresentacion === 'Externo' && !f.nombreInstitucionExterna) return false
     return true
   }
-  // Se quitó la obligatoriedad de los campos en los pasos 2 y 3 según lo solicitado
+
+  const cargosPaso2 = PERSONAS_OBLIGATORIAS.filter((p) =>
+    ['presi', 'vice', 'secHaci'].includes(p.prefix),
+  )
+  const cargosPaso3 = PERSONAS_OBLIGATORIAS.filter((p) =>
+    ['delCogob', 'delTitular', 'delSuplente'].includes(p.prefix),
+  )
+  const cargosAValidar = step === 2 ? cargosPaso2 : step === 3 ? cargosPaso3 : []
+
+  for (const { prefix, label, hasCelular } of cargosAValidar) {
+    const nombres = String(f[`${prefix}Nombres`] || '').trim()
+    const paterno = String(f[`${prefix}PrimerApellido`] || '').trim()
+    const ci = String(f[`${prefix}Ci`] || '').trim()
+    if (!nombres || !paterno || !ci) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Campos obligatorios',
+        text: `Completa nombres, apellido paterno y CI de ${label}.`,
+        toast: true,
+        position: 'top-end',
+        timer: 3500,
+        showConfirmButton: false,
+      })
+      return false
+    }
+    if (hasCelular && !String(f[`${prefix}Celular`] || '').trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Celular requerido',
+        text: `Indica el celular de ${label}.`,
+        toast: true,
+        position: 'top-end',
+        timer: 3000,
+        showConfirmButton: false,
+      })
+      return false
+    }
+  }
+
+  // Complemento SEGIP: si el switch está activo y hay CI, el complemento es obligatorio
+  const prefixesPaso =
+    step === 2
+      ? ['presi', 'vice', 'secGen', 'secHaci']
+      : step === 3
+        ? ['secActas', 'secPrensa', 'vocal', 'delCogob', 'delTitular', 'delSuplente']
+        : []
+  for (const prefix of prefixesPaso) {
+    if (!ciComplementoActivo.value[prefix]) continue
+    const persona = PERSONAS_DIRECTIVA.find((p) => p.prefix === prefix)
+    const ci = String(f[`${prefix}Ci`] || '').trim()
+    const comp = String(f[`${prefix}CiComplemento`] || '').trim()
+    if (ci && !comp) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Complemento requerido',
+        text: `Indica el complemento SEGIP para ${persona?.label || prefix} o desactiva el switch si no aplica.`,
+        toast: true,
+        position: 'top-end',
+        timer: 3500,
+        showConfirmButton: false,
+      })
+      return false
+    }
+  }
+
   return true
 }
 
@@ -1023,13 +1371,13 @@ const handleFile = (e, key) => {
     return
   }
   files.value[key] = file
+  marcarCampoEditado(key)
 }
 
 const hidratarFormularioDesdeFraternidad = async (fraternidad) => {
   if (!fraternidad) return
   hidratandoFormulario.value = true
   form.value.nombreFraternidad = fraternidad.nombre || form.value.nombreFraternidad
-  form.value.origenFraternidad = fraternidad.origenFraternidad || form.value.origenFraternidad || 'Danza Pesada'
   form.value.instanciaRepresentacion = fraternidad.nivelRepresentacion || form.value.instanciaRepresentacion || 'Facultad'
   form.value.idCategoria = fraternidad.categoria?.idCategoria || form.value.idCategoria
   form.value.idFacultad = fraternidad.facultad?.idFacultad || form.value.idFacultad
@@ -1044,22 +1392,19 @@ const hidratarFormularioDesdeSolicitud = async (solicitud) => {
   solicitudEditandoId.value = solicitud.idSolicitud
   form.value = {
     nombreFraternidad: solicitud.nombreFraternidad || fraternidadHeredada.value?.nombre || '',
-    origenFraternidad: solicitud.origenFraternidad || fraternidadHeredada.value?.origenFraternidad || 'Danza Pesada',
     instanciaRepresentacion: solicitud.instanciaRepresentacion || fraternidadHeredada.value?.nivelRepresentacion || 'Facultad',
     nombreInstitucionExterna: solicitud.nombreInstitucionExterna || fraternidadHeredada.value?.institucionExterna?.nombre || '',
     idCategoria: solicitud.categoria?.idCategoria || fraternidadHeredada.value?.categoria?.idCategoria || null,
+    idTipoDanza: solicitud.tipoDanza?.idTipoDanza || null,
     idFacultad: solicitud.facultad?.idFacultad || fraternidadHeredada.value?.facultad?.idFacultad || null,
     idCarrera: solicitud.carrera?.idCarrera || fraternidadHeredada.value?.carrera?.idCarrera || null,
     ...hidratarPersonasDesdeSolicitud(solicitud),
   }
+  ciComplementoActivo.value = hidratarComplementoActivoDesdeSolicitud(solicitud)
   documentosExistentes.value = {
-    ...hidratarArchivosCiDesdeSolicitud(solicitud),
-    cartaCompromiso: solicitud.urlCartaCompromiso || '',
-    resolucion: solicitud.urlResolucion || '',
-    actaDirectiva: solicitud.urlActaDirectiva || '',
-    sinDeudasFraternidad: solicitud.urlSinDeudasFraternidad || '',
-    sinDeudasAreas: solicitud.urlSinDeudasAreas || '',
+    ...hidratarArchivosPersonaDesdeSolicitud(solicitud),
   }
+  camposEditados.value = new Set()
   PERSONAS_DIRECTIVA.forEach(({ prefix, label }) => onCiChange(`${prefix}Ci`, label))
   await nextTick()
   hidratandoFormulario.value = false
@@ -1077,18 +1422,22 @@ const handleSubmit = async () => {
     return
   }
 
-  // Validate step 4 documents
-  const missingDocs = documentFields.value.filter(d => !tieneArchivo(d.key))
+  // Validate step 4 documents — solo los obligatorios
+  const missingDocs = documentFieldsObligatorios.value.filter((d) => !tieneArchivo(d.key))
   if (missingDocs.length > 0) {
-    Swal.fire('Atención', 'Debes subir todos los documentos requeridos.', 'warning')
+    Swal.fire(
+      'Atención',
+      `Debes subir los documentos obligatorios: ${missingDocs.map((d) => d.label).join(', ')}.`,
+      'warning',
+    )
     return
   }
 
   const camposMayusculas = [
-    'nombreFraternidad', 'origenFraternidad', 'nombreInstitucionExterna',
+    'nombreFraternidad', 'nombreInstitucionExterna',
     ...CAMPOS_NOMBRE_PERSONA,
   ]
-  const payload = { ...form.value }
+  const payload = limpiarComplementosInactivos({ ...form.value }, ciComplementoActivo.value)
   camposMayusculas.forEach((campo) => {
     if (typeof payload[campo] === 'string') {
       payload[campo] = payload[campo].trim().toUpperCase()
@@ -1112,7 +1461,7 @@ const handleSubmit = async () => {
 
     await Swal.fire({
       title: '¡Solicitud Enviada!',
-      text: 'Tu inscripción ha sido recibida y está en proceso de revisión por el comité administrativo.',
+      text: 'Tu inscripción ha sido recibida y está en proceso de revisión por La Comisión.',
       icon: 'success',
       confirmButtonColor: '#003399'
     })

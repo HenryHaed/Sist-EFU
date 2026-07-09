@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Facultad } from '../entities/Facultad';
@@ -6,9 +6,10 @@ import { Carrera } from '../entities/Carrera';
 import { InstitucionExterna } from '../entities/InstitucionExterna';
 import { Gestion } from '../entities/Gestion';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { ensureOrganizacionUmsaDefault } from '../common/organizacion-umsa-default';
 
 @Injectable()
-export class OrganizacionService {
+export class OrganizacionService implements OnModuleInit {
   constructor(
     @InjectRepository(Facultad)
     private readonly facultadRepo: Repository<Facultad>,
@@ -19,6 +20,10 @@ export class OrganizacionService {
     @InjectRepository(Gestion)
     private readonly gestionRepo: Repository<Gestion>,
   ) {}
+
+  async onModuleInit() {
+    await ensureOrganizacionUmsaDefault(this.facultadRepo, this.carreraRepo);
+  }
 
   async getGestionActiva() {
     return findGestionActivaOrLatest(this.gestionRepo);

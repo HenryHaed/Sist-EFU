@@ -100,7 +100,7 @@
                   </div>
                   <div>
                     <p class="font-bold text-slate-900 leading-none mb-1">{{ f.nombre }}</p>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{{ f.origenFraternidad }}</p>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{{ f.nivelRepresentacion || '—' }}</p>
                   </div>
                 </div>
               </td>
@@ -127,6 +127,14 @@
               </td>
               <td class="px-6 py-4 text-right">
                 <div class="flex justify-end gap-2">
+                  <button
+                    @click="verDirectiva(f)"
+                    class="px-3 py-1.5 rounded-lg flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-all"
+                    title="Ver directiva"
+                  >
+                    <span class="material-symbols-outlined text-[16px]">badge</span>
+                    Ver Directiva
+                  </button>
                   <button @click="editarFraternidad(f)" class="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/5 transition-all">
                     <span class="material-symbols-outlined text-[18px]">edit</span>
                   </button>
@@ -160,7 +168,7 @@
                 <span class="px-2 py-0.5 bg-white text-slate-600 rounded text-[9px] font-black uppercase tracking-wider border border-slate-200">
                   {{ f.categoria?.nombre || 'General' }}
                 </span>
-                <span class="text-[9px] font-black text-slate-400 uppercase tracking-tighter self-center ml-1">{{ f.origenFraternidad }}</span>
+                <span v-if="f.nivelRepresentacion" class="text-[9px] font-black text-slate-400 uppercase tracking-tighter self-center ml-1">{{ f.nivelRepresentacion }}</span>
               </div>
             </div>
           </div>
@@ -180,6 +188,13 @@
             </span>
             
             <div class="flex gap-2">
+              <button
+                @click="verDirectiva(f)"
+                class="px-3 py-1.5 rounded-lg flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-indigo-700 bg-white border border-indigo-200 shadow-sm"
+              >
+                <span class="material-symbols-outlined text-[14px]">badge</span>
+                Directiva
+              </button>
               <button @click="editarFraternidad(f)" class="size-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 shadow-sm">
                 <span class="material-symbols-outlined text-[16px]">edit</span>
               </button>
@@ -210,18 +225,7 @@
                   <input v-model="form.nombre" type="text" placeholder="Ej. Morenada Central" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold" />
                 </div>
 
-                <div>
-                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Tipo de Danza</label>
-                  <select v-model="form.origenFraternidad" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                    <option value="Danza Pesada">Danza Pesada</option>
-                    <option value="Danza Liviana">Danza Liviana</option>
-                    <option value="Danza Autóctona">Danza Autóctona</option>
-                    <option value="Taller Cultural">Taller Cultural</option>
-                    <option value="General">General</option>
-                  </select>
-                </div>
-
-                <div>
+                <div class="col-span-2">
                   <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Instancia (Nivel de Representación)</label>
                   <select v-model="form.nivelRepresentacion" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
                     <option value="Facultad">Facultad</option>
@@ -327,10 +331,18 @@ const getFullUrl = (url) => {
   return `http://localhost:3000${url}`
 }
 
+const verDirectiva = (f) => {
+  router.push({
+    query: {
+      v: 'directiva_fraternidad',
+      idFraternidad: f.idFraternidad,
+    },
+  })
+}
+
 const form = ref({
   idFraternidad: null,
   nombre: '',
-  origenFraternidad: 'Danza Pesada',
   nivelRepresentacion: 'Facultad',
   idCategoria: 1,
   idFacultad: null,
@@ -400,7 +412,7 @@ const fraternidadesOrdenadas = computed(() => {
       case 'nombre': {
         const byNombre = compareText((a.nombre || '').toLowerCase(), (b.nombre || '').toLowerCase())
         if (byNombre !== 0) return byNombre
-        return compareText((a.origenFraternidad || '').toLowerCase(), (b.origenFraternidad || '').toLowerCase())
+        return compareText((a.nivelRepresentacion || '').toLowerCase(), (b.nivelRepresentacion || '').toLowerCase())
       }
       case 'categoria':
         return compareText((a.categoria?.nombre || 'General').toLowerCase(), (b.categoria?.nombre || 'General').toLowerCase())
@@ -459,7 +471,6 @@ const abrirModalInscribirSolicitud = async (solicitud) => {
   form.value = {
     idFraternidad: null,
     nombre: solicitud.nombreFraternidad,
-    origenFraternidad: solicitud.origenFraternidad || 'Danza Pesada',
     nivelRepresentacion: solicitud.instanciaRepresentacion,
     idCategoria: solicitud.categoria ? solicitud.categoria.idCategoria : 1,
     idFacultad: solicitud.facultad ? solicitud.facultad.idFacultad : null,
@@ -492,7 +503,6 @@ const abrirModalCrear = () => {
   form.value = {
     idFraternidad: null,
     nombre: '',
-    origenFraternidad: 'Danza Pesada',
     nivelRepresentacion: 'Facultad',
     idCategoria: categorias.value.length > 0 ? categorias.value[0].idCategoria : 1,
     idFacultad: null,
@@ -530,7 +540,6 @@ const guardar = async () => {
 
   const payload = {
     nombre: form.value.nombre,
-    origenFraternidad: form.value.origenFraternidad,
     nivelRepresentacion: form.value.nivelRepresentacion,
     categoria: { idCategoria: form.value.idCategoria },
     idFacultad: form.value.idFacultad,

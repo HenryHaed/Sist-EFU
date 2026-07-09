@@ -120,7 +120,7 @@ const cargarFraternidades = async () => {
     fraternidades.value = response.data.map(f => ({
       id: f.idFraternidad,
       nombre: f.nombre,
-      facultad: f.facultad?.sigla || f.origenFraternidad,
+      facultad: f.facultad?.sigla || f.nivelRepresentacion,
       tipo: f.categoria?.nombre || 'General',
       categoria: f.categoria?.nombre,
       calificado: false, // Esto se conectará luego con las evaluaciones reales

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets } from 'typeorm';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
@@ -11,18 +11,23 @@ import { Carrera } from '../entities/Carrera';
 import { InstitucionExterna } from '../entities/InstitucionExterna';
 import { DataSource } from 'typeorm';
 import { Fraternidad } from '../entities/Fraternidad';
+import { TipoDanza } from '../entities/TipoDanza';
+import { MailService } from '../mail/mail.service';
+import { Evaluacion } from '../entities/Evaluacion';
+import { Incidencia } from '../entities/Incidencia';
+import { Asistencia } from '../entities/Asistencia';
 
 const PERSONAS_DIRECTIVA = [
-    { prefix: 'presi', checklist: 'Presidente', hasCelular: true },
-    { prefix: 'vice', checklist: 'Vicepresidente', hasCelular: true },
-    { prefix: 'secGen', checklist: 'Secretario General', hasCelular: false },
-    { prefix: 'secHaci', checklist: 'Secretario de Hacienda', hasCelular: false },
-    { prefix: 'secActas', checklist: 'Secretario de Actas', hasCelular: false },
-    { prefix: 'secPrensa', checklist: 'Secretario de Prensa', hasCelular: false },
-    { prefix: 'vocal', checklist: 'Vocal', hasCelular: false },
-    { prefix: 'delCogob', checklist: 'Delegado a Co-Gobierno', hasCelular: true },
-    { prefix: 'delTitular', checklist: 'Delegado Titular', hasCelular: true },
-    { prefix: 'delSuplente', checklist: 'Delegado Suplente', hasCelular: true },
+    { prefix: 'presi', checklist: 'Presidente', hasCelular: true, required: true },
+    { prefix: 'vice', checklist: 'Vicepresidente', hasCelular: true, required: true },
+    { prefix: 'secGen', checklist: 'Secretario General', hasCelular: false, required: false },
+    { prefix: 'secHaci', checklist: 'Secretario de Hacienda', hasCelular: false, required: true },
+    { prefix: 'secActas', checklist: 'Secretario de Actas', hasCelular: false, required: false },
+    { prefix: 'secPrensa', checklist: 'Secretario de Prensa', hasCelular: false, required: false },
+    { prefix: 'vocal', checklist: 'Vocal', hasCelular: false, required: false },
+    { prefix: 'delCogob', checklist: 'Delegado a Co-Gobierno', hasCelular: true, required: true },
+    { prefix: 'delTitular', checklist: 'Delegado Titular', hasCelular: true, required: true },
+    { prefix: 'delSuplente', checklist: 'Delegado Suplente', hasCelular: true, required: true },
 ] as const;
 
 const CAMPOS_NOMBRE_PERSONA = PERSONAS_DIRECTIVA.flatMap((p) => [
@@ -38,33 +43,72 @@ function buildMapDelegadoKeyToAdmin(): Record<string, string> {
         map[`${p.prefix}PrimerApellido`] = `${p.checklist}-paterno`;
         map[`${p.prefix}SegundoApellido`] = `${p.checklist}-materno`;
         map[`${p.prefix}Ci`] = `${p.checklist}-ci`;
+        map[`${p.prefix}CiComplemento`] = `${p.checklist}-ci-complemento`;
         if (p.hasCelular) map[`${p.prefix}Celular`] = `${p.checklist}-celular`;
         map[`${p.prefix}Nombre`] = `${p.checklist}-nombre`;
     }
     return map;
 }
 
-function docFileKeyFromPrefix(prefix: string): string {
-    return `ciMatricula${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}`;
+const TIPOS_DOCUMENTO_PERSONA = [
+    { type: 'ci', filePrefix: 'ci', urlInfix: 'Ci', label: 'CI' },
+    { type: 'matricula', filePrefix: 'matricula', urlInfix: 'Matricula', label: 'Matrícula' },
+    { type: 'deudaFrat', filePrefix: 'sinDeudasFraternidad', urlInfix: 'SinDeudasFraternidad', label: 'No deudas fraternidad' },
+    { type: 'deudaAreas', filePrefix: 'sinDeudasAreas', urlInfix: 'SinDeudasAreas', label: 'No deudas áreas' },
+] as const;
+
+function capitalizePrefix(prefix: string): string {
+    return `${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}`;
 }
 
-function docUrlFieldFromPrefix(prefix: string): string {
-    return `urlCiMatricula${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}`;
+function docFileKey(prefix: string, type: typeof TIPOS_DOCUMENTO_PERSONA[number]['type']): string {
+    const doc = TIPOS_DOCUMENTO_PERSONA.find((d) => d.type === type)!;
+    return `${doc.filePrefix}${capitalizePrefix(prefix)}`;
 }
 
-const DOCUMENTOS_CI_MATRICULA = PERSONAS_DIRECTIVA.map((p) => ({
-    prefix: p.prefix,
-    fileKey: docFileKeyFromPrefix(p.prefix),
-    urlField: docUrlFieldFromPrefix(p.prefix),
-}));
+function docUrlField(prefix: string, type: typeof TIPOS_DOCUMENTO_PERSONA[number]['type']): string {
+    const doc = TIPOS_DOCUMENTO_PERSONA.find((d) => d.type === type)!;
+    return `url${doc.urlInfix}${capitalizePrefix(prefix)}`;
+}
 
-const CAMPOS_CI_DIRECTIVA = PERSONAS_DIRECTIVA.map((p) => `${p.prefix}Ci`);
+const DOCUMENTOS_POR_PERSONA = PERSONAS_DIRECTIVA.flatMap((p) =>
+    TIPOS_DOCUMENTO_PERSONA.map((doc) => ({
+        prefix: p.prefix,
+        checklist: p.checklist,
+        required: p.required,
+        type: doc.type,
+        label: doc.label,
+        fileKey: docFileKey(p.prefix, doc.type),
+        urlField: docUrlField(p.prefix, doc.type),
+    })),
+);
 
-function encontrarCargoPorCi(solicitud: SolicitudInscripcion, ci: string): string | null {
-    const ciNorm = ci.trim();
+const DOCUMENTOS_INSTITUCIONALES = [
+    { key: 'cartaCompromiso', label: 'Carta de Compromiso', url: 'urlCartaCompromiso' as const },
+    { key: 'resolucion', label: 'Resolución HCU/HCF/HCC', url: 'urlResolucion' as const },
+    { key: 'actaDirectiva', label: 'Acta de Conformación', url: 'urlActaDirectiva' as const },
+];
+
+const CAMPOS_CI_DIRECTIVA = PERSONAS_DIRECTIVA.flatMap((p) => [`${p.prefix}Ci`, `${p.prefix}CiComplemento`]);
+
+function normalizarComplementoCi(val?: string | null): string {
+    return String(val || '').trim().toUpperCase().replace(/\s/g, '');
+}
+
+function ciIdentificador(ci: string, complemento?: string | null): string {
+    const base = String(ci || '').trim();
+    const comp = normalizarComplementoCi(complemento);
+    return `${base}|${comp}`;
+}
+
+function encontrarCargoPorCi(solicitud: SolicitudInscripcion, ci: string, complemento?: string | null): string | null {
+    const idBuscado = ciIdentificador(ci, complemento);
     for (const p of PERSONAS_DIRECTIVA) {
-        const valor = String((solicitud as any)[`${p.prefix}Ci`] || '').trim();
-        if (valor && valor === ciNorm) return p.checklist;
+        const valor = ciIdentificador(
+            String((solicitud as any)[`${p.prefix}Ci`] || ''),
+            (solicitud as any)[`${p.prefix}CiComplemento`],
+        );
+        if (valor.replace(/^\|/, '') && valor === idBuscado) return p.checklist;
     }
     return null;
 }
@@ -78,7 +122,9 @@ function campoEditableEnReedicion(clave: string, checklist: Record<string, any>)
         if (
             clave === `${p.prefix}Nombres` ||
             clave === `${p.prefix}PrimerApellido` ||
-            clave === `${p.prefix}SegundoApellido`
+            clave === `${p.prefix}SegundoApellido` ||
+            clave === `${p.prefix}Ci` ||
+            clave === `${p.prefix}CiComplemento`
         ) {
             if (checklist[`${p.checklist}-nombre`]?.estado === 'X') return true;
         }
@@ -88,6 +134,8 @@ function campoEditableEnReedicion(clave: string, checklist: Record<string, any>)
 
 @Injectable()
 export class InscripcionesService {
+    private readonly logger = new Logger(InscripcionesService.name);
+
     constructor(
         @InjectRepository(SolicitudInscripcion)
         private readonly solicitudRepo: Repository<SolicitudInscripcion>,
@@ -103,8 +151,40 @@ export class InscripcionesService {
         private readonly carreraRepo: Repository<Carrera>,
         @InjectRepository(InstitucionExterna)
         private readonly institucionRepo: Repository<InstitucionExterna>,
+        @InjectRepository(TipoDanza)
+        private readonly tipoDanzaRepo: Repository<TipoDanza>,
+        @InjectRepository(Fraternidad)
+        private readonly fraternidadRepo: Repository<Fraternidad>,
+        @InjectRepository(Usuario)
+        private readonly usuarioRepo: Repository<Usuario>,
+        @InjectRepository(Evaluacion)
+        private readonly evaluacionRepo: Repository<Evaluacion>,
+        @InjectRepository(Incidencia)
+        private readonly incidenciaRepo: Repository<Incidencia>,
+        @InjectRepository(Asistencia)
+        private readonly asistenciaRepo: Repository<Asistencia>,
         private readonly dataSource: DataSource,
+        private readonly mailService: MailService,
     ) {}
+
+    private async eliminarFraternidadVinculada(idFraternidad: number) {
+        await this.evaluacionRepo.delete({ fraternidad: { idFraternidad } });
+        await this.incidenciaRepo.delete({ fraternidad: { idFraternidad } });
+        await this.asistenciaRepo.delete({ fraternidad: { idFraternidad } });
+        await this.usuarioRepo
+            .createQueryBuilder()
+            .update()
+            .set({ fraternidad: null })
+            .where('id_fraternidad = :id', { id: idFraternidad })
+            .execute();
+        await this.solicitudRepo
+            .createQueryBuilder()
+            .update()
+            .set({ fraternidadCreada: null })
+            .where('id_fraternidad_creada = :id', { id: idFraternidad })
+            .execute();
+        await this.fraternidadRepo.delete(idFraternidad);
+    }
 
     private aMayusculas(valor: any): string | null | undefined {
         if (valor === null || valor === undefined) return valor;
@@ -116,7 +196,6 @@ export class InscripcionesService {
     private normalizarSolicitudInscripcion(solicitud: SolicitudInscripcion) {
         const camposTexto = [
             'nombreFraternidad',
-            'origenFraternidad',
             'nombreInstitucionExterna',
             ...CAMPOS_NOMBRE_PERSONA,
         ] as const;
@@ -129,15 +208,16 @@ export class InscripcionesService {
         }
     }
 
-    async verificarCiDirectiva(ci: string, excludeSolicitudId?: number) {
+    async verificarCiDirectiva(ci: string, complemento?: string, excludeSolicitudId?: number) {
         const ciNorm = String(ci || '').trim();
         if (!ciNorm) return { disponible: true };
+        const compNorm = normalizarComplementoCi(complemento);
 
         const qb = this.solicitudRepo
             .createQueryBuilder('s')
             .leftJoinAndSelect('s.fraternidadCreada', 'fraternidadCreada')
             .where('s.estado IN (:...estados)', {
-                estados: [EstadoSolicitud.APROBADO, EstadoSolicitud.PENDIENTE],
+                estados: [EstadoSolicitud.APROBADO, EstadoSolicitud.PENDIENTE, EstadoSolicitud.OBSERVADO],
             });
 
         if (excludeSolicitudId) {
@@ -147,7 +227,10 @@ export class InscripcionesService {
         qb.andWhere(
             new Brackets((sub) => {
                 for (const p of PERSONAS_DIRECTIVA) {
-                    sub.orWhere(`TRIM(s.${p.prefix}Ci) = :ciNorm`, { ciNorm });
+                    sub.orWhere(
+                        `TRIM(s.${p.prefix}Ci) = :ciNorm AND COALESCE(UPPER(REPLACE(TRIM(s.${p.prefix}CiComplemento), ' ', '')), '') = :compNorm`,
+                        { ciNorm, compNorm },
+                    );
                 }
             }),
         );
@@ -155,7 +238,7 @@ export class InscripcionesService {
         const conflicto = await qb.getOne();
         if (!conflicto) return { disponible: true };
 
-        const cargo = encontrarCargoPorCi(conflicto, ciNorm);
+        const cargo = encontrarCargoPorCi(conflicto, ciNorm, compNorm);
         const nombreFraternidad =
             conflicto.fraternidadCreada?.nombre || conflicto.nombreFraternidad || 'Otra fraternidad';
 
@@ -169,28 +252,71 @@ export class InscripcionesService {
     }
 
     private async assertCisDirectivaUnicos(data: any, excludeSolicitudId?: number) {
-        const cisIngresados: { ci: string; cargo: string }[] = [];
+        // Una misma persona PUEDE ocupar varios cargos dentro de la misma fraternidad.
+        // Lo que no se permite es figurar en la directiva de OTRA fraternidad.
+        const cisUnicos = new Map<string, string>();
 
         for (const p of PERSONAS_DIRECTIVA) {
             const ci = String(data[`${p.prefix}Ci`] || '').trim();
             if (!ci) continue;
-
-            const duplicadoEnFormulario = cisIngresados.find((item) => item.ci === ci);
-            if (duplicadoEnFormulario) {
-                throw new BadRequestException(
-                    `El CI ${ci} está repetido en ${p.checklist} y ${duplicadoEnFormulario.cargo}. Una persona no puede ocupar dos cargos en la misma directiva.`,
-                );
-            }
-            cisIngresados.push({ ci, cargo: p.checklist });
+            const complemento = normalizarComplementoCi(data[`${p.prefix}CiComplemento`]);
+            const id = ciIdentificador(ci, complemento);
+            if (!cisUnicos.has(id)) cisUnicos.set(id, p.checklist);
         }
 
-        for (const { ci, cargo } of cisIngresados) {
-            const resultado = await this.verificarCiDirectiva(ci, excludeSolicitudId);
+        for (const [id, cargo] of cisUnicos.entries()) {
+            const [ci, complemento = ''] = id.split('|');
+            const resultado = await this.verificarCiDirectiva(ci, complemento, excludeSolicitudId);
             if (!resultado.disponible) {
                 throw new BadRequestException(
-                    `El CI ${ci} (${cargo}) ya figura como ${resultado.cargo} en la fraternidad "${resultado.nombreFraternidad}". Una persona no puede integrar la directiva de más de una fraternidad.`,
+                    `El CI ${ci}${complemento ? ` ${complemento}` : ''} (${cargo}) ya figura como ${resultado.cargo} en la fraternidad "${resultado.nombreFraternidad}". Una persona no puede integrar la directiva de más de una fraternidad.`,
                 );
             }
+        }
+    }
+
+    private assertCargosObligatorios(data: any) {
+        const faltantes: string[] = [];
+        for (const p of PERSONAS_DIRECTIVA) {
+            if (!p.required) continue;
+            const nombres = String(data[`${p.prefix}Nombres`] || '').trim();
+            const paterno = String(data[`${p.prefix}PrimerApellido`] || '').trim();
+            const ci = String(data[`${p.prefix}Ci`] || '').trim();
+            if (!nombres || !paterno || !ci) {
+                faltantes.push(p.checklist);
+                continue;
+            }
+            if (p.hasCelular) {
+                const celular = String(data[`${p.prefix}Celular`] || '').trim();
+                if (!celular) faltantes.push(`${p.checklist} (celular)`);
+            }
+        }
+        if (faltantes.length) {
+            throw new BadRequestException(
+                `Completa los cargos obligatorios: ${faltantes.join(', ')}.`,
+            );
+        }
+    }
+
+    private assertDocumentosObligatorios(solicitud: SolicitudInscripcion, files: any, existente: SolicitudInscripcion | null) {
+        const faltantes: string[] = [];
+        for (const doc of DOCUMENTOS_POR_PERSONA) {
+            if (!doc.required) continue;
+            const tiene =
+                Boolean(files?.[doc.fileKey]) ||
+                Boolean((solicitud as any)[doc.urlField]) ||
+                Boolean(existente && (existente as any)[doc.urlField]);
+            if (!tiene) faltantes.push(`${doc.label} de ${doc.checklist}`);
+        }
+        for (const doc of DOCUMENTOS_INSTITUCIONALES) {
+            const tiene =
+                Boolean(files?.[doc.key]) ||
+                Boolean((solicitud as any)[doc.url]) ||
+                Boolean(existente && (existente as any)[doc.url]);
+            if (!tiene) faltantes.push(doc.label);
+        }
+        if (faltantes.length) {
+            throw new BadRequestException(`Faltan documentos obligatorios: ${faltantes.join(', ')}.`);
         }
     }
 
@@ -207,13 +333,28 @@ export class InscripcionesService {
             },
             relations: ['categoria']
         });
-        const puedeReeditar = existente && existente.estado === EstadoSolicitud.RECHAZADO;
+        const puedeReeditar = existente && existente.estado === EstadoSolicitud.OBSERVADO;
         if (existente && !puedeReeditar) {
-            throw new BadRequestException('Ya tienes una solicitud de inscripción en proceso para esta gestión.');
+            const msgEstado =
+                existente.estado === EstadoSolicitud.RECHAZADO
+                    ? 'Tu solicitud fue rechazada y anulada por La Comisión. No puedes reenviarla en esta gestión.'
+                    : 'Ya tienes una solicitud de inscripción en proceso para esta gestión.';
+            throw new BadRequestException(msgEstado);
         }
 
         const idCategoria = parseInt(data.idCategoria || existente?.categoria?.idCategoria);
         if (isNaN(idCategoria)) throw new BadRequestException('La categoría es requerida.');
+
+        const idTipoDanza = parseInt(data.idTipoDanza || existente?.tipoDanza?.idTipoDanza);
+        if (isNaN(idTipoDanza)) {
+            throw new BadRequestException('El tipo de danza es requerido.');
+        }
+        const tipoDanza = await this.tipoDanzaRepo.findOne({
+            where: { idTipoDanza, activo: true },
+        });
+        if (!tipoDanza) {
+            throw new BadRequestException('El tipo de danza seleccionado no es válido.');
+        }
 
         let checklistReedicion = existente?.revisionChecklist || {};
         if (typeof checklistReedicion === 'string') {
@@ -254,6 +395,11 @@ export class InscripcionesService {
                 `${p.prefix}Ci`,
                 data[`${p.prefix}Ci`],
                 existente?.[`${p.prefix}Ci`],
+            );
+            camposDirectiva[`${p.prefix}CiComplemento`] = conservarSiNoRechazado(
+                `${p.prefix}CiComplemento`,
+                data[`${p.prefix}CiComplemento`] || '',
+                existente?.[`${p.prefix}CiComplemento`],
             );
             if (p.hasCelular) {
                 camposDirectiva[`${p.prefix}Celular`] = conservarSiNoRechazado(
@@ -296,10 +442,16 @@ export class InscripcionesService {
 
         Object.assign(solicitud, {
             nombreFraternidad: conservarSiNoRechazado('nombreFraternidad', data.nombreFraternidad, existente?.nombreFraternidad),
-            origenFraternidad: conservarSiNoRechazado('origenFraternidad', data.origenFraternidad || 'General', existente?.origenFraternidad || 'General'),
             instanciaRepresentacion: conservarSiNoRechazado('instancia', data.instanciaRepresentacion, existente?.instanciaRepresentacion),
             nombreInstitucionExterna: conservarSiNoRechazado('institucionExterna', data.nombreInstitucionExterna, existente?.nombreInstitucionExterna),
             categoria: { idCategoria: conservarSiNoRechazado('categoria', idCategoria, existente?.categoria?.idCategoria) } as any,
+            tipoDanza: {
+                idTipoDanza: conservarSiNoRechazado(
+                    'tipoDanza',
+                    idTipoDanza,
+                    existente?.tipoDanza?.idTipoDanza,
+                ),
+            } as any,
             ...camposDirectiva,
             gestion,
             delegado: usuario,
@@ -336,33 +488,27 @@ export class InscripcionesService {
         };
 
         if (files) {
-            for (const doc of DOCUMENTOS_CI_MATRICULA) {
+            for (const doc of DOCUMENTOS_POR_PERSONA) {
                 (solicitud as any)[doc.urlField] = conservarArchivo(
                     doc.fileKey,
                     files[doc.fileKey],
                     (existente as any)?.[doc.urlField],
                 );
             }
-            solicitud.urlCartaCompromiso = conservarArchivo('cartaCompromiso', files.cartaCompromiso, existente?.urlCartaCompromiso);
-            solicitud.urlResolucion = conservarArchivo('resolucion', files.resolucion, existente?.urlResolucion);
-            solicitud.urlActaDirectiva = conservarArchivo('actaDirectiva', files.actaDirectiva, existente?.urlActaDirectiva);
-            solicitud.urlSinDeudasFraternidad = conservarArchivo(
-                'sinDeudasFraternidad',
-                files.sinDeudasFraternidad,
-                existente?.urlSinDeudasFraternidad,
-            );
-            solicitud.urlSinDeudasAreas = conservarArchivo(
-                'sinDeudasAreas',
-                files.sinDeudasAreas,
-                existente?.urlSinDeudasAreas,
-            );
+            for (const doc of DOCUMENTOS_INSTITUCIONALES) {
+                (solicitud as any)[doc.url] = conservarArchivo(
+                    doc.key,
+                    files[doc.key],
+                    (existente as any)?.[doc.url],
+                );
+            }
         }
 
         if (puedeReeditar) {
             solicitud.estado = EstadoSolicitud.PENDIENTE;
-            
-            // Restablecer los elementos de revisión que estaban con X a PENDIENTE,
-            // ya que el delegado los acaba de corregir.
+            solicitud.observaciones = null;
+
+            // Restablecer los elementos corregidos: quitar marca X y motivo asociado.
             let updatedChecklist = solicitud.revisionChecklist || {};
             if (typeof updatedChecklist === 'string') {
                 try { updatedChecklist = JSON.parse(updatedChecklist); } catch { updatedChecklist = {}; }
@@ -378,7 +524,9 @@ export class InscripcionesService {
             solicitud.revisionChecklist = updatedChecklist;
         }
 
+        await this.assertCargosObligatorios(data);
         await this.assertCisDirectivaUnicos(data, puedeReeditar ? existente?.idSolicitud : undefined);
+        this.assertDocumentosObligatorios(solicitud, files, puedeReeditar ? existente : null);
 
         this.normalizarSolicitudInscripcion(solicitud);
 
@@ -388,7 +536,7 @@ export class InscripcionesService {
     async getMisSolicitudes(idUsuario: number) {
         return await this.solicitudRepo.find({
             where: { delegado: { idUsuario } },
-            relations: ['gestion', 'categoria', 'facultad', 'carrera', 'fraternidadCreada'],
+            relations: ['gestion', 'categoria', 'tipoDanza', 'facultad', 'carrera', 'fraternidadCreada'],
             order: { createdAt: 'DESC' }
         });
     }
@@ -396,7 +544,7 @@ export class InscripcionesService {
     async getSolicitudById(id: number) {
         const sol = await this.solicitudRepo.findOne({
             where: { idSolicitud: id },
-            relations: ['gestion', 'categoria', 'facultad', 'carrera', 'institucionExterna', 'delegado', 'fraternidadCreada']
+            relations: ['gestion', 'categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'delegado', 'fraternidadCreada']
         });
         if (!sol) throw new NotFoundException('Solicitud no encontrada');
         return sol;
@@ -407,15 +555,73 @@ export class InscripcionesService {
         if (estado) where.estado = estado;
         return await this.solicitudRepo.find({
             where,
-            relations: ['gestion', 'categoria', 'facultad', 'carrera', 'institucionExterna', 'delegado', 'fraternidadCreada'],
+            relations: ['gestion', 'categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'delegado', 'fraternidadCreada'],
             order: { createdAt: 'DESC' }
         });
+    }
+
+    private extraerItemsObservados(
+        checklist: Record<string, { estado?: string; label?: string; comentario?: string }> = {},
+    ) {
+        return Object.entries(checklist)
+            .filter(([, item]) => item?.estado === 'X')
+            .map(([, item]) => {
+                const etiqueta = item?.label || 'Dato observado';
+                const motivo = item?.comentario?.trim();
+                return motivo ? `${etiqueta}: ${motivo}` : etiqueta;
+            })
+            .filter(Boolean);
+    }
+
+    private async notificarDelegadoEstadoSolicitud(
+        sol: SolicitudInscripcion,
+        estado: EstadoSolicitud,
+        observaciones?: string,
+    ): Promise<{ enviado: boolean; correo?: string; error?: string }> {
+        if (![EstadoSolicitud.OBSERVADO, EstadoSolicitud.APROBADO, EstadoSolicitud.RECHAZADO].includes(estado)) {
+            return { enviado: false };
+        }
+
+        const delegado = sol.delegado;
+        const correo = delegado?.correo?.trim();
+        if (!correo) {
+            this.logger.warn(
+                `Delegado sin correo (solicitud #${sol.idSolicitud}). No se pudo notificar estado ${estado}.`,
+            );
+            return { enviado: false, error: 'El delegado no tiene correo registrado en el sistema.' };
+        }
+
+        const nombre = [delegado.nombres, delegado.primerApellido, delegado.segundoApellido]
+            .filter(Boolean)
+            .join(' ')
+            .trim() || 'Delegado';
+
+        try {
+            await this.mailService.sendResultadoSolicitudInscripcion(
+                correo,
+                nombre,
+                {
+                    nombreFraternidad: sol.nombreFraternidad,
+                    estado: estado as 'OBSERVADO' | 'APROBADO' | 'RECHAZADO',
+                },
+                observaciones,
+                estado === EstadoSolicitud.OBSERVADO
+                    ? this.extraerItemsObservados(sol.revisionChecklist || {})
+                    : undefined,
+            );
+            this.logger.log(`Correo de estado ${estado} enviado al delegado ${correo} (solicitud #${sol.idSolicitud}).`);
+            return { enviado: true, correo };
+        } catch (error) {
+            const msg = error?.message || 'Error al enviar el correo';
+            this.logger.warn(`No se pudo notificar por correo al delegado ${correo}: ${msg}`);
+            return { enviado: false, correo, error: msg };
+        }
     }
 
     async updateEstadoSolicitud(id: number, estado: string, observaciones?: string, revisionChecklist?: any) {
         const sol = await this.solicitudRepo.findOne({
             where: { idSolicitud: id },
-            relations: ['fraternidadCreada'],
+            relations: ['fraternidadCreada', 'delegado'],
         });
         if (!sol) throw new NotFoundException('Solicitud no encontrada');
 
@@ -428,12 +634,59 @@ export class InscripcionesService {
                 throw new BadRequestException('Solo se puede aprobar una solicitud cuando todos los datos revisados están marcados como correctos.');
             }
         }
-        const estadosPermitidos = [EstadoSolicitud.PENDIENTE, EstadoSolicitud.APROBADO, EstadoSolicitud.RECHAZADO];
-        if (!estadosPermitidos.includes(estado as EstadoSolicitud)) {
-            throw new BadRequestException(`El estado '${estado}' no es válido. Se permite: PENDIENTE, APROBADO, RECHAZADO.`);
+
+        if (estado === EstadoSolicitud.OBSERVADO) {
+            const itemsObservados = Object.values(checklistNormalizado).filter(
+                (item: any) => item?.estado === 'X',
+            );
+            if (!itemsObservados.length) {
+                throw new BadRequestException(
+                    'Marca con ✕ al menos un dato o documento incorrecto antes de observar la solicitud.',
+                );
+            }
+            const sinMotivo = itemsObservados.filter(
+                (item: any) => !item?.comentario?.trim(),
+            );
+            if (sinMotivo.length) {
+                throw new BadRequestException(
+                    'Indica el motivo de rechazo en cada dato o documento marcado con ✕.',
+                );
+            }
         }
+
+        if (estado === EstadoSolicitud.RECHAZADO && !observaciones?.trim()) {
+            throw new BadRequestException(
+                'Indica el motivo del rechazo. La inscripción quedará anulada sin derecho a corrección.',
+            );
+        }
+
+        const estadosPermitidos = [
+            EstadoSolicitud.PENDIENTE,
+            EstadoSolicitud.OBSERVADO,
+            EstadoSolicitud.APROBADO,
+            EstadoSolicitud.RECHAZADO,
+        ];
+        if (!estadosPermitidos.includes(estado as EstadoSolicitud)) {
+            throw new BadRequestException(
+                `El estado '${estado}' no es válido. Se permite: PENDIENTE, OBSERVADO, APROBADO, RECHAZADO.`,
+            );
+        }
+
+        const revierteAprobacion =
+            estadoAnterior === EstadoSolicitud.APROBADO &&
+            [EstadoSolicitud.OBSERVADO, EstadoSolicitud.RECHAZADO].includes(estado as EstadoSolicitud);
+
+        if (revierteAprobacion && sol.fraternidadCreada?.idFraternidad) {
+            await this.eliminarFraternidadVinculada(sol.fraternidadCreada.idFraternidad);
+            sol.fraternidadCreada = null;
+        }
+
         sol.estado = estado as EstadoSolicitud;
-        if (observaciones !== undefined) sol.observaciones = observaciones;
+        if (estado === EstadoSolicitud.OBSERVADO) {
+            sol.observaciones = null;
+        } else if (observaciones !== undefined) {
+            sol.observaciones = observaciones;
+        }
         if (revisionChecklist !== undefined) sol.revisionChecklist = revisionChecklist || {};
         await this.solicitudRepo.save(sol);
 
@@ -447,6 +700,74 @@ export class InscripcionesService {
             }
         }
 
+        let notificacionDelegado: { enviado: boolean; correo?: string; error?: string } | undefined;
+
+        if (
+            estado !== estadoAnterior &&
+            [EstadoSolicitud.OBSERVADO, EstadoSolicitud.APROBADO, EstadoSolicitud.RECHAZADO].includes(
+                estado as EstadoSolicitud,
+            )
+        ) {
+            notificacionDelegado = await this.notificarDelegadoEstadoSolicitud(
+                sol,
+                estado as EstadoSolicitud,
+                observaciones,
+            );
+        }
+
+        const resultado = await this.getSolicitudById(id);
+        return notificacionDelegado ? { ...resultado, notificacionDelegado } : resultado;
+    }
+
+    async updateSolicitudAdmin(id: number, data: Record<string, any>) {
+        const sol = await this.solicitudRepo.findOne({
+            where: { idSolicitud: id },
+            relations: ['categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'fraternidadCreada'],
+        });
+        if (!sol) throw new NotFoundException('Solicitud no encontrada');
+        if (sol.estado === EstadoSolicitud.RECHAZADO) {
+            throw new BadRequestException('No se pueden editar solicitudes rechazadas y anuladas.');
+        }
+
+        if (data.nombreFraternidad !== undefined) {
+            sol.nombreFraternidad = data.nombreFraternidad;
+        }
+        if (data.instanciaRepresentacion !== undefined) {
+            sol.instanciaRepresentacion = data.instanciaRepresentacion;
+        }
+        if (data.nombreInstitucionExterna !== undefined) {
+            sol.nombreInstitucionExterna = data.nombreInstitucionExterna || null;
+        }
+        if (data.idCategoria !== undefined) {
+            const idCategoria = parseInt(data.idCategoria, 10);
+            if (!isNaN(idCategoria)) sol.categoria = { idCategoria } as Categoria;
+        }
+        if (data.idTipoDanza !== undefined) {
+            const idTipoDanza = parseInt(data.idTipoDanza, 10);
+            if (!isNaN(idTipoDanza)) sol.tipoDanza = { idTipoDanza } as TipoDanza;
+        }
+        if (data.idFacultad !== undefined) {
+            const idFacultad = data.idFacultad ? parseInt(data.idFacultad, 10) : null;
+            sol.facultad = idFacultad && !isNaN(idFacultad) ? ({ idFacultad } as Facultad) : null;
+        }
+        if (data.idCarrera !== undefined) {
+            const idCarrera = data.idCarrera ? parseInt(data.idCarrera, 10) : null;
+            sol.carrera = idCarrera && !isNaN(idCarrera) ? ({ idCarrera } as Carrera) : null;
+        }
+
+        for (const p of PERSONAS_DIRECTIVA) {
+            for (const suffix of ['Nombres', 'PrimerApellido', 'SegundoApellido', 'Ci', 'CiComplemento']) {
+                const key = `${p.prefix}${suffix}`;
+                if (data[key] !== undefined) sol[key] = data[key];
+            }
+            if (p.hasCelular && data[`${p.prefix}Celular`] !== undefined) {
+                sol[`${p.prefix}Celular`] = data[`${p.prefix}Celular`];
+            }
+        }
+
+        await this.assertCisDirectivaUnicos(sol, sol.idSolicitud);
+        this.normalizarSolicitudInscripcion(sol);
+        await this.solicitudRepo.save(sol);
         return this.getSolicitudById(id);
     }
 
@@ -489,13 +810,16 @@ export class InscripcionesService {
         data?: any,
     ) {
         fraternidad.nombre = this.aMayusculas((data?.nombre || solicitud.nombreFraternidad)?.trim()) as string;
-        fraternidad.origenFraternidad = this.aMayusculas(data?.origenFraternidad || solicitud.origenFraternidad || 'General') as string;
         fraternidad.nivelRepresentacion = data?.nivelRepresentacion || solicitud.instanciaRepresentacion;
 
         if (data?.categoria?.idCategoria) {
             fraternidad.categoria = { idCategoria: data.categoria.idCategoria } as any;
-        } else if (solicitud.categoria) {
+        } else         if (solicitud.categoria) {
             fraternidad.categoria = solicitud.categoria;
+        }
+
+        if (solicitud.tipoDanza) {
+            fraternidad.tipoDanza = solicitud.tipoDanza;
         }
 
         if (data?.idFacultad) {
@@ -522,7 +846,7 @@ export class InscripcionesService {
 
         if (data?.habilitadoEfu !== undefined) {
             fraternidad.habilitadoEfu = data.habilitadoEfu;
-        } else if (fraternidad.habilitadoEfu === undefined || fraternidad.habilitadoEfu === null) {
+        } else {
             fraternidad.habilitadoEfu = true;
         }
     }
@@ -530,7 +854,7 @@ export class InscripcionesService {
     async inscribirDesdeSolicitud(idSolicitud: number, data?: any) {
         const solicitud = await this.solicitudRepo.findOne({
             where: { idSolicitud },
-            relations: ['delegado', 'fraternidadCreada', 'categoria', 'facultad', 'carrera', 'institucionExterna', 'gestion', 'delegado.fraternidad']
+            relations: ['delegado', 'fraternidadCreada', 'categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'gestion', 'delegado.fraternidad']
         });
 
         if (!solicitud) {

@@ -11,6 +11,7 @@ import { InscripcionesModule } from './inscripciones/inscripciones.module';
 import { AsistenciasModule } from './asistencias/asistencias.module';
 import { MonografiasModule } from './monografias/monografias.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
+import { ReportesModule } from './reportes/reportes.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
@@ -48,6 +49,7 @@ import { join } from 'path';
     AsistenciasModule,
     MonografiasModule,
     AuditoriaModule,
+    ReportesModule,
   ],
 })
 export class AppModule {}

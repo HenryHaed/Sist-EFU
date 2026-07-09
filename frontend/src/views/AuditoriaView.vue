@@ -1,6 +1,6 @@
 <template>
-  <div class="dashboard-page max-w-6xl">
-    <div class="mb-8 sm:mb-10">
+  <div :class="embedded ? 'w-full' : 'dashboard-page max-w-6xl'">
+    <div v-if="!embedded" class="mb-8 sm:mb-10">
       <div class="flex items-center gap-3 mb-2">
         <span class="h-6 sm:h-8 w-2 bg-secondary rounded-full shrink-0"></span>
         <h2 class="dashboard-page-title italic uppercase text-primary">Auditoría del Sistema</h2>
@@ -230,6 +230,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '../services/api'
+
+defineProps({
+  embedded: { type: Boolean, default: false },
+})
 
 const tabs = [
   { id: 'sesiones', label: 'Inicios de sesión' },

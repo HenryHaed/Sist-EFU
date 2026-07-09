@@ -22,17 +22,20 @@ const storage = diskStorage({
   },
 });
 
-const CI_MATRICULA_FILE_FIELDS = [
-  { name: 'ciMatriculaPresi', maxCount: 1 },
-  { name: 'ciMatriculaVice', maxCount: 1 },
-  { name: 'ciMatriculaSecGen', maxCount: 1 },
-  { name: 'ciMatriculaSecHaci', maxCount: 1 },
-  { name: 'ciMatriculaSecActas', maxCount: 1 },
-  { name: 'ciMatriculaSecPrensa', maxCount: 1 },
-  { name: 'ciMatriculaVocal', maxCount: 1 },
-  { name: 'ciMatriculaDelCogob', maxCount: 1 },
-  { name: 'ciMatriculaDelTitular', maxCount: 1 },
-  { name: 'ciMatriculaDelSuplente', maxCount: 1 },
+const PERSONA_PREFIXES = [
+  'Presi', 'Vice', 'SecGen', 'SecHaci', 'SecActas', 'SecPrensa',
+  'Vocal', 'DelCogob', 'DelTitular', 'DelSuplente',
+];
+const DOC_FILE_PREFIXES = ['ci', 'matricula', 'sinDeudasFraternidad', 'sinDeudasAreas'];
+
+const PERSONA_DOC_FILE_FIELDS = PERSONA_PREFIXES.flatMap((prefix) =>
+  DOC_FILE_PREFIXES.map((doc) => ({ name: `${doc}${prefix}`, maxCount: 1 })),
+);
+
+const INSTITUCIONAL_FILE_FIELDS = [
+  { name: 'cartaCompromiso', maxCount: 1 },
+  { name: 'resolucion', maxCount: 1 },
+  { name: 'actaDirectiva', maxCount: 1 },
 ];
 
 @Controller('inscripciones')
@@ -45,12 +48,8 @@ export class InscripcionesController {
   @UseInterceptors(
     FileFieldsInterceptor(
       [
-        ...CI_MATRICULA_FILE_FIELDS,
-        { name: 'cartaCompromiso', maxCount: 1 },
-        { name: 'resolucion', maxCount: 1 },
-        { name: 'actaDirectiva', maxCount: 1 },
-        { name: 'sinDeudasFraternidad', maxCount: 1 },
-        { name: 'sinDeudasAreas', maxCount: 1 },
+        ...PERSONA_DOC_FILE_FIELDS,
+        ...INSTITUCIONAL_FILE_FIELDS,
       ],
       {
         storage,
@@ -74,10 +73,15 @@ export class InscripcionesController {
   @Roles('delegado', 'superusuario', 'admin')
   async verificarCiDirectiva(
     @Query('ci') ci: string,
+    @Query('complemento') complemento?: string,
     @Query('excludeSolicitudId') excludeSolicitudId?: string,
   ) {
     const excludeId = excludeSolicitudId ? parseInt(excludeSolicitudId, 10) : undefined;
-    return this.inscripcionesService.verificarCiDirectiva(ci, Number.isNaN(excludeId) ? undefined : excludeId);
+    return this.inscripcionesService.verificarCiDirectiva(
+      ci,
+      complemento,
+      Number.isNaN(excludeId) ? undefined : excludeId,
+    );
   }
 
   @Get('mis-solicitudes')
@@ -109,6 +113,15 @@ export class InscripcionesController {
     @Body('revisionChecklist') revisionChecklist?: any,
   ) {
     return this.inscripcionesService.updateEstadoSolicitud(id, estado, observaciones, revisionChecklist);
+  }
+
+  @Put(':id/admin-datos')
+  @Roles('superusuario', 'admin')
+  async updateSolicitudAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: Record<string, any>,
+  ) {
+    return this.inscripcionesService.updateSolicitudAdmin(id, body);
   }
 
   // ── Cronogramas ──────────────────────────────────────────────────────────

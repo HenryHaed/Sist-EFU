@@ -78,7 +78,7 @@
                 <span class="material-symbols-outlined text-secondary">bar_chart</span>
                 Puntajes más Altos - EFU {{ gestionData.anio }}
               </h3>
-              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Promedio de fases cerradas por fraternidad</p>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Máximo 7 fraternidades visibles en barras; el resto se ve en Podio EFU</p>
             </div>
             <div class="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
                 <span class="size-2 rounded-full bg-primary"></span>
@@ -102,8 +102,8 @@
           </div>
         </div>
 
-        <!-- TOP 5 RANKING LIST -->
-        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+        <!-- Podio EFU (vista previa) -->
+        <div id="podio-efu" class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
           <div class="flex items-center justify-between mb-8">
             <h3 class="text-lg font-black text-primary uppercase italic tracking-tighter">Podio EFU</h3>
             <span class="size-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
@@ -111,9 +111,9 @@
             </span>
           </div>
 
-          <div v-if="rankingEfu.length > 0" class="space-y-3 flex-1 overflow-y-auto custom-scrollbar pr-1">
+          <div v-if="rankingEfu.length > 0" class="space-y-3 flex-1">
             <div
-              v-for="(item, i) in rankingEfu.slice(0, 7)"
+              v-for="(item, i) in rankingEfuPreview"
               :key="item.nombre"
               class="group flex items-center justify-between p-4 rounded-2xl border transition-all duration-300"
               :class="i === 0 ? 'bg-primary text-white border-primary shadow-xl shadow-primary/10 -rotate-1 active:rotate-0' : 'bg-white border-slate-100 hover:border-primary/30 hover:bg-slate-50'"
@@ -141,7 +141,89 @@
             <p class="text-[10px] font-black uppercase tracking-[0.2em]">Sin datos disponibles</p>
           </div>
 
-          <button @click="$emit('ir-calificar')" class="mt-8 py-3 w-full bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-primary hover:border-primary transition-all">Ver todos los resultados</button>
+          <p v-if="rankingEfu.length > 7" class="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
+            Mostrando top 7 de {{ rankingEfu.length }} fraternidades
+          </p>
+
+          <button
+            type="button"
+            @click="abrirPodioCompleto"
+            :disabled="!rankingEfu.length"
+            class="mt-4 py-3 w-full bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-primary hover:border-primary disabled:opacity-40 transition-all"
+          >
+            Ir a Podio EFU
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between mb-8 gap-4 flex-wrap">
+          <div>
+            <h3 class="text-lg font-black text-primary uppercase italic tracking-tighter flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary">military_tech</span>
+              Concursos Externos - Top 3 por categoría
+            </h3>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+              Chacha, Warmi, Fotografía, Diseñador y cualquier concurso externo creado en la gestión
+            </p>
+          </div>
+          <div class="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            {{ concursosTop3.length }} concurso(s)
+          </div>
+        </div>
+
+        <div v-if="concursosTop3.length" class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div
+            v-for="concurso in concursosTop3"
+            :key="concurso.nombreConcurso"
+            class="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50/40"
+          >
+            <div class="px-5 py-4 bg-white border-b border-slate-100">
+              <h4 class="text-sm font-black text-slate-800 uppercase tracking-wide">
+                {{ concurso.nombreConcurso }}
+              </h4>
+              <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                Mejores 3 concursantes
+              </p>
+            </div>
+
+            <div class="p-4 space-y-3">
+              <div
+                v-for="participante in concurso.participantes"
+                :key="`${concurso.nombreConcurso}-${participante.puesto}-${participante.nombre}`"
+                class="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4"
+              >
+                <div class="flex items-start gap-3 min-w-0">
+                  <div
+                    class="size-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0"
+                    :class="participante.puesto === 1 ? 'bg-amber-100 text-amber-700' : participante.puesto === 2 ? 'bg-slate-200 text-slate-700' : 'bg-orange-100 text-orange-700'"
+                  >
+                    {{ participante.puesto }}
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-black text-slate-800 leading-tight break-words">
+                      {{ participante.nombre }}
+                    </p>
+                    <p class="text-[10px] uppercase font-bold text-slate-400 tracking-widest mt-1">
+                      {{ participante.tipo }}
+                    </p>
+                    <p class="text-xs text-slate-500 mt-1 break-words">
+                      {{ participante.fraternidad }}
+                    </p>
+                  </div>
+                </div>
+                <div class="text-right shrink-0">
+                  <p class="text-lg font-black tracking-tighter text-primary">{{ participante.puntajeFinal }}</p>
+                  <p class="text-[8px] font-black uppercase tracking-widest text-slate-400">pts</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="py-16 text-center text-slate-300 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-100">
+          <span class="material-symbols-outlined text-5xl mb-3">emoji_events</span>
+          <p class="text-[10px] font-black uppercase tracking-[0.2em]">Sin concursos externos calificados aún</p>
         </div>
       </div>
 
@@ -174,11 +256,122 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal: Podio EFU completo -->
+    <v-dialog v-model="mostrarPodioCompleto" max-width="960" scrollable>
+      <v-card class="rounded-3xl overflow-hidden">
+        <v-card-title class="bg-primary text-white px-6 py-5 flex items-center justify-between gap-4">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-[0.25em] opacity-70 mb-1">Ranking oficial</p>
+            <h3 class="text-lg font-black uppercase italic tracking-tight">Podio EFU {{ gestionData.anio }}</h3>
+          </div>
+          <button
+            type="button"
+            @click="mostrarPodioCompleto = false"
+            class="size-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </v-card-title>
+
+        <v-card-text class="pa-6 bg-slate-50">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-2xl border border-slate-200 p-4">
+              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Fraternidades</p>
+              <p class="text-2xl font-black text-primary">{{ rankingEfu.length }}</p>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-4">
+              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Líder actual</p>
+              <p class="text-sm font-black text-slate-800 truncate">{{ rankingEfu[0]?.nombre || '—' }}</p>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-4">
+              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Puntaje máximo</p>
+              <p class="text-2xl font-black text-secondary">{{ rankingEfu[0]?.puntaje ?? '—' }}</p>
+            </div>
+          </div>
+
+          <div v-if="rankingEfu.length" class="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-8">
+            <div class="px-5 py-4 border-b border-slate-100">
+              <h4 class="text-[10px] font-black uppercase tracking-widest text-primary">Clasificación general EFU</h4>
+            </div>
+            <div class="max-h-[50vh] overflow-y-auto custom-scrollbar">
+              <table class="w-full text-left">
+                <thead class="sticky top-0 bg-slate-50 z-10">
+                  <tr class="border-b border-slate-100">
+                    <th class="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 w-16">#</th>
+                    <th class="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Fraternidad</th>
+                    <th class="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Categoría</th>
+                    <th class="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Puntaje</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(item, i) in rankingEfu"
+                    :key="`podio-full-${item.nombre}-${i}`"
+                    class="border-b border-slate-50 hover:bg-slate-50/80"
+                  >
+                    <td class="px-5 py-3">
+                      <span
+                        class="inline-flex size-8 items-center justify-center rounded-xl text-xs font-black"
+                        :class="i === 0 ? 'bg-amber-100 text-amber-700' : i < 3 ? 'bg-secondary text-white' : 'bg-slate-100 text-slate-500'"
+                      >
+                        {{ i + 1 }}
+                      </span>
+                    </td>
+                    <td class="px-5 py-3 text-sm font-bold text-slate-800">{{ item.nombre }}</td>
+                    <td class="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{{ item.tipo }}</td>
+                    <td class="px-5 py-3 text-right">
+                      <span class="text-lg font-black text-primary">{{ item.puntaje }}</span>
+                      <span class="text-[9px] font-black text-slate-400 uppercase ml-1">pts</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div v-if="concursosTop3.length" class="space-y-4">
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-primary px-1">Concursos externos — Top 3</h4>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div
+                v-for="concurso in concursosTop3"
+                :key="`modal-${concurso.nombreConcurso}`"
+                class="bg-white rounded-2xl border border-slate-200 overflow-hidden"
+              >
+                <div class="px-5 py-3 border-b border-slate-100 bg-slate-50">
+                  <p class="text-sm font-black text-slate-800">{{ concurso.nombreConcurso }}</p>
+                </div>
+                <div class="divide-y divide-slate-100">
+                  <div
+                    v-for="p in concurso.participantes"
+                    :key="`${concurso.nombreConcurso}-${p.puesto}`"
+                    class="px-5 py-3 flex items-center justify-between gap-3"
+                  >
+                    <div class="min-w-0">
+                      <p class="text-xs font-black text-slate-800">
+                        <span class="text-slate-400 mr-2">#{{ p.puesto }}</span>{{ p.nombre }}
+                      </p>
+                      <p class="text-[10px] text-slate-500 mt-0.5">{{ p.tipo }} · {{ p.fraternidad }}</p>
+                    </div>
+                    <span class="text-sm font-black text-primary shrink-0">{{ p.puntajeFinal }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="!rankingEfu.length" class="py-16 text-center text-slate-400">
+            <span class="material-symbols-outlined text-5xl mb-3">emoji_events</span>
+            <p class="text-[10px] font-black uppercase tracking-widest">Aún no hay datos de podio</p>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, defineComponent } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import api from '../services/api'
 import VueApexCharts from 'vue3-apexcharts'
 
@@ -192,12 +385,21 @@ const stats = ref([])
 const rankingEfu = ref([])
 const concursos = ref([])
 const gestionData = ref({})
+const mostrarPodioCompleto = ref(false)
+const rankingBarras = computed(() => rankingEfu.value.slice(0, 7))
+const rankingEfuPreview = computed(() => rankingEfu.value.slice(0, 7))
+const concursosTop3 = computed(() => concursos.value || [])
+
+const abrirPodioCompleto = () => {
+  if (!rankingEfu.value.length) return
+  mostrarPodioCompleto.value = true
+}
 
 // ApexCharts Configuration
 const chartSeries = computed(() => {
   return [{
     name: 'Puntaje',
-    data: rankingEfu.value.slice(0, 10).map(r => r.puntaje)
+    data: rankingBarras.value.map(r => r.puntaje)
   }]
 })
 
@@ -217,7 +419,7 @@ const chartOptions = computed(() => {
         dataLabels: { position: 'top' }
       }
     },
-    colors: ['#003399', '#C8102E', '#F1C40F', '#003399', '#C8102E', '#F1C40F', '#003399', '#C8102E', '#003399', '#C8102E'],
+    colors: ['#003399', '#C8102E', '#F1C40F', '#003399', '#C8102E', '#F1C40F', '#003399'],
     dataLabels: {
       enabled: true,
       formatter: (val) => val,
@@ -226,7 +428,7 @@ const chartOptions = computed(() => {
     },
     legend: { show: false },
     xaxis: {
-      categories: rankingEfu.value.slice(0, 10).map(r => r.nombre.length > 15 ? r.nombre.substring(0, 12) + '...' : r.nombre),
+      categories: rankingBarras.value.map(r => r.nombre.length > 15 ? r.nombre.substring(0, 12) + '...' : r.nombre),
       labels: { style: { fontSize: '10px', fontWeight: '700', colors: '#64748b' } },
       axisBorder: { show: false },
       axisTicks: { show: false }

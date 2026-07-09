@@ -1,10 +1,14 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, MinLength, MaxLength, IsEmail } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, MinLength, MaxLength, IsEmail, Matches, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+const CI_USUARIO_REGEX = /^\d{5,20}$/;
+const CI_USUARIO_MSG = 'El CI debe contener solo números y al menos 5 dígitos.';
 
 export class CreateUsuarioDto {
   @ApiProperty({ example: '1234567' })
   @IsString()
   @IsNotEmpty()
+  @Matches(CI_USUARIO_REGEX, { message: CI_USUARIO_MSG })
   @MaxLength(20)
   ci: string;
 
@@ -56,8 +60,9 @@ export class CreateUsuarioDto {
 
 export class UpdateUsuarioDto {
   @ApiProperty({ required: false })
+  @ValidateIf((o) => o.ci !== undefined && o.ci !== null && String(o.ci).trim() !== '')
   @IsString()
-  @IsOptional()
+  @Matches(CI_USUARIO_REGEX, { message: CI_USUARIO_MSG })
   @MaxLength(20)
   ci?: string;
 

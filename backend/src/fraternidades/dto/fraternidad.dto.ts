@@ -8,12 +8,6 @@ export class CreateFraternidadDto {
   @MaxLength(255)
   nombre: string;
 
-  @ApiProperty({ example: 'UMSA' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  origenFraternidad: string;
-
   @ApiProperty({ example: 'Facultad de Derecho', required: false })
   @IsString()
   @IsOptional()
@@ -72,12 +66,6 @@ export class UpdateFraternidadDto {
   @IsOptional()
   @MaxLength(255)
   nombre?: string;
-
-  @ApiProperty({ required: false })
-  @IsString()
-  @IsOptional()
-  @MaxLength(50)
-  origenFraternidad?: string;
 
   @ApiProperty({ required: false })
   @IsString()

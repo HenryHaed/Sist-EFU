@@ -12,7 +12,7 @@
       <v-card-text class="pa-8 pt-4">
         <div class="bg-slate-50 border border-slate-200 rounded-lg pa-4 mb-6 text-center">
           <p class="text-xs text-slate-500 uppercase tracking-widest font-black mb-1">Motivo</p>
-          <p class="text-primary font-bold">Tiempo de inicio de sesión excedido (4 horas)</p>
+          <p class="text-primary font-bold">{{ motivoTexto }}</p>
         </div>
         
         <p class="text-sm text-slate-500 text-center leading-relaxed">
@@ -52,8 +52,18 @@ const router = useRouter();
 
 const show = computed(() => authStore.showExpiryModal);
 
+const motivoTexto = computed(() => {
+  const reason = authStore.expiryReason;
+  if (reason === 'inactivity') {
+    return 'Inactividad detectada (sin uso por más de 30 minutos)';
+  }
+  if (reason === 'absolute') {
+    return 'Tiempo máximo de sesión alcanzado';
+  }
+  return 'La sesión ya no es válida. Debe autenticarse nuevamente.';
+});
+
 const hasUnsavedChanges = computed(() => {
-  // Verificamos si hay borradores activos en localStorage
   return localStorage.getItem('evaluacion_draft_active') === 'true';
 });
 

@@ -18,6 +18,11 @@ api.interceptors.request.use((config) => {
   if (gestionContextId) {
     config.headers['X-Gestion-Id'] = gestionContextId;
   }
+  // Cualquier petición API cuenta como actividad
+  try {
+    const authStore = useAuthStore();
+    if (authStore.isAuthenticated) authStore.touchActivity();
+  } catch { /* store aún no listo */ }
   return config;
 });
 
@@ -27,7 +32,7 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       const authStore = useAuthStore();
       if (authStore.isAuthenticated) {
-        authStore.triggerExpiry();
+        authStore.triggerExpiry('unauthorized');
       }
     }
     return Promise.reject(error);

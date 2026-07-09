@@ -24,7 +24,7 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET', 'efu_secret_key'),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '4h') as any,
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '12h') as any,
         },
       }),
     }),

@@ -1,15 +1,70 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import SessionExpiryModal from './components/SessionExpiryModal.vue';
-import { useAuthStore } from './store/auth';
+import { onMounted, onUnmounted, watch } from 'vue'
+import SessionExpiryModal from './components/SessionExpiryModal.vue'
+import { useAuthStore } from './store/auth'
+import { ACTIVITY_EVENTS } from './utils/session'
 
-const authStore = useAuthStore();
+const authStore = useAuthStore()
+
+const onUserActivity = () => {
+  authStore.touchActivity()
+}
+
+const bindActivityListeners = () => {
+  ACTIVITY_EVENTS.forEach((evt) => {
+    window.addEventListener(evt, onUserActivity, { passive: true, capture: true })
+  })
+  document.addEventListener('visibilitychange', onVisibility)
+}
+
+const unbindActivityListeners = () => {
+  ACTIVITY_EVENTS.forEach((evt) => {
+    window.removeEventListener(evt, onUserActivity, { capture: true } as EventListenerOptions)
+  })
+  document.removeEventListener('visibilitychange', onVisibility)
+}
+
+const onVisibility = () => {
+  if (document.visibilityState === 'visible') {
+    authStore.checkSessionExpiry()
+    authStore.touchActivity(true)
+  }
+}
+
+/** Si otra pestaña actualiza lastActivityAt, recalcular el timer. */
+const onStorage = (e: StorageEvent) => {
+  if (e.key === 'lastActivityAt' && authStore.isAuthenticated) {
+    authStore.scheduleIdleCheck()
+  }
+  if (e.key === 'token' && !e.newValue) {
+    // Logout en otra pestaña
+    if (authStore.token) authStore.logout()
+  }
+}
 
 onMounted(() => {
   if (authStore.isAuthenticated) {
-    authStore.startSessionTimer();
+    authStore.startSessionTimer()
+    authStore.touchActivity(true)
   }
-});
+  bindActivityListeners()
+  window.addEventListener('storage', onStorage)
+})
+
+onUnmounted(() => {
+  unbindActivityListeners()
+  window.removeEventListener('storage', onStorage)
+})
+
+watch(
+  () => authStore.isAuthenticated,
+  (ok) => {
+    if (ok) {
+      authStore.startSessionTimer()
+      authStore.touchActivity(true)
+    }
+  },
+)
 </script>
 
 <template>

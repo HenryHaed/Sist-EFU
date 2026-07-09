@@ -2,11 +2,28 @@
   <div class="dashboard-page max-w-5xl w-full">
     <!-- Header -->
     <div class="mb-10">
-      <div class="flex items-center gap-2 mb-2">
-        <span class="h-1 w-10 bg-secondary inline-block"></span>
-        <h2 class="text-3xl font-black tracking-tight text-primary uppercase italic">Ajustes del Sistema</h2>
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <span class="h-1 w-10 bg-secondary inline-block"></span>
+            <h2 class="text-3xl font-black tracking-tight text-primary uppercase italic">Ajustes del Sistema</h2>
+          </div>
+          <p class="text-slate-500 text-sm font-medium">Configuración maestra de la Entrada Universitaria y personalización visual.</p>
+        </div>
+
+        <div v-if="gestionesDisponibles.length > 0" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm min-w-[240px]">
+          <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Gestión a configurar</label>
+          <select
+            v-model="selectedGestionId"
+            @change="cambiarGestion"
+            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-700 transition-all"
+          >
+            <option v-for="g in gestionesDisponibles" :key="g.idGestion" :value="g.idGestion">
+              Gestión {{ g.anio }}{{ g.activa ? ' (Activa)' : '' }}
+            </option>
+          </select>
+        </div>
       </div>
-      <p class="text-slate-500 text-sm font-medium">Configuración maestra de la Entrada Universitaria y personalización visual.</p>
     </div>
 
     <!-- Tabs -->
@@ -175,7 +192,7 @@
       </div>
 
       <!-- Footer Buttons (solo para general/multimedia) -->
-      <div v-if="activeTab !== 'documentos'" class="flex justify-end gap-4 pt-6 border-t border-slate-100">
+      <div v-if="activeTab === 'general' || activeTab === 'multimedia'" class="flex justify-end gap-4 pt-6 border-t border-slate-100">
          <button 
           v-if="hasChanges"
           type="button" @click="resetChanges"
@@ -293,63 +310,105 @@
         </div>
       </div>
       
-      <!-- TAB: CRONOGRAMAS -->
-      <div v-if="activeTab === 'cronogramas'" class="space-y-6">
+      <!-- TAB: DEFINIR CRONOGRAMA -->
+      <div v-if="activeTab === 'cronogramas'" class="space-y-6 animate-in fade-in duration-500">
         <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="bg-indigo-600 px-6 py-4 flex items-center gap-3">
-            <span class="material-symbols-outlined text-white">calendar_month</span>
-            <h3 class="text-sm font-black text-white uppercase tracking-widest">Cronograma de Inscripciones por Categoría</h3>
+          <div class="bg-primary px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-white text-2xl">calendar_month</span>
+              <div>
+                <h3 class="text-sm font-black text-white uppercase tracking-widest">Definir Cronograma</h3>
+                <p class="text-[10px] text-white/80 font-bold uppercase tracking-wider mt-0.5">
+                  Gestión {{ gestion.anio }} — Inscripciones por categoría
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              @click="guardarTodosCronogramas"
+              :disabled="savingAllCronos || categorias.length === 0 || loadingCronos"
+              class="px-5 py-2.5 bg-secondary hover:bg-red-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            >
+              <span v-if="savingAllCronos" class="material-symbols-outlined animate-spin text-sm">sync</span>
+              <span v-else class="material-symbols-outlined text-sm">save</span>
+              {{ savingAllCronos ? 'Guardando...' : 'Guardar todo' }}
+            </button>
           </div>
           
           <div class="p-6">
             <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-start gap-3">
-              <span class="material-symbols-outlined text-blue-600">info</span>
-              <p class="text-xs text-blue-800 font-medium">
-                Define los periodos de tiempo en los que los delegados podrán enviar sus solicitudes de inscripción. 
-                Los usuarios solo verán el formulario si están dentro del rango de fechas establecido para su categoría.
+              <span class="material-symbols-outlined text-primary shrink-0">info</span>
+              <p class="text-xs text-blue-900 font-medium leading-relaxed">
+                Establece las fechas de apertura y cierre de inscripciones para cada categoría.
+                Los delegados solo podrán enviar solicitudes dentro del periodo definido para su categoría.
               </p>
             </div>
 
             <div v-if="loadingCronos" class="py-12 text-center text-slate-400">
               <span class="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+              <p class="text-xs font-bold uppercase tracking-widest mt-3">Cargando cronograma...</p>
+            </div>
+
+            <div v-else-if="categorias.length === 0" class="py-14 text-center">
+              <span class="material-symbols-outlined text-5xl text-slate-200 mb-3">event_busy</span>
+              <p class="text-sm font-black text-slate-600 uppercase tracking-tight">No se pudieron cargar las categorías</p>
+              <p class="text-xs text-slate-400 font-medium mt-2 max-w-md mx-auto">
+                Intenta recargar la pestaña o verifica que la gestión {{ gestion.anio }} esté correctamente configurada.
+              </p>
             </div>
 
             <div v-else class="space-y-4">
-              <div v-for="cat in categorias" :key="cat.idCategoria" class="bg-slate-50 rounded-2xl border border-slate-200 p-6">
-                <div class="flex flex-col md:flex-row md:items-center gap-6">
-                  <div class="md:w-1/3">
-                    <p class="text-sm font-black text-slate-800 uppercase tracking-tighter">{{ cat.nombre }}</p>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configurar periodo</p>
+              <div
+                v-for="cat in categorias"
+                :key="cat.idCategoria"
+                class="bg-slate-50 rounded-2xl border border-slate-200 p-6 hover:border-primary/30 transition-colors"
+              >
+                <div class="flex flex-col lg:flex-row lg:items-end gap-6">
+                  <div class="lg:w-1/4">
+                    <div class="flex items-center gap-3 mb-2">
+                      <span
+                        class="size-10 rounded-xl flex items-center justify-center text-lg font-black text-white shadow-lg"
+                        :class="badgeCategoria(cat.nombre).color"
+                      >
+                        {{ badgeCategoria(cat.nombre).letra }}
+                      </span>
+                      <div>
+                        <p class="text-[10px] font-black text-secondary uppercase tracking-widest">Categoría</p>
+                        <p class="text-base font-black text-slate-800 uppercase tracking-tight">{{ cat.nombre }}</p>
+                      </div>
+                    </div>
+                    <p v-if="cat.descripcion" class="text-xs text-slate-500 mt-1 leading-relaxed">{{ cat.descripcion }}</p>
                   </div>
                   
-                  <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 px-1">Fecha y Hora de Inicio</label>
+                      <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 px-1">Apertura de inscripciones</label>
                       <input 
                         type="datetime-local" 
                         v-model="cronoForms[cat.idCategoria].fechaInicio"
-                        class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary font-bold text-xs"
+                        class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-sm text-slate-700"
                       />
                     </div>
                     <div>
-                      <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 px-1">Fecha y Hora de Cierre</label>
+                      <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 px-1">Cierre de inscripciones</label>
                       <input 
                         type="datetime-local" 
                         v-model="cronoForms[cat.idCategoria].fechaFin"
-                        class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary font-bold text-xs"
+                        class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-sm text-slate-700"
                       />
                     </div>
                   </div>
 
-                  <div class="md:w-32 flex justify-end">
+                  <div class="lg:w-36 flex justify-end">
                     <button 
                       type="button"
                       @click="guardarCronograma(cat.idCategoria)"
                       :disabled="savingCrono === cat.idCategoria"
-                      class="px-4 py-2 bg-slate-800 hover:bg-black text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                      class="w-full px-4 py-2.5 bg-primary hover:bg-blue-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                     >
                       <span v-if="savingCrono === cat.idCategoria" class="material-symbols-outlined animate-spin text-xs">sync</span>
-                      {{ savingCrono === cat.idCategoria ? '...' : 'Actualizar' }}
+                      <span v-else class="material-symbols-outlined text-xs">save</span>
+                      {{ savingCrono === cat.idCategoria ? 'Guardando' : 'Guardar' }}
                     </button>
                   </div>
                 </div>
@@ -369,19 +428,22 @@ import api from '../services/api'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
-  gestionId: { type: Number, default: null }
+  gestionId: { type: Number, default: null },
+  initialTab: { type: String, default: 'general' },
 })
 
 const tabs = [
   { id: 'general', label: 'Información General' },
   { id: 'multimedia', label: 'Multimedia e Imagen' },
   { id: 'documentos', label: 'Reglamentos y Docs' },
-  { id: 'cronogramas', label: 'Cronogramas' }
+  { id: 'cronogramas', label: 'Definir Cronograma' }
 ]
-const activeTab = ref('general')
+const activeTab = ref(props.initialTab || 'general')
 const loading = ref(true)
 const saving = ref(false)
 const hasChanges = ref(false)
+const gestionesDisponibles = ref([])
+const selectedGestionId = ref(null)
 
 const gestion = ref({
   idGestion: null,
@@ -414,17 +476,17 @@ const previews = ref({
 import { getImageUrl } from '../utils/url'
 import { applySiteTitle } from '../utils/siteTitle'
 
-const loadGestion = async () => {
+const loadGestion = async (idGestion = null) => {
   loading.value = true
   try {
-    const url = props.gestionId ? `/evaluaciones/gestiones/${props.gestionId}` : '/evaluaciones/gestion-activa'
+    const url = idGestion ? `/evaluaciones/gestiones/${idGestion}` : '/evaluaciones/gestion-activa'
     const { data } = await api.get(url)
     if (data) {
-      // Transformamos las URLs relativas a absolutas para la previsualización
       data.urlLogo = getImageUrl(data.urlLogo)
       data.urlBanner = getImageUrl(data.urlBanner)
       data.urlImagenLogin = getImageUrl(data.urlImagenLogin)
       gestion.value = data
+      selectedGestionId.value = data.idGestion
       applySiteTitle(data.nombreSitio)
     }
   } catch (err) {
@@ -434,6 +496,24 @@ const loadGestion = async () => {
     loading.value = false
     hasChanges.value = false
   }
+}
+
+const cargarGestionesDisponibles = async () => {
+  try {
+    const { data } = await api.get('/evaluaciones/gestiones')
+    gestionesDisponibles.value = data || []
+  } catch (e) {
+    console.error('Error cargando gestiones:', e)
+  }
+}
+
+const cambiarGestion = async () => {
+  if (!selectedGestionId.value) return
+  files.value = { logo: null, banner: null, loginImg: null }
+  previews.value = { logo: null, banner: null, loginImg: null }
+  await loadGestion(selectedGestionId.value)
+  if (activeTab.value === 'documentos') cargarDocumentos()
+  if (activeTab.value === 'cronogramas') cargarDatosCronogramas()
 }
 
 const handleFile = (event, type) => {
@@ -446,7 +526,7 @@ const handleFile = (event, type) => {
 }
 
 const resetChanges = () => {
-  loadGestion()
+  loadGestion(selectedGestionId.value || props.gestionId || null)
   files.value = { logo: null, banner: null, loginImg: null }
   previews.value = { logo: null, banner: null, loginImg: null }
 }
@@ -575,57 +655,84 @@ const categorias = ref([])
 const cronoForms = ref({})
 const loadingCronos = ref(false)
 const savingCrono = ref(null)
+const savingAllCronos = ref(false)
+
+const formatDatetimeLocal = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const badgeCategoria = (nombre) => {
+  const letra = (nombre || '').replace(/categor[ií]a\s*/i, '').trim().charAt(0).toUpperCase() || '?'
+  const colores = {
+    A: 'bg-primary shadow-primary/30',
+    B: 'bg-amber-500 shadow-amber-500/30',
+    C: 'bg-emerald-600 shadow-emerald-600/30',
+  }
+  return { letra, color: colores[letra] || 'bg-slate-500 shadow-slate-500/30' }
+}
 
 const cargarDatosCronogramas = async () => {
+  if (!gestion.value.idGestion) return
   loadingCronos.value = true
   try {
-    // 1. Cargar Categorías
-    const { data: cats } = await api.get('/categorias')
+    await api.post(`/categorias/asegurar/${gestion.value.idGestion}`)
+
+    const { data: cats } = await api.get('/categorias', {
+      params: { idGestion: gestion.value.idGestion },
+    })
     categorias.value = cats
 
-    // Inicializar formularios
-    cats.forEach(c => {
-      cronoForms.value[c.idCategoria] = { fechaInicio: '', fechaFin: '' }
+    const forms = {}
+    cats.forEach((c) => {
+      forms[c.idCategoria] = { fechaInicio: '', fechaFin: '' }
     })
+    cronoForms.value = forms
 
-    // 2. Cargar Cronogramas existentes para esta gestión
     const { data: cronos } = await api.get(`/inscripciones/cronogramas/${gestion.value.idGestion}`)
     
-    cronos.forEach(c => {
-      if (cronoForms.value[c.categoria.idCategoria]) {
-        // Formatear para datetime-local (YYYY-MM-DDThh:mm)
-        const format = (dateStr) => {
-          if (!dateStr) return ''
-          const d = new Date(dateStr)
-          return d.toISOString().slice(0, 16)
-        }
-        cronoForms.value[c.categoria.idCategoria].fechaInicio = format(c.fechaInicio)
-        cronoForms.value[c.categoria.idCategoria].fechaFin = format(c.fechaFin)
+    cronos.forEach((c) => {
+      const idCat = c.categoria?.idCategoria
+      if (idCat && cronoForms.value[idCat]) {
+        cronoForms.value[idCat].fechaInicio = formatDatetimeLocal(c.fechaInicio)
+        cronoForms.value[idCat].fechaFin = formatDatetimeLocal(c.fechaFin)
       }
     })
   } catch (e) {
     console.error('Error cargando datos cronograma:', e)
+    Swal.fire('Error', 'No se pudo cargar el cronograma de inscripciones.', 'error')
   } finally {
     loadingCronos.value = false
   }
 }
 
+const validarFechasCronograma = (form) => {
+  if (!form.fechaInicio || !form.fechaFin) {
+    Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Debes definir apertura y cierre.', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
+    return false
+  }
+  if (new Date(form.fechaFin) <= new Date(form.fechaInicio)) {
+    Swal.fire({ icon: 'warning', title: 'Fechas inválidas', text: 'El cierre debe ser posterior a la apertura.', toast: true, position: 'top-end', timer: 3000, showConfirmButton: false })
+    return false
+  }
+  return true
+}
+
 const guardarCronograma = async (idCategoria) => {
   const form = cronoForms.value[idCategoria]
-  if (!form.fechaInicio || !form.fechaFin) {
-    Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Debes definir ambas fechas.', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false })
-    return
-  }
+  if (!validarFechasCronograma(form)) return
 
   savingCrono.value = idCategoria
   try {
     await api.post('/inscripciones/cronogramas', {
       idGestion: gestion.value.idGestion,
-      idCategoria: idCategoria,
+      idCategoria,
       fechaInicio: form.fechaInicio,
-      fechaFin: form.fechaFin
+      fechaFin: form.fechaFin,
     })
-    Swal.fire({ icon: 'success', title: 'Cronograma actualizado', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
+    Swal.fire({ icon: 'success', title: 'Cronograma guardado', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
   } catch (e) {
     console.error('Error al guardar cronograma:', e)
     Swal.fire('Error', 'No se pudo guardar el cronograma.', 'error')
@@ -634,7 +741,54 @@ const guardarCronograma = async (idCategoria) => {
   }
 }
 
-onMounted(loadGestion)
+const guardarTodosCronogramas = async () => {
+  const pendientes = categorias.value.filter((cat) => {
+    const form = cronoForms.value[cat.idCategoria]
+    return form?.fechaInicio && form?.fechaFin
+  })
+
+  if (pendientes.length === 0) {
+    Swal.fire({ icon: 'info', title: 'Sin fechas', text: 'Completa al menos una categoría antes de guardar.', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
+    return
+  }
+
+  for (const cat of pendientes) {
+    if (!validarFechasCronograma(cronoForms.value[cat.idCategoria])) return
+  }
+
+  savingAllCronos.value = true
+  try {
+    for (const cat of pendientes) {
+      const form = cronoForms.value[cat.idCategoria]
+      await api.post('/inscripciones/cronogramas', {
+        idGestion: gestion.value.idGestion,
+        idCategoria: cat.idCategoria,
+        fechaInicio: form.fechaInicio,
+        fechaFin: form.fechaFin,
+      })
+    }
+    Swal.fire({ icon: 'success', title: 'Cronograma completo guardado', toast: true, position: 'top-end', timer: 2800, showConfirmButton: false })
+  } catch (e) {
+    console.error('Error al guardar cronogramas:', e)
+    Swal.fire('Error', 'No se pudieron guardar todos los cronogramas.', 'error')
+  } finally {
+    savingAllCronos.value = false
+  }
+}
+
+onMounted(async () => {
+  await cargarGestionesDisponibles()
+  await loadGestion(props.gestionId || null)
+  if (props.initialTab === 'cronogramas') cargarDatosCronogramas()
+})
+
+watch(() => props.gestionId, async (id) => {
+  if (id) {
+    selectedGestionId.value = id
+    await loadGestion(id)
+    if (activeTab.value === 'cronogramas') cargarDatosCronogramas()
+  }
+})
 </script>
 
 <style scoped>

@@ -248,7 +248,7 @@ const guardarClonacion = async () => {
     notify.success('Clonado', 'Configuración clonada correctamente')
     cargar()
   } catch (e) {
-    notify.error('Error', 'No se pudo clonar la configuración')
+    notify.error('Error', e.response?.data?.message || 'No se pudo clonar la configuración')
   } finally {
     cloning.value = false
   }
@@ -326,7 +326,7 @@ const eliminarGestion = async (g) => {
         notify.success('Eliminado', `La gestión ${g.anio} ha sido eliminada.`)
         cargar()
       } catch (e) {
-        notify.error('Error', 'No se pudo eliminar la gestión. Verifique que no tenga dependencias críticas.')
+        notify.error('Error', e.response?.data?.message || 'No se pudo eliminar la gestión.')
       }
     }
   })

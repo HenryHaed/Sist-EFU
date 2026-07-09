@@ -5,6 +5,11 @@ import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Role } from './entities/Role';
+import { Facultad } from './entities/Facultad';
+import { Carrera } from './entities/Carrera';
+import { TipoDanza } from './entities/TipoDanza';
+import { ensureOrganizacionUmsaDefault } from './common/organizacion-umsa-default';
+import { ensureTiposDanzaDefault } from './common/tipos-danza-default';
 
 const UPLOAD_SUBDIRS = [
   'Doc_Gestion',
@@ -89,6 +94,7 @@ async function limpiarBaseDeDatos(dataSource: DataSource) {
     'categorias',
     'carreras',
     'facultades',
+    'tipos_danza',
     'instituciones_externas',
     'eventos_control',
     'gestiones',
@@ -105,6 +111,7 @@ async function limpiarBaseDeDatos(dataSource: DataSource) {
     'usuarios_id_usuario_seq',
     'facultades_id_facultad_seq',
     'carreras_id_carrera_seq',
+    'tipos_danza_id_tipo_danza_seq',
     'categorias_id_categoria_seq',
     'instituciones_externas_id_institucion_seq',
     'fraternidades_id_fraternidad_seq',
@@ -177,6 +184,16 @@ async function sembrarProduccion(dataSource: DataSource) {
   console.log('  (Deberá cambiar la contraseña en el primer inicio de sesión)');
   console.log('══════════════════════════════════════════════════');
   console.log('');
+
+  console.log('[RESET] Sembrando catálogos base (facultades, carreras, tipos de danza)...');
+  const org = await ensureOrganizacionUmsaDefault(
+    dataSource.getRepository(Facultad),
+    dataSource.getRepository(Carrera),
+  );
+  await ensureTiposDanzaDefault(dataSource.getRepository(TipoDanza));
+  console.log(
+    `[RESET] Organización UMSA: +${org.facultadesInsertadas} facultades, +${org.carrerasInsertadas} carreras.`,
+  );
 }
 
 async function bootstrap() {

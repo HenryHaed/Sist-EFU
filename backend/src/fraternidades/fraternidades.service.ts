@@ -1,12 +1,15 @@
 ﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Response } from 'express';
 import { Fraternidad } from '../entities/Fraternidad';
 import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
-import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
+import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { CreateFraternidadDto, UpdateFraternidadDto } from './dto/fraternidad.dto';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
+import { buildMiembrosDirectiva } from '../common/personas-directiva';
 
 @Injectable()
 export class FraternidadesService {
@@ -28,8 +31,11 @@ export class FraternidadesService {
   async findAll() {
     const gestion = await this.getGestionActiva();
     return this.fraternidadRepo.find({
-      where: gestion ? { gestion: { idGestion: gestion.idGestion } } : {},
-      relations: ['facultad', 'carrera', 'institucionExterna', 'categoria'],
+      where: {
+        habilitadoEfu: true,
+        ...(gestion ? { gestion: { idGestion: gestion.idGestion } } : {}),
+      },
+      relations: ['facultad', 'carrera', 'institucionExterna', 'categoria', 'tipoDanza'],
       order: { nombre: 'ASC' },
     });
   }
@@ -43,12 +49,13 @@ export class FraternidadesService {
       .leftJoinAndSelect('fraternidad.carrera', 'carrera')
       .leftJoinAndSelect('carrera.facultad', 'carreraFacultad')
       .leftJoinAndSelect('fraternidad.institucionExterna', 'institucionExterna')
-      .leftJoinAndSelect('fraternidad.categoria', 'categoria');
+      .leftJoinAndSelect('fraternidad.categoria', 'categoria')
+      .where('fraternidad.habilitado_efu = true');
 
     if (query.length > 0) {
-      qb.where(
-        'LOWER(fraternidad.nombre) LIKE LOWER(:q) OR LOWER(fraternidad.origenFraternidad) LIKE LOWER(:q) OR LOWER(fraternidad.nivelRepresentacion) LIKE LOWER(:q) OR LOWER(facultad.nombre) LIKE LOWER(:q) OR LOWER(carrera.nombre) LIKE LOWER(:q) OR LOWER(institucionExterna.nombre) LIKE LOWER(:q)',
-        { q: `%${query}%` }
+      qb.andWhere(
+        '(LOWER(fraternidad.nombre) LIKE LOWER(:q) OR LOWER(fraternidad.nivelRepresentacion) LIKE LOWER(:q) OR LOWER(facultad.nombre) LIKE LOWER(:q) OR LOWER(carrera.nombre) LIKE LOWER(:q) OR LOWER(institucionExterna.nombre) LIKE LOWER(:q))',
+        { q: `%${query}%` },
       );
     }
 
@@ -63,7 +70,6 @@ export class FraternidadesService {
       idFraternidad: fraternidad.idFraternidad,
       nombre: fraternidad.nombre,
       nivelRepresentacion: fraternidad.nivelRepresentacion,
-      origenFraternidad: fraternidad.origenFraternidad,
       gestionAnio: fraternidad.gestion?.anio || null,
       gestionActiva: !!fraternidad.gestion?.activa,
       etiqueta: this.formatearEtiquetaFraternidad(fraternidad),
@@ -109,7 +115,7 @@ export class FraternidadesService {
       return `Externo - ${institucion}`;
     }
 
-    return fraternidad.origenFraternidad || 'General';
+    return fraternidad.nivelRepresentacion || 'General';
   }
 
   async findOne(id: number) {
@@ -175,5 +181,166 @@ export class FraternidadesService {
 
     await this.fraternidadRepo.remove(fraternidad);
     return { message: 'Fraternidad eliminada con exito' };
+  }
+
+  private async obtenerSolicitudDirectiva(idFraternidad: number) {
+    const fraternidad = await this.fraternidadRepo.findOne({
+      where: { idFraternidad },
+      relations: ['categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'gestion'],
+    });
+    if (!fraternidad) {
+      throw new NotFoundException(`Fraternidad con ID ${idFraternidad} no encontrada`);
+    }
+
+    const solicitud = await this.solicitudRepo.findOne({
+      where: {
+        fraternidadCreada: { idFraternidad },
+        estado: EstadoSolicitud.APROBADO,
+      },
+      relations: ['gestion', 'categoria', 'facultad', 'carrera', 'institucionExterna', 'delegado'],
+      order: { updatedAt: 'DESC' },
+    });
+
+    if (!solicitud) {
+      throw new NotFoundException(
+        'No hay una inscripción aprobada con directiva registrada para esta fraternidad.',
+      );
+    }
+
+    return { fraternidad, solicitud };
+  }
+
+  private instanciaLabel(solicitud: SolicitudInscripcion) {
+    if (solicitud.facultad?.nombre) return `Facultad: ${solicitud.facultad.nombre}`;
+    if (solicitud.carrera?.nombre) return `Carrera: ${solicitud.carrera.nombre}`;
+    if (solicitud.nombreInstitucionExterna) return `Externo: ${solicitud.nombreInstitucionExterna}`;
+    return solicitud.instanciaRepresentacion || '—';
+  }
+
+  async getDirectiva(idFraternidad: number) {
+    const { fraternidad, solicitud } = await this.obtenerSolicitudDirectiva(idFraternidad);
+    const miembros = buildMiembrosDirectiva(solicitud);
+
+    if (miembros.length === 0) {
+      throw new NotFoundException('La solicitud aprobada no contiene datos de directiva.');
+    }
+
+    return {
+      fraternidad: {
+        idFraternidad: fraternidad.idFraternidad,
+        nombre: fraternidad.nombre,
+        tipoDanza: fraternidad.tipoDanza?.nombre || null,
+        categoria: fraternidad.categoria?.nombre,
+        nivelRepresentacion: fraternidad.nivelRepresentacion,
+        gestionAnio: fraternidad.gestion?.anio || solicitud.gestion?.anio,
+      },
+      solicitud: {
+        idSolicitud: solicitud.idSolicitud,
+        fechaAprobacion: solicitud.updatedAt,
+        instancia: this.instanciaLabel(solicitud),
+        delegado: solicitud.delegado
+          ? {
+              nombre: [solicitud.delegado.nombres, solicitud.delegado.primerApellido]
+                .filter(Boolean)
+                .join(' '),
+              ci: solicitud.delegado.ci,
+              correo: solicitud.delegado.correo,
+            }
+          : null,
+      },
+      miembros,
+    };
+  }
+
+  async generarPdfDirectiva(idFraternidad: number, res: Response) {
+    const data = await this.getDirectiva(idFraternidad);
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50, size: 'A4', autoFirstPage: true });
+
+    const nombreArchivo = `Directiva_${data.fraternidad.nombre.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+    doc.pipe(res);
+
+    const { contentStartY } = drawPdfInstitutionalHeader(doc, 'REPORTE OFICIAL DE DIRECTIVA');
+
+    let y = contentStartY;
+    doc.fontSize(12).fillColor('#003399').font('Helvetica-Bold').text('DATOS DE LA FRATERNIDAD', 50, y);
+    y += 20;
+
+    const infoLines = [
+      ['Fraternidad', data.fraternidad.nombre],
+      ['Tipo de danza', data.fraternidad.tipoDanza || '—'],
+      ['Categoría', data.fraternidad.categoria || '—'],
+      ['Instancia', data.solicitud.instancia],
+      ['Gestión', String(data.fraternidad.gestionAnio || '—')],
+      ['Solicitud N°', String(data.solicitud.idSolicitud)],
+    ];
+
+    infoLines.forEach(([label, value]) => {
+      doc.fontSize(9).fillColor('#64748b').font('Helvetica-Bold').text(`${label}:`, 50, y, { width: 90 });
+      doc.fontSize(10).fillColor('#0f172a').font('Helvetica').text(String(value), 145, y, { width: 400 });
+      y += 16;
+    });
+
+    y += 10;
+    doc.fontSize(12).fillColor('#003399').font('Helvetica-Bold').text('INTEGRANTES DE LA DIRECTIVA', 50, y);
+    y += 18;
+
+    const colCargo = 50;
+    const colNombre = 175;
+    const colCi = 370;
+    const colCel = 460;
+    const rowH = 18;
+
+    const drawTableHeader = (startY: number) => {
+      doc.save();
+      doc.rect(50, startY, 495, rowH).fill('#003399');
+      doc.fontSize(8).fillColor('#ffffff').font('Helvetica-Bold');
+      doc.text('Cargo', colCargo + 4, startY + 5, { width: 115 });
+      doc.text('Nombre completo', colNombre + 4, startY + 5, { width: 185 });
+      doc.text('CI', colCi + 4, startY + 5, { width: 80 });
+      doc.text('Celular', colCel + 4, startY + 5, { width: 75 });
+      doc.restore();
+      return startY + rowH;
+    };
+
+    y = drawTableHeader(y);
+
+    data.miembros.forEach((m, i) => {
+      if (y > 720) {
+        doc.addPage();
+        y = 50;
+        doc.fontSize(9).fillColor('#003399').font('Helvetica-Bold').text(`Directiva — ${data.fraternidad.nombre}`, 50, y);
+        y += 22;
+        y = drawTableHeader(y);
+      }
+
+      if (i % 2 === 0) {
+        doc.save().rect(50, y, 495, rowH).fill('#f8fafc').restore();
+      }
+
+      doc.fontSize(8).fillColor('#0f172a').font('Helvetica-Bold').text(m.cargo, colCargo + 4, y + 5, { width: 115 });
+      doc.font('Helvetica').text(m.nombre || '—', colNombre + 4, y + 5, { width: 185 });
+      doc.text(m.ci || '—', colCi + 4, y + 5, { width: 80 });
+      doc.text(m.celular || '—', colCel + 4, y + 5, { width: 75 });
+      y += rowH;
+    });
+
+    y += 24;
+    if (y > 700) {
+      doc.addPage();
+      y = 50;
+    }
+
+    doc.fontSize(8).fillColor('#64748b').font('Helvetica-Oblique');
+    doc.text(
+      `Documento generado el ${new Date().toLocaleString('es-BO')} — La Comisión de la Entrada Folklórica Universitaria`,
+      50,
+      y,
+      { width: 495, align: 'center' },
+    );
+
+    doc.end();
   }
 }

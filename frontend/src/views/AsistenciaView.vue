@@ -12,13 +12,21 @@
       </div>
 
       <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+        <button
+          type="button"
+          @click="abrirModalEvento"
+          class="w-full sm:w-auto px-5 py-3 bg-secondary hover:bg-amber-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-secondary/20 transition-all flex items-center justify-center gap-2"
+        >
+          <span class="material-symbols-outlined text-lg">event</span>
+          Crear evento
+        </button>
         <select
           v-model="eventoSeleccionado"
-          class="w-full sm:min-w-[220px] px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-primary shadow-sm"
+          class="w-full sm:min-w-[260px] px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-primary shadow-sm"
         >
           <option :value="null" disabled>Seleccionar evento</option>
           <option v-for="ev in eventos" :key="ev.idEvento" :value="ev.idEvento">
-            {{ ev.nombre }}
+            {{ etiquetaEvento(ev) }}
           </option>
         </select>
         <div class="relative w-full md:w-72">
@@ -126,7 +134,7 @@
           <div v-if="eventoSeleccionado" class="pt-2 border-t border-slate-100 flex flex-col gap-3">
             <p class="text-[10px] text-slate-400 font-medium italic">
               Basta con que asista el titular o el suplente para marcar presente a la fraternidad.
-              Si ninguno asiste, se aplican −10 pts en disciplina.
+              Si ninguno asiste, se aplican −3 pts en disciplina (10% de 30).
             </p>
             <button
               @click="guardarAsistencia(frat)"
@@ -155,6 +163,94 @@
         {{ mensaje.texto }}
       </div>
     </transition>
+
+    <!-- Modal crear evento -->
+    <div
+      v-if="modalEvento"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+      @click.self="cerrarModalEvento"
+    >
+      <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl p-8">
+        <div class="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <h3 class="font-black uppercase tracking-tight text-xl text-primary italic underline decoration-secondary decoration-4 underline-offset-4">
+              Crear evento
+            </h3>
+            <p class="text-[10px] font-medium text-slate-500 mt-2">
+              Se citará por correo a todos los delegados del sistema. Debe asistir al menos uno por fraternidad.
+            </p>
+          </div>
+          <button type="button" @click="cerrarModalEvento" class="text-slate-400 hover:text-slate-600">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Evento</label>
+            <input
+              v-model="formEvento.nombre"
+              type="text"
+              placeholder="Ej: Reunión de delegados"
+              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all"
+            />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Fecha</label>
+              <input
+                v-model="formEvento.fecha"
+                type="date"
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Hora</label>
+              <input
+                v-model="formEvento.hora"
+                type="time"
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Ubicación</label>
+            <input
+              v-model="formEvento.ubicacion"
+              type="text"
+              placeholder="Ej: Auditorio HCU, UMSA"
+              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all"
+            />
+          </div>
+        </div>
+
+        <div class="mt-6 p-4 rounded-2xl bg-amber-50 border border-amber-100">
+          <p class="text-[10px] text-amber-800 font-medium leading-relaxed">
+            Al confirmar, el sistema enviará un correo automático solo a los usuarios con rol <strong>delegado</strong>.
+            La inasistencia de titular y suplente puede sancionarse con <strong>−3 pts</strong> en disciplina.
+          </p>
+        </div>
+
+        <div class="mt-8 flex gap-3">
+          <button
+            type="button"
+            @click="cerrarModalEvento"
+            class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-2xl transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            @click="crearEvento"
+            :disabled="!formEventoValido || creandoEvento"
+            class="flex-[2] py-3 bg-primary text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg shadow-primary/20 hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <span v-if="creandoEvento" class="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+            {{ creandoEvento ? 'Enviando citaciones...' : 'Crear y citar delegados' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -170,6 +266,48 @@ const eventoSeleccionado = ref(null)
 const guardando = reactive({})
 const asistenciaForm = reactive({})
 const mensaje = ref(null)
+const modalEvento = ref(false)
+const creandoEvento = ref(false)
+const formEvento = reactive({
+  nombre: '',
+  fecha: '',
+  hora: '',
+  ubicacion: '',
+})
+
+const PENALIZACION_DISCIPLINA = 3
+
+const formEventoValido = computed(() =>
+  formEvento.nombre.trim() && formEvento.fecha && formEvento.hora && formEvento.ubicacion.trim()
+)
+
+const etiquetaEvento = (ev) => {
+  if (!ev) return ''
+  const fecha = ev.fechaHora
+    ? new Date(ev.fechaHora).toLocaleString('es-BO', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : ''
+  const lugar = ev.ubicacion ? ` · ${ev.ubicacion}` : ''
+  return fecha ? `${ev.nombre} — ${fecha}${lugar}` : ev.nombre
+}
+
+const abrirModalEvento = () => {
+  formEvento.nombre = ''
+  formEvento.fecha = ''
+  formEvento.hora = ''
+  formEvento.ubicacion = ''
+  modalEvento.value = true
+}
+
+const cerrarModalEvento = () => {
+  if (creandoEvento.value) return
+  modalEvento.value = false
+}
 
 const totalDelegados = computed(() =>
   fraternidades.value.reduce((acc, f) => acc + (f.titular ? 1 : 0) + (f.suplente ? 1 : 0), 0)
@@ -195,15 +333,19 @@ const initForm = () => {
   })
 }
 
+const fetchEventos = async () => {
+  const res = await api.get('/asistencias/eventos')
+  eventos.value = res.data
+}
+
 const fetchData = async () => {
   loading.value = true
   try {
-    const [resDelegados, resEventos] = await Promise.all([
+    const [resDelegados] = await Promise.all([
       api.get('/asistencias/delegados'),
-      api.get('/asistencias/eventos'),
+      fetchEventos(),
     ])
     fraternidades.value = resDelegados.data
-    eventos.value = resEventos.data
     if (eventos.value.length > 0 && !eventoSeleccionado.value) {
       eventoSeleccionado.value = eventos.value[0].idEvento
     }
@@ -212,6 +354,41 @@ const fetchData = async () => {
     console.error('Error fetching delegados:', err)
   } finally {
     loading.value = false
+  }
+}
+
+const crearEvento = async () => {
+  if (!formEventoValido.value || creandoEvento.value) return
+
+  creandoEvento.value = true
+  try {
+    const fechaHora = new Date(`${formEvento.fecha}T${formEvento.hora}:00`)
+    const { data } = await api.post('/asistencias/eventos', {
+      nombre: formEvento.nombre.trim(),
+      fechaHora: fechaHora.toISOString(),
+      ubicacion: formEvento.ubicacion.trim(),
+    })
+
+    await fetchEventos()
+    if (data.evento?.idEvento) {
+      eventoSeleccionado.value = data.evento.idEvento
+    }
+
+    const avisoFallos = data.fallidos > 0
+      ? ` (${data.fallidos} correo(s) fallaron)`
+      : ''
+    mostrarMensaje(
+      `Evento creado. Citación enviada a ${data.enviados} delegado(s)${avisoFallos}`,
+      data.fallidos > 0 ? 'error' : 'success',
+    )
+    modalEvento.value = false
+  } catch (err) {
+    const msg = Array.isArray(err.response?.data?.message)
+      ? err.response.data.message.join(', ')
+      : err.response?.data?.message || 'No se pudo crear el evento'
+    mostrarMensaje(msg, 'error')
+  } finally {
+    creandoEvento.value = false
   }
 }
 
@@ -235,7 +412,10 @@ const guardarAsistencia = async (frat) => {
     })
 
     if (data.sancion) {
-      mostrarMensaje(`${frat.nombreFraternidad}: inasistencia registrada (−10 pts disciplina)`, 'error')
+      mostrarMensaje(
+        `${frat.nombreFraternidad}: inasistencia registrada (−${PENALIZACION_DISCIPLINA} pts disciplina)`,
+        'error',
+      )
     } else {
       mostrarMensaje(`${frat.nombreFraternidad}: asistencia registrada correctamente`)
     }

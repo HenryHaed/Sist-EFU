@@ -12,7 +12,10 @@ export class EventoControl {
     @Column({ name: 'fecha_hora', type: 'timestamp' })
     fechaHora: Date;
 
-    @Column({ name: 'puntos_penalizacion', type: 'decimal', precision: 5, scale: 2, default: 0 })
+    @Column({ length: 500, nullable: true })
+    ubicacion: string;
+
+    @Column({ name: 'puntos_penalizacion', type: 'decimal', precision: 5, scale: 2, default: 3 })
     puntosPenalizacion: number;
 
     @CreateDateColumn({ name: 'created_at' })

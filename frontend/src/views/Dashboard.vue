@@ -135,7 +135,17 @@
               <span class="text-sm font-bold">Inscribir Fraternidad</span>
             </button>
 
-            <p v-if="can('ajustes') || can('gestion_sistema') || can('auditoria')" class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-4 mt-6 mb-2">Configuración</p>
+            <button
+              v-if="can('auditoria_reportes')"
+              @click="setVista('auditoria_reportes')"
+              :class="vistaActual === 'auditoria_reportes' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left mt-1"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'auditoria_reportes' ? 'text-secondary' : 'text-slate-400'">fact_check</span>
+              <span class="text-sm">Auditoría y Reportes</span>
+            </button>
+
+            <p v-if="can('ajustes') || can('gestion_sistema')" class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-4 mt-6 mb-2">Configuración</p>
             
             <!-- Menú Acordeón: Gestión Usuarios -->
             <div v-if="can('gestion_usuarios')" class="w-full">
@@ -221,15 +231,6 @@
               <span class="text-sm font-bold">Subir Monografía</span>
             </button>
 
-            <button
-              v-if="can('auditoria')"
-              @click="setVista('auditoria')"
-              :class="vistaActual === 'auditoria' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent text-left transition-all'"
-              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all"
-            >
-              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'auditoria' ? 'text-secondary' : 'text-slate-400'">history</span>
-              <span class="text-sm font-bold">Auditoría del Sistema</span>
-            </button>
 
             <button
               v-if="can('enviar_mensaje')"
@@ -323,7 +324,7 @@
             <EstadisticasView
               v-if="vistaActual === 'estadisticas'"
               key="estadisticas"
-              @ir-calificar="setVista('fraternidades')"
+              @ir-calificar="setVista('seleccionar_fase')"
             />
 
             <!-- Vista: Nueva Selección Inteligente de Fase -->
@@ -353,7 +354,7 @@
               v-else-if="vistaActual === 'gestion_fases'"
               key="gestion_fases_maestro"
               @seleccionar-gestion="(g) => { gestionSeleccionada = g; authStore.setGestionContext(g.idGestion); vistaActual = 'gestion_fases_detalle' }"
-              @ir-ajustes-gestion="(id) => { gestionParaAjustes = id; authStore.setGestionContext(id); vistaActual = 'ajustes' }"
+              @ir-ajustes-gestion="(id) => { gestionParaAjustes = id; ajustesInitialTab = 'cronogramas'; authStore.setGestionContext(id); vistaActual = 'ajustes' }"
             />
 
             <!-- Vista: Fases de una Gestión (Admin) - Nivel Detalle -->
@@ -417,6 +418,12 @@
               key="fraternidades_crud"
             />
 
+            <DirectivaFraternidadView
+              v-else-if="vistaActual === 'directiva_fraternidad' && directivaFraternidadId"
+              :key="`directiva-${directivaFraternidadId}`"
+              :id-fraternidad="directivaFraternidadId"
+            />
+
             <OrganizacionCRUDView
               v-else-if="vistaActual === 'organizacion_crud'"
               key="organizacion_crud"
@@ -429,10 +436,10 @@
               :rol-filtro="vistaActual.replace('usuarios_', '')"
             />
 
-            <!-- Vista: Auditoría (Superusuario) -->
-            <AuditoriaView
-              v-else-if="vistaActual === 'auditoria'"
-              key="auditoria"
+            <!-- Vista: Auditoría y Reportes -->
+            <AuditoriaReportesView
+              v-else-if="vistaActual === 'auditoria_reportes'"
+              key="auditoria_reportes"
             />
 
             <!-- Vista: Enviar Mensaje (Admin) -->
@@ -444,8 +451,9 @@
             <!-- Vista: Ajustes del Sistema -->
             <AjustesView
               v-else-if="vistaActual === 'ajustes'"
-              :key="`ajustes-${gestionParaAjustes || 'activa'}`"
+              :key="`ajustes-${gestionParaAjustes || 'activa'}-${ajustesInitialTab}`"
               :gestion-id="gestionParaAjustes"
+              :initial-tab="ajustesInitialTab"
             />
 
             <!-- Vista: Inscripción de Fraternidad (Delegado) -->
@@ -620,12 +628,13 @@ import ListadoCompetidoresView from './ListadoCompetidoresView.vue'
 import DelegadoParticipantesView from './DelegadoParticipantesView.vue'
 import OrganizacionCRUDView from './OrganizacionCRUDView.vue'
 import EnviarMensajeView from './EnviarMensajeView.vue'
-import AuditoriaView from './AuditoriaView.vue'
+import AuditoriaReportesView from './AuditoriaReportesView.vue'
 import AjustesView from './AjustesView.vue'
 import InscribirFraternidadView from './InscribirFraternidadView.vue'
 import ReglamentoView from './ReglamentoView.vue'
 import SolicitudesInscripcionView from './SolicitudesInscripcionView.vue'
 import AsistenciaView from './AsistenciaView.vue'
+import DirectivaFraternidadView from './DirectivaFraternidadView.vue'
 import SubirMonografiaView from './SubirMonografiaView.vue'
 
 import { getImageUrl } from '../utils/url'
@@ -640,6 +649,11 @@ const vuetifyTheme = useTheme()
 // State
 const siteInfo = ref({})
 const vistaActual = ref('estadisticas')
+const directivaFraternidadId = computed(() => {
+  const raw = router.currentRoute.value.query.idFraternidad
+  const id = Number(raw)
+  return Number.isFinite(id) && id > 0 ? id : null
+})
 const sidebarOpen = ref(false)
 const gestionUsuariosOpen = ref(false)
 const gestionEventoOpen = ref(false)
@@ -647,6 +661,7 @@ const fraternidadSeleccionada = ref(null)
 const faseSeleccionada = ref(null)
 const gestionSeleccionada = ref(null)  // Maestro → Detalle de Gestión
 const gestionParaAjustes = ref(null)
+const ajustesInitialTab = ref('general')
 
 const activeFaseJurado = ref(null)
 const activeFraternidadJurado = ref(null)
@@ -701,8 +716,8 @@ const passPolicyRules = computed(() => {
 const can = (permission) => {
   const role = authStore.userRole?.toLowerCase()
   const permissions = {
-    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin'],
-    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
+    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'auditoria_reportes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin'],
+    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria_reportes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
     jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
     delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'gestionar_participantes', 'inscripcion_fraternidad']
@@ -710,14 +725,14 @@ const can = (permission) => {
   return permissions[role]?.includes(permission) || false
 }
 
-// Timer logic
-const timerSegundos = ref(authStore.remainingSessionSeconds)
+// Timer logic — cuenta regresiva de inactividad (se reinicia con actividad)
+const timerSegundos = ref(authStore.remainingIdleSeconds)
 let timerInterval = null
 const timer = computed(() => {
-  const h = Math.floor(timerSegundos.value / 3600)
-  const m = Math.floor((timerSegundos.value % 3600) / 60)
-  const s = timerSegundos.value % 60
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+  const total = Math.max(0, timerSegundos.value)
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
 })
 
 onMounted(async () => {
@@ -725,7 +740,9 @@ onMounted(async () => {
   localStorage.theme = 'light'
   vuetifyTheme.global.name.value = 'umsa'
 
-  timerInterval = setInterval(() => { timerSegundos.value-- }, 1000)
+  timerInterval = setInterval(() => {
+    timerSegundos.value = authStore.remainingIdleSeconds
+  }, 1000)
 
   // Cargar info del sitio
   try {
@@ -807,6 +824,7 @@ const tituloVista = computed(() => {
     seleccionar_fase: 'Calificación de Fraternidades',
     seleccionar_concurso: 'Calificación de Concursos',
     fraternidades_crud: 'Listado de Fraternidades',
+    directiva_fraternidad: 'Directiva de Fraternidad',
     listado_fase: 'Listado de Fraternidades por Fase',
     listado_competidores: 'Listado de Competidores',
     wizard: 'Evaluación de Fraternidad',
@@ -817,7 +835,7 @@ const tituloVista = computed(() => {
     gestion_criterios_detalle: faseSeleccionada.value ? `Fase: ${faseSeleccionada.value.nombre} — Criterios` : 'Criterios de Evaluación',
     ajustes: 'Ajustes del Sistema',
     enviar_mensaje: 'Enviar un Mensaje',
-    auditoria: 'Auditoría del Sistema',
+    auditoria_reportes: 'Auditoría y Reportes',
     inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad',
     reglamento: 'Reglamentos y Documentos Oficiales',
     solicitudes_inscripcion: 'Solicitudes de Preinscripción',
@@ -842,7 +860,8 @@ const setVista = (vista) => {
   gestionSeleccionada.value = null
   faseSeleccionada.value = null
   if (vista === 'ajustes') {
-    gestionParaAjustes.value = null // reset if clicking from sidebar
+    gestionParaAjustes.value = null
+    ajustesInitialTab.value = 'general'
   }
   sidebarOpen.value = false
 }

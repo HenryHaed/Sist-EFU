@@ -9,6 +9,8 @@ import { Infraccion } from '../entities/Infraccion';
 import { Gestion } from '../entities/Gestion';
 import { Fraternidad } from '../entities/Fraternidad';
 import { EventoControl } from '../entities/EventoControl';
+import { Usuario } from '../entities/Usuario';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -20,7 +22,9 @@ import { EventoControl } from '../entities/EventoControl';
       Gestion,
       Fraternidad,
       EventoControl,
+      Usuario,
     ]),
+    MailModule,
   ],
   controllers: [AsistenciasController],
   providers: [AsistenciasService],

@@ -9,6 +9,13 @@ import { Categoria } from '../entities/Categoria';
 import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { InstitucionExterna } from '../entities/InstitucionExterna';
+import { TipoDanza } from '../entities/TipoDanza';
+import { Fraternidad } from '../entities/Fraternidad';
+import { Usuario } from '../entities/Usuario';
+import { Evaluacion } from '../entities/Evaluacion';
+import { Incidencia } from '../entities/Incidencia';
+import { Asistencia } from '../entities/Asistencia';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -19,8 +26,15 @@ import { InstitucionExterna } from '../entities/InstitucionExterna';
       Categoria,
       Facultad,
       Carrera,
-      InstitucionExterna
+      InstitucionExterna,
+      TipoDanza,
+      Fraternidad,
+      Usuario,
+      Evaluacion,
+      Incidencia,
+      Asistencia,
     ]),
+    MailModule,
   ],
   controllers: [InscripcionesController],
   providers: [InscripcionesService],

@@ -5,7 +5,7 @@ Documentación generada a partir de las **22 entidades TypeORM** en `backend/src
 - **Motor:** PostgreSQL  
 - **Base de datos:** `efu_db` (configurable vía `.env`)  
 - **ORM:** TypeORM con `synchronize: true` (el esquema se alinea automáticamente al iniciar el backend)  
-- **Última revisión:** junio 2026  
+- **Última revisión:** julio 2026  
 
 ---
 
@@ -23,6 +23,8 @@ Documentación generada a partir de las **22 entidades TypeORM** en `backend/src
 
 - Solo puede existir **un usuario con rol `delegado` por fraternidad** (validado en `UsuariosService`).
 - Los textos de **solicitudes de inscripción** (nombres, fraternidad, directiva) se persisten en **MAYÚSCULAS**.
+- **Preinscripción — directiva:** cada cargo tiene nombres, apellidos, CI y complemento SEGIP opcional; cargos obligatorios vs opcionales según reglamento.
+- **Preinscripción — documentos:** **4 PDFs por integrante** (CI, Matrícula, No deudas fraternidad, No deudas áreas). Sin certificados globales de deuda. **3 PDFs institucionales** globales (carta, resolución, acta).
 - Al **aprobar** una solicitud se crea o reutiliza la fraternidad oficial y se vincula al delegado.
 - **Directorio de delegados:** solo delegado **titular** y **suplente** (datos en `solicitudes_inscripcion`).
 - **Monografía:** cada fraternidad sube **un único PDF** vía su delegado; admin/jurado/superusuario lo consultan al calificar la fase Monografía.
@@ -197,8 +199,7 @@ Participación oficial de un grupo folclórico en una gestión.
 |---------|------|---------------|-------------|
 | `id_fraternidad` | SERIAL | PK | Identificador |
 | `nombre` | VARCHAR(255) | NOT NULL, **UNIQUE** | Nombre (único global) |
-| `origen_fraternidad` | VARCHAR(50) | NOT NULL | Tipo de danza / origen |
-| `nivel_representacion` | VARCHAR(100) | NULL | Facultad, Carrera, UMSA, etc. |
+| `nivel_representacion` | VARCHAR(100) | NULL | Facultad, Carrera, UMSA, Externo, etc. |
 | `id_gestion` | INTEGER | FK → `gestiones`, ON DELETE CASCADE | Gestión |
 | `id_facultad` | INTEGER | FK → `facultades`, ON DELETE SET NULL | Facultad |
 | `id_carrera` | INTEGER | FK → `carreras`, ON DELETE SET NULL | Carrera |
@@ -244,12 +245,14 @@ Monografía única por fraternidad, subida por el delegado. Archivo en `uploads/
 
 ### `solicitudes_inscripcion`
 
-Formulario de 33 puntos enviado por el delegado antes de la inscripción oficial.
+Formulario de preinscripción enviado por el delegado antes de la inscripción oficial.
 
 **Enums:**
 
 - `estado`: `PENDIENTE` | `OBSERVADO` | `APROBADO` | `RECHAZADO`
 - `instancia_representacion`: `Facultad` | `Carrera` | `UMSA` | `FEDSIDUMSA` | `STUMSA` | `Externo`
+
+#### Datos generales
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
@@ -257,33 +260,64 @@ Formulario de 33 puntos enviado por el delegado antes de la inscripción oficial
 | `id_gestion` | FK → `gestiones` | Gestión |
 | `id_usuario_delegado` | FK → `usuarios` | Usuario delegado |
 | `nombre_fraternidad` | VARCHAR(255) | Nombre solicitado (MAYÚSCULAS) |
-| `origen_fraternidad` | VARCHAR(50) | Origen / tipo danza |
 | `instancia_representacion` | ENUM | Nivel de representación |
 | `id_facultad` | FK nullable | Facultad |
 | `id_carrera` | FK nullable | Carrera |
-| `id_institucion_externa` | FK nullable | Institución externa catálogo |
+| `id_institucion_externa` | FK nullable | Institución externa (catálogo) |
 | `nombre_institucion_externa` | VARCHAR(255) | Nombre libre si es externo |
-| `id_categoria` | FK → `categorias` | Categoría |
-| `presi_nombre`, `presi_ci`, `presi_celular` | VARCHAR | Presidente |
-| `vice_nombre`, `vice_ci`, `vice_celular` | VARCHAR | Vicepresidente |
-| `sec_gen_nombre`, `sec_gen_ci` | VARCHAR | Secretario general |
-| `sec_haci_nombre`, `sec_haci_ci` | VARCHAR | Secretario hacienda |
-| `sec_actas_nombre`, `sec_actas_ci` | VARCHAR | Secretario actas |
-| `sec_prensa_nombre`, `sec_prensa_ci` | VARCHAR | Secretario prensa |
-| `vocal_nombre`, `vocal_ci` | VARCHAR | Vocal |
-| `del_cogob_nombre`, `del_cogob_ci`, `del_cogob_celular` | VARCHAR | Delegado co-gobierno |
-| `del_titular_nombre`, `del_titular_ci`, `del_titular_celular` | VARCHAR | **Delegado titular** |
-| `del_suplente_nombre`, `del_suplente_ci`, `del_suplente_celular` | VARCHAR | **Delegado suplente** |
-| `url_ci_matricula_pre_vice_del` | VARCHAR(500) | Doc. punto 29 |
-| `url_ci_matricula_sec_voc_del` | VARCHAR(500) | Doc. punto 30 |
-| `url_carta_compromiso` | VARCHAR(500) | Doc. punto 31 |
-| `url_resolucion` | VARCHAR(500) | Doc. punto 32 |
-| `url_acta_directiva` | VARCHAR(500) | Doc. punto 33 |
+| `id_categoria` | FK → `categorias` | Categoría A/B/C de la gestión |
+
+#### Directiva (10 cargos)
+
+Por cada prefijo (`presi`, `vice`, `secGen`, `secHaci`, `secActas`, `secPrensa`, `vocal`, `delCogob`, `delTitular`, `delSuplente`):
+
+| Sufijo columna | Descripción |
+|----------------|-------------|
+| `{prefix}_nombres` | Nombres |
+| `{prefix}_primer_apellido` | Apellido paterno |
+| `{prefix}_segundo_apellido` | Apellido materno |
+| `{prefix}_ci` | Carnet de identidad |
+| `{prefix}_ci_complemento` | Complemento SEGIP (ej. `-1A`) |
+| `{prefix}_celular` | Celular (solo cargos con celular: presi, vice, delCogob, delTitular, delSuplente) |
+
+**Cargos obligatorios:** Presidente, Vicepresidente, Secretario de Hacienda, Delegado Co-Gobierno, Delegado Titular, Delegado Suplente.  
+**Cargos opcionales:** Secretario General, Secretario de Actas, Secretario de Prensa, Vocal.
+
+#### Documentos PDF
+
+**4 PDFs por integrante** (prefijos de archivo multer / columnas URL):
+
+| Tipo | fileKey (ej. Presidente) | Columna URL |
+|------|--------------------------|-------------|
+| CI | `ciPresi` | `url_ci_presi` |
+| Matrícula | `matriculaPresi` | `url_matricula_presi` |
+| No deudas fraternidad | `sinDeudasFraternidadPresi` | `url_sin_deudas_fraternidad_presi` |
+| No deudas áreas | `sinDeudasAreasPresi` | `url_sin_deudas_areas_presi` |
+
+Mismo patrón para los 10 cargos (`Vice`, `SecGen`, `SecHaci`, `SecActas`, `SecPrensa`, `Vocal`, `DelCogob`, `DelTitular`, `DelSuplente`).  
+**Total:** 40 columnas URL por persona + 3 institucionales.
+
+**Documentos institucionales (globales, una vez por solicitud):**
+
+| fileKey | Columna | Punto reglamento |
+|---------|---------|------------------|
+| `cartaCompromiso` | `url_carta_compromiso` | 31 |
+| `resolucion` | `url_resolucion` | 32 |
+| `actaDirectiva` | `url_acta_directiva` | 33 |
+
+**Eliminados del modelo actual:** `url_ci_matricula_*` (PDF combinado), `url_sin_deudas_fraternidad` y `url_sin_deudas_areas` globales.
+
+#### Control administrativo
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
 | `estado` | ENUM | Estado administrativo |
 | `observaciones` | TEXT | Observaciones del admin |
-| `revision_checklist` | JSONB | Checklist de revisión por campo `{ estado: PENDIENTE\|OK\|X, comentario? }` |
+| `revision_checklist` | JSONB | Checklist `{ key: { estado: PENDIENTE\|OK\|X, label, value, comentario? } }`. Keys unificadas: `{Cargo}-nombres`, `{Cargo}-ci`, `ciPresi`, etc. |
 | `id_fraternidad_creada` | FK nullable → `fraternidades` | Fraternidad oficial al aprobar |
 | `created_at`, `updated_at` | TIMESTAMP | Auditoría |
+
+**Nota:** la directiva y sus PDFs viven en la solicitud; la tabla `fraternidades` no replica la directiva ni los documentos de preinscripción.
 
 ---
 
@@ -606,7 +640,6 @@ CREATE TABLE IF NOT EXISTS documentos_gestion (
 CREATE TABLE IF NOT EXISTS fraternidades (
     id_fraternidad          SERIAL PRIMARY KEY,
     nombre                  VARCHAR(255) NOT NULL UNIQUE,
-    origen_fraternidad      VARCHAR(50) NOT NULL,
     nivel_representacion    VARCHAR(100),
     id_gestion              INTEGER REFERENCES gestiones(id_gestion) ON DELETE CASCADE,
     id_facultad             INTEGER REFERENCES facultades(id_facultad) ON DELETE SET NULL,
@@ -678,47 +711,34 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 );
 
 -- ------------------------------------------------------------
--- 5. Solicitudes de inscripción
+-- 5. Solicitudes de inscripción (esquema resumido; ver sección 4 para convención de columnas)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS solicitudes_inscripcion (
     id_solicitud                    SERIAL PRIMARY KEY,
     id_gestion                      INTEGER NOT NULL REFERENCES gestiones(id_gestion),
     id_usuario_delegado             INTEGER NOT NULL REFERENCES usuarios(id_usuario),
     nombre_fraternidad              VARCHAR(255) NOT NULL,
-    origen_fraternidad              VARCHAR(50) NOT NULL DEFAULT 'General',
     instancia_representacion        instancia_representacion NOT NULL,
     id_facultad                     INTEGER REFERENCES facultades(id_facultad),
     id_carrera                      INTEGER REFERENCES carreras(id_carrera),
     id_institucion_externa          INTEGER REFERENCES instituciones_externas(id_institucion),
     nombre_institucion_externa      VARCHAR(255),
     id_categoria                    INTEGER NOT NULL REFERENCES categorias(id_categoria),
-    presi_nombre                    VARCHAR(255),
+    -- Directiva: por cada cargo → {prefix}_nombres, _primer_apellido, _segundo_apellido,
+    --            _ci, _ci_complemento, _celular (ver prefijos en sección 4)
+    presi_nombres                   VARCHAR(150),
+    presi_primer_apellido           VARCHAR(100),
+    presi_segundo_apellido          VARCHAR(100),
     presi_ci                        VARCHAR(50),
+    presi_ci_complemento            VARCHAR(10),
     presi_celular                   VARCHAR(50),
-    vice_nombre                     VARCHAR(255),
-    vice_ci                         VARCHAR(50),
-    vice_celular                    VARCHAR(50),
-    sec_gen_nombre                  VARCHAR(255),
-    sec_gen_ci                      VARCHAR(50),
-    sec_haci_nombre                 VARCHAR(255),
-    sec_haci_ci                     VARCHAR(50),
-    sec_actas_nombre                VARCHAR(255),
-    sec_actas_ci                    VARCHAR(50),
-    sec_prensa_nombre               VARCHAR(255),
-    sec_prensa_ci                   VARCHAR(50),
-    vocal_nombre                    VARCHAR(255),
-    vocal_ci                        VARCHAR(50),
-    del_cogob_nombre                VARCHAR(255),
-    del_cogob_ci                    VARCHAR(50),
-    del_cogob_celular               VARCHAR(50),
-    del_titular_nombre              VARCHAR(255),
-    del_titular_ci                  VARCHAR(50),
-    del_titular_celular             VARCHAR(50),
-    del_suplente_nombre             VARCHAR(255),
-    del_suplente_ci                 VARCHAR(50),
-    del_suplente_celular            VARCHAR(50),
-    url_ci_matricula_pre_vice_del   VARCHAR(500),
-    url_ci_matricula_sec_voc_del    VARCHAR(500),
+    -- ... (vice, sec_gen, sec_haci, sec_actas, sec_prensa, vocal, del_cogob, del_titular, del_suplente)
+    -- Documentos: 4 URLs por cargo (url_ci_*, url_matricula_*, url_sin_deudas_fraternidad_*, url_sin_deudas_areas_*)
+    url_ci_presi                    VARCHAR(500),
+    url_matricula_presi             VARCHAR(500),
+    url_sin_deudas_fraternidad_presi VARCHAR(500),
+    url_sin_deudas_areas_presi      VARCHAR(500),
+    -- ... (mismo patrón × 10 cargos = 40 columnas)
     url_carta_compromiso            VARCHAR(500),
     url_resolucion                  VARCHAR(500),
     url_acta_directiva              VARCHAR(500),
@@ -934,3 +954,69 @@ CREATE INDEX IF NOT EXISTS idx_participantes_fase ON participantes_concurso(id_f
 | `controladorhcu` | Asistencia y disciplina HCU |
 | `delegado` | Inscripción de fraternidad y participantes externos |
 | `jurado` | Calificación de fases |
+
+---
+
+## 13. Reportes y catálogo de tipos de danza
+
+### Catálogo `tipos_danza` (implementado)
+
+Tabla global (no por gestión) con los tipos folklóricos de Bolivia usados en inscripción y reportes.
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id_tipo_danza` | PK | Identificador |
+| `nombre` | VARCHAR(120) UNIQUE | Ej. La Morenada, El Tinku |
+| `orden` | INT | Orden de visualización |
+| `activo` | BOOL | Catálogo activo |
+
+**FK:**
+- `solicitudes_inscripcion.id_tipo_danza` — obligatorio en nuevas solicitudes de inscripción.
+- `fraternidades.id_tipo_danza` — copiado al aprobar/inscribir la solicitud.
+
+**Seed:** `ensureTiposDanzaDefault()` en `backend/src/common/tipos-danza-default.ts` (36 tipos por defecto). Se ejecuta al arrancar el módulo `reportes`.
+
+### Módulo `reportes` (implementado)
+
+Rutas bajo `/api/v1/reportes` (JWT + roles indicados):
+
+| Método | Ruta | Roles | Uso |
+|--------|------|-------|-----|
+| `GET` | `/reportes/tipos-danza` | superusuario, admin, delegado, controladorhcu | Catálogo para inscripción y filtros |
+| `GET` | `/reportes/opciones-filtro?idGestion=` | superusuario, admin | Gestiones, facultades, carreras, categorías (por gestión), instancias, tipos de danza |
+| `POST` | `/reportes/consultar` | superusuario, admin | Búsqueda paginada con filtros y orden |
+| `POST` | `/reportes/consultar/pdf` | superusuario, admin | Mismo criterio → PDF (logo institucional 25pt) |
+
+**Tipos de reporte (`tipoReporte`):**
+- `fraternidades` — nombre, tipo de danza, categoría, instancia, pertenencia, gestión.
+- `directiva` — filas por cargo (nombre, CI, celular) desde solicitud APROBADA vinculada.
+- `calificaciones` — requiere `idGestion`; puesto, promedio jurado, sanciones, puntaje final.
+
+**Filtros opcionales:** `idGestion`, `idTipoDanza`, `idFacultad`, `idCarrera`, `idCategoria`, `instanciaRepresentacion`, `busqueda`, `ordenarPor`, `orden`, `page`, `limit`.
+
+### UI: Auditoría y Reportes
+
+Vista lateral **Auditoría y Reportes** (`auditoria_reportes`) para **superusuario** y **admin**:
+- Tab **Auditoría** — solo superusuario (registro de sesiones y cambios).
+- Tab **Reportes** — consulta multi-filtro + descarga PDF.
+
+### Matriz de viabilidad (actualizada)
+
+| Reporte solicitado | ¿Soportado? | Tablas / campos clave | Observaciones |
+|--------------------|-------------|------------------------|---------------|
+| Fraternidades inscritas en gestión X | **Sí** | `fraternidades.id_gestion` | `POST /reportes/consultar` con `tipoReporte=fraternidades`. |
+| Por facultad / carrera / instancia | **Sí** | FKs en `fraternidades` | Filtros en módulo reportes. |
+| Por tipo de danza (Morenada, Tinku…) | **Sí** | `tipos_danza` + FK | Obligatorio en inscripción delegado. |
+| Directiva por fraternidad | **Sí** | `solicitudes_inscripcion` APROBADA | `tipoReporte=directiva` o `GET /fraternidades/:id/directiva`. |
+| Calificaciones / ranking por gestión | **Sí** | `evaluaciones` + agregación | `tipoReporte=calificaciones` o `GET /evaluaciones/reporte/:idGestion`. |
+| Ganadores (1.er puesto) por gestión | **Sí (calculado)** | Ranking EFU | Sin tabla `resultados_oficiales` persistida. |
+
+### Pendientes opcionales
+
+1. **Tabla `resultados` / snapshot de puestos** — persistir puesto oficial al cerrar evaluación.
+2. **Fraternidades legacy** — pueden tener `id_tipo_danza` NULL hasta edición manual.
+3. **Ganadores por fase EFU** — agregación por `evaluaciones.id_fase` (no expuesta aún en reportes).
+
+### Conclusión
+
+El módulo de reportes parametrizable está implementado en backend y frontend. El eje **tipo de danza** queda cubierto por `tipos_danza`. El ranking histórico sigue disponible en `GET /evaluaciones/reporte/:idGestion` y en reportes de calificaciones filtrados.

@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, UseInterceptors, UploadedFile, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, UseInterceptors, UploadedFile, Query, ParseIntPipe, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -53,6 +54,20 @@ export class FraternidadesController {
   @ApiOperation({ summary: 'Buscar fraternidades activas e históricas para autocompletado' })
   buscar(@Query('q') q?: string) {
     return this.fraternidadesService.buscar(q || '');
+  }
+
+  @Get(':id/directiva/pdf')
+  @Roles('superusuario', 'admin', 'controladorhcu')
+  @ApiOperation({ summary: 'Generar PDF de la directiva de una fraternidad inscrita' })
+  async getDirectivaPdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    return this.fraternidadesService.generarPdfDirectiva(id, res);
+  }
+
+  @Get(':id/directiva')
+  @Roles('superusuario', 'admin', 'controladorhcu')
+  @ApiOperation({ summary: 'Obtener directiva de una fraternidad desde inscripción aprobada' })
+  getDirectiva(@Param('id', ParseIntPipe) id: number) {
+    return this.fraternidadesService.getDirectiva(id);
   }
 
   @Get(':id')

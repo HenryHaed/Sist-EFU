@@ -8,21 +8,41 @@
         <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="cerrarDetalle"></div>
 
         <!-- Panel -->
-        <div class="relative ml-auto w-full max-w-5xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
+        <div class="relative ml-auto w-full h-full bg-white shadow-2xl flex flex-col overflow-hidden" style="max-width: min(1400px, 95vw)">
 
           <!-- Header del panel -->
-          <div class="shrink-0 bg-primary px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="shrink-0 bg-primary px-4 sm:px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="min-w-0">
-              <p class="text-[10px] text-white/60 font-black uppercase tracking-widest">Solicitud #{{ solicitudActiva.idSolicitud }}</p>
-              <h2 class="text-xl font-black text-white italic uppercase tracking-tighter leading-tight">
-                {{ solicitudActiva.nombreFraternidad }}
+              <p class="text-[10px] text-white/60 font-black uppercase tracking-widest mb-1">
+                Solicitud #{{ solicitudActiva.idSolicitud }}
+              </p>
+              <h2 class="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight leading-tight">
+                APROBACION DE DATOS Y DOCUMENTOS
               </h2>
-              <p class="text-xs text-white/70 font-medium mt-0.5">
+              <p class="text-base sm:text-lg font-black text-white/95 italic uppercase tracking-tighter mt-2 leading-tight">
+                {{ solicitudActiva.nombreFraternidad }}
+              </p>
+              <p class="text-xs text-white/70 font-medium mt-1">
                 {{ solicitudActiva.categoria?.nombre }} · {{ instanciaLabel(solicitudActiva) }}
               </p>
             </div>
             <div class="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
-              <!-- Badge estado -->
+              <button
+                v-if="!modoEdicionAdmin && solicitudActiva.estado !== 'RECHAZADO'"
+                type="button"
+                @click="activarEdicionAdmin"
+                class="px-3 py-2 rounded-xl bg-amber-500/90 hover:bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest transition-colors"
+              >
+                Editar datos de entrada
+              </button>
+              <template v-if="modoEdicionAdmin">
+                <button type="button" @click="guardarEdicionAdmin" :disabled="guardandoAdmin" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest disabled:opacity-50">
+                  Guardar
+                </button>
+                <button type="button" @click="cancelarEdicionAdmin" class="px-3 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-[9px] font-black uppercase tracking-widest">
+                  Cancelar
+                </button>
+              </template>
               <div
                 class="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border"
                 :class="estadoStyle(solicitudActiva.estado).badge"
@@ -35,279 +55,419 @@
             </div>
           </div>
 
-          <!-- Contenido scrollable -->
-          <div class="flex-1 overflow-y-auto custom-scrollbar">
+          <!-- Barra de progreso -->
+          <div v-if="modoEdicionAdmin" class="shrink-0 px-6 py-3 bg-amber-50 border-b border-amber-200">
+            <p class="text-[10px] font-black uppercase tracking-widest text-amber-800 flex items-center gap-2">
+              <span class="material-symbols-outlined text-sm">edit</span>
+              Modo edición activo — los cambios se guardan al pulsar Guardar
+            </p>
+          </div>
+          <div class="shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-100">
+            <div class="flex items-center justify-between gap-3 mb-2">
+              <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Progreso de revisión</p>
+              <p class="text-[10px] font-black text-primary">{{ revisionProgreso.revisados }} / {{ revisionProgreso.total }}</p>
+            </div>
+            <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div class="h-full bg-primary transition-all duration-500 rounded-full" :style="{ width: revisionProgreso.porcentaje + '%' }"></div>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button
+                v-for="sec in seccionesRevision"
+                :key="sec.id"
+                type="button"
+                @click="irASeccion(sec.id)"
+                class="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all"
+                :class="seccionActiva === sec.id ? 'bg-primary text-white border-primary' : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
+              >
+                {{ sec.label }}
+              </button>
+            </div>
+            <!-- Tabs móvil -->
+            <div class="flex lg:hidden gap-2 mt-3">
+              <button
+                type="button"
+                @click="mobileTab = 'datos'"
+                class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border"
+                :class="mobileTab === 'datos' ? 'bg-primary text-white border-primary' : 'bg-white text-slate-500 border-slate-200'"
+              >Datos</button>
+              <button
+                type="button"
+                @click="mobileTab = 'pdfs'"
+                class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border"
+                :class="mobileTab === 'pdfs' ? 'bg-primary text-white border-primary' : 'bg-white text-slate-500 border-slate-200'"
+              >PDFs</button>
+            </div>
+          </div>
 
-            <!-- === DELEGADO === -->
-            <section class="px-6 py-5 border-b border-slate-100">
-              <h3 class="section-title">Delegado</h3>
-              <div class="space-y-3">
-                <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:flex-row md:items-end md:justify-between">
-                  <div class="min-w-0 flex-1">
-                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre Completo</p>
-                    <p class="text-sm font-medium text-slate-800 break-words">{{ `${solicitudActiva.delegado?.nombres || ''} ${solicitudActiva.delegado?.primerApellido || ''} ${solicitudActiva.delegado?.segundoApellido || ''}` || '—' }}</p>
-                  </div>
-                  <div class="flex items-center gap-2 shrink-0">
-                    <button @click.stop="setChecklistEstado({ key: 'delegadoNombre', label: 'Delegado - Nombre Completo', value: `${solicitudActiva.delegado?.nombres || ''} ${solicitudActiva.delegado?.primerApellido || ''} ${solicitudActiva.delegado?.segundoApellido || ''}` }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('delegadoNombre', 'OK')]" aria-label="Marcar correcto">✓</button>
-                    <button @click.stop="setChecklistEstado({ key: 'delegadoNombre', label: 'Delegado - Nombre Completo', value: `${solicitudActiva.delegado?.nombres || ''} ${solicitudActiva.delegado?.primerApellido || ''} ${solicitudActiva.delegado?.segundoApellido || ''}` }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('delegadoNombre', 'X')]" aria-label="Marcar incorrecto">✕</button>
+          <!-- Split: datos | PDFs -->
+          <div class="flex-1 min-h-0 flex flex-col lg:flex-row">
+            <!-- IZQUIERDA: datos + checklist -->
+            <div
+              ref="panelDetalleScroll"
+              class="flex-1 overflow-y-auto custom-scrollbar lg:w-[48%] lg:border-r border-slate-100"
+              :class="mobileTab === 'datos' ? 'block' : 'hidden lg:block'"
+            >
+              <!-- DELEGADO -->
+              <section id="sec-delegado" class="px-5 py-5 border-b border-slate-100">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h3 class="section-title mb-0">Delegado</h3>
+                  <div class="flex flex-wrap gap-2 shrink-0">
+                    <button type="button" @click="aceptarSeccion('delegado')" class="btn-revision-masiva btn-revision-aceptar">Aceptar todo</button>
+                    <button type="button" @click="rechazarSeccion('delegado')" class="btn-revision-masiva btn-revision-rechazar">Rechazar todo</button>
                   </div>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">CI Delegado</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.delegado?.ci || '—' }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <button @click.stop="setChecklistEstado({ key: 'delegadoCi', label: 'Delegado - CI', value: solicitudActiva.delegado?.ci || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('delegadoCi', 'OK')]" aria-label="Marcar correcto">✓</button>
-                      <button @click.stop="setChecklistEstado({ key: 'delegadoCi', label: 'Delegado - CI', value: solicitudActiva.delegado?.ci || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('delegadoCi', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                    </div>
-                  </div>
-                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Fecha de Solicitud</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ formatFecha(solicitudActiva.createdAt) || '—' }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <button @click.stop="setChecklistEstado({ key: 'fechaSolicitud', label: 'Fecha de Solicitud', value: formatFecha(solicitudActiva.createdAt) || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('fechaSolicitud', 'OK')]" aria-label="Marcar correcto">✓</button>
-                      <button @click.stop="setChecklistEstado({ key: 'fechaSolicitud', label: 'Fecha de Solicitud', value: formatFecha(solicitudActiva.createdAt) || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('fechaSolicitud', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                    </div>
-                  </div>
-                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between md:col-span-2">
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Gestión</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.gestion?.anio || '—' }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <button @click.stop="setChecklistEstado({ key: 'gestion', label: 'Gestión', value: String(solicitudActiva.gestion?.anio || '') }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('gestion', 'OK')]" aria-label="Marcar correcto">✓</button>
-                      <button @click.stop="setChecklistEstado({ key: 'gestion', label: 'Gestión', value: String(solicitudActiva.gestion?.anio || '') }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('gestion', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <!-- === IDENTIFICACIÓN FRATERNIDAD === -->
-            <section class="px-6 py-5 border-b border-slate-100">
-              <h3 class="section-title">Identificación de la Fraternidad</h3>
-              <div class="space-y-3">
-                <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:flex-row md:items-end md:justify-between">
-                  <div class="min-w-0 flex-1">
-                    <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Nombre Fraternidad</p>
-                    <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.nombreFraternidad || '—' }}</p>
-                  </div>
-                  <div class="flex items-center gap-2 shrink-0">
-                    <button @click.stop="setChecklistEstado({ key: 'nombreFraternidad', label: 'Nombre Fraternidad', value: solicitudActiva.nombreFraternidad || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('nombreFraternidad', 'OK')]" aria-label="Marcar correcto">✓</button>
-                    <button @click.stop="setChecklistEstado({ key: 'nombreFraternidad', label: 'Nombre Fraternidad', value: solicitudActiva.nombreFraternidad || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('nombreFraternidad', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Categoría</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.categoria?.nombre || '—' }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <button @click.stop="setChecklistEstado({ key: 'categoria', label: 'Categoría', value: solicitudActiva.categoria?.nombre || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('categoria', 'OK')]" aria-label="Marcar correcto">✓</button>
-                      <button @click.stop="setChecklistEstado({ key: 'categoria', label: 'Categoría', value: solicitudActiva.categoria?.nombre || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('categoria', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                    </div>
-                  </div>
-                  <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Instancia</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ instanciaLabel(solicitudActiva) || '—' }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <button @click.stop="setChecklistEstado({ key: 'instancia', label: 'Instancia', value: instanciaLabel(solicitudActiva) || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('instancia', 'OK')]" aria-label="Marcar correcto">✓</button>
-                      <button @click.stop="setChecklistEstado({ key: 'instancia', label: 'Instancia', value: instanciaLabel(solicitudActiva) || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('instancia', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                    </div>
-                  </div>
-                  <div v-if="solicitudActiva.facultad" class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Facultad</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.facultad?.nombre || '—' }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <button @click.stop="setChecklistEstado({ key: 'facultad', label: 'Facultad', value: solicitudActiva.facultad?.nombre || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('facultad', 'OK')]" aria-label="Marcar correcto">✓</button>
-                      <button @click.stop="setChecklistEstado({ key: 'facultad', label: 'Facultad', value: solicitudActiva.facultad?.nombre || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('facultad', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                    </div>
-                  </div>
-                  <div v-if="solicitudActiva.carrera" class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Carrera</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.carrera?.nombre || '—' }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <button @click.stop="setChecklistEstado({ key: 'carrera', label: 'Carrera', value: solicitudActiva.carrera?.nombre || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('carrera', 'OK')]" aria-label="Marcar correcto">✓</button>
-                      <button @click.stop="setChecklistEstado({ key: 'carrera', label: 'Carrera', value: solicitudActiva.carrera?.nombre || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('carrera', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                    </div>
-                  </div>
-                  <div v-if="solicitudActiva.nombreInstitucionExterna" class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between md:col-span-2">
-                    <div class="min-w-0 flex-1">
-                      <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Institución Externa</p>
-                      <p class="text-sm font-medium text-slate-800 break-words">{{ solicitudActiva.nombreInstitucionExterna || '—' }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <button @click.stop="setChecklistEstado({ key: 'institucionExterna', label: 'Institución Externa', value: solicitudActiva.nombreInstitucionExterna || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('institucionExterna', 'OK')]" aria-label="Marcar correcto">✓</button>
-                      <button @click.stop="setChecklistEstado({ key: 'institucionExterna', label: 'Institución Externa', value: solicitudActiva.nombreInstitucionExterna || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase('institucionExterna', 'X')]" aria-label="Marcar incorrecto">✕</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <!-- === DIRECTIVA === -->
-            <section class="px-6 py-5 border-b border-slate-100">
-              <h3 class="section-title">Directiva</h3>
-              <div class="space-y-3">
-                <div v-for="cargo in directiva" :key="cargo.label" class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                  <p class="text-[9px] font-black uppercase tracking-widest text-primary mb-2">{{ cargo.label }}</p>
-                  <div class="space-y-3">
-                    <div v-for="parte in cargo.partesNombre" :key="parte.key" class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div class="space-y-3">
+                  <div v-for="item in itemsDelegado" :key="item.key" class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                       <div class="min-w-0 flex-1">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">{{ parte.label }}</p>
-                        <p class="text-sm font-medium text-slate-800 break-words">{{ parte.value || '—' }}</p>
+                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">{{ item.label }}</p>
+                        <p class="text-sm font-medium text-slate-800 break-words">{{ item.value || '—' }}</p>
                       </div>
                       <div class="flex items-center gap-2 shrink-0">
-                        <button @click.stop="setChecklistEstado({ key: parte.checklistKey, label: `${cargo.label} - ${parte.label}`, value: parte.value || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(parte.checklistKey, 'OK')]" aria-label="Marcar correcto">✓</button>
-                        <button @click.stop="setChecklistEstado({ key: parte.checklistKey, label: `${cargo.label} - ${parte.label}`, value: parte.value || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(parte.checklistKey, 'X')]" aria-label="Marcar incorrecto">✕</button>
+                        <button type="button" @click.stop="setChecklistEstado(item, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(item.key, 'OK')]">✓</button>
+                        <button type="button" @click.stop="setChecklistEstado(item, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(item.key, 'X')]">✕</button>
                       </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
-                        <div class="min-w-0 flex-1">
-                          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">CI</p>
-                          <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.ci || '—' }}</p>
+                    <div v-if="checklistEstado(item.key) === 'X'" class="mt-3 pt-3 border-t border-red-100">
+                      <label class="block text-[9px] font-black uppercase tracking-widest text-red-600 mb-1">Motivo del rechazo</label>
+                      <textarea
+                        :value="checklistComentario(item.key)"
+                        @input="setChecklistComentario(item.key, $event.target.value)"
+                        rows="2"
+                        placeholder="Indique por qué se rechaza este dato..."
+                        class="w-full px-3 py-2 bg-white border border-red-200 rounded-xl text-xs text-slate-700 resize-none focus:ring-2 focus:ring-red-200 outline-none"
+                      ></textarea>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- FRATERNIDAD -->
+              <section id="sec-fraternidad" class="px-5 py-5 border-b border-slate-100">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h3 class="section-title mb-0">Fraternidad</h3>
+                  <div class="flex flex-wrap gap-2 shrink-0">
+                    <button type="button" @click="aceptarSeccion('fraternidad')" class="btn-revision-masiva btn-revision-aceptar">Aceptar todo</button>
+                    <button type="button" @click="rechazarSeccion('fraternidad')" class="btn-revision-masiva btn-revision-rechazar">Rechazar todo</button>
+                  </div>
+                </div>
+                <div class="space-y-3">
+                  <div v-for="item in itemsFraternidad" :key="item.key" class="rounded-2xl border border-slate-100 bg-white p-3">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div class="min-w-0 flex-1">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">{{ item.label }}</p>
+                        <div v-if="modoEdicionAdmin && adminCampoEditable(item.key)" class="mt-1">
+                          <input
+                            v-if="item.key === 'nombreFraternidad' || item.key === 'institucionExterna'"
+                            v-model="adminFormDraft[adminFieldKey(item.key)]"
+                            type="text"
+                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                          />
+                          <select
+                            v-else-if="item.key === 'instancia'"
+                            v-model="adminFormDraft.instanciaRepresentacion"
+                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                          >
+                            <option v-for="inst in instanciasOpciones" :key="inst" :value="inst">{{ inst }}</option>
+                          </select>
+                          <select
+                            v-else-if="item.key === 'categoria'"
+                            v-model="adminFormDraft.idCategoria"
+                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                          >
+                            <option v-for="c in adminOpciones.categorias" :key="c.idCategoria" :value="c.idCategoria">{{ c.nombre }}</option>
+                          </select>
+                          <select
+                            v-else-if="item.key === 'tipoDanza'"
+                            v-model="adminFormDraft.idTipoDanza"
+                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                          >
+                            <option v-for="t in adminOpciones.tiposDanza" :key="t.idTipoDanza" :value="t.idTipoDanza">{{ t.nombre }}</option>
+                          </select>
+                          <select
+                            v-else-if="item.key === 'facultad'"
+                            v-model="adminFormDraft.idFacultad"
+                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                          >
+                            <option :value="null">—</option>
+                            <option v-for="f in adminOpciones.facultades" :key="f.idFacultad" :value="f.idFacultad">{{ f.nombre }}</option>
+                          </select>
+                          <select
+                            v-else-if="item.key === 'carrera'"
+                            v-model="adminFormDraft.idCarrera"
+                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                          >
+                            <option :value="null">—</option>
+                            <option v-for="c in adminCarrerasFiltradas" :key="c.idCarrera" :value="c.idCarrera">{{ c.nombre }}</option>
+                          </select>
                         </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                          <button @click.stop="setChecklistEstado({ key: `${cargo.label}-ci`, label: `${cargo.label} - CI`, value: cargo.ci || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-ci`, 'OK')]" aria-label="Marcar correcto">✓</button>
-                          <button @click.stop="setChecklistEstado({ key: `${cargo.label}-ci`, label: `${cargo.label} - CI`, value: cargo.ci || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-ci`, 'X')]" aria-label="Marcar incorrecto">✕</button>
+                        <p v-else class="text-sm font-medium text-slate-800 break-words">{{ item.value || '—' }}</p>
+                      </div>
+                      <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" @click.stop="setChecklistEstado(item, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(item.key, 'OK')]">✓</button>
+                        <button type="button" @click.stop="setChecklistEstado(item, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(item.key, 'X')]">✕</button>
+                      </div>
+                    </div>
+                    <div v-if="checklistEstado(item.key) === 'X'" class="mt-3 pt-3 border-t border-red-100">
+                      <label class="block text-[9px] font-black uppercase tracking-widest text-red-600 mb-1">Motivo del rechazo</label>
+                      <textarea
+                        :value="checklistComentario(item.key)"
+                        @input="setChecklistComentario(item.key, $event.target.value)"
+                        rows="2"
+                        placeholder="Indique por qué se rechaza este dato..."
+                        class="w-full px-3 py-2 bg-white border border-red-200 rounded-xl text-xs text-slate-700 resize-none focus:ring-2 focus:ring-red-200 outline-none"
+                      ></textarea>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- DIRECTIVA -->
+              <section id="sec-directiva" class="px-5 py-5 border-b border-slate-100">
+                <h3 class="section-title">Directiva</h3>
+                <p class="text-[10px] text-slate-400 font-medium mb-4 -mt-2">Revisa datos y documentos de respaldo por cargo. Puedes aprobar un dato y rechazar su PDF.</p>
+                <div class="space-y-4">
+                  <div v-for="cargo in directiva" :key="cargo.label" class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                      <p class="text-[9px] font-black uppercase tracking-widest text-primary">{{ cargo.label }}</p>
+                      <div class="flex flex-wrap gap-2 shrink-0">
+                        <button type="button" @click="aceptarSeccionCargo(cargo)" class="btn-revision-masiva btn-revision-aceptar">Aceptar todo</button>
+                        <button type="button" @click="rechazarSeccionCargo(cargo)" class="btn-revision-masiva btn-revision-rechazar">Rechazar todo</button>
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <div v-for="parte in cargo.checklistItems" :key="parte.key" class="bg-white rounded-xl border border-slate-100 p-3">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                          <div class="min-w-0 flex-1">
+                            <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">{{ parte.label }}</p>
+                            <input
+                              v-if="modoEdicionAdmin && parte.adminField"
+                              v-model="adminFormDraft[parte.adminField]"
+                              type="text"
+                              class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                            />
+                            <p v-else class="text-sm font-medium text-slate-800 break-words">{{ parte.value || '—' }}</p>
+                          </div>
+                          <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" @click.stop="setChecklistEstado(parte, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(parte.key, 'OK')]">✓</button>
+                            <button type="button" @click.stop="setChecklistEstado(parte, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(parte.key, 'X')]">✕</button>
+                          </div>
+                        </div>
+                        <div v-if="checklistEstado(parte.key) === 'X'" class="mt-3 pt-3 border-t border-red-100">
+                          <label class="block text-[9px] font-black uppercase tracking-widest text-red-600 mb-1">Motivo del rechazo</label>
+                          <textarea
+                            :value="checklistComentario(parte.key)"
+                            @input="setChecklistComentario(parte.key, $event.target.value)"
+                            rows="2"
+                            placeholder="Indique por qué se rechaza este dato..."
+                            class="w-full px-3 py-2 bg-slate-50 border border-red-200 rounded-xl text-xs text-slate-700 resize-none focus:ring-2 focus:ring-red-200 outline-none"
+                          ></textarea>
                         </div>
                       </div>
-                      <div v-if="cargo.celular !== undefined" class="flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-4 md:flex-row md:items-end md:justify-between">
-                        <div class="min-w-0 flex-1">
-                          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Celular</p>
-                          <p class="text-sm font-medium text-slate-800 break-words">{{ cargo.celular || '—' }}</p>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                          <button @click.stop="setChecklistEstado({ key: `${cargo.label}-celular`, label: `${cargo.label} - Celular`, value: cargo.celular || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-celular`, 'OK')]" aria-label="Marcar correcto">✓</button>
-                          <button @click.stop="setChecklistEstado({ key: `${cargo.label}-celular`, label: `${cargo.label} - Celular`, value: cargo.celular || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(`${cargo.label}-celular`, 'X')]" aria-label="Marcar incorrecto">✕</button>
-                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-slate-200">
+                      <p class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-3">Documentos de respaldo — {{ cargo.label }}</p>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          v-for="doc in cargo.documentos"
+                          :key="doc.key"
+                          type="button"
+                          @click="seleccionarPdf(doc)"
+                          class="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-left transition-all"
+                          :class="pdfSeleccionado?.key === doc.key ? 'border-primary bg-primary/5' : 'border-slate-200 bg-white hover:border-primary/30'"
+                        >
+                          <span class="text-[10px] font-bold text-slate-700 leading-tight">{{ doc.btnLabel }}</span>
+                          <span class="flex items-center gap-1 shrink-0">
+                            <span
+                              class="size-2 rounded-full"
+                              :class="checklistEstado(doc.key) === 'OK' ? 'bg-emerald-500' : checklistEstado(doc.key) === 'X' ? 'bg-red-500' : 'bg-slate-300'"
+                            ></span>
+                            <span class="material-symbols-outlined text-sm text-primary">visibility</span>
+                          </span>
+                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </section>
+              </section>
 
-            <!-- === DOCUMENTOS === -->
-            <section class="px-6 py-5 border-b border-slate-100">
-              <h3 class="section-title">Documentos Adjuntos</h3>
-              <div class="grid grid-cols-1 gap-3">
-                <div
-                  v-for="doc in documentos"
-                  :key="doc.label"
-                  class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:border-primary/30 transition-all group md:flex-row md:items-center md:justify-between"
-                >
-                  <div class="flex items-center gap-3 min-w-0">
-                    <div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <span class="material-symbols-outlined text-primary text-sm">picture_as_pdf</span>
+              <!-- DOCUMENTOS INSTITUCIONALES -->
+              <section id="sec-institucionales" class="px-5 py-5 border-b border-slate-100">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h3 class="section-title mb-0">Documentos institucionales</h3>
+                  <div class="flex flex-wrap gap-2 shrink-0">
+                    <button type="button" @click="aceptarSeccion('institucionales')" class="btn-revision-masiva btn-revision-aceptar">Aceptar todo</button>
+                    <button type="button" @click="rechazarSeccion('institucionales')" class="btn-revision-masiva btn-revision-rechazar">Rechazar todo</button>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <div
+                    v-for="doc in documentosInstitucionales"
+                    :key="doc.key"
+                    class="rounded-xl border p-3 transition-all"
+                    :class="pdfSeleccionado?.key === doc.key ? 'border-primary bg-primary/5' : 'border-slate-200 bg-white'"
+                  >
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <button type="button" @click="seleccionarPdf(doc)" class="flex-1 min-w-0 text-left">
+                        <p class="text-xs font-bold text-slate-700">{{ doc.label }}</p>
+                        <p class="text-[9px] text-slate-400 uppercase tracking-widest">{{ doc.url ? 'Adjunto' : 'Sin archivo' }}</p>
+                      </button>
+                      <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" @click="setChecklistEstado(docChecklistItem(doc), 'OK')" :class="['size-8 rounded-lg border text-sm font-black flex items-center justify-center', checklistBotonClase(doc.key, 'OK')]">✓</button>
+                        <button type="button" @click="setChecklistEstado(docChecklistItem(doc), 'X')" :class="['size-8 rounded-lg border text-sm font-black flex items-center justify-center', checklistBotonClase(doc.key, 'X')]">✕</button>
+                      </div>
                     </div>
-                    <div class="min-w-0">
-                      <span class="text-xs font-bold text-slate-700 truncate block">{{ doc.label }}</span>
-                      <p class="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">{{ doc.url ? 'Documento adjunto' : 'Sin archivo' }}</p>
+                    <div v-if="checklistEstado(doc.key) === 'X'" class="mt-3 pt-3 border-t border-red-100">
+                      <label class="block text-[9px] font-black uppercase tracking-widest text-red-600 mb-1">Motivo del rechazo</label>
+                      <textarea
+                        :value="checklistComentario(doc.key)"
+                        @input="setChecklistComentario(doc.key, $event.target.value)"
+                        rows="2"
+                        placeholder="Indique por qué se rechaza este documento..."
+                        class="w-full px-3 py-2 bg-slate-50 border border-red-200 rounded-xl text-xs text-slate-700 resize-none focus:ring-2 focus:ring-red-200 outline-none"
+                      ></textarea>
                     </div>
                   </div>
-                  <div class="flex items-center gap-2 shrink-0 flex-wrap">
-                    <button @click.stop="setChecklistEstado({ key: doc.key, label: doc.label, value: doc.url || '' }, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(doc.key, 'OK')]" aria-label="Marcar correcto">✓</button>
-                    <button @click.stop="setChecklistEstado({ key: doc.key, label: doc.label, value: doc.url || '' }, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(doc.key, 'X')]" aria-label="Marcar incorrecto">✕</button>
+                </div>
+              </section>
+
+              <!-- DECISIÓN -->
+              <section id="sec-decision" class="px-5 py-5">
+                <h3 class="section-title">Decisión Administrativa</h3>
+                <div v-if="solicitudActiva.delegado?.correo" class="mb-4 p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-slate-400 text-lg">mail</span>
+                  <p class="text-[11px] text-slate-600 font-medium">
+                    Correo del delegado:
+                    <strong class="text-slate-800">{{ solicitudActiva.delegado.correo }}</strong>
+                    <span class="text-slate-400"> — se notificará al aprobar, observar o rechazar.</span>
+                  </p>
+                </div>
+                <div v-else class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-amber-600 text-lg">warning</span>
+                  <p class="text-[11px] text-amber-800 font-medium">
+                    El delegado no tiene correo registrado. No se podrá enviar notificación por email.
+                  </p>
+                </div>
+                <div class="space-y-4">
+                  <div class="flex flex-wrap gap-3">
                     <button
-                      @click="verPdf({ url: doc.url, titulo: doc.label })"
-                      :disabled="!doc.url"
-                      class="shrink-0 px-3 py-2 bg-slate-100 hover:bg-primary text-slate-600 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      v-if="solicitudActiva.estado !== 'APROBADO'"
+                      @click="confirmarCambioEstado('APROBADO')"
+                      :disabled="actualizando || !puedeAprobarSolicitud"
+                      class="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                     >
-                      Ver
+                      <span class="material-symbols-outlined text-sm">check_circle</span>
+                      Aprobar Solicitud
                     </button>
+                    <button
+                      v-if="solicitudActiva.estado !== 'OBSERVADO' && solicitudActiva.estado !== 'RECHAZADO'"
+                      @click="confirmarCambioEstado('OBSERVADO')"
+                      :disabled="actualizando || !tieneItemsObservados"
+                      class="flex items-center gap-2 px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50"
+                    >
+                      <span class="material-symbols-outlined text-sm">edit_note</span>
+                      {{ solicitudActiva.estado === 'APROBADO' ? 'Volver a observar' : 'Observar para corrección' }}
+                    </button>
+                    <button
+                      v-if="solicitudActiva.estado !== 'RECHAZADO'"
+                      @click="confirmarCambioEstado('RECHAZADO')"
+                      :disabled="actualizando"
+                      class="flex items-center gap-2 px-5 py-3 bg-secondary hover:bg-red-800 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-secondary/20 disabled:opacity-50"
+                    >
+                      <span class="material-symbols-outlined text-sm">cancel</span>
+                      Rechazar y anular
+                    </button>
+                    <button
+                      v-if="!['PENDIENTE', 'APROBADO'].includes(solicitudActiva.estado)"
+                      @click="confirmarCambioEstado('PENDIENTE')"
+                      :disabled="actualizando"
+                      class="flex items-center gap-2 px-5 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                    >
+                      <span class="material-symbols-outlined text-sm">history</span>
+                      Marcar Pendiente
+                    </button>
+                    <button
+                      v-if="solicitudActiva.estado === 'APROBADO' && !solicitudActiva.fraternidadCreada"
+                      @click="inscribirFraternidad"
+                      :disabled="actualizando"
+                      class="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 mt-2 w-full justify-center"
+                    >
+                      <span class="material-symbols-outlined text-sm">verified</span>
+                      Completar Inscripción Manualmente
+                    </button>
+                    <div v-if="solicitudActiva.estado === 'APROBADO' && solicitudActiva.fraternidadCreada" class="mt-2 w-full bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center gap-3">
+                      <span class="material-symbols-outlined text-indigo-600 text-2xl">task_alt</span>
+                      <div>
+                        <p class="text-xs font-black uppercase text-indigo-800">Fraternidad Registrada</p>
+                        <p class="text-[11px] text-indigo-600 font-medium">
+                          {{ solicitudActiva.fraternidadCreada.nombre }} ya está disponible en fraternidades y evaluaciones.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <p v-if="solicitudActiva.estado === 'RECHAZADO' && solicitudActiva.observaciones" class="text-xs text-slate-500 bg-red-50 border border-red-200 p-3 rounded-xl">
+                    <span class="font-black text-red-700">Motivo del rechazo:</span> {{ solicitudActiva.observaciones }}
+                  </p>
+                </div>
+              </section>
+            </div>
+
+            <!-- DERECHA: visor PDF con revisión -->
+            <div
+              class="flex-1 flex flex-col min-h-0 lg:w-[52%] bg-slate-50"
+              :class="mobileTab === 'pdfs' ? 'flex' : 'hidden lg:flex'"
+            >
+              <div v-if="pdfSeleccionado?.url" class="shrink-0 flex flex-col gap-2 px-4 py-3 bg-slate-800 text-white border-b border-white/10">
+                <div class="flex items-center justify-between gap-2">
+                  <p class="text-[10px] font-black uppercase tracking-widest truncate flex-1">{{ pdfSeleccionado.titulo || pdfSeleccionado.label }}</p>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      @click="setChecklistEstado(pdfChecklistItem, 'OK')"
+                      :class="['size-8 rounded-lg border text-sm font-black flex items-center justify-center', checklistBotonClase(pdfSeleccionado.key, 'OK')]"
+                    >✓</button>
+                    <button
+                      type="button"
+                      @click="setChecklistEstado(pdfChecklistItem, 'X')"
+                      :class="['size-8 rounded-lg border text-sm font-black flex items-center justify-center', checklistBotonClase(pdfSeleccionado.key, 'X')]"
+                    >✕</button>
+                    <button type="button" @click="ampliarPdf" class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-black uppercase">Ampliar</button>
+                    <a :href="pdfUrlActivo" target="_blank" class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-black uppercase">Abrir</a>
                   </div>
                 </div>
-              </div>
-            </section>
-
-            <!-- === ACCIÓN ADMINISTRATIVA === -->
-            <section class="px-6 py-5">
-              <h3 class="section-title">Decisión Administrativa</h3>
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Observaciones / Motivo</label>
+                <div v-if="checklistEstado(pdfSeleccionado.key) === 'X'" class="pb-1">
                   <textarea
-                    v-model="obsForm"
-                    rows="3"
-                    placeholder="Escriba observaciones o el motivo de la decisión..."
-                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 font-medium resize-none focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    :value="checklistComentario(pdfSeleccionado.key)"
+                    @input="setChecklistComentario(pdfSeleccionado.key, $event.target.value)"
+                    rows="2"
+                    placeholder="Motivo del rechazo de este documento..."
+                    class="w-full px-3 py-2 bg-slate-900 border border-red-400/50 rounded-lg text-xs text-white placeholder:text-white/40 resize-none focus:ring-2 focus:ring-red-400/30 outline-none"
                   ></textarea>
                 </div>
-                <div class="flex flex-wrap gap-3">
-                  <button
-                    v-if="solicitudActiva.estado !== 'APROBADO'"
-                    @click="confirmarCambioEstado('APROBADO')"
-                    :disabled="actualizando || !puedeAprobarSolicitud"
-                    class="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-                  >
-                    <span class="material-symbols-outlined text-sm">check_circle</span>
-                    Aprobar Solicitud
-                  </button>
-
-                  <button
-                    v-if="solicitudActiva.estado !== 'RECHAZADO'"
-                    @click="confirmarCambioEstado('RECHAZADO')"
-                    :disabled="actualizando"
-                    class="flex items-center gap-2 px-5 py-3 bg-secondary hover:bg-red-800 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-secondary/20 disabled:opacity-50"
-                  >
-                    <span class="material-symbols-outlined text-sm">cancel</span>
-                    Rechazar
-                  </button>
-                  <button
-                    v-if="solicitudActiva.estado !== 'PENDIENTE'"
-                    @click="confirmarCambioEstado('PENDIENTE')"
-                    :disabled="actualizando"
-                    class="flex items-center gap-2 px-5 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                  >
-                    <span class="material-symbols-outlined text-sm">history</span>
-                    Marcar Pendiente
-                  </button>
-                  <button
-                    v-if="solicitudActiva.estado === 'APROBADO' && !solicitudActiva.fraternidadCreada"
-                    @click="inscribirFraternidad"
-                    :disabled="actualizando"
-                    class="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 mt-4 w-full justify-center"
-                  >
-                    <span class="material-symbols-outlined text-sm">verified</span>
-                    Completar Inscripción Manualmente
-                  </button>
-
-                  <div v-if="solicitudActiva.estado === 'APROBADO' && solicitudActiva.fraternidadCreada" class="mt-4 w-full bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center gap-3">
-                    <span class="material-symbols-outlined text-indigo-600 text-2xl">task_alt</span>
-                    <div>
-                      <p class="text-xs font-black uppercase text-indigo-800">Fraternidad Registrada</p>
-                      <p class="text-[11px] text-indigo-600 font-medium">
-                        {{ solicitudActiva.fraternidadCreada.nombre }} ya está disponible en fraternidades y evaluaciones.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <p v-if="solicitudActiva.observaciones" class="text-xs text-slate-500 bg-amber-50 border border-amber-200 p-3 rounded-xl">
-                  <span class="font-black text-amber-700">Última observación:</span> {{ solicitudActiva.observaciones }}
-                </p>
               </div>
-            </section>
-
+              <div v-else class="shrink-0 px-4 py-3 border-b border-slate-200 bg-white">
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Vista previa del documento</p>
+                <p class="text-[11px] text-slate-400 mt-1">Selecciona un documento de respaldo en la directiva o documentos institucionales.</p>
+              </div>
+              <div class="flex-1 min-h-[240px] flex flex-col">
+                <iframe
+                  v-if="pdfSeleccionado?.url"
+                  :src="pdfUrlActivo + '#toolbar=1'"
+                  class="flex-1 w-full border-none bg-white"
+                  :title="pdfSeleccionado.label"
+                ></iframe>
+                <div v-else class="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 p-6">
+                  <span class="material-symbols-outlined text-4xl">picture_as_pdf</span>
+                  <p class="text-xs font-bold text-center">Selecciona un documento para previsualizar</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </transition>
 
-    <!-- ===== VISOR PDF ===== -->
+    <!-- ===== VISOR PDF FULLSCREEN (ampliar) ===== -->
     <transition name="fade">
       <div v-if="pdfViewer.abierto" class="fixed inset-0 z-[60] flex flex-col bg-slate-900/95 backdrop-blur-md">
         <div class="shrink-0 flex items-center justify-between px-6 py-4 bg-slate-900 border-b border-white/10">
@@ -345,7 +505,7 @@
       </div>
 
       <!-- Filtros y Stats -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         <button
           v-for="s in statsCards"
           :key="s.label"
@@ -435,7 +595,7 @@
                   <span class="material-symbols-outlined text-[14px]">schedule</span>
                   {{ formatFecha(sol.createdAt) }}
                 </span>
-                <span v-if="sol.observaciones" class="flex items-center gap-1 text-[11px] text-amber-600 font-bold">
+                <span v-if="tieneObservacionesPendientes(sol)" class="flex items-center gap-1 text-[11px] text-amber-600 font-bold">
                   <span class="material-symbols-outlined text-[14px]">info</span>
                   Tiene observaciones
                 </span>
@@ -453,13 +613,23 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import api from '../services/api'
 import { getImageUrl } from '../utils/url'
 import Swal from 'sweetalert2'
 import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
-import { PERSONAS_DIRECTIVA, nombreCompletoPersona, DOCUMENTOS_CI_MATRICULA, DOCUMENTOS_DEUDA } from '../utils/personaDirectiva'
+import { PERSONAS_DIRECTIVA, nombreCompletoPersona, formatCiSoloBase, normalizarComplementoCi, DOCUMENTOS_POR_PERSONA, DOCUMENTOS_INSTITUCIONALES } from '../utils/personaDirectiva'
+
+const INSTANCIAS_OPCIONES = ['Facultad', 'Carrera', 'UMSA', 'FEDSIDUMSA', 'STUMSA', 'Externo']
+const DELEGADO_KEYS_NO_EDITABLES = new Set(['delegadoNombre', 'delegadoCi', 'fechaSolicitud', 'gestion'])
+
+const DOC_BTN_LABELS = {
+  ci: 'Ver CI',
+  matricula: 'Ver Matrícula',
+  deudaFrat: 'Ver Cert. no deudas con la Fraternidad',
+  deudaAreas: 'Ver Cert. no deudas con las Áreas Desconcentradas',
+}
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 const solicitudes = ref([])
@@ -471,6 +641,35 @@ const solicitudActiva = ref(null)
 const obsForm = ref('')
 const revisionChecklistDraft = ref({})
 const pdfViewer = ref({ abierto: false, url: '', titulo: '' })
+const pdfSeleccionado = ref(null)
+const mobileTab = ref('datos')
+const panelDetalleScroll = ref(null)
+const seccionActiva = ref('sec-delegado')
+const modoEdicionAdmin = ref(false)
+const adminFormDraft = ref({})
+const guardandoAdmin = ref(false)
+const adminOpciones = ref({ categorias: [], tiposDanza: [], facultades: [], carreras: [] })
+const instanciasOpciones = INSTANCIAS_OPCIONES
+
+const seccionesRevision = [
+  { id: 'sec-delegado', label: 'Delegado' },
+  { id: 'sec-fraternidad', label: 'Fraternidad' },
+  { id: 'sec-directiva', label: 'Directiva' },
+  { id: 'sec-institucionales', label: 'Docs. inst.' },
+  { id: 'sec-decision', label: 'Decisión' },
+]
+
+const irASeccion = (id) => {
+  seccionActiva.value = id
+  mobileTab.value = 'datos'
+  nextTick(() => {
+    const el = document.getElementById(id)
+    if (el && panelDetalleScroll.value) {
+      const top = el.offsetTop - panelDetalleScroll.value.offsetTop - 8
+      panelDetalleScroll.value.scrollTo({ top, behavior: 'smooth' })
+    }
+  })
+}
 
 // ── Carga de datos ─────────────────────────────────────────────────────────────
 const cargarSolicitudes = async () => {
@@ -502,6 +701,8 @@ const solicitudesFiltradas = computed(() => {
 const statsCards = computed(() => [
   { label: 'Total', filter: '', count: solicitudes.value.length, icon: 'inbox', color: 'bg-slate-100 text-slate-600 border-slate-200' },
   { label: 'Pendientes', filter: 'PENDIENTE', count: solicitudes.value.filter(s => s.estado === 'PENDIENTE').length, icon: 'hourglass_empty', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { label: 'Observadas', filter: 'OBSERVADO', count: solicitudes.value.filter(s => s.estado === 'OBSERVADO').length, icon: 'edit_note', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  { label: 'Rechazadas', filter: 'RECHAZADO', count: solicitudes.value.filter(s => s.estado === 'RECHAZADO').length, icon: 'block', color: 'bg-red-50 text-red-700 border-red-200' },
   { label: 'Aprobadas', filter: 'APROBADO', count: solicitudes.value.filter(s => s.estado === 'APROBADO').length, icon: 'check_circle', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 ])
 
@@ -510,50 +711,70 @@ const abrirDetalle = async (sol) => {
   try {
     const { data } = await api.get(`/inscripciones/${sol.idSolicitud}`)
     solicitudActiva.value = data
-    obsForm.value = data.observaciones || ''
+    obsForm.value = data.estado === 'RECHAZADO' ? (data.observaciones || '') : ''
     revisionChecklistDraft.value = data.revisionChecklist ? JSON.parse(JSON.stringify(data.revisionChecklist)) : {}
+    seccionActiva.value = 'sec-delegado'
+    mobileTab.value = 'datos'
+    pdfSeleccionado.value = null
+    await nextTick()
+    panelDetalleScroll.value?.scrollTo({ top: 0, behavior: 'smooth' })
+    // Preseleccionar primer PDF disponible
+    const docs = [...documentosInstitucionales.value]
+    directiva.value.forEach((cargo) => {
+      const primeroCargo = cargo.documentos?.find((d) => d.url)
+      if (primeroCargo) docs.unshift(primeroCargo)
+    })
+    const primero = docs.find((d) => d.url)
+    if (primero) seleccionarPdf(primero)
   } catch {
     notify.error('Error', 'No se pudo cargar el detalle.')
   }
 }
-const cerrarDetalle = () => { solicitudActiva.value = null }
+const cerrarDetalle = () => {
+  solicitudActiva.value = null
+  pdfSeleccionado.value = null
+  pdfViewer.value.abierto = false
+  modoEdicionAdmin.value = false
+  adminFormDraft.value = {}
+}
+
+const itemsDelegado = computed(() => {
+  if (!solicitudActiva.value) return []
+  const s = solicitudActiva.value
+  const nombre = `${s.delegado?.nombres || ''} ${s.delegado?.primerApellido || ''} ${s.delegado?.segundoApellido || ''}`.trim()
+  return [
+    { key: 'delegadoNombre', label: 'Nombre Completo', value: nombre },
+    { key: 'delegadoCi', label: 'CI Delegado', value: s.delegado?.ci || '' },
+    { key: 'fechaSolicitud', label: 'Fecha de Solicitud', value: formatFecha(s.createdAt) || '' },
+    { key: 'gestion', label: 'Gestión', value: String(s.gestion?.anio || '') },
+  ]
+})
+
+const itemsFraternidad = computed(() => {
+  if (!solicitudActiva.value) return []
+  const s = solicitudActiva.value
+  const items = [
+    { key: 'nombreFraternidad', label: 'Nombre Fraternidad', value: s.nombreFraternidad || '' },
+    { key: 'tipoDanza', label: 'Tipo de danza', value: s.tipoDanza?.nombre || '—' },
+    { key: 'categoria', label: 'Categoría', value: s.categoria?.nombre || '' },
+    { key: 'instancia', label: 'Instancia', value: instanciaLabel(s) || '' },
+  ]
+  if (s.facultad) items.push({ key: 'facultad', label: 'Facultad', value: s.facultad?.nombre || '' })
+  if (s.carrera) items.push({ key: 'carrera', label: 'Carrera', value: s.carrera?.nombre || '' })
+  if (s.nombreInstitucionExterna) items.push({ key: 'institucionExterna', label: 'Institución Externa', value: s.nombreInstitucionExterna || '' })
+  return items
+})
 
 const checklistItems = computed(() => {
   if (!solicitudActiva.value) return []
-  const s = solicitudActiva.value
   return [
-    { key: 'nombreFraternidad', label: 'Nombre de la fraternidad', value: s.nombreFraternidad },
-    { key: 'origenFraternidad', label: 'Origen / Tipo de Danza', value: s.origenFraternidad },
-    { key: 'categoria', label: 'Categoría', value: s.categoria?.nombre },
-    { key: 'instancia', label: 'Instancia de representación', value: instanciaLabel(s) },
-    { key: 'facultad', label: 'Facultad', value: s.facultad?.nombre },
-    { key: 'carrera', label: 'Carrera', value: s.carrera?.nombre },
-    { key: 'institucionExterna', label: 'Institución externa', value: s.nombreInstitucionExterna },
-    ...PERSONAS_DIRECTIVA.flatMap(({ prefix, label, hasCelular }) => {
-      const items = [
-        { key: `${prefix}Nombres`, label: `${label} - Nombres`, value: s[`${prefix}Nombres`] },
-        { key: `${prefix}PrimerApellido`, label: `${label} - Paterno`, value: s[`${prefix}PrimerApellido`] },
-        { key: `${prefix}SegundoApellido`, label: `${label} - Materno`, value: s[`${prefix}SegundoApellido`] },
-        { key: `${prefix}Ci`, label: `${label} - CI`, value: s[`${prefix}Ci`] },
-      ]
-      if (hasCelular) {
-        items.push({ key: `${prefix}Celular`, label: `${label} - Celular`, value: s[`${prefix}Celular`] })
-      }
-      return items
-    }),
-    ...DOCUMENTOS_CI_MATRICULA.map(({ fileKey, urlField, label }) => ({
-      key: fileKey,
-      label: `CI y Matrícula — ${label}`,
-      value: s[urlField],
-      isDoc: true,
-    })),
-    { key: 'cartaCompromiso', label: 'Documento 31 — Carta de Compromiso', value: s.urlCartaCompromiso, isDoc: true },
-    { key: 'resolucion', label: 'Documento 32 — Resolución', value: s.urlResolucion, isDoc: true },
-    { key: 'actaDirectiva', label: 'Documento 33 — Acta Directiva', value: s.urlActaDirectiva, isDoc: true },
-    ...DOCUMENTOS_DEUDA.map(({ fileKey, urlField, label }) => ({
-      key: fileKey,
-      label,
-      value: s[urlField],
+    ...itemsDelegado.value,
+    ...itemsFraternidad.value,
+    ...directiva.value.flatMap((c) => c.checklistItems),
+    ...documentosTodos.value.map((doc) => ({
+      key: doc.key,
+      label: doc.label,
+      value: doc.url || '',
       isDoc: true,
     })),
   ]
@@ -561,10 +782,14 @@ const checklistItems = computed(() => {
 
 const checklistEstado = (key) => revisionChecklistDraft.value?.[key]?.estado || 'PENDIENTE'
 
-const checklistClase = (estado) => {
-  if (estado === 'OK') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (estado === 'X') return 'bg-red-50 text-secondary border-red-200'
-  return 'bg-slate-50 text-slate-500 border-slate-200'
+const checklistComentario = (key) => revisionChecklistDraft.value?.[key]?.comentario || ''
+
+const setChecklistComentario = (key, comentario) => {
+  const actual = revisionChecklistDraft.value?.[key] || {}
+  revisionChecklistDraft.value = {
+    ...revisionChecklistDraft.value,
+    [key]: { ...actual, comentario },
+  }
 }
 
 const checklistBotonClase = (key, estadoEsperado) => {
@@ -581,60 +806,345 @@ const checklistBotonClase = (key, estadoEsperado) => {
 }
 
 const setChecklistEstado = (item, estado) => {
+  const prev = revisionChecklistDraft.value?.[item.key] || {}
+  const entry = {
+    estado,
+    label: item.label,
+    value: item.value || '',
+  }
+  if (estado === 'OK') {
+    entry.comentario = undefined
+  } else if (estado === 'X' && prev.comentario) {
+    entry.comentario = prev.comentario
+  }
   revisionChecklistDraft.value = {
     ...revisionChecklistDraft.value,
-    [item.key]: { estado, label: item.label, value: item.value || '' }
+    [item.key]: entry,
   }
 }
 
+const docChecklistItem = (doc) => ({
+  key: doc.key,
+  label: doc.label,
+  value: doc.url || '',
+})
+
+const pdfChecklistItem = computed(() => {
+  if (!pdfSeleccionado.value) return { key: '', label: '', value: '' }
+  return docChecklistItem(pdfSeleccionado.value)
+})
+
+const aceptarItems = (items) => {
+  const next = { ...revisionChecklistDraft.value }
+  items.forEach((item) => {
+    next[item.key] = { estado: 'OK', label: item.label, value: item.value || '' }
+  })
+  revisionChecklistDraft.value = next
+}
+
+const rechazarItems = (items) => {
+  const next = { ...revisionChecklistDraft.value }
+  items.forEach((item) => {
+    const prev = next[item.key] || {}
+    next[item.key] = {
+      estado: 'X',
+      label: item.label,
+      value: item.value || '',
+      comentario: prev.comentario || '',
+    }
+  })
+  revisionChecklistDraft.value = next
+}
+
+const aceptarSeccion = (tipo) => {
+  if (tipo === 'delegado') aceptarItems(itemsDelegado.value)
+  else if (tipo === 'fraternidad') aceptarItems(itemsFraternidad.value)
+  else if (tipo === 'institucionales') {
+    aceptarItems(documentosInstitucionales.value.map((d) => docChecklistItem(d)))
+  }
+}
+
+const rechazarSeccion = (tipo) => {
+  if (tipo === 'delegado') rechazarItems(itemsDelegado.value)
+  else if (tipo === 'fraternidad') rechazarItems(itemsFraternidad.value)
+  else if (tipo === 'institucionales') {
+    rechazarItems(documentosInstitucionales.value.map((d) => docChecklistItem(d)))
+  }
+}
+
+const documentosDeCargo = (prefix) => {
+  if (!solicitudActiva.value) return []
+  const s = solicitudActiva.value
+  return DOCUMENTOS_POR_PERSONA
+    .filter((d) => d.prefix === prefix)
+    .map(({ fileKey, urlField, label, type, cargoLabel }) => ({
+      key: fileKey,
+      label: `${label} — ${cargoLabel}`,
+      btnLabel: DOC_BTN_LABELS[type] || label,
+      url: s[urlField],
+      type,
+    }))
+}
+
+const aceptarSeccionCargo = (cargo) => {
+  aceptarItems(cargo.checklistItems || [])
+  aceptarItems(cargo.documentos.map((d) => docChecklistItem(d)))
+}
+
+const rechazarSeccionCargo = (cargo) => {
+  rechazarItems(cargo.checklistItems || [])
+  rechazarItems(cargo.documentos.map((d) => docChecklistItem(d)))
+}
+
 const puedeAprobarSolicitud = computed(() => {
-  const items = Object.values(revisionChecklistDraft.value || {})
-  return items.length > 0 && items.every(item => item?.estado === 'OK')
+  const items = checklistItems.value
+  if (!items.length) return false
+  return items.every((item) => revisionChecklistDraft.value?.[item.key]?.estado === 'OK')
+})
+
+const tieneItemsObservados = computed(() =>
+  Object.values(revisionChecklistDraft.value || {}).some((item) => item?.estado === 'X'),
+)
+
+const itemsObservadosSinMotivo = computed(() =>
+  Object.values(revisionChecklistDraft.value || {}).filter(
+    (item) => item?.estado === 'X' && !item?.comentario?.trim(),
+  ),
+)
+
+const tieneObservacionesPendientes = (sol) => {
+  if (sol.estado !== 'OBSERVADO') return false
+  let checklist = sol.revisionChecklist || {}
+  if (typeof checklist === 'string') {
+    try { checklist = JSON.parse(checklist) } catch { return false }
+  }
+  return Object.values(checklist).some((item) => item?.estado === 'X')
+}
+
+const revisionProgreso = computed(() => {
+  const items = checklistItems.value
+  const total = items.length
+  const revisados = items.filter((item) => {
+    const estado = revisionChecklistDraft.value?.[item.key]?.estado
+    return estado === 'OK' || estado === 'X'
+  }).length
+  return {
+    total,
+    revisados,
+    porcentaje: total > 0 ? Math.round((revisados / total) * 100) : 0,
+  }
 })
 
 // ── Directiva computada ───────────────────────────────────────────────────────
 const directiva = computed(() => {
   if (!solicitudActiva.value) return []
   const s = solicitudActiva.value
-  return PERSONAS_DIRECTIVA.map(({ prefix, label, hasCelular }) => ({
-    label,
-    nombreCompleto: nombreCompletoPersona(s, prefix),
-    ci: s[`${prefix}Ci`],
-    celular: hasCelular ? s[`${prefix}Celular`] : undefined,
-    partesNombre: [
-      { key: 'nombres', checklistKey: `${label}-nombres`, label: 'Nombres', value: s[`${prefix}Nombres`] },
-      { key: 'paterno', checklistKey: `${label}-paterno`, label: 'Paterno', value: s[`${prefix}PrimerApellido`] },
-      { key: 'materno', checklistKey: `${label}-materno`, label: 'Materno', value: s[`${prefix}SegundoApellido`] },
-    ],
-  })).filter((d) => d.nombreCompleto)
+  return PERSONAS_DIRECTIVA.map(({ prefix, label, hasCelular }) => {
+    const complemento = normalizarComplementoCi(s[`${prefix}CiComplemento`] || '')
+    const ciBase = formatCiSoloBase(s[`${prefix}Ci`])
+    const checklistItemsCargo = [
+      { key: `${label}-nombres`, label: 'Nombres', value: s[`${prefix}Nombres`] || '', adminField: `${prefix}Nombres` },
+      { key: `${label}-paterno`, label: 'Paterno', value: s[`${prefix}PrimerApellido`] || '', adminField: `${prefix}PrimerApellido` },
+      { key: `${label}-materno`, label: 'Materno', value: s[`${prefix}SegundoApellido`] || '', adminField: `${prefix}SegundoApellido` },
+      { key: `${label}-ci`, label: 'CI', value: ciBase, adminField: `${prefix}Ci` },
+    ]
+    if (complemento) {
+      checklistItemsCargo.push({
+        key: `${label}-ci-complemento`,
+        label: 'Complemento CI',
+        value: complemento,
+        adminField: `${prefix}CiComplemento`,
+      })
+    }
+    if (hasCelular) {
+      checklistItemsCargo.push({
+        key: `${label}-celular`,
+        label: 'Celular',
+        value: s[`${prefix}Celular`] || '',
+        adminField: `${prefix}Celular`,
+      })
+    }
+    return {
+      prefix,
+      label,
+      hasCelular,
+      nombreCompleto: nombreCompletoPersona(s, prefix),
+      ci: s[`${prefix}Ci`],
+      complemento,
+      ciDisplay: complemento ? `${ciBase} ${complemento}` : ciBase,
+      celular: hasCelular ? s[`${prefix}Celular`] : undefined,
+      checklistItems: checklistItemsCargo,
+      documentos: documentosDeCargo(prefix),
+    }
+  }).filter((d) => d.nombreCompleto || d.ci)
 })
 
 // ── Documentos adjuntos ───────────────────────────────────────────────────────
-const documentos = computed(() => {
+const documentosInstitucionales = computed(() => {
   if (!solicitudActiva.value) return []
   const s = solicitudActiva.value
+  return DOCUMENTOS_INSTITUCIONALES.map(({ fileKey, urlField, label }) => ({
+    key: fileKey,
+    label,
+    url: s[urlField],
+  }))
+})
+
+const documentosTodos = computed(() => {
+  if (!solicitudActiva.value) return []
+  const s = solicitudActiva.value
+  const prefixesConDatos = new Set(directiva.value.map((d) => d.prefix))
   return [
-    ...DOCUMENTOS_CI_MATRICULA.map(({ fileKey, urlField, label }) => ({
-      key: fileKey,
-      label: `CI y Matrícula — ${label}`,
-      url: s[urlField],
-    })),
-    { key: 'cartaCompromiso', label: 'Carta de Compromiso', url: s.urlCartaCompromiso },
-    { key: 'resolucion', label: 'Resolución HCU/HCF/HCC', url: s.urlResolucion },
-    { key: 'actaDirectiva', label: 'Acta de Conformación de Directiva', url: s.urlActaDirectiva },
-    ...DOCUMENTOS_DEUDA.map(({ fileKey, urlField, label }) => ({
-      key: fileKey,
-      label,
-      url: s[urlField],
-    })),
+    ...DOCUMENTOS_POR_PERSONA
+      .filter((d) => prefixesConDatos.has(d.prefix))
+      .map(({ fileKey, urlField, shortLabel, cargoLabel }) => ({
+        key: fileKey,
+        label: `${shortLabel} — ${cargoLabel}`,
+        url: s[urlField],
+      })),
+    ...documentosInstitucionales.value,
   ]
 })
+
+const pdfUrlActivo = computed(() => {
+  if (!pdfSeleccionado.value?.url) return ''
+  return getImageUrl(pdfSeleccionado.value.url)
+})
+
+const seleccionarPdf = (doc) => {
+  if (!doc) return
+  pdfSeleccionado.value = { ...doc, titulo: doc.label }
+  if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+    mobileTab.value = 'pdfs'
+  }
+}
+
+const ampliarPdf = () => {
+  if (!pdfSeleccionado.value?.url) return
+  pdfViewer.value = {
+    abierto: true,
+    url: pdfUrlActivo.value,
+    titulo: pdfSeleccionado.value.label,
+  }
+}
+
+const verPdf = ({ url, titulo }) => {
+  pdfViewer.value = { abierto: true, url: getImageUrl(url), titulo }
+}
+
+const adminFieldKey = (itemKey) => {
+  const map = {
+    nombreFraternidad: 'nombreFraternidad',
+    tipoDanza: 'idTipoDanza',
+    categoria: 'idCategoria',
+    instancia: 'instanciaRepresentacion',
+    facultad: 'idFacultad',
+    carrera: 'idCarrera',
+    institucionExterna: 'nombreInstitucionExterna',
+  }
+  return map[itemKey] || itemKey
+}
+
+const adminCampoEditable = (key) => !DELEGADO_KEYS_NO_EDITABLES.has(key)
+
+const hidratarAdminFormDesdeSolicitud = (s) => {
+  const draft = {
+    nombreFraternidad: s.nombreFraternidad || '',
+    instanciaRepresentacion: s.instanciaRepresentacion || 'Facultad',
+    nombreInstitucionExterna: s.nombreInstitucionExterna || '',
+    idCategoria: s.categoria?.idCategoria || null,
+    idTipoDanza: s.tipoDanza?.idTipoDanza || null,
+    idFacultad: s.facultad?.idFacultad || null,
+    idCarrera: s.carrera?.idCarrera || null,
+  }
+  PERSONAS_DIRECTIVA.forEach(({ prefix, hasCelular }) => {
+    draft[`${prefix}Nombres`] = s[`${prefix}Nombres`] || ''
+    draft[`${prefix}PrimerApellido`] = s[`${prefix}PrimerApellido`] || ''
+    draft[`${prefix}SegundoApellido`] = s[`${prefix}SegundoApellido`] || ''
+    draft[`${prefix}Ci`] = s[`${prefix}Ci`] || ''
+    draft[`${prefix}CiComplemento`] = s[`${prefix}CiComplemento`] || ''
+    if (hasCelular) draft[`${prefix}Celular`] = s[`${prefix}Celular`] || ''
+  })
+  adminFormDraft.value = draft
+}
+
+const cargarAdminOpciones = async (idGestion) => {
+  try {
+    const [cats, facs, cars, tipos] = await Promise.all([
+      api.get('/categorias', { params: idGestion ? { idGestion } : {} }),
+      api.get('/organizacion/facultades'),
+      api.get('/organizacion/carreras'),
+      api.get('/reportes/tipos-danza'),
+    ])
+    adminOpciones.value = {
+      categorias: cats.data || [],
+      facultades: facs.data || [],
+      carreras: cars.data || [],
+      tiposDanza: tipos.data || [],
+    }
+  } catch {
+    notify.error('Error', 'No se pudieron cargar opciones para edición.')
+  }
+}
+
+const adminCarrerasFiltradas = computed(() => {
+  if (!adminFormDraft.value.idFacultad) return adminOpciones.value.carreras
+  return adminOpciones.value.carreras.filter(
+    (c) => c.facultad?.idFacultad === adminFormDraft.value.idFacultad,
+  )
+})
+
+const activarEdicionAdmin = async () => {
+  const { isConfirmed } = await Swal.fire({
+    title: '¿Editar datos de entrada?',
+    html: 'Modificarás los datos enviados por el delegado en la preinscripción.<br><span class="text-sm text-slate-500">Usa esta opción solo para corregir errores de captura antes de la decisión final.</span>',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, editar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#d97706',
+    focusCancel: true,
+  })
+  if (!isConfirmed) return
+  await cargarAdminOpciones(solicitudActiva.value?.gestion?.idGestion)
+  hidratarAdminFormDesdeSolicitud(solicitudActiva.value)
+  modoEdicionAdmin.value = true
+}
+
+const cancelarEdicionAdmin = () => {
+  modoEdicionAdmin.value = false
+  adminFormDraft.value = {}
+}
+
+const guardarEdicionAdmin = async () => {
+  if (!solicitudActiva.value) return
+  guardandoAdmin.value = true
+  try {
+    const { data } = await api.put(`/inscripciones/${solicitudActiva.value.idSolicitud}/admin-datos`, adminFormDraft.value)
+    solicitudActiva.value = data
+    const idx = solicitudes.value.findIndex((s) => s.idSolicitud === data.idSolicitud)
+    if (idx !== -1) solicitudes.value[idx] = { ...solicitudes.value[idx], ...data }
+    modoEdicionAdmin.value = false
+    notify.success('Datos actualizados', 'Los datos de la preinscripción fueron guardados.')
+    const { data: refreshed } = await api.get(`/inscripciones/${solicitudActiva.value.idSolicitud}`)
+    solicitudActiva.value = refreshed
+    revisionChecklistDraft.value = refreshed.revisionChecklist
+      ? JSON.parse(JSON.stringify(refreshed.revisionChecklist))
+      : {}
+  } catch (e) {
+    notify.error('Error', e?.response?.data?.message || 'No se pudieron guardar los datos.')
+  } finally {
+    guardandoAdmin.value = false
+  }
+}
 
 // ── Cambio de estado ───────────────────────────────────────────────────────────
 const confirmarCambioEstado = async (nuevoEstado) => {
   if (!solicitudActiva.value) return
 
   const nombre = solicitudActiva.value.nombreFraternidad || 'esta fraternidad'
+  const eraAprobada = solicitudActiva.value.estado === 'APROBADO'
+  const tieneFraternidad = !!solicitudActiva.value.fraternidadCreada
 
   if (nuevoEstado === 'APROBADO' && !puedeAprobarSolicitud.value) {
     await Swal.fire({
@@ -646,12 +1156,33 @@ const confirmarCambioEstado = async (nuevoEstado) => {
     return
   }
 
+  if (nuevoEstado === 'OBSERVADO') {
+    if (!tieneItemsObservados.value) {
+      await Swal.fire({
+        title: 'Sin datos observados',
+        text: 'Marca con ✕ al menos un dato o documento incorrecto antes de observar la solicitud.',
+        icon: 'warning',
+        confirmButtonColor: '#003399',
+      })
+      return
+    }
+    if (itemsObservadosSinMotivo.value.length) {
+      await Swal.fire({
+        title: 'Faltan motivos de rechazo',
+        text: 'Indica el motivo en cada dato o documento marcado con ✕ antes de observar.',
+        icon: 'warning',
+        confirmButtonColor: '#003399',
+      })
+      return
+    }
+  }
+
   if (nuevoEstado === 'RECHAZADO' && !obsForm.value?.trim()) {
     const { value: motivo, isConfirmed } = await Swal.fire({
       title: 'Motivo del rechazo',
-      text: 'Indica las observaciones para que el delegado sepa qué corregir.',
+      text: 'La inscripción quedará anulada. El delegado no podrá corregir ni reenviar.',
       input: 'textarea',
-      inputPlaceholder: 'Escriba el motivo u observaciones...',
+      inputPlaceholder: 'Escriba el motivo del rechazo por La Comisión...',
       inputValue: obsForm.value || '',
       showCancelButton: true,
       confirmButtonText: 'Continuar',
@@ -666,16 +1197,29 @@ const confirmarCambioEstado = async (nuevoEstado) => {
   const configs = {
     APROBADO: {
       title: '¿Está seguro de aprobar?',
-      html: `Va a <strong>aprobar</strong> la preinscripción de <strong>${nombre}</strong>.<br><span class="text-sm text-slate-500">La fraternidad quedará registrada oficialmente si corresponde.</span>`,
+      html: `La <strong>Comisión</strong> aprobará la preinscripción de <strong>${nombre}</strong>.<br><span class="text-sm text-slate-500">La fraternidad quedará registrada oficialmente si corresponde.</span>`,
       icon: 'question',
       confirmButtonColor: '#059669',
       confirmButtonText: 'Sí, aprobar',
       cancelButtonText: 'No',
       focusCancel: false,
     },
+    OBSERVADO: {
+      title: eraAprobada ? '¿Volver a observar solicitud aprobada?' : '¿Observar solicitud?',
+      html: eraAprobada && tieneFraternidad
+        ? `La <strong>Comisión</strong> devolverá la solicitud de <strong>${nombre}</strong> al delegado.<br><span class="text-sm text-red-600 font-bold">Se eliminará la fraternidad registrada</span> hasta que vuelva a aprobarse.`
+        : `La <strong>Comisión</strong> devolverá la solicitud de <strong>${nombre}</strong> al delegado para corrección.<br><span class="text-sm text-slate-500">Solo podrá modificar los campos marcados con ✕.</span>`,
+      icon: 'warning',
+      confirmButtonColor: '#ea580c',
+      confirmButtonText: 'Sí, observar',
+      cancelButtonText: 'No',
+      focusCancel: true,
+    },
     RECHAZADO: {
-      title: '¿Está seguro de rechazar?',
-      html: `Va a <strong>rechazar</strong> la preinscripción de <strong>${nombre}</strong>.<br><span class="text-sm text-slate-500">El delegado solo podrá corregir los campos marcados con ✕.</span>`,
+      title: eraAprobada ? '¿Rechazar solicitud ya aprobada?' : '¿Rechazar y anular?',
+      html: eraAprobada && tieneFraternidad
+        ? `La <strong>Comisión</strong> rechazará la preinscripción de <strong>${nombre}</strong>.<br><span class="text-sm text-red-600 font-bold">Se eliminará la fraternidad registrada.</span> El delegado no podrá corregir ni reenviar.`
+        : `La <strong>Comisión</strong> rechazará y <strong>anulará</strong> la preinscripción de <strong>${nombre}</strong>.<br><span class="text-sm text-slate-500">El delegado <strong>no</strong> tendrá derecho a corregir ni reenviar.</span>`,
       icon: 'warning',
       confirmButtonColor: '#dc2626',
       confirmButtonText: 'Sí, rechazar',
@@ -703,12 +1247,24 @@ const confirmarCambioEstado = async (nuevoEstado) => {
   await cambiarEstado(nuevoEstado)
 }
 
+const mensajeNotificacionEmail = (data) => {
+  const n = data?.notificacionDelegado
+  if (!n) return ''
+  if (n.enviado && n.correo) {
+    return `<br><span class="text-sm text-slate-500">Se envió notificación por correo a <strong>${n.correo}</strong>.</span>`
+  }
+  if (n.error) {
+    return `<br><span class="text-sm text-amber-700"><strong>Atención:</strong> ${n.error}</span>`
+  }
+  return ''
+}
+
 const cambiarEstado = async (nuevoEstado) => {
   actualizando.value = true
   try {
     const { data } = await api.put(`/inscripciones/${solicitudActiva.value.idSolicitud}/estado`, {
       estado: nuevoEstado,
-      observaciones: obsForm.value || undefined,
+      observaciones: nuevoEstado === 'RECHAZADO' ? (obsForm.value || undefined) : undefined,
       revisionChecklist: revisionChecklistDraft.value,
     })
     solicitudActiva.value = { ...solicitudActiva.value, ...data }
@@ -718,17 +1274,28 @@ const cambiarEstado = async (nuevoEstado) => {
     if (nuevoEstado === 'APROBADO') {
       await Swal.fire({
         title: '¡Preinscripción aprobada!',
-        html: data.fraternidadCreada
-          ? `La fraternidad <strong>${data.fraternidadCreada.nombre}</strong> quedó registrada oficialmente.`
-          : `La solicitud de <strong>${data.nombreFraternidad || 'la fraternidad'}</strong> fue aprobada correctamente.`,
+        html: (data.fraternidadCreada
+          ? `La Comisión aprobó la solicitud. La fraternidad <strong>${data.fraternidadCreada.nombre}</strong> quedó registrada oficialmente.`
+          : `La Comisión aprobó la solicitud de <strong>${data.nombreFraternidad || 'la fraternidad'}</strong>.`)
+          + mensajeNotificacionEmail(data),
         icon: 'success',
         confirmButtonText: 'Entendido',
         confirmButtonColor: '#059669',
       })
+    } else if (nuevoEstado === 'OBSERVADO') {
+      await Swal.fire({
+        title: 'Solicitud observada',
+        html: 'La Comisión devolvió la solicitud al delegado para corrección.'
+          + mensajeNotificacionEmail(data),
+        icon: 'info',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#ea580c',
+      })
     } else if (nuevoEstado === 'RECHAZADO') {
       await Swal.fire({
-        title: 'Preinscripción rechazada',
-        html: 'La solicitud fue rechazada.<br><span class="text-sm text-slate-500">El delegado recibirá la solicitud para corregir únicamente los campos marcados con ✕.</span>',
+        title: 'Solicitud anulada',
+        html: 'La Comisión rechazó y anuló la solicitud.<br><span class="text-sm text-slate-500">El delegado no podrá corregir ni reenviar.</span>'
+          + mensajeNotificacionEmail(data),
         icon: 'info',
         confirmButtonText: 'Entendido',
         confirmButtonColor: '#003399',
@@ -741,11 +1308,6 @@ const cambiarEstado = async (nuevoEstado) => {
   } finally {
     actualizando.value = false
   }
-}
-
-// ── Visor PDF ─────────────────────────────────────────────────────────────────
-const verPdf = ({ url, titulo }) => {
-  pdfViewer.value = { abierto: true, url: getImageUrl(url), titulo }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -807,6 +1369,37 @@ onMounted(cargarSolicitudes)
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.section-title.mb-0,
+h3.section-title.mb-0 {
+  margin-bottom: 0;
+}
+.btn-revision-masiva {
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.15s;
+}
+.btn-revision-aceptar {
+  background: #059669;
+  color: white;
+  border: 1px solid #047857;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.25);
+}
+.btn-revision-aceptar:hover {
+  background: #047857;
+}
+.btn-revision-rechazar {
+  background: #dc2626;
+  color: white;
+  border: 1px solid #b91c1c;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25);
+}
+.btn-revision-rechazar:hover {
+  background: #b91c1c;
 }
 .section-title::before {
   content: '';

@@ -6,6 +6,7 @@ import { Carrera } from './Carrera';
 import { InstitucionExterna } from './InstitucionExterna';
 import { Categoria } from './Categoria';
 import { Fraternidad } from './Fraternidad';
+import { TipoDanza } from './TipoDanza';
 
 export enum EstadoSolicitud {
     PENDIENTE = 'PENDIENTE',
@@ -41,9 +42,6 @@ export class SolicitudInscripcion {
     @Column({ name: 'nombre_fraternidad', length: 255 })
     nombreFraternidad: string;
 
-    @Column({ name: 'origen_fraternidad', length: 50, default: 'General' })
-    origenFraternidad: string;
-
     // 2. Instancia a la que representa
     @Column({ type: 'enum', enum: InstanciaRepresentacion, name: 'instancia_representacion' })
     instanciaRepresentacion: InstanciaRepresentacion;
@@ -68,6 +66,10 @@ export class SolicitudInscripcion {
     @JoinColumn({ name: 'id_categoria' })
     categoria: Categoria;
 
+    @ManyToOne(() => TipoDanza, { nullable: true })
+    @JoinColumn({ name: 'id_tipo_danza' })
+    tipoDanza: TipoDanza;
+
     // --- Directiva (Puntos 4 al 28) ---
     // Presidente
     @Column({ name: 'presi_nombres', length: 150, nullable: true })
@@ -78,6 +80,8 @@ export class SolicitudInscripcion {
     presiSegundoApellido: string;
     @Column({ name: 'presi_ci', length: 50, nullable: true })
     presiCi: string;
+    @Column({ name: 'presi_ci_complemento', length: 10, nullable: true })
+    presiCiComplemento: string;
     @Column({ name: 'presi_celular', length: 50, nullable: true })
     presiCelular: string;
 
@@ -90,6 +94,8 @@ export class SolicitudInscripcion {
     viceSegundoApellido: string;
     @Column({ name: 'vice_ci', length: 50, nullable: true })
     viceCi: string;
+    @Column({ name: 'vice_ci_complemento', length: 10, nullable: true })
+    viceCiComplemento: string;
     @Column({ name: 'vice_celular', length: 50, nullable: true })
     viceCelular: string;
 
@@ -102,6 +108,8 @@ export class SolicitudInscripcion {
     secGenSegundoApellido: string;
     @Column({ name: 'sec_gen_ci', length: 50, nullable: true })
     secGenCi: string;
+    @Column({ name: 'sec_gen_ci_complemento', length: 10, nullable: true })
+    secGenCiComplemento: string;
 
     // Secretario de Hacienda
     @Column({ name: 'sec_haci_nombres', length: 150, nullable: true })
@@ -112,6 +120,8 @@ export class SolicitudInscripcion {
     secHaciSegundoApellido: string;
     @Column({ name: 'sec_haci_ci', length: 50, nullable: true })
     secHaciCi: string;
+    @Column({ name: 'sec_haci_ci_complemento', length: 10, nullable: true })
+    secHaciCiComplemento: string;
 
     // Secretario de Actas
     @Column({ name: 'sec_actas_nombres', length: 150, nullable: true })
@@ -122,6 +132,8 @@ export class SolicitudInscripcion {
     secActasSegundoApellido: string;
     @Column({ name: 'sec_actas_ci', length: 50, nullable: true })
     secActasCi: string;
+    @Column({ name: 'sec_actas_ci_complemento', length: 10, nullable: true })
+    secActasCiComplemento: string;
 
     // Secretario de Prensa y Propaganda
     @Column({ name: 'sec_prensa_nombres', length: 150, nullable: true })
@@ -132,6 +144,8 @@ export class SolicitudInscripcion {
     secPrensaSegundoApellido: string;
     @Column({ name: 'sec_prensa_ci', length: 50, nullable: true })
     secPrensaCi: string;
+    @Column({ name: 'sec_prensa_ci_complemento', length: 10, nullable: true })
+    secPrensaCiComplemento: string;
 
     // Vocal
     @Column({ name: 'vocal_nombres', length: 150, nullable: true })
@@ -142,6 +156,8 @@ export class SolicitudInscripcion {
     vocalSegundoApellido: string;
     @Column({ name: 'vocal_ci', length: 50, nullable: true })
     vocalCi: string;
+    @Column({ name: 'vocal_ci_complemento', length: 10, nullable: true })
+    vocalCiComplemento: string;
 
     // Delegado a Co-Gobierno
     @Column({ name: 'del_cogob_nombres', length: 150, nullable: true })
@@ -152,6 +168,8 @@ export class SolicitudInscripcion {
     delCogobSegundoApellido: string;
     @Column({ name: 'del_cogob_ci', length: 50, nullable: true })
     delCogobCi: string;
+    @Column({ name: 'del_cogob_ci_complemento', length: 10, nullable: true })
+    delCogobCiComplemento: string;
     @Column({ name: 'del_cogob_celular', length: 50, nullable: true })
     delCogobCelular: string;
 
@@ -164,6 +182,8 @@ export class SolicitudInscripcion {
     delTitularSegundoApellido: string;
     @Column({ name: 'del_titular_ci', length: 50, nullable: true })
     delTitularCi: string;
+    @Column({ name: 'del_titular_ci_complemento', length: 10, nullable: true })
+    delTitularCiComplemento: string;
     @Column({ name: 'del_titular_celular', length: 50, nullable: true })
     delTitularCelular: string;
 
@@ -176,49 +196,112 @@ export class SolicitudInscripcion {
     delSuplenteSegundoApellido: string;
     @Column({ name: 'del_suplente_ci', length: 50, nullable: true })
     delSuplenteCi: string;
+    @Column({ name: 'del_suplente_ci_complemento', length: 10, nullable: true })
+    delSuplenteCiComplemento: string;
     @Column({ name: 'del_suplente_celular', length: 50, nullable: true })
     delSuplenteCelular: string;
 
-    // --- Documentos Requisitos (Puntos 29 al 33) ---
-    // 29. CI y Matrícula por integrante de la directiva (PDF individual)
-    @Column({ name: 'url_ci_matricula_presi', length: 500, nullable: true })
-    urlCiMatriculaPresi: string;
-    @Column({ name: 'url_ci_matricula_vice', length: 500, nullable: true })
-    urlCiMatriculaVice: string;
-    @Column({ name: 'url_ci_matricula_sec_gen', length: 500, nullable: true })
-    urlCiMatriculaSecGen: string;
-    @Column({ name: 'url_ci_matricula_sec_haci', length: 500, nullable: true })
-    urlCiMatriculaSecHaci: string;
-    @Column({ name: 'url_ci_matricula_sec_actas', length: 500, nullable: true })
-    urlCiMatriculaSecActas: string;
-    @Column({ name: 'url_ci_matricula_sec_prensa', length: 500, nullable: true })
-    urlCiMatriculaSecPrensa: string;
-    @Column({ name: 'url_ci_matricula_vocal', length: 500, nullable: true })
-    urlCiMatriculaVocal: string;
-    @Column({ name: 'url_ci_matricula_del_cogob', length: 500, nullable: true })
-    urlCiMatriculaDelCogob: string;
-    @Column({ name: 'url_ci_matricula_del_titular', length: 500, nullable: true })
-    urlCiMatriculaDelTitular: string;
-    @Column({ name: 'url_ci_matricula_del_suplente', length: 500, nullable: true })
-    urlCiMatriculaDelSuplente: string;
+    // --- Documentos Requisitos ---
+    // 4 PDFs por integrante: CI, Matrícula, No deudas fraternidad, No deudas áreas
+    @Column({ name: 'url_ci_presi', length: 500, nullable: true })
+    urlCiPresi: string;
+    @Column({ name: 'url_matricula_presi', length: 500, nullable: true })
+    urlMatriculaPresi: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_presi', length: 500, nullable: true })
+    urlSinDeudasFraternidadPresi: string;
+    @Column({ name: 'url_sin_deudas_areas_presi', length: 500, nullable: true })
+    urlSinDeudasAreasPresi: string;
 
-    // 31. Carta de Compromiso
+    @Column({ name: 'url_ci_vice', length: 500, nullable: true })
+    urlCiVice: string;
+    @Column({ name: 'url_matricula_vice', length: 500, nullable: true })
+    urlMatriculaVice: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_vice', length: 500, nullable: true })
+    urlSinDeudasFraternidadVice: string;
+    @Column({ name: 'url_sin_deudas_areas_vice', length: 500, nullable: true })
+    urlSinDeudasAreasVice: string;
+
+    @Column({ name: 'url_ci_sec_gen', length: 500, nullable: true })
+    urlCiSecGen: string;
+    @Column({ name: 'url_matricula_sec_gen', length: 500, nullable: true })
+    urlMatriculaSecGen: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_sec_gen', length: 500, nullable: true })
+    urlSinDeudasFraternidadSecGen: string;
+    @Column({ name: 'url_sin_deudas_areas_sec_gen', length: 500, nullable: true })
+    urlSinDeudasAreasSecGen: string;
+
+    @Column({ name: 'url_ci_sec_haci', length: 500, nullable: true })
+    urlCiSecHaci: string;
+    @Column({ name: 'url_matricula_sec_haci', length: 500, nullable: true })
+    urlMatriculaSecHaci: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_sec_haci', length: 500, nullable: true })
+    urlSinDeudasFraternidadSecHaci: string;
+    @Column({ name: 'url_sin_deudas_areas_sec_haci', length: 500, nullable: true })
+    urlSinDeudasAreasSecHaci: string;
+
+    @Column({ name: 'url_ci_sec_actas', length: 500, nullable: true })
+    urlCiSecActas: string;
+    @Column({ name: 'url_matricula_sec_actas', length: 500, nullable: true })
+    urlMatriculaSecActas: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_sec_actas', length: 500, nullable: true })
+    urlSinDeudasFraternidadSecActas: string;
+    @Column({ name: 'url_sin_deudas_areas_sec_actas', length: 500, nullable: true })
+    urlSinDeudasAreasSecActas: string;
+
+    @Column({ name: 'url_ci_sec_prensa', length: 500, nullable: true })
+    urlCiSecPrensa: string;
+    @Column({ name: 'url_matricula_sec_prensa', length: 500, nullable: true })
+    urlMatriculaSecPrensa: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_sec_prensa', length: 500, nullable: true })
+    urlSinDeudasFraternidadSecPrensa: string;
+    @Column({ name: 'url_sin_deudas_areas_sec_prensa', length: 500, nullable: true })
+    urlSinDeudasAreasSecPrensa: string;
+
+    @Column({ name: 'url_ci_vocal', length: 500, nullable: true })
+    urlCiVocal: string;
+    @Column({ name: 'url_matricula_vocal', length: 500, nullable: true })
+    urlMatriculaVocal: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_vocal', length: 500, nullable: true })
+    urlSinDeudasFraternidadVocal: string;
+    @Column({ name: 'url_sin_deudas_areas_vocal', length: 500, nullable: true })
+    urlSinDeudasAreasVocal: string;
+
+    @Column({ name: 'url_ci_del_cogob', length: 500, nullable: true })
+    urlCiDelCogob: string;
+    @Column({ name: 'url_matricula_del_cogob', length: 500, nullable: true })
+    urlMatriculaDelCogob: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_del_cogob', length: 500, nullable: true })
+    urlSinDeudasFraternidadDelCogob: string;
+    @Column({ name: 'url_sin_deudas_areas_del_cogob', length: 500, nullable: true })
+    urlSinDeudasAreasDelCogob: string;
+
+    @Column({ name: 'url_ci_del_titular', length: 500, nullable: true })
+    urlCiDelTitular: string;
+    @Column({ name: 'url_matricula_del_titular', length: 500, nullable: true })
+    urlMatriculaDelTitular: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_del_titular', length: 500, nullable: true })
+    urlSinDeudasFraternidadDelTitular: string;
+    @Column({ name: 'url_sin_deudas_areas_del_titular', length: 500, nullable: true })
+    urlSinDeudasAreasDelTitular: string;
+
+    @Column({ name: 'url_ci_del_suplente', length: 500, nullable: true })
+    urlCiDelSuplente: string;
+    @Column({ name: 'url_matricula_del_suplente', length: 500, nullable: true })
+    urlMatriculaDelSuplente: string;
+    @Column({ name: 'url_sin_deudas_fraternidad_del_suplente', length: 500, nullable: true })
+    urlSinDeudasFraternidadDelSuplente: string;
+    @Column({ name: 'url_sin_deudas_areas_del_suplente', length: 500, nullable: true })
+    urlSinDeudasAreasDelSuplente: string;
+
+    // Documentos institucionales
     @Column({ name: 'url_carta_compromiso', length: 500, nullable: true })
     urlCartaCompromiso: string;
 
-    // 32. Resolución HCU/HCF/HCC
     @Column({ name: 'url_resolucion', length: 500, nullable: true })
     urlResolucion: string;
 
-    // 33. Acta de Conformación
     @Column({ name: 'url_acta_directiva', length: 500, nullable: true })
     urlActaDirectiva: string;
-
-    // Certificados de no adeudar
-    @Column({ name: 'url_sin_deudas_fraternidad', length: 500, nullable: true })
-    urlSinDeudasFraternidad: string;
-    @Column({ name: 'url_sin_deudas_areas', length: 500, nullable: true })
-    urlSinDeudasAreas: string;
 
     // --- Control Administrativo ---
     @Column({ type: 'enum', enum: EstadoSolicitud, default: EstadoSolicitud.PENDIENTE })

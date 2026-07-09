@@ -37,11 +37,17 @@
                   <input
                     id="ci"
                     v-model="form.ci"
-                    type="text" required
-                    placeholder="Ej. 1234567 LP"
+                    type="text"
+                    required
+                    inputmode="numeric"
+                    minlength="5"
+                    maxlength="20"
+                    pattern="[0-9]{5,20}"
+                    placeholder="Ej. 1234567"
                     class="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:bg-white text-slate-900 placeholder:text-slate-400 transition-all duration-200 outline-none text-base font-bold"
                   />
                 </div>
+                <p class="text-[9px] text-slate-400 mt-2 font-medium">Solo números, mínimo 5 dígitos.</p>
               </div>
 
               <!-- Nombres -->
@@ -211,6 +217,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../services/api'
 import Swal from 'sweetalert2'
+import { validarCiUsuario, normalizarCiUsuario } from '../utils/ciUsuario'
 
 const router = useRouter()
 const loading = ref(false)
@@ -245,6 +252,12 @@ const startCountdown = () => {
 }
 
 const handleRegister = async () => {
+  const errorCi = validarCiUsuario(form.value.ci)
+  if (errorCi) {
+    Swal.fire({ title: 'CI inválido', text: errorCi, icon: 'warning', confirmButtonColor: '#c8102e' })
+    return
+  }
+  form.value.ci = normalizarCiUsuario(form.value.ci)
   loading.value = true
   try {
     await api.post('/usuarios/registrar-delegado', form.value)

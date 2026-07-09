@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, DataSource } from 'typeorm';
 import { Usuario } from '../entities/Usuario';
 import { Role } from '../entities/Role';
 import { Jurado } from '../entities/Jurado';
@@ -10,6 +10,7 @@ import { Fase } from '../entities/Fase';
 import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
 import { normalizeEmail } from '../common/password-policy';
 import { MailService } from '../mail/mail.service';
+import { validarCiUsuario } from '../common/ci-usuario.validation';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -30,6 +31,7 @@ export class UsuariosService {
     @InjectRepository(Fraternidad)
     private readonly fraternidadRepo: Repository<Fraternidad>,
     private readonly mailService: MailService,
+    private readonly dataSource: DataSource,
   ) { }
 
   async findAll() {
@@ -101,7 +103,8 @@ export class UsuariosService {
       const gestionActiva = await this.gestionRepo.findOne({ where: { activa: true } });
       const frat = new Fraternidad();
       frat.nombre = nombreNorm;
-      frat.origenFraternidad = 'UMSA';
+      frat.nivelRepresentacion = 'UMSA';
+      frat.habilitadoEfu = false;
       if (gestionActiva) frat.gestion = gestionActiva;
       return this.fraternidadRepo.save(frat);
     }
@@ -170,10 +173,11 @@ export class UsuariosService {
     }
     await this.assertCorreoUnico(correoNorm);
 
+    const ciNorm = validarCiUsuario(data.ci);
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new Usuario();
-    Object.assign(newUser, { ...data, correo: correoNorm });
+    Object.assign(newUser, { ...data, ci: ciNorm, correo: correoNorm });
     newUser.password = hashedPassword;
     newUser.rol = role;
 
@@ -239,6 +243,10 @@ export class UsuariosService {
     const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, ...data } = updateDto as any;
 
     let updateData: any = { ...data };
+
+    if (data.ci !== undefined && data.ci !== null && String(data.ci).trim() !== '') {
+      updateData.ci = validarCiUsuario(data.ci);
+    }
 
     if (data.correo !== undefined) {
       const correoNorm = this.prepareCorreo(data.correo);
@@ -355,7 +363,10 @@ export class UsuariosService {
 
     // Solo asignar fraternidades para jurados EFU o AMBOS
     if (tipoJurado !== 'EXTERNO' && fraternidadesIds.length > 0) {
-      perfil.fraternidadesHabilitadas = await this.fraternidadRepo.findBy({ idFraternidad: In(fraternidadesIds) });
+      perfil.fraternidadesHabilitadas = await this.fraternidadRepo.findBy({
+        idFraternidad: In(fraternidadesIds),
+        habilitadoEfu: true,
+      });
     } else if (tipoJurado === 'EXTERNO') {
       perfil.fraternidadesHabilitadas = [];
     }
@@ -457,8 +468,75 @@ export class UsuariosService {
 
   async remove(id: number) {
     const user = await this.findOne(id);
-    await this.usuarioRepo.remove(user);
-    return { message: 'Usuario eliminado con éxito' };
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (user.rol?.nombre === 'superusuario') {
+      const totalSuper = await this.usuarioRepo
+        .createQueryBuilder('u')
+        .innerJoin('u.rol', 'rol')
+        .where('rol.nombre = :rol', { rol: 'superusuario' })
+        .getCount();
+      if (totalSuper <= 1) {
+        throw new BadRequestException('No se puede eliminar el único superusuario del sistema.');
+      }
+    }
+
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
+    try {
+      // Solicitudes de inscripción del delegado
+      await qr.query(`DELETE FROM solicitudes_inscripcion WHERE id_usuario_delegado = $1`, [id]);
+
+      // Tokens de recuperación
+      await qr.query(`DELETE FROM password_reset_tokens WHERE id_usuario = $1`, [id]);
+
+      // Auditoría / sesiones (si existen)
+      try {
+        await qr.query(
+          `UPDATE auditoria_acciones SET id_usuario = NULL WHERE id_usuario = $1`,
+          [id],
+        );
+      } catch { /* ignore */ }
+      try {
+        await qr.query(`DELETE FROM sesiones_usuario WHERE id_usuario = $1`, [id]);
+      } catch { /* ignore */ }
+
+      // Monografías referenciadas como subido por
+      try {
+        await qr.query(`UPDATE monografias SET id_usuario_subio = NULL WHERE id_usuario_subio = $1`, [id]);
+      } catch { /* ignore */ }
+
+      // Incidencias y asistencias registradas por el usuario
+      await qr.query(`DELETE FROM incidencias WHERE id_usuario = $1`, [id]);
+      await qr.query(`DELETE FROM asistencias WHERE id_usuario = $1`, [id]);
+
+      // Perfiles de jurado (evaluaciones + vinculaciones)
+      const jurados: Array<{ id_jurado: number }> = await qr.query(
+        `SELECT id_jurado FROM jurados WHERE id_usuario = $1`,
+        [id],
+      );
+      for (const j of jurados) {
+        await qr.query(`DELETE FROM evaluaciones WHERE id_jurado = $1`, [j.id_jurado]);
+        await qr.query(`DELETE FROM jurado_fases WHERE id_jurado = $1`, [j.id_jurado]);
+        await qr.query(`DELETE FROM jurado_fraternidades WHERE id_jurado = $1`, [j.id_jurado]);
+      }
+      await qr.query(`DELETE FROM jurados WHERE id_usuario = $1`, [id]);
+
+      // Finalmente el usuario (la fraternidad queda; solo se desliga)
+      await qr.query(`DELETE FROM usuarios WHERE id_usuario = $1`, [id]);
+
+      await qr.commitTransaction();
+      return {
+        message: `Usuario ${user.nombres} ${user.primerApellido} eliminado con éxito`,
+      };
+    } catch (err: any) {
+      await qr.rollbackTransaction();
+      const detail = err?.driverError?.detail || err?.message || 'Error desconocido';
+      throw new BadRequestException(`No se pudo eliminar al usuario: ${detail}`);
+    } finally {
+      await qr.release();
+    }
   }
 
   async registerDelegado(data: { ci: string; nombres: string; primerApellido: string; segundoApellido?: string; correo: string; password?: string }) {
@@ -484,11 +562,13 @@ export class UsuariosService {
     }
     await this.assertCorreoUnico(correoNorm);
 
-    const rawPassword = data.password || data.ci;
+    const ciNorm = validarCiUsuario(data.ci);
+    const rawPassword = data.password || ciNorm;
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const { correo: _c, password: _p, ...rest } = data;
     const newUser = this.usuarioRepo.create({
         ...rest,
+        ci: ciNorm,
         correo: correoNorm,
         password: hashedPassword,
         rol: roleDelegado,
