@@ -57,13 +57,26 @@ NODE_ENV=production npm run start:prod
 
 Por defecto escucha en `PORT=3000`. API: `/api/v1` · Swagger (si habilitado): `/api`
 
-## Semilla de datos
+## Semilla de datos (`seed`)
 
 ```bash
+# Desarrollo
 npm run seed
+
+# Producción (después de npm run build; no requiere ts-node)
+npm run seed:prod
 ```
 
-Solo en **base de datos vacía** (desarrollo o primer despliegue). **No ejecutar** en producción con datos reales.
+En **BD vacía**, el script:
+
+1. **Crea todas las tablas** (`synchronize()` interno, independiente de `TYPEORM_SYNCHRONIZE` del `.env`)
+2. Inserta roles, superusuario y catálogos UMSA
+
+**Superusuario:** CI `12512405`, contraseña inicial = el CI, `primerLogin: true`.
+
+**Solo ejecutar una vez** al inicio. Volver a ejecutarlo **borra todos los datos**.
+
+La API en producción debe mantener `TYPEORM_SYNCHRONIZE=false`; el seed ya no necesita ponerlo en `true`.
 
 ## Estructura `src/`
 

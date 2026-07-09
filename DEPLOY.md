@@ -35,9 +35,28 @@ DB_NAME=efu_db
 TYPEORM_SYNCHRONIZE=false
 ```
 
-> Con `TYPEORM_SYNCHRONIZE=false` el esquema **no** se crea solo. Opciones:
-> - Primera vez en BD vacía: ejecutar `npm run seed` (solo una vez), o
-> - Restaurar un dump SQL del esquema inicial.
+### Primera vez: crear tablas + datos iniciales
+
+Con la BD vacía (solo `CREATE DATABASE`), ejecutar **una sola vez**:
+
+```bash
+cd backend
+npm ci
+npm run build
+npm run seed:prod
+```
+
+`npm run seed:prod` hace automáticamente:
+
+1. **Crea todas las tablas** (`dataSource.synchronize()` desde las entidades)
+2. Inserta roles, superusuario y catálogos UMSA
+3. No requiere `TYPEORM_SYNCHRONIZE=true` en el `.env` de la API
+
+**Superusuario inicial:** CI `12512405`, contraseña inicial = el mismo CI. Debe cambiarla en el primer login.
+
+> **No volver a ejecutar** `seed:prod` si ya hay datos reales (borra todo).
+
+En desarrollo local puede usarse `npm run seed` (con `ts-node`).
 
 ---
 
@@ -50,6 +69,7 @@ cp .env.production.example .env
 
 npm ci
 npm run build
+npm run seed:prod    # Solo la primera vez (BD vacía)
 NODE_ENV=production npm run start:prod
 ```
 
@@ -150,7 +170,7 @@ SMTP_FROM="EFU <culturas@fcpn.edu.bo>"
 - [ ] HTTPS activo
 - [ ] `SWAGGER_ENABLED=false` (o protegido)
 - [ ] Backups de PostgreSQL y `uploads/`
-- [ ] `npm run seed` **no** ejecutado sobre datos reales
+- [ ] `npm run seed:prod` ejecutado **una vez** en BD vacía (no repetir con datos reales)
 
 ---
 

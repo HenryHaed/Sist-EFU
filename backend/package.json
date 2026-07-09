@@ -8,6 +8,7 @@
     "start:prod": "NODE_ENV=production node dist/src/main.js",
     "build": "tsc",
     "seed": "ts-node src/seed.ts",
+    "seed:prod": "node dist/src/seed.js",
     "reset:production": "ts-node src/seed.ts",
     "seed:carreras": "ts-node src/seed-carreras-umsa.ts",
     "seed:organizacion": "ts-node src/seed-carreras-umsa.ts"

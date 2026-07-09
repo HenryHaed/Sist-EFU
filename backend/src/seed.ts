@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Role } from './entities/Role';
+import { Usuario } from './entities/Usuario';
 import { Facultad } from './entities/Facultad';
 import { Carrera } from './entities/Carrera';
 import { TipoDanza } from './entities/TipoDanza';
@@ -35,7 +36,7 @@ function limpiarArchivosSubidos() {
   const uploadsRoot = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsRoot)) {
     fs.mkdirSync(uploadsRoot, { recursive: true });
-    console.log('[RESET] Carpeta uploads/ creada (vacía).');
+    console.log('[SEED] Carpeta uploads/ creada (vacía).');
     return;
   }
 
@@ -64,11 +65,36 @@ function limpiarArchivosSubidos() {
     }
   }
 
-  console.log(`[RESET] Archivos eliminados de uploads/: ${eliminados}`);
+  console.log(`[SEED] Archivos eliminados de uploads/: ${eliminados}`);
+}
+
+/**
+ * Seed / reset inicial del sistema EFU.
+ *
+ * 1. Crea el esquema (tablas) con TypeORM si la BD está vacía — no depende de TYPEORM_SYNCHRONIZE del .env.
+ * 2. Vacía datos y archivos subidos (reset).
+ * 3. Inserta roles, superusuario y catálogos base.
+ *
+ * Uso primera vez en producción (BD vacía): npm run seed
+ * ¡No ejecutar de nuevo si ya hay datos reales!
+ */
+
+async function asegurarEsquemaBaseDeDatos(dataSource: DataSource) {
+  console.log('[SEED] Creando/sincronizando estructura de tablas desde entidades TypeORM...');
+  await dataSource.synchronize();
+  console.log('[SEED] Estructura de base de datos lista.');
+}
+
+async function tablaExiste(dataSource: DataSource, tabla: string): Promise<boolean> {
+  const rows = await dataSource.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1 LIMIT 1`,
+    [tabla],
+  );
+  return rows.length > 0;
 }
 
 async function limpiarBaseDeDatos(dataSource: DataSource) {
-  console.log('[RESET] Vaciando base de datos...');
+  console.log('[SEED] Vaciando datos existentes...');
 
   const tablas = [
     'auditoria_acciones',
@@ -102,7 +128,10 @@ async function limpiarBaseDeDatos(dataSource: DataSource) {
   ];
 
   for (const tabla of tablas) {
-    await dataSource.query(`DELETE FROM ${tabla}`);
+    if (!(await tablaExiste(dataSource, tabla))) {
+      continue;
+    }
+    await dataSource.query(`DELETE FROM "${tabla}"`);
   }
 
   const secuencias = [
@@ -142,11 +171,11 @@ async function limpiarBaseDeDatos(dataSource: DataSource) {
     }
   }
 
-  console.log('[RESET] Base de datos vaciada.');
+  console.log('[SEED] Datos existentes eliminados.');
 }
 
 async function sembrarProduccion(dataSource: DataSource) {
-  console.log('[RESET] Insertando roles del sistema...');
+  console.log('[SEED] Insertando roles del sistema...');
   const roleRepo = dataSource.getRepository(Role);
   const roles = await roleRepo.save([
     { nombre: 'superusuario', descripcion: 'Dueño del sistema. Acceso total.' },
@@ -159,8 +188,8 @@ async function sembrarProduccion(dataSource: DataSource) {
   const rolSuper = roles.find((r) => r.nombre === 'superusuario');
   if (!rolSuper) throw new Error('No se pudo crear el rol superusuario.');
 
-  console.log('[RESET] Creando SuperUsuario de producción...');
-  const usuarioRepo = dataSource.getRepository('usuarios');
+  console.log('[SEED] Creando SuperUsuario de producción...');
+  const usuarioRepo = dataSource.getRepository(Usuario);
   const passwordHash = await bcrypt.hash(SUPERUSUARIO.ci, 10);
 
   await usuarioRepo.save({
@@ -185,14 +214,14 @@ async function sembrarProduccion(dataSource: DataSource) {
   console.log('══════════════════════════════════════════════════');
   console.log('');
 
-  console.log('[RESET] Sembrando catálogos base (facultades, carreras, tipos de danza)...');
+  console.log('[SEED] Sembrando catálogos base (facultades, carreras, tipos de danza)...');
   const org = await ensureOrganizacionUmsaDefault(
     dataSource.getRepository(Facultad),
     dataSource.getRepository(Carrera),
   );
   await ensureTiposDanzaDefault(dataSource.getRepository(TipoDanza));
   console.log(
-    `[RESET] Organización UMSA: +${org.facultadesInsertadas} facultades, +${org.carrerasInsertadas} carreras.`,
+    `[SEED] Organización UMSA: +${org.facultadesInsertadas} facultades, +${org.carrerasInsertadas} carreras.`,
   );
 }
 
@@ -201,12 +230,13 @@ async function bootstrap() {
   const dataSource = app.get(DataSource);
 
   try {
+    await asegurarEsquemaBaseDeDatos(dataSource);
     limpiarArchivosSubidos();
     await limpiarBaseDeDatos(dataSource);
     await sembrarProduccion(dataSource);
-    console.log('[RESET] Proceso completado exitosamente.');
+    console.log('[SEED] Proceso completado exitosamente.');
   } catch (error) {
-    console.error('[RESET] Error durante el reset:', error);
+    console.error('[SEED] Error durante el seed:', error);
     process.exitCode = 1;
   } finally {
     await app.close();

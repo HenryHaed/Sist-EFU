@@ -39,9 +39,12 @@ App: `http://localhost:5173`
 
 ### 3. Datos iniciales (solo primera vez)
 
+Crea **tablas + superusuario + catálogos** en BD vacía:
+
 ```bash
 cd backend
-npm run seed
+npm run seed          # desarrollo (ts-node)
+# En servidor: npm run build && npm run seed:prod
 ```
 
 ---
@@ -58,11 +61,10 @@ npm run seed
 ### Checklist rápido (servidor)
 
 1. **PostgreSQL** — crear BD y usuario dedicado.
-2. **Backend** — `cp backend/.env.production.example backend/.env` → editar → `npm ci` → `npm run build` → `npm run start:prod` (o PM2/systemd).
+2. **Backend** — `cp backend/.env.production.example backend/.env` → editar → `npm ci` → `npm run build` → **`npm run seed:prod`** (una vez, BD vacía) → `npm run start:prod`.
 3. **Frontend** — `cp frontend/.env.production.example frontend/.env.production` → editar dominios → `npm ci` → `npm run build` → servir `frontend/dist` con Nginx.
 4. **HTTPS** — certificado en el reverse proxy (Nginx/Caddy).
-5. **Seed inicial** — `npm run seed` **una sola vez** en BD vacía (nunca en producción con datos reales).
-6. **Secretos** — `JWT_SECRET` con `openssl rand -base64 64`; `TYPEORM_SYNCHRONIZE=false`.
+5. **Secretos** — `JWT_SECRET` con `openssl rand -base64 64`; `TYPEORM_SYNCHRONIZE=false` en la API (el seed crea tablas por su cuenta).
 
 ### Variables clave
 
