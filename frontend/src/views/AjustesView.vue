@@ -26,17 +26,36 @@
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="flex gap-4 mb-8 border-b border-slate-200">
-      <button 
-        v-for="tab in tabs" :key="tab.id"
-        @click="activeTab = tab.id"
-        class="pb-4 px-2 text-sm font-black uppercase tracking-widest transition-all relative"
-        :class="activeTab === tab.id ? 'text-primary' : 'text-slate-400 hover:text-slate-600'"
+    <!-- Tabs: scroll horizontal en móvil (Información → Cronogramas) -->
+    <div class="-mx-1 mb-8">
+      <div
+        ref="tabsScrollEl"
+        class="flex gap-1 sm:gap-2 overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-mandatory border-b border-slate-200 px-1 touch-pan-x
+               [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        role="tablist"
+        aria-label="Secciones de ajustes"
       >
-        {{ tab.label }}
-        <div v-if="activeTab === tab.id" class="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full"></div>
-      </button>
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :data-tab-id="tab.id"
+          :aria-selected="activeTab === tab.id"
+          @click="activeTab = tab.id"
+          class="shrink-0 snap-start pb-3 sm:pb-4 px-3 sm:px-4 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all relative whitespace-nowrap"
+          :class="activeTab === tab.id ? 'text-primary' : 'text-slate-400 hover:text-slate-600'"
+        >
+          {{ tab.label }}
+          <div
+            v-if="activeTab === tab.id"
+            class="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full"
+          ></div>
+        </button>
+      </div>
+      <p class="mt-2 text-[9px] font-bold uppercase tracking-widest text-slate-300 sm:hidden px-1">
+        Desliza horizontalmente →
+      </p>
     </div>
 
     <!-- Loading -->
@@ -113,20 +132,20 @@
 
         <!-- Toggles -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex items-center justify-between group">
-                <div>
-                   <p class="text-xs font-black text-slate-700 uppercase leading-none mb-1">Modo Mantenimiento</p>
-                   <p class="text-[10px] text-slate-400 font-bold">Bloquea acceso público</p>
-                </div>
-                <input type="checkbox" v-model="gestion.modoMantenimiento" class="toggle-checkbox" />
-             </div>
-             
              <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <div>
                    <p class="text-xs font-black text-slate-700 uppercase leading-none mb-1">Mostrar Ranking</p>
-                   <p class="text-[10px] text-slate-400 font-bold">Público en dashboard public</p>
+                   <p class="text-[10px] text-slate-400 font-bold">Público en el landing</p>
                 </div>
                 <input type="checkbox" v-model="gestion.mostrarRanking" class="toggle-checkbox" />
+             </div>
+
+             <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex items-center justify-between">
+                <div>
+                   <p class="text-xs font-black text-slate-700 uppercase leading-none mb-1">Mostrar Histórico</p>
+                   <p class="text-[10px] text-slate-400 font-bold">Archivo histórico en el landing</p>
+                </div>
+                <input type="checkbox" v-model="gestion.mostrarHistorico" class="toggle-checkbox" />
              </div>
 
              <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-center justify-between">
@@ -189,26 +208,118 @@
                 </label>
              </div>
         </div>
+
+        <!-- Fraternidades del landing -->
+        <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 space-y-6">
+          <div>
+            <h4 class="text-[10px] font-black uppercase tracking-widest text-slate-400">Fraternidades en el landing</h4>
+            <p class="text-[10px] text-slate-400 font-medium mt-2">
+              Edita el nombre, subtítulo, descripción e imagen de las 3 tarjetas de la sección Fraternidades en la página de inicio.
+              La primera es la tarjeta grande destacada.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div
+              v-for="(card, index) in gestion.landingFraternidades"
+              :key="index"
+              class="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50"
+            >
+              <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between gap-2">
+                <p class="text-[10px] font-black uppercase tracking-widest">
+                  {{ index === 0 ? 'Tarjeta destacada' : `Tarjeta lateral ${index}` }}
+                </p>
+                <span class="text-[9px] font-bold text-white/60">#{{ index + 1 }}</span>
+              </div>
+
+              <div class="p-4 space-y-4">
+                <div class="aspect-[4/3] bg-slate-100 rounded-xl border-2 border-dashed border-slate-200 relative overflow-hidden group">
+                  <img
+                    v-if="previews[`landingFrat${index}`] || card.urlImagen"
+                    :src="previews[`landingFrat${index}`] || card.urlImagen"
+                    class="size-full object-cover"
+                    :alt="card.titulo || `Fraternidad ${index + 1}`"
+                  />
+                  <div v-else class="size-full flex flex-col items-center justify-center text-slate-300">
+                    <span class="material-symbols-outlined text-3xl">groups</span>
+                    <p class="text-[9px] font-bold uppercase mt-1">Sin imagen</p>
+                  </div>
+                  <label class="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer">
+                    <span class="material-symbols-outlined mb-1">upload</span>
+                    <span class="text-[10px] font-black uppercase">Cambiar imagen</span>
+                    <input type="file" class="hidden" @change="handleLandingFratFile($event, index)" accept="image/*" />
+                  </label>
+                </div>
+
+                <div>
+                  <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Nombre / danza</label>
+                  <input
+                    v-model="card.titulo"
+                    type="text"
+                    maxlength="120"
+                    placeholder="Ej. CAPORALES"
+                    class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-700 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Subtítulo / facultad</label>
+                  <input
+                    v-model="card.subtitulo"
+                    type="text"
+                    maxlength="120"
+                    placeholder="Ej. INGENIERÍA"
+                    class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-700 text-sm"
+                  />
+                </div>
+
+                <div v-if="index === 0">
+                  <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Descripción</label>
+                  <textarea
+                    v-model="card.descripcion"
+                    rows="3"
+                    maxlength="500"
+                    placeholder="Texto breve bajo el nombre en la tarjeta grande..."
+                    class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-medium text-slate-700 text-sm resize-none"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Footer Buttons (solo para general/multimedia) -->
-      <div v-if="activeTab === 'general' || activeTab === 'multimedia'" class="flex justify-end gap-4 pt-6 border-t border-slate-100">
-         <button 
-          v-if="hasChanges"
-          type="button" @click="resetChanges"
-          class="px-6 py-3 text-sm font-black uppercase text-slate-400 hover:text-slate-600 transition-colors"
-         >
-           Descartar
-         </button>
-         <button 
-          type="submit"
-          :disabled="saving || !hasChanges"
-          class="px-10 py-3 bg-primary text-white rounded-xl text-sm font-black shadow-xl shadow-primary/20 flex items-center gap-3 disabled:opacity-50 disabled:shadow-none hover:scale-102 transition-all active:scale-95"
-         >
-           <span v-if="saving" class="material-symbols-outlined animate-spin">progress_activity</span>
-           <span v-else class="material-symbols-outlined">save</span>
-           {{ saving ? 'GUARDANDO...' : 'GUARDAR AJUSTES' }}
-         </button>
+      <div
+        v-if="activeTab === 'general' || activeTab === 'multimedia'"
+        class="sticky bottom-0 z-20 -mx-2 sm:mx-0 mt-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] px-2 sm:px-0
+               border-t border-slate-100 bg-gradient-to-t from-slate-50 via-slate-50/95 to-slate-50/80 backdrop-blur-sm
+               sm:static sm:bg-transparent sm:backdrop-blur-none sm:from-transparent sm:via-transparent sm:to-transparent sm:pb-0"
+      >
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sm:gap-4">
+          <button
+            v-if="hasChanges"
+            type="button"
+            @click="resetChanges"
+            class="w-full sm:w-auto px-6 py-3.5 sm:py-3 text-xs sm:text-sm font-black uppercase tracking-widest
+                   text-slate-500 hover:text-slate-700 bg-white sm:bg-transparent border border-slate-200 sm:border-0
+                   rounded-xl transition-colors active:scale-[0.98]"
+          >
+            Descartar
+          </button>
+          <button
+            type="submit"
+            :disabled="saving || !hasChanges"
+            class="w-full sm:w-auto px-6 sm:px-10 py-3.5 sm:py-3 bg-primary text-white rounded-xl text-xs sm:text-sm font-black
+                   shadow-xl shadow-primary/20 flex items-center justify-center gap-2 sm:gap-3
+                   disabled:opacity-50 disabled:shadow-none hover:scale-[1.02] transition-all active:scale-95"
+          >
+            <span v-if="saving" class="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+            <span v-else class="material-symbols-outlined text-lg">save</span>
+            <span class="sm:hidden">{{ saving ? 'Guardando…' : 'Guardar' }}</span>
+            <span class="hidden sm:inline">{{ saving ? 'GUARDANDO...' : 'GUARDAR AJUSTES' }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- TAB: DOCUMENTOS -->
@@ -423,9 +534,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import api from '../services/api'
 import Swal from 'sweetalert2'
+import { getImageUrl } from '../utils/url'
+import { applySiteTitle } from '../utils/siteTitle'
 
 const props = defineProps({
   gestionId: { type: Number, default: null },
@@ -439,11 +552,58 @@ const tabs = [
   { id: 'cronogramas', label: 'Definir Cronograma' }
 ]
 const activeTab = ref(props.initialTab || 'general')
+const tabsScrollEl = ref(null)
+
+const scrollActiveTabIntoView = () => {
+  const root = tabsScrollEl.value
+  if (!root) return
+  const btn = root.querySelector(`[data-tab-id="${activeTab.value}"]`)
+  btn?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+}
+
 const loading = ref(true)
 const saving = ref(false)
 const hasChanges = ref(false)
 const gestionesDisponibles = ref([])
 const selectedGestionId = ref(null)
+
+const DEFAULT_LANDING_FRATERNIDADES = () => ([
+  {
+    titulo: 'CAPORALES',
+    subtitulo: 'INGENIERÍA',
+    descripcion: 'Energía, fuerza y saltos acrobáticos. Potencia pura en el recorrido.',
+    urlImagen: '',
+  },
+  {
+    titulo: 'MORENADA',
+    subtitulo: 'DERECHO',
+    descripcion: '',
+    urlImagen: '',
+  },
+  {
+    titulo: 'TINKUS',
+    subtitulo: 'WISTUS',
+    descripcion: '',
+    urlImagen: '',
+  },
+])
+
+const normalizeLandingFraternidades = (raw) => {
+  const defaults = DEFAULT_LANDING_FRATERNIDADES()
+  const list = Array.isArray(raw) ? raw : []
+  return defaults.map((fallback, index) => {
+    const item = list[index] || {}
+    return {
+      titulo: item.titulo || fallback.titulo,
+      subtitulo: item.subtitulo || fallback.subtitulo,
+      descripcion: item.descripcion ?? fallback.descripcion,
+      urlImagen: item.urlImagen ? getImageUrl(item.urlImagen) : '',
+    }
+  })
+}
+
+const emptyLandingFiles = () => ({ landingFrat0: null, landingFrat1: null, landingFrat2: null })
+const emptyLandingPreviews = () => ({ landingFrat0: null, landingFrat1: null, landingFrat2: null })
 
 const gestion = ref({
   idGestion: null,
@@ -458,23 +618,24 @@ const gestion = ref({
   urlImagenLogin: '',
   modoMantenimiento: false,
   mostrarRanking: true,
-  permiteInscripcionPublica: false
+  mostrarHistorico: false,
+  permiteInscripcionPublica: false,
+  landingFraternidades: DEFAULT_LANDING_FRATERNIDADES(),
 })
 
 const files = ref({
   logo: null,
   banner: null,
-  loginImg: null
+  loginImg: null,
+  ...emptyLandingFiles(),
 })
 
 const previews = ref({
   logo: null,
   banner: null,
-  loginImg: null
+  loginImg: null,
+  ...emptyLandingPreviews(),
 })
-
-import { getImageUrl } from '../utils/url'
-import { applySiteTitle } from '../utils/siteTitle'
 
 const loadGestion = async (idGestion = null) => {
   loading.value = true
@@ -485,6 +646,7 @@ const loadGestion = async (idGestion = null) => {
       data.urlLogo = getImageUrl(data.urlLogo)
       data.urlBanner = getImageUrl(data.urlBanner)
       data.urlImagenLogin = getImageUrl(data.urlImagenLogin)
+      data.landingFraternidades = normalizeLandingFraternidades(data.landingFraternidades)
       gestion.value = data
       selectedGestionId.value = data.idGestion
       applySiteTitle(data.nombreSitio)
@@ -509,8 +671,8 @@ const cargarGestionesDisponibles = async () => {
 
 const cambiarGestion = async () => {
   if (!selectedGestionId.value) return
-  files.value = { logo: null, banner: null, loginImg: null }
-  previews.value = { logo: null, banner: null, loginImg: null }
+  files.value = { logo: null, banner: null, loginImg: null, ...emptyLandingFiles() }
+  previews.value = { logo: null, banner: null, loginImg: null, ...emptyLandingPreviews() }
   await loadGestion(selectedGestionId.value)
   if (activeTab.value === 'documentos') cargarDocumentos()
   if (activeTab.value === 'cronogramas') cargarDatosCronogramas()
@@ -525,23 +687,50 @@ const handleFile = (event, type) => {
   hasChanges.value = true
 }
 
+const handleLandingFratFile = (event, index) => {
+  handleFile(event, `landingFrat${index}`)
+}
+
 const resetChanges = () => {
   loadGestion(selectedGestionId.value || props.gestionId || null)
-  files.value = { logo: null, banner: null, loginImg: null }
-  previews.value = { logo: null, banner: null, loginImg: null }
+  files.value = { logo: null, banner: null, loginImg: null, ...emptyLandingFiles() }
+  previews.value = { logo: null, banner: null, loginImg: null, ...emptyLandingPreviews() }
 }
 
 const saveSettings = async () => {
   saving.value = true
   try {
+    const toStoredAssetPath = (url) => {
+      if (!url) return ''
+      if (url.startsWith('/api') || url.startsWith('/uploads')) return url
+      try {
+        return new URL(url).pathname
+      } catch {
+        return url
+      }
+    }
+
     const formData = new FormData()
-    // Append JSON data as a string
-    formData.append('data', JSON.stringify(gestion.value))
+    const payload = {
+      ...gestion.value,
+      urlLogo: toStoredAssetPath(gestion.value.urlLogo),
+      urlBanner: toStoredAssetPath(gestion.value.urlBanner),
+      urlImagenLogin: toStoredAssetPath(gestion.value.urlImagenLogin),
+      landingFraternidades: (gestion.value.landingFraternidades || []).map((card) => ({
+        titulo: card.titulo || '',
+        subtitulo: card.subtitulo || '',
+        descripcion: card.descripcion || '',
+        urlImagen: toStoredAssetPath(card.urlImagen),
+      })),
+    }
+    formData.append('data', JSON.stringify(payload))
     
-    // Append files
     if (files.value.logo) formData.append('logo', files.value.logo)
     if (files.value.banner) formData.append('banner', files.value.banner)
     if (files.value.loginImg) formData.append('loginImg', files.value.loginImg)
+    if (files.value.landingFrat0) formData.append('landingFrat0', files.value.landingFrat0)
+    if (files.value.landingFrat1) formData.append('landingFrat1', files.value.landingFrat1)
+    if (files.value.landingFrat2) formData.append('landingFrat2', files.value.landingFrat2)
 
     await api.put(`/evaluaciones/gestiones/${gestion.value.idGestion}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
@@ -555,7 +744,9 @@ const saveSettings = async () => {
     })
     Toast.fire({ icon: 'success', title: 'Ajustes guardados correctamente' })
     
-    loadGestion() // Reload to get new image URLs
+    files.value = { logo: null, banner: null, loginImg: null, ...emptyLandingFiles() }
+    previews.value = { logo: null, banner: null, loginImg: null, ...emptyLandingPreviews() }
+    await loadGestion(gestion.value.idGestion)
   } catch (err) {
     console.error('Error saving:', err)
     Swal.fire('Error', 'No se pudieron guardar los cambios.', 'error')
@@ -644,8 +835,9 @@ const etiquetaTipoDoc = (tipo) => {
   return map[tipo] || 'Documento'
 }
 
-// Cargar documentos cuando se activa esa pestaña
-watch(activeTab, (val) => { 
+// Cargar documentos cuando se activa esa pestaña + centrar tab en scroll
+watch(activeTab, (val) => {
+  scrollActiveTabIntoView()
   if (val === 'documentos') cargarDocumentos()
   if (val === 'cronogramas') cargarDatosCronogramas()
 })
@@ -780,6 +972,8 @@ onMounted(async () => {
   await cargarGestionesDisponibles()
   await loadGestion(props.gestionId || null)
   if (props.initialTab === 'cronogramas') cargarDatosCronogramas()
+  await nextTick()
+  scrollActiveTabIntoView()
 })
 
 watch(() => props.gestionId, async (id) => {

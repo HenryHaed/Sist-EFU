@@ -35,7 +35,7 @@
           @click="irALogin"
         >
           <span class="material-symbols-outlined mr-2">login</span>
-          Iniciar Sesión de Nuevo
+          Iniciar sesión de nuevo
         </v-btn>
       </v-card-actions>
     </v-card>

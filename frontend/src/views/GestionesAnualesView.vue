@@ -146,14 +146,14 @@
         <v-card-text class="pa-6 space-y-5">
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">De Gestión (Origen)</label>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Gestión origen</label>
               <select v-model="formClonar.idOrigen" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 outline-none font-bold text-sm">
                 <option value="">Seleccione...</option>
                 <option v-for="g in gestiones" :key="g.idGestion" :value="g.idGestion">{{ g.anio }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">A Gestión (Destino)</label>
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Gestión destino</label>
               <select v-model="formClonar.idDestino" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-indigo-500 outline-none font-bold text-sm">
                 <option value="">Seleccione...</option>
                 <option v-for="g in gestiones" :key="g.idGestion" :value="g.idGestion" :disabled="g.idGestion === formClonar.idOrigen">{{ g.anio }}</option>
@@ -188,7 +188,7 @@
                 <input type="checkbox" v-model="formClonar.modules" value="fraternidades_base" class="size-4 accent-indigo-600" />
                 <div>
                   <div class="text-sm font-bold text-slate-800">Fraternidades - Listado Base</div>
-                  <div class="text-[10px] text-slate-500 uppercase tracking-wider">Nombres y facultad (Sin registros activos ni notas)</div>
+                  <div class="text-[10px] text-slate-500 uppercase tracking-wider">Nombres y facultad (sin registros activos ni notas)</div>
                 </div>
               </label>
             </div>

@@ -627,8 +627,8 @@ const DELEGADO_KEYS_NO_EDITABLES = new Set(['delegadoNombre', 'delegadoCi', 'fec
 const DOC_BTN_LABELS = {
   ci: 'Ver CI',
   matricula: 'Ver Matrícula',
-  deudaFrat: 'Ver Cert. no deudas con la Fraternidad',
-  deudaAreas: 'Ver Cert. no deudas con las Áreas Desconcentradas',
+  deudaFrat: 'Ver cert. no deudas con la fraternidad',
+  deudaAreas: 'Ver cert. no deudas con las áreas desconcentradas',
 }
 
 // ── Estado ────────────────────────────────────────────────────────────────────

@@ -3,12 +3,25 @@ import { AsistenciasService } from './asistencias.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { CrearEventoDto } from './dto/crear-evento.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('asistencias')
 export class AsistenciasController {
   constructor(private readonly asistenciasService: AsistenciasService) {}
+
+  @Public()
+  @Get('eventos-publicos')
+  getEventosPublicos() {
+    return this.asistenciasService.getEventosPublicos();
+  }
+
+  @Get('mis-citas')
+  @Roles('delegado')
+  getMisCitas() {
+    return this.asistenciasService.getMisCitasDelegado();
+  }
 
   @Get('delegados')
   @Roles('superusuario', 'admin', 'controladorhcu')

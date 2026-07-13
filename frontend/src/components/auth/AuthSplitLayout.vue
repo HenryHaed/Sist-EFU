@@ -10,7 +10,7 @@
           </h2>
           <div class="w-16 h-1 bg-secondary mb-4"></div>
           <p class="text-white/80 max-w-sm font-medium text-base">
-            La Entrada Folclórica Universitaria de la UMSA es patrimonio cultural vivo que celebra nuestra identidad nacional.
+            La Entrada Folklórica Universitaria de la UMSA es patrimonio cultural vivo que celebra nuestra identidad nacional.
           </p>
         </div>
       </div>

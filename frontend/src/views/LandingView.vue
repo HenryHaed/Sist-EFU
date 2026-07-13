@@ -38,13 +38,22 @@
             <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">map</span>
             <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Recorrido</p>
           </a>
+          <a @click.prevent="scrollTo('eventos')" href="#eventos"
+            class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer">
+            <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">event</span>
+            <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Eventos</p>
+          </a>
           <a @click.prevent="scrollTo('estadisticas')" href="#estadisticas"
             class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer">
             <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">leaderboard</span>
             <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Estadísticas</p>
           </a>
-          <a @click.prevent="scrollTo('historicos')" href="#historicos"
-            class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer">
+          <a
+            v-if="mostrarHistoricoLanding"
+            @click.prevent="scrollTo('historicos')"
+            href="#historicos"
+            class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer"
+          >
             <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">history</span>
             <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Histórico</p>
           </a>
@@ -74,11 +83,19 @@
         <span class="material-symbols-outlined text-[22px]">map</span>
         <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Ruta</span>
       </button>
+      <button @click="scrollTo('eventos')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[22px]">event</span>
+        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Eventos</span>
+      </button>
       <button @click="scrollTo('estadisticas')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
         <span class="material-symbols-outlined text-[22px]">leaderboard</span>
         <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Ranking</span>
       </button>
-      <button @click="scrollTo('historicos')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
+      <button
+        v-if="mostrarHistoricoLanding"
+        @click="scrollTo('historicos')"
+        class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors"
+      >
         <span class="material-symbols-outlined text-[22px]">history</span>
         <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Histórico</span>
       </button>
@@ -112,7 +129,7 @@
               class="flex items-center gap-2 bg-secondary hover:bg-red-700 text-white px-7 py-3 rounded-full font-black tracking-widest uppercase text-sm transition-all shadow-lg shadow-red-200"
             >
               <span class="material-symbols-outlined text-base">login</span>
-              Iniciar Sesión
+              Iniciar sesión
             </router-link>
           </header>
 
@@ -155,7 +172,7 @@
                   v-else
                   class="text-[2.1rem] leading-[0.9] sm:text-5xl md:text-8xl lg:text-9xl font-black italic tracking-tighter reveal reveal-left"
                 >
-                  <span class="text-slate-900">ENTRADA FOLKLORICA</span><br />
+                  <span class="text-slate-900">ENTRADA FOLKLÓRICA</span><br />
                   <span class="text-primary">UNIVERSITARIA</span><br />
                   <span class="text-primary">UMS</span><span class="text-secondary">A</span>
                 </h1>
@@ -168,7 +185,7 @@
                     class="w-full sm:w-auto bg-primary text-white hover:bg-blue-900 px-8 py-3.5 sm:py-4 rounded-full font-black tracking-wider uppercase text-xs sm:text-sm transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 reveal reveal-right"
                   >
                     <span class="material-symbols-outlined text-base">login</span>
-                    Iniciar Sesión
+                    Iniciar sesión
                   </router-link>
                 </div>
               </div>
@@ -225,7 +242,7 @@
       <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-white" id="fraternidades">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-16 gap-6 reveal reveal-left">
           <div>
-            <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic uppercase tracking-tighter">FRATERNIDADES <span class="text-secondary">ESTRELLA</span></h2>
+            <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic uppercase tracking-tighter">FRATERNIDADES</h2>
             <div class="h-1.5 w-24 md:w-32 bg-primary mt-4"></div>
           </div>
           <button 
@@ -238,27 +255,51 @@
         <div class="grid grid-cols-12 gap-6 md:gap-8">
           <!-- Featured card -->
           <div class="col-span-12 md:col-span-7 relative h-[280px] sm:h-[340px] md:h-auto min-h-[280px] group overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-xl shadow-slate-200/50">
-            <img alt="Caporales" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-              src="/src/assets/img/caporal.jpg" />
+            <img
+              v-if="landingFraternidades[0]?.urlImagen"
+              :alt="landingFraternidades[0].titulo || 'Fraternidad destacada'"
+              class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+              :src="landingFraternidades[0].urlImagen"
+            />
+            <div v-else class="w-full h-full bg-gradient-to-br from-slate-200 via-slate-100 to-slate-300"></div>
             <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent p-6 md:p-10 flex flex-col justify-end text-left">
-              <h3 class="text-2xl md:text-4xl font-black text-white italic uppercase leading-tight">CAPORALES <br class="md:hidden"/> <span class="text-secondary text-xl md:text-2xl">INGENIERÍA</span></h3>
-              <p class="text-white/90 mt-4 max-w-md font-medium leading-relaxed text-sm md:text-base">Energía, fuerza y saltos acrobáticos. Potencia pura en el recorrido.</p>
+              <h3 class="text-2xl md:text-4xl font-black text-white italic uppercase leading-tight">
+                {{ landingFraternidades[0]?.titulo || 'FRATERNIDAD' }}
+                <template v-if="landingFraternidades[0]?.subtitulo">
+                  <br class="md:hidden"/>
+                  <span class="text-secondary text-xl md:text-2xl"> {{ landingFraternidades[0].subtitulo }}</span>
+                </template>
+              </h3>
+              <p
+                v-if="landingFraternidades[0]?.descripcion"
+                class="text-white/90 mt-4 max-w-md font-medium leading-relaxed text-sm md:text-base"
+              >
+                {{ landingFraternidades[0].descripcion }}
+              </p>
             </div>
           </div>
           <!-- Side cards -->
           <div class="col-span-12 md:col-span-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-6 md:gap-8">
-            <div class="relative h-[220px] sm:h-[250px] md:h-auto min-h-[220px] group overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-lg shadow-slate-200/50">
-              <img alt="Morenada" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                src="/src/assets/img/morenada.jpg" />
+            <div
+              v-for="(card, index) in landingFraternidades.slice(1, 3)"
+              :key="`landing-frat-${index + 1}`"
+              class="relative h-[220px] sm:h-[250px] md:h-auto min-h-[220px] group overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-lg shadow-slate-200/50"
+            >
+              <img
+                v-if="card.urlImagen"
+                :alt="card.titulo || `Fraternidad ${index + 2}`"
+                class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                :src="card.urlImagen"
+              />
+              <div v-else class="w-full h-full bg-gradient-to-br from-slate-200 via-slate-100 to-slate-300"></div>
               <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent p-6 md:p-8 flex flex-col justify-end text-left">
-                <h3 class="text-xl md:text-2xl font-black text-white italic uppercase leading-tight">MORENADA <br class="sm:hidden lg:inline"/> <span class="text-secondary inline md:block lg:inline">DERECHO</span></h3>
-              </div>
-            </div>
-            <div class="relative h-[220px] sm:h-[250px] md:h-auto min-h-[220px] group overflow-hidden rounded-2xl sm:rounded-3xl bg-slate-100 shadow-lg shadow-slate-200/50">
-              <img alt="Tinkus" class="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                src="/src/assets/img/tinkus.jpg" />
-              <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent p-6 md:p-8 flex flex-col justify-end text-left">
-                <h3 class="text-xl md:text-2xl font-black text-white italic uppercase leading-tight">TINKUS <br class="sm:hidden lg:inline" /> <span class="text-secondary inline md:block lg:inline">WISTUS</span></h3>
+                <h3 class="text-xl md:text-2xl font-black text-white italic uppercase leading-tight">
+                  {{ card.titulo || 'FRATERNIDAD' }}
+                  <template v-if="card.subtitulo">
+                    <br class="sm:hidden lg:inline"/>
+                    <span class="text-secondary inline md:block lg:inline"> {{ card.subtitulo }}</span>
+                  </template>
+                </h3>
               </div>
             </div>
           </div>
@@ -340,6 +381,55 @@
             </v-card-actions>
           </v-card>
         </v-dialog>
+      </section>
+
+      <!-- ===== EVENTOS PÚBLICOS ===== -->
+      <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-slate-50" id="eventos">
+        <div class="text-center mb-12 md:mb-16 reveal">
+          <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">
+            PANEL DE <span class="text-primary">EVENTOS</span>
+          </h2>
+          <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">
+            Actividades y convocatorias oficiales
+          </p>
+        </div>
+
+        <div v-if="loadingEventos" class="flex justify-center py-16">
+          <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+        </div>
+
+        <div v-else-if="eventosPublicos.length === 0" class="max-w-xl mx-auto text-center py-12 reveal">
+          <span class="material-symbols-outlined text-5xl text-slate-300 mb-4">event_busy</span>
+          <p class="text-slate-500 font-medium">No hay eventos públicos programados por ahora.</p>
+        </div>
+
+        <div v-else class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          <article
+            v-for="ev in eventosPublicos"
+            :key="ev.idEvento"
+            class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-lg shadow-slate-100/60 p-6 sm:p-8 reveal reveal-left text-left"
+          >
+            <div class="flex items-start justify-between gap-4 mb-4">
+              <span class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-primary/10 text-primary">
+                <span class="material-symbols-outlined text-sm">public</span>
+                Público
+              </span>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">
+                {{ formatearFechaEvento(ev.fechaHora) }}
+              </p>
+            </div>
+            <h3 class="text-xl md:text-2xl font-black text-slate-900 italic uppercase tracking-tight mb-3">
+              {{ ev.nombre }}
+            </h3>
+            <p v-if="ev.descripcion" class="text-slate-500 font-medium text-sm leading-relaxed mb-4">
+              {{ ev.descripcion }}
+            </p>
+            <div class="flex items-center gap-2 text-slate-600 font-bold text-sm">
+              <span class="material-symbols-outlined text-secondary text-lg">location_on</span>
+              {{ ev.ubicacion || 'Ubicación por confirmar' }}
+            </div>
+          </article>
+        </div>
       </section>
 
       <!-- ===== ESTADÍSTICAS ===== -->
@@ -425,7 +515,11 @@
       </section>
 
       <!-- ===== REPORTES HISTÓRICOS ===== -->
-      <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-white border-t border-slate-100" id="historicos">
+      <section
+        v-if="mostrarHistoricoLanding"
+        class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-white border-t border-slate-100"
+        id="historicos"
+      >
         <div class="text-center mb-12 md:mb-16 reveal">
           <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">ARCHIVO <span class="text-primary">HISTÓRICO</span></h2>
           <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">Resultados oficiales por gestión</p>
@@ -535,7 +629,7 @@
                 class="h-16 w-auto object-contain"
               />
               <h3 class="text-xl md:text-3xl font-black italic tracking-tighter uppercase">
-                <span class="text-slate-900">ENTRADA FOLKLORICA</span>
+                <span class="text-slate-900">ENTRADA FOLKLÓRICA</span>
                 <span class="text-primary"> UNIVERSITARIA </span>
                 <span class="text-primary">UMS</span><span class="text-secondary">A</span>
               </h3>
@@ -570,15 +664,18 @@
             <ul class="space-y-4 text-slate-500 text-[10px] md:text-xs font-bold uppercase">
               <li><a @click.prevent="scrollTo('fraternidades')" href="#fraternidades" class="hover:text-primary transition-colors cursor-pointer">Fraternidades</a></li>
               <li><a @click.prevent="scrollTo('ruta')" href="#ruta" class="hover:text-primary transition-colors cursor-pointer">Ruta Oficial</a></li>
+              <li><a @click.prevent="scrollTo('eventos')" href="#eventos" class="hover:text-primary transition-colors cursor-pointer">Eventos</a></li>
               <li><a @click.prevent="scrollTo('estadisticas')" href="#estadisticas" class="hover:text-primary transition-colors cursor-pointer">Estadísticas</a></li>
-              <li><a @click.prevent="scrollTo('historicos')" href="#historicos" class="hover:text-primary transition-colors cursor-pointer">Archivo Histórico</a></li>
+              <li v-if="mostrarHistoricoLanding">
+                <a @click.prevent="scrollTo('historicos')" href="#historicos" class="hover:text-primary transition-colors cursor-pointer">Archivo Histórico</a>
+              </li>
             </ul>
           </div>
           <div class="text-left">
             <h4 class="font-black text-slate-900 mb-6 md:mb-8 uppercase tracking-widest text-[9px] md:text-[10px]">Contacto</h4>
             <ul class="space-y-4 md:space-y-5 text-slate-500 text-[10px] md:text-xs font-medium">
-              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">mail</span> divisionculturayartesumsa@gmail.com</li>
-              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">call</span> (591 - 2) 2445499</li>
+              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">mail</span> culturas@fcpn.edu.bo</li>
+              <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">call</span> (591 - 2) 2612256</li>
               <li class="flex items-center gap-3"><span class="material-symbols-outlined text-primary text-base md:text-lg">location_on</span> Av. Villazón N° 1995, Plaza del Bicentenario - Zona Central.
               <br>Ciudad de La Paz. Bolivia</li>
             </ul>
@@ -613,16 +710,79 @@ const siteInfo = ref({})
 const mostrarMapa = ref(false)
 const mainRef = ref(null)
 
+const DEFAULT_LANDING_FRATERNIDADES = [
+  {
+    titulo: 'CAPORALES',
+    subtitulo: 'INGENIERÍA',
+    descripcion: 'Energía, fuerza y saltos acrobáticos. Potencia pura en el recorrido.',
+    urlImagen: '',
+  },
+  {
+    titulo: 'MORENADA',
+    subtitulo: 'DERECHO',
+    descripcion: '',
+    urlImagen: '',
+  },
+  {
+    titulo: 'TINKUS',
+    subtitulo: 'WISTUS',
+    descripcion: '',
+    urlImagen: '',
+  },
+]
+
+const landingFraternidades = computed(() => {
+  const raw = siteInfo.value?.landingFraternidades
+  const list = Array.isArray(raw) && raw.length ? raw : DEFAULT_LANDING_FRATERNIDADES
+  return DEFAULT_LANDING_FRATERNIDADES.map((fallback, index) => {
+    const item = list[index] || {}
+    return {
+      titulo: item.titulo || fallback.titulo,
+      subtitulo: item.subtitulo || fallback.subtitulo,
+      descripcion: item.descripcion ?? fallback.descripcion,
+      urlImagen: item.urlImagen ? getImageUrl(item.urlImagen) : '',
+    }
+  })
+})
+
 const aniosTradicion = computed(() => {
   const currentYear = new Date().getFullYear()
   return currentYear - 1988
 })
 
 const heroBannerUrl = computed(() => siteInfo.value.urlBanner || defaultHeroBanner)
+const mostrarHistoricoLanding = computed(() => siteInfo.value?.mostrarHistorico === true)
 
 const rankingPublico = ref([])
 const loadingRanking = ref(true)
+const eventosPublicos = ref([])
+const loadingEventos = ref(true)
 let refreshInterval = null
+
+const formatearFechaEvento = (fechaHora) => {
+  if (!fechaHora) return ''
+  return new Date(fechaHora).toLocaleString('es-BO', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const cargarEventosPublicos = async () => {
+  loadingEventos.value = true
+  try {
+    const { data } = await api.get('/asistencias/eventos-publicos')
+    eventosPublicos.value = Array.isArray(data) ? data : []
+  } catch (err) {
+    console.error('Error al cargar eventos públicos:', err)
+    eventosPublicos.value = []
+  } finally {
+    loadingEventos.value = false
+  }
+}
 
 const cargarDatos = async () => {
   try {
@@ -643,6 +803,9 @@ const cargarDatos = async () => {
   } finally {
     loadingRanking.value = false
   }
+
+  await cargarEventosPublicos()
+  await cargarGestionesPublicas()
 }
 
 const gestionesPublicas = ref([])
@@ -651,6 +814,12 @@ const reporteActual = ref(null)
 const loadingReporte = ref(false)
 
 const cargarGestionesPublicas = async () => {
+  if (!mostrarHistoricoLanding.value) {
+    gestionesPublicas.value = []
+    reporteActual.value = null
+    gestionSeleccionada.value = null
+    return
+  }
   try {
     const { data } = await api.get('/evaluaciones/gestiones-publicas')
     gestionesPublicas.value = data
@@ -682,7 +851,6 @@ const descargarPdfReporte = (idGestion, anio) => {
 
 onMounted(() => {
   cargarDatos()
-  cargarGestionesPublicas()
   // Actualizar cada 15 segundos para "tiempo real"
   refreshInterval = setInterval(cargarDatos, 15000)
 
@@ -728,7 +896,7 @@ const scrollTo = (id) => {
 }
 
 const ruta = [
-  { titulo: 'Partida: Plaza Bolivia', desc: 'Capitan Ravelo - Punto de inicio y concentración.' },
+  { titulo: 'Partida: Plaza Bolivia', desc: 'Capitán Ravelo — Punto de inicio y concentración.' },
   { titulo: 'Palco: Av. Camacho', desc: 'Centro del recorrido y punto de mayor concurrencia.' },
   { titulo: 'Final: Simón Bolívar', desc: 'Desconcentración frente al Estadio.' },
 ]

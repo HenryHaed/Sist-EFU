@@ -494,6 +494,224 @@ export class EvaluacionesService {
     };
   }
 
+  /**
+   * Auditoría de calificaciones: desglose por fraternidad (EFU) o concurso (EXTERNO).
+   * El total/promedio usa la misma lógica que el panel de estadísticas:
+   * promedio de las N notas de N jurados (+ sanciones en EFU).
+   */
+  async getAuditoriaCalificaciones(ambito: 'EFU' | 'EXTERNO' = 'EFU', idGestion?: number) {
+    const gestion = idGestion
+      ? await this.gestionRepo.findOne({ where: { idGestion } })
+      : await this.getGestionActiva();
+    if (!gestion) throw new NotFoundException('No hay gestión activa');
+
+    const nombreJurado = (j?: Jurado | null) => {
+      const u = j?.usuario;
+      if (!u) return 'Jurado sin usuario';
+      return [u.nombres, u.primerApellido, u.segundoApellido].filter(Boolean).join(' ').trim() || `Jurado #${j.idJurado}`;
+    };
+
+    if (ambito === 'EXTERNO') {
+      const evsExt = await this.evaluacionRepo.find({
+        where: [
+          { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } },
+          { estado: 'EN_PROGRESO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EXTERNO' } },
+        ],
+        relations: ['participante', 'participante.fraternidad', 'fase', 'jurado', 'jurado.usuario'],
+        order: { fechaCierre: 'DESC', createdAt: 'DESC' },
+      });
+
+      const concursosMap = new Map<number, {
+        idFase: number;
+        nombreConcurso: string;
+        participantesMap: Map<number, any>;
+      }>();
+
+      for (const e of evsExt) {
+        if (!e.participante || !e.fase) continue;
+        const idFase = e.fase.idFase;
+        if (!concursosMap.has(idFase)) {
+          concursosMap.set(idFase, {
+            idFase,
+            nombreConcurso: e.fase.nombre,
+            participantesMap: new Map(),
+          });
+        }
+        const concurso = concursosMap.get(idFase)!;
+        const idPart = e.participante.idParticipante;
+        if (!concurso.participantesMap.has(idPart)) {
+          concurso.participantesMap.set(idPart, {
+            idParticipante: idPart,
+            nombre: e.participante.nombre,
+            tipo: e.participante.tipo || 'Participante',
+            fraternidad: e.participante.fraternidad?.nombre || e.participante.institucionExterna || 'Independiente',
+            sum: 0,
+            count: 0,
+            calificaciones: [] as any[],
+          });
+        }
+        const part = concurso.participantesMap.get(idPart)!;
+        const pts = Number(e.puntajeTotal) || 0;
+        part.sum += pts;
+        part.count++;
+        part.calificaciones.push({
+          idEvaluacion: e.idEvaluacion,
+          idJurado: e.jurado?.idJurado ?? null,
+          juradoNombre: nombreJurado(e.jurado),
+          idFase: e.fase.idFase,
+          faseNombre: e.fase.nombre,
+          puntajeTotal: Number(pts.toFixed(2)),
+          estado: e.estado,
+          fechaCierre: e.fechaCierre || e.updatedAt || null,
+          criteriosEvaluados: e.criteriosEvaluados || null,
+        });
+      }
+
+      const concursos = Array.from(concursosMap.values())
+        .map((c) => ({
+          idFase: c.idFase,
+          nombreConcurso: c.nombreConcurso,
+          participantes: Array.from(c.participantesMap.values())
+            .map((p) => {
+              const promedioJurado = p.count > 0 ? Number((p.sum / p.count).toFixed(2)) : 0;
+              return {
+                idParticipante: p.idParticipante,
+                nombre: p.nombre,
+                tipo: p.tipo,
+                fraternidad: p.fraternidad,
+                cantidadJurados: p.count,
+                promedioJurado,
+                puntajeFinal: promedioJurado,
+                calificaciones: p.calificaciones.sort(
+                  (a: any, b: any) => Number(b.puntajeTotal) - Number(a.puntajeTotal),
+                ),
+              };
+            })
+            .sort((a, b) => b.puntajeFinal - a.puntajeFinal),
+        }))
+        .sort((a, b) => a.nombreConcurso.localeCompare(b.nombreConcurso, 'es'));
+
+      return {
+        gestion: { idGestion: gestion.idGestion, anio: gestion.anio },
+        ambito: 'EXTERNO',
+        formula: 'promedio = suma(notas de jurados) / N jurados',
+        concursos,
+      };
+    }
+
+    // EFU — fraternidades
+    const frats = await this.fraternidadRepo.find({
+      where: {
+        habilitadoEfu: true,
+        gestion: { idGestion: gestion.idGestion },
+        nivelRepresentacion: Not('Externo'),
+      },
+      relations: ['categoria'],
+      order: { nombre: 'ASC' },
+    });
+
+    const evsEfu = await this.evaluacionRepo.find({
+      where: [
+        { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } },
+        { estado: 'EN_PROGRESO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } },
+      ],
+      relations: ['fraternidad', 'fase', 'jurado', 'jurado.usuario'],
+      order: { fechaCierre: 'DESC', createdAt: 'DESC' },
+    });
+
+    const incidencias = await this.incidenciaRepo.find({
+      where: { gestion: { idGestion: gestion.idGestion } },
+      relations: ['fraternidad', 'infraccion'],
+    });
+
+    type FratAgg = {
+      idFraternidad: number;
+      nombre: string;
+      categoria: string;
+      sum: number;
+      count: number;
+      impactos: number;
+      calificaciones: any[];
+    };
+
+    const map = new Map<number, FratAgg>();
+    frats.forEach((f) => {
+      map.set(f.idFraternidad, {
+        idFraternidad: f.idFraternidad,
+        nombre: f.nombre,
+        categoria: f.categoria?.nombre || 'General',
+        sum: 0,
+        count: 0,
+        impactos: 0,
+        calificaciones: [],
+      });
+    });
+
+    evsEfu.forEach((e) => {
+      if (!e.fraternidad) return;
+      const id = e.fraternidad.idFraternidad;
+      let ex = map.get(id);
+      if (!ex) {
+        ex = {
+          idFraternidad: id,
+          nombre: e.fraternidad.nombre,
+          categoria: 'General',
+          sum: 0,
+          count: 0,
+          impactos: 0,
+          calificaciones: [],
+        };
+        map.set(id, ex);
+      }
+      const pts = Number(e.puntajeTotal) || 0;
+      ex.sum += pts;
+      ex.count++;
+      ex.calificaciones.push({
+        idEvaluacion: e.idEvaluacion,
+        idJurado: e.jurado?.idJurado ?? null,
+        juradoNombre: nombreJurado(e.jurado),
+        idFase: e.fase?.idFase ?? null,
+        faseNombre: e.fase?.nombre || '—',
+        puntajeTotal: Number(pts.toFixed(2)),
+        estado: e.estado,
+        fechaCierre: e.fechaCierre || e.updatedAt || null,
+        criteriosEvaluados: e.criteriosEvaluados || null,
+      });
+    });
+
+    incidencias.forEach((i) => {
+      if (!i.fraternidad || !i.infraccion) return;
+      const ex = map.get(i.fraternidad.idFraternidad);
+      if (ex) ex.impactos += Number(i.infraccion.valorImpacto) || 0;
+    });
+
+    const items = Array.from(map.values())
+      .map((r) => {
+        const promedioJurado = r.count > 0 ? Number((r.sum / r.count).toFixed(2)) : 0;
+        const puntajeFinal = Math.max(0, Number((promedioJurado + r.impactos).toFixed(2)));
+        return {
+          idFraternidad: r.idFraternidad,
+          nombre: r.nombre,
+          categoria: r.categoria,
+          cantidadJurados: r.count,
+          promedioJurado,
+          impactoSanciones: Number(r.impactos.toFixed(2)),
+          puntajeFinal,
+          calificaciones: r.calificaciones.sort(
+            (a, b) => Number(b.puntajeTotal) - Number(a.puntajeTotal),
+          ),
+        };
+      })
+      .sort((a, b) => b.puntajeFinal - a.puntajeFinal);
+
+    return {
+      gestion: { idGestion: gestion.idGestion, anio: gestion.anio },
+      ambito: 'EFU',
+      formula: 'promedio jurados = suma(notas) / N; final = max(0, promedio + sanciones)',
+      items,
+    };
+  }
+
   // --- GESTIONES (AJUSTES) ---
   async getGestionActiva() {
     return findGestionActivaOrLatest(this.gestionRepo);
@@ -702,7 +920,33 @@ export class EvaluacionesService {
         .where('id_gestion != :id', { id })
         .execute();
     }
-    await this.gestionRepo.update({ idGestion: id }, data);
+
+    const payload: Partial<Gestion> = {};
+    const allowed = [
+      'anio', 'lema', 'activa', 'nombreSitio', 'tituloPrincipal', 'subtituloPrincipal',
+      'urlBanner', 'urlLogo', 'urlImagenLogin', 'urlMapaUbicacion',
+      'modoMantenimiento', 'mostrarRanking', 'mostrarHistorico', 'permiteInscripcionPublica',
+      'landingFraternidades',
+    ] as const;
+
+    for (const key of allowed) {
+      if (data[key] !== undefined) {
+        (payload as any)[key] = data[key];
+      }
+    }
+
+    if (payload.landingFraternidades !== undefined) {
+      const raw = payload.landingFraternidades;
+      const list = Array.isArray(raw) ? raw : [];
+      payload.landingFraternidades = list.slice(0, 3).map((item: any) => ({
+        titulo: String(item?.titulo || '').trim().slice(0, 120),
+        subtitulo: String(item?.subtitulo || '').trim().slice(0, 120),
+        descripcion: String(item?.descripcion || '').trim().slice(0, 500),
+        urlImagen: String(item?.urlImagen || '').trim().slice(0, 500),
+      }));
+    }
+
+    await this.gestionRepo.update({ idGestion: id }, payload);
     return this.gestionRepo.findOne({ where: { idGestion: id } });
   }
 

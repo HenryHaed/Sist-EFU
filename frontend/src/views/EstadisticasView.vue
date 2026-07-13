@@ -239,7 +239,7 @@
                 <p class="text-[10px] font-black tracking-[0.4em] uppercase opacity-60">Universidad Mayor de San Andrés</p>
             </div>
             <h4 class="text-3xl font-black italic tracking-tighter uppercase mb-2">Compromiso con la Cultura</h4>
-            <p class="text-slate-400 text-sm leading-relaxed">Este sistema garantiza la transparencia en la calificación de la XXXV Entrada Folclórica Universitaria - Gestión {{ gestionData.anio }}.</p>
+            <p class="text-slate-400 text-sm leading-relaxed">Este sistema garantiza la transparencia en la calificación de la XXXV Entrada Folklórica Universitaria — Gestión {{ gestionData.anio }}.</p>
           </div>
           
           <div class="flex gap-8 items-center shrink-0 border-l border-white/10 pl-10 h-full">

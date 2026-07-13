@@ -285,7 +285,7 @@
               <!-- Password (solo edición) -->
               <div v-if="editando">
                 <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Nueva Contraseña <span class="text-slate-400 font-medium normal-case">(Opcional)</span>
+                  Nueva contraseña <span class="text-slate-400 font-medium normal-case">(opcional)</span>
                 </label>
                 <input v-model="form.password" type="password" placeholder="••••••••"
                   class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all" />

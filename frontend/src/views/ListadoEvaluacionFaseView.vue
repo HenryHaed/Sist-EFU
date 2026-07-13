@@ -48,7 +48,7 @@
               <tr v-for="item in fraternidades" :key="item.idFraternidad" class="hover:bg-slate-50 transition-colors">
                 <td class="px-6 py-4">
                   <p class="font-bold text-primary">{{ item.nombre }}</p>
-                  <p class="text-xs text-slate-500">{{ item.categoria || 'Sin Categoría' }}</p>
+                  <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
                   
                   <!-- LISTADO DE PENALIZACIONES (Solo en Disciplina) -->
                   <div v-if="item.penalizaciones && item.penalizaciones.length > 0" class="mt-2 flex flex-wrap gap-1">
@@ -178,7 +178,7 @@
             <div class="flex justify-between items-start pl-2">
               <div>
                 <p class="font-black text-primary text-base">{{ item.nombre }}</p>
-                <p class="text-xs text-slate-500">{{ item.categoria || 'Sin Categoría' }}</p>
+                <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
               </div>
               <div class="text-right">
                 <p class="text-xl font-black text-primary">{{ item.puntajeActual || 0 }}</p>

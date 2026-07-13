@@ -330,7 +330,7 @@
                   <span class="material-symbols-outlined text-2xl">school</span>
                   <div class="text-center">
                     <p class="text-[10px] font-black uppercase tracking-widest">EFU</p>
-                    <p class="text-[9px] text-slate-400 mt-0.5">Evaluación Folclórica Universitaria</p>
+                    <p class="text-[9px] text-slate-400 mt-0.5">Evaluación Folklórica Universitaria</p>
                   </div>
                 </button>
                 <button type="button" @click="form.tipoConcurso = 'EXTERNO'"

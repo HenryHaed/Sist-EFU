@@ -257,7 +257,7 @@
               class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl text-slate-600 hover:bg-red-50 border-l-4 border-l-transparent hover:text-secondary text-left transition-all"
             >
               <span class="material-symbols-outlined text-[20px] text-slate-400">logout</span>
-              <span class="text-sm">Cerrar Sesión</span>
+              <span class="text-sm">Cerrar sesión</span>
             </button>
           </nav>
 
@@ -318,6 +318,32 @@
 
         <!-- Scroll Area -->
         <main class="flex-1 overflow-y-auto overflow-x-hidden bg-transparent min-w-0">
+          <!-- Citaciones privadas para delegados -->
+          <div
+            v-if="esDelegado && citasDelegado.length > 0"
+            class="mx-4 sm:mx-6 md:mx-8 mt-4 sm:mt-6"
+          >
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="material-symbols-outlined text-amber-700">mail</span>
+                <h3 class="text-xs font-black uppercase tracking-widest text-amber-900">Tus citaciones privadas</h3>
+              </div>
+              <ul class="space-y-2">
+                <li
+                  v-for="cita in citasDelegado"
+                  :key="cita.idEvento"
+                  class="bg-white/80 rounded-xl px-3 py-2.5 border border-amber-100"
+                >
+                  <p class="text-sm font-black text-slate-800 uppercase italic">{{ cita.nombre }}</p>
+                  <p class="text-[11px] text-slate-500 font-medium mt-0.5">
+                    {{ formatearCitaDelegado(cita.fechaHora) }}
+                    <span v-if="cita.ubicacion"> · {{ cita.ubicacion }}</span>
+                  </p>
+                </li>
+              </ul>
+            </div>
+          </div>
+
           <transition name="slide-fade" mode="out-in">
 
             <!-- Vista: Estadísticas -->
@@ -516,7 +542,7 @@
 
               <div class="space-y-5">
                 <div>
-                  <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Nueva Contraseña</label>
+                  <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Nueva contraseña</label>
                   <div class="relative">
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">lock</span>
                     <input 
@@ -557,7 +583,7 @@
                 </div>
 
                 <div>
-                  <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Confirmar Contraseña</label>
+                  <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Confirmar contraseña</label>
                   <div class="relative">
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">check_circle</span>
                     <input 
@@ -680,6 +706,29 @@ const changingPass = ref(false)
 
 // User data from store
 const currentUser = computed(() => authStore.user)
+const esDelegado = computed(() => authStore.userRole?.toLowerCase() === 'delegado')
+const citasDelegado = ref([])
+
+const formatearCitaDelegado = (fechaHora) => {
+  if (!fechaHora) return ''
+  return new Date(fechaHora).toLocaleString('es-BO', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const cargarCitasDelegado = async () => {
+  if (!esDelegado.value) return
+  try {
+    const { data } = await api.get('/asistencias/mis-citas')
+    citasDelegado.value = Array.isArray(data) ? data : []
+  } catch {
+    citasDelegado.value = []
+  }
+}
 
 const canChangePassword = computed(() =>
   isPasswordPolicyValid(newPassword.value, currentUser.value?.ci || '') &&
@@ -774,6 +823,8 @@ onMounted(async () => {
   if (!queryVista && authStore.userRole?.toLowerCase() === 'delegado') {
     vistaActual.value = 'inscripcion_fraternidad'
   }
+
+  await cargarCitasDelegado()
 })
 
 // Sincronizar vista con URL para habilitar flechas de navegación

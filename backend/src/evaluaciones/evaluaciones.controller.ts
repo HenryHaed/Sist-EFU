@@ -151,6 +151,20 @@ export class EvaluacionesController {
     return this.evaluacionesService.getEstadisticasDashboard();
   }
 
+  @Get('auditoria-calificaciones')
+  @Roles('superusuario', 'admin')
+  getAuditoriaCalificaciones(
+    @Query('ambito') ambito?: string,
+    @Query('idGestion') idGestion?: string,
+  ) {
+    const scope = (ambito || 'EFU').toUpperCase() === 'EXTERNO' ? 'EXTERNO' : 'EFU';
+    const id = idGestion ? parseInt(idGestion, 10) : undefined;
+    return this.evaluacionesService.getAuditoriaCalificaciones(
+      scope as 'EFU' | 'EXTERNO',
+      Number.isFinite(id) ? id : undefined,
+    );
+  }
+
   @Public()
   @Get('gestion-activa')
   getGestionActiva() {
@@ -213,17 +227,44 @@ export class EvaluacionesController {
     { name: 'logo', maxCount: 1 },
     { name: 'banner', maxCount: 1 },
     { name: 'loginImg', maxCount: 1 },
+    { name: 'landingFrat0', maxCount: 1 },
+    { name: 'landingFrat1', maxCount: 1 },
+    { name: 'landingFrat2', maxCount: 1 },
   ], multerOptionsGestion))
   updateGestion(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: any,
-    @UploadedFiles() files: { logo?: any[], banner?: any[], loginImg?: any[] }
+    @UploadedFiles() files: {
+      logo?: any[];
+      banner?: any[];
+      loginImg?: any[];
+      landingFrat0?: any[];
+      landingFrat1?: any[];
+      landingFrat2?: any[];
+    },
   ) {
     const data = typeof body.data === 'string' ? JSON.parse(body.data) : body;
     if (files) {
       if (files.logo) data.urlLogo = `/api/v1/archivos/gestion/${files.logo[0].filename}`;
       if (files.banner) data.urlBanner = `/api/v1/archivos/gestion/${files.banner[0].filename}`;
       if (files.loginImg) data.urlImagenLogin = `/api/v1/archivos/gestion/${files.loginImg[0].filename}`;
+
+      const landingKeys = ['landingFrat0', 'landingFrat1', 'landingFrat2'] as const;
+      if (landingKeys.some((k) => files[k]?.length)) {
+        const cards = Array.isArray(data.landingFraternidades)
+          ? [...data.landingFraternidades]
+          : [{}, {}, {}];
+        landingKeys.forEach((key, index) => {
+          if (files[key]?.[0]) {
+            while (cards.length <= index) cards.push({});
+            cards[index] = {
+              ...(cards[index] || {}),
+              urlImagen: `/api/v1/archivos/gestion/${files[key][0].filename}`,
+            };
+          }
+        });
+        data.landingFraternidades = cards;
+      }
     }
     return this.evaluacionesService.updateGestion(id, data);
   }

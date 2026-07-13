@@ -164,93 +164,163 @@
       </div>
     </transition>
 
-    <!-- Modal crear evento -->
-    <div
-      v-if="modalEvento"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-      @click.self="cerrarModalEvento"
-    >
-      <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl p-8">
-        <div class="flex items-start justify-between gap-4 mb-6">
-          <div>
-            <h3 class="font-black uppercase tracking-tight text-xl text-primary italic underline decoration-secondary decoration-4 underline-offset-4">
-              Crear evento
-            </h3>
-            <p class="text-[10px] font-medium text-slate-500 mt-2">
-              Se citará por correo a todos los delegados del sistema. Debe asistir al menos uno por fraternidad.
-            </p>
+    <!-- Modal crear evento (Teleport: evita offset por transform del dashboard) -->
+    <Teleport to="body">
+      <div
+        v-if="modalEvento"
+        class="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto overscroll-contain"
+        @click.self="cerrarModalEvento"
+      >
+        <div
+          class="bg-white w-full max-w-[calc(100vw-1.5rem)] sm:max-w-md rounded-2xl sm:rounded-3xl shadow-2xl my-auto max-h-[min(92dvh,900px)] flex flex-col overflow-hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-crear-evento-titulo"
+        >
+          <div class="shrink-0 flex items-start justify-between gap-3 px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b border-slate-100">
+            <div class="min-w-0">
+              <h3
+                id="modal-crear-evento-titulo"
+                class="font-black uppercase tracking-tight text-lg sm:text-xl text-primary italic underline decoration-secondary decoration-4 underline-offset-4"
+              >
+                Crear evento
+              </h3>
+              <p class="text-[10px] font-medium text-slate-500 mt-2 leading-relaxed">
+                Elige si el evento será público en el landing o privado solo para delegados.
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="cerrarModalEvento"
+              class="shrink-0 size-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
-          <button type="button" @click="cerrarModalEvento" class="text-slate-400 hover:text-slate-600">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
 
-        <div class="space-y-4">
-          <div>
-            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Evento</label>
-            <input
-              v-model="formEvento.nombre"
-              type="text"
-              placeholder="Ej: Reunión de delegados"
-              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all"
-            />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5 space-y-4">
             <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Fecha</label>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Visibilidad</label>
+              <div class="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  @click="formEvento.esPublico = false"
+                  class="px-3 py-3 rounded-2xl border-2 text-left transition-all"
+                  :class="!formEvento.esPublico
+                    ? 'border-primary bg-primary/5 shadow-sm'
+                    : 'border-slate-200 bg-slate-50 hover:border-slate-300'"
+                >
+                  <p class="text-[10px] font-black uppercase tracking-widest" :class="!formEvento.esPublico ? 'text-primary' : 'text-slate-500'">Privado</p>
+                  <p class="text-[9px] text-slate-500 font-medium mt-1 leading-snug">Solo delegados · correo + cuenta</p>
+                </button>
+                <button
+                  type="button"
+                  @click="formEvento.esPublico = true"
+                  class="px-3 py-3 rounded-2xl border-2 text-left transition-all"
+                  :class="formEvento.esPublico
+                    ? 'border-primary bg-primary/5 shadow-sm'
+                    : 'border-slate-200 bg-slate-50 hover:border-slate-300'"
+                >
+                  <p class="text-[10px] font-black uppercase tracking-widest" :class="formEvento.esPublico ? 'text-primary' : 'text-slate-500'">Público</p>
+                  <p class="text-[9px] text-slate-500 font-medium mt-1 leading-snug">Visible en el landing</p>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Evento</label>
               <input
-                v-model="formEvento.fecha"
-                type="date"
-                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all"
+                v-model="formEvento.nombre"
+                type="text"
+                placeholder="Ej: Reunión de delegados"
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all text-sm"
               />
             </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Fecha</label>
+                <input
+                  v-model="formEvento.fecha"
+                  type="date"
+                  class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all text-sm"
+                />
+              </div>
+              <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Hora</label>
+                <input
+                  v-model="formEvento.hora"
+                  type="time"
+                  class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all text-sm"
+                />
+              </div>
+            </div>
             <div>
-              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Hora</label>
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Ubicación</label>
               <input
-                v-model="formEvento.hora"
-                type="time"
-                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all"
+                v-model="formEvento.ubicacion"
+                type="text"
+                placeholder="Ej: Auditorio HCU, UMSA"
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all text-sm"
               />
             </div>
-          </div>
-          <div>
-            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Ubicación</label>
-            <input
-              v-model="formEvento.ubicacion"
-              type="text"
-              placeholder="Ej: Auditorio HCU, UMSA"
-              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-primary transition-all"
-            />
-          </div>
-        </div>
+            <div v-if="formEvento.esPublico">
+              <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Descripción (opcional)</label>
+              <textarea
+                v-model="formEvento.descripcion"
+                rows="2"
+                maxlength="1000"
+                placeholder="Texto breve para el panel de eventos del landing..."
+                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-medium outline-none focus:border-primary transition-all resize-none text-sm"
+              ></textarea>
+            </div>
 
-        <div class="mt-6 p-4 rounded-2xl bg-amber-50 border border-amber-100">
-          <p class="text-[10px] text-amber-800 font-medium leading-relaxed">
-            Al confirmar, el sistema enviará un correo automático solo a los usuarios con rol <strong>delegado</strong>.
-            La inasistencia de titular y suplente puede sancionarse con <strong>−3 pts</strong> en disciplina.
-          </p>
-        </div>
+            <div
+              class="p-3 sm:p-4 rounded-2xl border"
+              :class="formEvento.esPublico ? 'bg-sky-50 border-sky-100' : 'bg-amber-50 border-amber-100'"
+            >
+              <p
+                class="text-[10px] font-medium leading-relaxed"
+                :class="formEvento.esPublico ? 'text-sky-800' : 'text-amber-800'"
+              >
+                <template v-if="formEvento.esPublico">
+                  El evento aparecerá en el <strong>panel Eventos</strong> del landing para el público.
+                  No se enviará citación por correo a delegados.
+                </template>
+                <template v-else>
+                  Se enviará un correo automático a usuarios con rol <strong>delegado</strong>
+                  y quedará disponible en sus cuentas al ingresar.
+                  La inasistencia de titular y suplente puede sancionarse con <strong>−3 pts</strong> en disciplina.
+                </template>
+              </p>
+            </div>
+          </div>
 
-        <div class="mt-8 flex gap-3">
-          <button
-            type="button"
-            @click="cerrarModalEvento"
-            class="flex-1 py-3 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-2xl transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            @click="crearEvento"
-            :disabled="!formEventoValido || creandoEvento"
-            class="flex-[2] py-3 bg-primary text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg shadow-primary/20 hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            <span v-if="creandoEvento" class="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-            {{ creandoEvento ? 'Enviando citaciones...' : 'Crear y citar delegados' }}
-          </button>
+          <div class="shrink-0 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 px-4 py-4 sm:px-6 border-t border-slate-100 bg-white pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              @click="cerrarModalEvento"
+              class="flex-1 py-3 text-slate-500 font-bold uppercase text-[10px] tracking-widest hover:bg-slate-50 rounded-2xl transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              @click="crearEvento"
+              :disabled="!formEventoValido || creandoEvento"
+              class="flex-[2] py-3 bg-primary text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg shadow-primary/20 hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <span v-if="creandoEvento" class="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+              <template v-if="creandoEvento">
+                {{ formEvento.esPublico ? 'Publicando...' : 'Enviando citaciones...' }}
+              </template>
+              <template v-else>
+                {{ formEvento.esPublico ? 'Publicar en landing' : 'Crear y citar delegados' }}
+              </template>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
@@ -273,6 +343,8 @@ const formEvento = reactive({
   fecha: '',
   hora: '',
   ubicacion: '',
+  descripcion: '',
+  esPublico: false,
 })
 
 const PENALIZACION_DISCIPLINA = 3
@@ -293,7 +365,8 @@ const etiquetaEvento = (ev) => {
       })
     : ''
   const lugar = ev.ubicacion ? ` · ${ev.ubicacion}` : ''
-  return fecha ? `${ev.nombre} — ${fecha}${lugar}` : ev.nombre
+  const modo = ev.esPublico ? ' · Público' : ' · Privado'
+  return fecha ? `${ev.nombre} — ${fecha}${lugar}${modo}` : `${ev.nombre}${modo}`
 }
 
 const abrirModalEvento = () => {
@@ -301,6 +374,8 @@ const abrirModalEvento = () => {
   formEvento.fecha = ''
   formEvento.hora = ''
   formEvento.ubicacion = ''
+  formEvento.descripcion = ''
+  formEvento.esPublico = false
   modalEvento.value = true
 }
 
@@ -367,6 +442,8 @@ const crearEvento = async () => {
       nombre: formEvento.nombre.trim(),
       fechaHora: fechaHora.toISOString(),
       ubicacion: formEvento.ubicacion.trim(),
+      descripcion: formEvento.descripcion.trim() || undefined,
+      esPublico: !!formEvento.esPublico,
     })
 
     await fetchEventos()
@@ -374,13 +451,17 @@ const crearEvento = async () => {
       eventoSeleccionado.value = data.evento.idEvento
     }
 
-    const avisoFallos = data.fallidos > 0
-      ? ` (${data.fallidos} correo(s) fallaron)`
-      : ''
-    mostrarMensaje(
-      `Evento creado. Citación enviada a ${data.enviados} delegado(s)${avisoFallos}`,
-      data.fallidos > 0 ? 'error' : 'success',
-    )
+    if (data.modo === 'publico' || formEvento.esPublico) {
+      mostrarMensaje('Evento público creado. Ya aparece en el panel Eventos del landing.', 'success')
+    } else {
+      const avisoFallos = data.fallidos > 0
+        ? ` (${data.fallidos} correo(s) fallaron)`
+        : ''
+      mostrarMensaje(
+        `Evento privado creado. Citación enviada a ${data.enviados} delegado(s)${avisoFallos}`,
+        data.fallidos > 0 ? 'error' : 'success',
+      )
+    }
     modalEvento.value = false
   } catch (err) {
     const msg = Array.isArray(err.response?.data?.message)

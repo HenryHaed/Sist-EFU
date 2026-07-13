@@ -3,7 +3,28 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
 import { join } from 'path';
+
+async function ensureSchemaPatches(dataSource: DataSource) {
+  // Producción con TYPEORM_SYNCHRONIZE=false: columnas nuevas sin migración formal
+  await dataSource.query(`
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS landing_fraternidades jsonb NULL
+  `);
+  await dataSource.query(`
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS mostrar_historico boolean NOT NULL DEFAULT false
+  `);
+  await dataSource.query(`
+    ALTER TABLE eventos_control
+    ADD COLUMN IF NOT EXISTS es_publico boolean NOT NULL DEFAULT false
+  `);
+  await dataSource.query(`
+    ALTER TABLE eventos_control
+    ADD COLUMN IF NOT EXISTS descripcion text NULL
+  `);
+}
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -18,6 +39,12 @@ async function bootstrap() {
   const swaggerDefault = nodeEnv === 'production' ? 'false' : 'true';
   const swaggerEnabled =
     configService.get<string>('SWAGGER_ENABLED', swaggerDefault) === 'true';
+
+  try {
+    await ensureSchemaPatches(app.get(DataSource));
+  } catch (err) {
+    console.warn('[SERVER] No se pudo aplicar patch de esquema:', (err as Error)?.message || err);
+  }
 
   // Prefijo global para todas las rutas: /api/v1
   app.setGlobalPrefix('api/v1');

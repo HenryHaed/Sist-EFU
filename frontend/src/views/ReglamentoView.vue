@@ -110,7 +110,7 @@
           <div class="size-24 bg-slate-100 rounded-3xl flex items-center justify-center mb-6">
             <span class="material-symbols-outlined text-5xl text-slate-300">folder_off</span>
           </div>
-          <h3 class="text-xl font-black text-slate-700 italic uppercase tracking-tighter">Sin Documentos</h3>
+          <h3 class="text-xl font-black text-slate-700 italic uppercase tracking-tighter">Sin documentos</h3>
           <p class="text-slate-400 text-sm font-medium mt-2">Los reglamentos serán publicados próximamente.</p>
         </div>
 

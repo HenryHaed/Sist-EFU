@@ -51,8 +51,21 @@ export class Gestion {
     @Column({ name: 'mostrar_ranking', default: true })
     mostrarRanking: boolean;
 
+    /** Si es true, la sección Archivo Histórico aparece en el landing. */
+    @Column({ name: 'mostrar_historico', default: false })
+    mostrarHistorico: boolean;
+
     @Column({ name: 'permite_inscripcion_publica', default: false })
     permiteInscripcionPublica: boolean;
+
+    /** Tarjetas de fraternidades destacadas en el landing (nombre, subtítulo, descripción, imagen). */
+    @Column({ name: 'landing_fraternidades', type: 'jsonb', nullable: true })
+    landingFraternidades: Array<{
+        titulo: string;
+        subtitulo?: string;
+        descripcion?: string;
+        urlImagen?: string;
+    }> | null;
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;

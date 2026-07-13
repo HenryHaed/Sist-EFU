@@ -15,6 +15,13 @@ export class EventoControl {
     @Column({ length: 500, nullable: true })
     ubicacion: string;
 
+    @Column({ type: 'text', nullable: true })
+    descripcion: string;
+
+    /** true = visible en landing; false = solo delegados (citación por correo). */
+    @Column({ name: 'es_publico', default: false })
+    esPublico: boolean;
+
     @Column({ name: 'puntos_penalizacion', type: 'decimal', precision: 5, scale: 2, default: 3 })
     puntosPenalizacion: number;
 

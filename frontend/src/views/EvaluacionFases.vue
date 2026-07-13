@@ -66,7 +66,7 @@
           <template v-slot:prepend>
              <span class="material-symbols-outlined mr-3 text-slate-400">logout</span>
           </template>
-          <v-list-item-title class="font-medium">Cerrar Sesión</v-list-item-title>
+          <v-list-item-title class="font-medium">Cerrar sesión</v-list-item-title>
         </v-list-item>
       </v-list>
 

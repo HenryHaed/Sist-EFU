@@ -48,9 +48,38 @@ export class AsistenciasService {
     return this.eventoRepo.find({ order: { fechaHora: 'DESC' } });
   }
 
+  /** Eventos públicos para el landing (próximos primero; incluye recientes). */
+  async getEventosPublicos() {
+    const desde = new Date();
+    desde.setDate(desde.getDate() - 7);
+
+    return this.eventoRepo
+      .createQueryBuilder('e')
+      .where('e.esPublico = :publico', { publico: true })
+      .andWhere('e.fechaHora >= :desde', { desde })
+      .orderBy('e.fechaHora', 'ASC')
+      .take(20)
+      .getMany();
+  }
+
+  /** Citaciones privadas próximas para el delegado autenticado. */
+  async getMisCitasDelegado() {
+    const ahora = new Date();
+    return this.eventoRepo
+      .createQueryBuilder('e')
+      .where('e.esPublico = :publico', { publico: false })
+      .andWhere('e.fechaHora >= :ahora', { ahora })
+      .orderBy('e.fechaHora', 'ASC')
+      .take(10)
+      .getMany();
+  }
+
   async crearEventoYCitarDelegados(dto: CrearEventoDto, remitenteNombre: string) {
     const nombre = dto.nombre?.trim();
     const ubicacion = dto.ubicacion?.trim();
+    const descripcion = dto.descripcion?.trim() || null;
+    const esPublico = dto.esPublico === true;
+
     if (!nombre) throw new BadRequestException('Indica el nombre del evento.');
     if (!ubicacion) throw new BadRequestException('Indica la ubicación del evento.');
 
@@ -63,11 +92,26 @@ export class AsistenciasService {
       this.eventoRepo.create({
         nombre,
         ubicacion,
+        descripcion,
+        esPublico,
         fechaHora,
         puntosPenalizacion: PENALIZACION_INASISTENCIA_DEFAULT,
       }),
     );
 
+    // Público: visible en landing, sin citación por correo
+    if (esPublico) {
+      return {
+        evento,
+        modo: 'publico',
+        totalDestinatarios: 0,
+        enviados: 0,
+        fallidos: 0,
+        correosFallidos: [],
+      };
+    }
+
+    // Privado: citación por correo a delegados
     const delegados = await this.usuarioRepo
       .createQueryBuilder('u')
       .innerJoin('u.rol', 'rol')
@@ -111,6 +155,7 @@ export class AsistenciasService {
 
     return {
       evento,
+      modo: 'privado',
       totalDestinatarios: elegibles.length,
       enviados,
       fallidos: fallidos.length,
