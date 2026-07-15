@@ -239,7 +239,7 @@
                 <p class="text-[10px] font-black tracking-[0.4em] uppercase opacity-60">Universidad Mayor de San Andrés</p>
             </div>
             <h4 class="text-3xl font-black italic tracking-tighter uppercase mb-2">Compromiso con la Cultura</h4>
-            <p class="text-slate-400 text-sm leading-relaxed">Este sistema garantiza la transparencia en la calificación de la XXXV Entrada Folklórica Universitaria — Gestión {{ gestionData.anio }}.</p>
+            <p class="text-slate-400 text-sm leading-relaxed">Este sistema garantiza la transparencia en la calificación de la {{ gestionData.edicion || 'XXXV' }} Entrada Folklórica Universitaria — Gestión {{ gestionData.anio }}.</p>
           </div>
           
           <div class="flex gap-8 items-center shrink-0 border-l border-white/10 pl-10 h-full">
@@ -249,7 +249,7 @@
             </div>
             <div class="w-px h-16 bg-white/10"></div>
             <div class="text-center group-hover:scale-110 transition-transform delay-75">
-              <p class="text-5xl font-black text-white tracking-tighter mb-1">{{ stats.length ? stats[0].valor : '0' }}</p>
+              <p class="text-5xl font-black text-white tracking-tighter mb-1">{{ totalFraternidades }}</p>
               <p class="text-[10px] uppercase font-black opacity-40 tracking-widest">Fraternidades</p>
             </div>
           </div>
@@ -385,6 +385,7 @@ const stats = ref([])
 const rankingEfu = ref([])
 const concursos = ref([])
 const gestionData = ref({})
+const totalFraternidades = ref(0)
 const mostrarPodioCompleto = ref(false)
 const rankingBarras = computed(() => rankingEfu.value.slice(0, 7))
 const rankingEfuPreview = computed(() => rankingEfu.value.slice(0, 7))
@@ -474,6 +475,7 @@ const cargarEstadisticas = async () => {
         rankingEfu.value = data.rankingEfu || []
         concursos.value = data.concursos || []
         gestionData.value = data.gestion || {}
+        totalFraternidades.value = data.totalFraternidades || 0
     } catch (error) {
         console.error('Error al cargar métricas:', error)
     } finally {

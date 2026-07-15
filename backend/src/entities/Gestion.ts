@@ -18,6 +18,9 @@ export class Gestion {
     @Column({ unique: true })
     anio: number;
 
+    @Column({ length: 20, nullable: true })
+    edicion: string;
+
     @Column({ type: 'text', nullable: true })
     lema: string;
 

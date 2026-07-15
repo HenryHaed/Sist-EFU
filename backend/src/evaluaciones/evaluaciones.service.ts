@@ -362,6 +362,10 @@ export class EvaluacionesService {
     const gestion = await this.getGestionActiva();
     if (!gestion) throw new NotFoundException('No hay gestión activa');
 
+    const totalFraternidades = await this.fraternidadRepo.count({
+      where: { gestion: { idGestion: gestion.idGestion } },
+    });
+
     const frats = await this.fraternidadRepo.find({
       where: {
         habilitadoEfu: true,
@@ -490,7 +494,8 @@ export class EvaluacionesService {
       ],
       rankingEfu: rankingSorted,
       concursos,
-      gestion: { anio: gestion.anio, edicion: 'XXXV' }
+      totalFraternidades,
+      gestion: { anio: gestion.anio, edicion: gestion.edicion }
     };
   }
 
@@ -904,6 +909,9 @@ export class EvaluacionesService {
         .set({ activa: false })
         .execute();
     }
+    if (data.edicion !== undefined) {
+      data.edicion = String(data.edicion || '').trim().toUpperCase().slice(0, 20) || null;
+    }
     const nuevaGestion = this.gestionRepo.create(data);
     const saved = await this.gestionRepo.save(nuevaGestion);
     const gestion = Array.isArray(saved) ? saved[0] : saved;
@@ -923,7 +931,7 @@ export class EvaluacionesService {
 
     const payload: Partial<Gestion> = {};
     const allowed = [
-      'anio', 'lema', 'activa', 'nombreSitio', 'tituloPrincipal', 'subtituloPrincipal',
+      'anio', 'edicion', 'lema', 'activa', 'nombreSitio', 'tituloPrincipal', 'subtituloPrincipal',
       'urlBanner', 'urlLogo', 'urlImagenLogin', 'urlMapaUbicacion',
       'modoMantenimiento', 'mostrarRanking', 'mostrarHistorico', 'permiteInscripcionPublica',
       'landingFraternidades',
@@ -933,6 +941,10 @@ export class EvaluacionesService {
       if (data[key] !== undefined) {
         (payload as any)[key] = data[key];
       }
+    }
+
+    if (payload.edicion !== undefined) {
+      payload.edicion = String(payload.edicion || '').trim().toUpperCase().slice(0, 20) || null;
     }
 
     if (payload.landingFraternidades !== undefined) {

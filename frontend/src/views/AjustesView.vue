@@ -68,7 +68,7 @@
       
       <!-- TAB: GENERAL -->
       <div v-if="activeTab === 'general'" class="space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <!-- Site Name -->
           <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
              <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Nombre del Sitio / Entidad</label>
@@ -89,6 +89,20 @@
               type="number" 
               readonly
               class="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl outline-none font-bold text-slate-500 cursor-not-allowed transition-all"
+             />
+          </div>
+
+          <!-- Número de edición -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+             <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Edición</label>
+             <p class="text-[10px] text-slate-400 font-medium mb-2">Se muestra en Estadísticas. Puede escribirse en números romanos.</p>
+             <input
+              v-model="gestion.edicion"
+              type="text"
+              maxlength="20"
+              placeholder="Ej. XXXV"
+              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-black uppercase text-slate-700 transition-all"
+              @input="gestion.edicion = gestion.edicion.toUpperCase()"
              />
           </div>
         </div>
@@ -608,6 +622,7 @@ const emptyLandingPreviews = () => ({ landingFrat0: null, landingFrat1: null, la
 const gestion = ref({
   idGestion: null,
   anio: new Date().getFullYear(),
+  edicion: '',
   lema: '',
   activa: true,
   nombreSitio: '',

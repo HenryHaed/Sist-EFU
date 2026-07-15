@@ -2,52 +2,80 @@ import { Repository } from 'typeorm';
 import { TipoDanza } from '../entities/TipoDanza';
 
 export const TIPOS_DANZA_DEFAULT = [
-  'La Diablada',
-  'La Morenada',
-  'Los Caporales',
-  'El Tinku',
-  'La Cueca',
-  'La Llamerada',
-  'El Pujllay',
-  'El Ayarichi',
-  'La Kullawada',
-  'Los Tobas',
-  'La Waca Waca',
-  'El Suri Sicuri',
-  'Los Doctorcitos',
-  'Los Potolos',
-  'El Taquirari',
-  'La Chovena',
-  'El Sarao',
-  'Los Macheteros',
-  'El Arete Guazú',
-  'La Saya Afroboliviana',
-  'El Tundiqui',
-  'El Huayño',
-  'La Chapaqueada',
-  'La Rueda Chapaca',
-  'Los Chunchos',
-  'La ChampaDance',
-  'Los Kusillos',
-  'El Carnavalito',
-  'La Cahuaniri',
-  'El Auqui Auqui',
-  'Los Jacha Tata Danzanti',
-  'La Tarqueada',
-  'La Pinquillada',
-  'La Moseñada',
-  'Los Negritos',
-  'La Cacharpaya',
+  'Amor tacana',
+  'Antawara',
+  'Arete Guazú',
+  'Auqui Auqui',
+  'Awatiris',
+  'Ayarichi',
+  'Bailecito',
+  'Cacharpaya',
+  'Cahuaniri',
+  'Calcheños',
+  'Caporales',
+  'Carnavalito',
+  'Chacarera',
+  'ChampaDance',
+  'Chapaqueada',
+  'Chicheños',
+  'Chovena',
+  'Chunchos',
+  'Chutas',
+  'Cueca',
+  'Diablada',
+  'Doctorcitos',
+  'Huayño',
+  'Incas',
+  'Jacha Tata Danzanti',
+  'Jula julas',
+  'Kallawaya',
+  'Kullawada',
+  'Kusillos',
+  'Llamerada',
+  'Macheteros',
+  'Morenada',
+  'Moseñada',
+  'Negritos',
+  'Pinquillada',
+  'Potolos',
+  'Pujllay',
+  'Quena quena',
+  'Rueda Chapaca',
+  'Salay',
+  'Sarao',
+  'Saya Afroboliviana',
+  'Suri Sicuri',
+  'Taquirari',
+  'Tarqueada',
+  'Tinku',
+  'Tobas',
+  'Tundiqui',
+  'Waca Waca',
+  'Wititis',
 ] as const;
 
 export async function ensureTiposDanzaDefault(repo: Repository<TipoDanza>): Promise<TipoDanza[]> {
   const existing = await repo.find({ order: { orden: 'ASC', idTipoDanza: 'ASC' } });
-  const byName = new Set(existing.map((t) => t.nombre.trim().toLowerCase()));
-  const result = [...existing];
+  const limpiarArticulo = (nombre: string) => nombre.trim().replace(/^(el|la|los|las)\s+/i, '');
+  const defaultsByName = new Map(
+    TIPOS_DANZA_DEFAULT.map((nombre, index) => [nombre.toLocaleLowerCase('es'), { nombre, orden: index + 1 }]),
+  );
 
+  for (const tipo of existing) {
+    const limpio = limpiarArticulo(tipo.nombre);
+    const valorDefault = defaultsByName.get(limpio.toLocaleLowerCase('es'));
+    if (!valorDefault) continue;
+    tipo.nombre = valorDefault.nombre;
+    tipo.orden = valorDefault.orden;
+    tipo.activo = true;
+  }
+  if (existing.length) await repo.save(existing);
+
+  const byName = new Set(existing.map((t) => t.nombre.trim().toLocaleLowerCase('es')));
+  const nuevos: TipoDanza[] = [];
   TIPOS_DANZA_DEFAULT.forEach((nombre, index) => {
-    if (byName.has(nombre.toLowerCase())) return;
-    result.push(
+    if (byName.has(nombre.toLocaleLowerCase('es'))) return;
+    nuevos.push(
       repo.create({
         nombre,
         orden: index + 1,
@@ -56,11 +84,6 @@ export async function ensureTiposDanzaDefault(repo: Repository<TipoDanza>): Prom
     );
   });
 
-  const toSave = result.filter((t) => !t.idTipoDanza);
-  if (toSave.length) {
-    const saved = await repo.save(toSave);
-    return [...existing, ...saved].sort((a, b) => a.orden - b.orden || a.idTipoDanza - b.idTipoDanza);
-  }
-
-  return existing;
+  if (nuevos.length) await repo.save(nuevos);
+  return repo.find({ where: { activo: true }, order: { nombre: 'ASC' } });
 }

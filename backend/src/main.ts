@@ -17,6 +17,10 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     ADD COLUMN IF NOT EXISTS mostrar_historico boolean NOT NULL DEFAULT false
   `);
   await dataSource.query(`
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS edicion varchar(20) NULL
+  `);
+  await dataSource.query(`
     ALTER TABLE eventos_control
     ADD COLUMN IF NOT EXISTS es_publico boolean NOT NULL DEFAULT false
   `);

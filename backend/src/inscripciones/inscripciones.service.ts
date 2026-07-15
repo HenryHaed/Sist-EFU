@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Brackets } from 'typeorm';
+import { Repository, Brackets, ILike } from 'typeorm';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { Gestion } from '../entities/Gestion';
 import { CronogramaInscripcion } from '../entities/CronogramaInscripcion';
@@ -167,6 +167,38 @@ export class InscripcionesService {
         private readonly mailService: MailService,
     ) {}
 
+    private async resolverTipoDanza(idTipoDanza: unknown, tipoDanzaOtro?: unknown): Promise<TipoDanza> {
+        if (String(idTipoDanza).toLowerCase() !== 'otro') {
+            const id = Number.parseInt(String(idTipoDanza), 10);
+            if (Number.isNaN(id)) {
+                throw new BadRequestException('El tipo de danza es requerido.');
+            }
+            const tipo = await this.tipoDanzaRepo.findOne({ where: { idTipoDanza: id, activo: true } });
+            if (!tipo) {
+                throw new BadRequestException('El tipo de danza seleccionado no es válido.');
+            }
+            return tipo;
+        }
+
+        const nombre = String(tipoDanzaOtro || '').trim().replace(/\s+/g, ' ');
+        if (nombre.length < 2 || nombre.length > 120 || nombre.toLocaleLowerCase('es') === 'otro') {
+            throw new BadRequestException('Ingresa un tipo de danza válido (2 a 120 caracteres).');
+        }
+
+        const existente = await this.tipoDanzaRepo.findOne({ where: { nombre: ILike(nombre) } });
+        if (existente) {
+            if (!existente.activo) {
+                existente.activo = true;
+                await this.tipoDanzaRepo.save(existente);
+            }
+            return existente;
+        }
+
+        return this.tipoDanzaRepo.save(
+            this.tipoDanzaRepo.create({ nombre, orden: 1000, activo: true }),
+        );
+    }
+
     private async eliminarFraternidadVinculada(idFraternidad: number) {
         await this.evaluacionRepo.delete({ fraternidad: { idFraternidad } });
         await this.incidenciaRepo.delete({ fraternidad: { idFraternidad } });
@@ -331,7 +363,7 @@ export class InscripcionesService {
                 delegado: { idUsuario: usuario.idUsuario },
                 gestion: { idGestion: gestion.idGestion }
             },
-            relations: ['categoria']
+            relations: ['categoria', 'tipoDanza']
         });
         const puedeReeditar = existente && existente.estado === EstadoSolicitud.OBSERVADO;
         if (existente && !puedeReeditar) {
@@ -345,16 +377,11 @@ export class InscripcionesService {
         const idCategoria = parseInt(data.idCategoria || existente?.categoria?.idCategoria);
         if (isNaN(idCategoria)) throw new BadRequestException('La categoría es requerida.');
 
-        const idTipoDanza = parseInt(data.idTipoDanza || existente?.tipoDanza?.idTipoDanza);
-        if (isNaN(idTipoDanza)) {
-            throw new BadRequestException('El tipo de danza es requerido.');
-        }
-        const tipoDanza = await this.tipoDanzaRepo.findOne({
-            where: { idTipoDanza, activo: true },
-        });
-        if (!tipoDanza) {
-            throw new BadRequestException('El tipo de danza seleccionado no es válido.');
-        }
+        const tipoDanza = await this.resolverTipoDanza(
+            data.idTipoDanza ?? existente?.tipoDanza?.idTipoDanza,
+            data.tipoDanzaOtro,
+        );
+        const idTipoDanza = tipoDanza.idTipoDanza;
 
         let checklistReedicion = existente?.revisionChecklist || {};
         if (typeof checklistReedicion === 'string') {
@@ -743,8 +770,7 @@ export class InscripcionesService {
             if (!isNaN(idCategoria)) sol.categoria = { idCategoria } as Categoria;
         }
         if (data.idTipoDanza !== undefined) {
-            const idTipoDanza = parseInt(data.idTipoDanza, 10);
-            if (!isNaN(idTipoDanza)) sol.tipoDanza = { idTipoDanza } as TipoDanza;
+            sol.tipoDanza = await this.resolverTipoDanza(data.idTipoDanza, data.tipoDanzaOtro);
         }
         if (data.idFacultad !== undefined) {
             const idFacultad = data.idFacultad ? parseInt(data.idFacultad, 10) : null;

@@ -224,7 +224,23 @@
                 <option v-for="td in tiposDanza" :key="td.idTipoDanza" :value="td.idTipoDanza">
                   {{ td.nombre }}
                 </option>
+                <option value="otro">Otro</option>
               </select>
+              <p class="mt-2 text-[10px] font-medium text-slate-400">
+                Abre la lista y escribe una letra para saltar automáticamente a las danzas que comienzan con ella.
+              </p>
+              <input
+                v-if="form.idTipoDanza === 'otro'"
+                v-model.trim="form.tipoDanzaOtro"
+                type="text"
+                minlength="2"
+                maxlength="120"
+                required
+                :disabled="!puedeEditarCampo('tipoDanza')"
+                placeholder="Escribe el tipo de danza"
+                :class="[claseInputCampo('idTipoDanza'), 'mt-3']"
+                @input="marcarCampoEditado('idTipoDanza')"
+              />
             </div>
 
             <!-- Conditional Selects based on Instancia -->
@@ -854,6 +870,7 @@ const form = ref({
   nombreInstitucionExterna: '',
   idCategoria: null,
   idTipoDanza: null,
+  tipoDanzaOtro: '',
   idFacultad: null,
   idCarrera: null,
   ...crearEstadoVacioPersonas(),
@@ -1275,6 +1292,7 @@ const validateStep = (step) => {
   const f = form.value
   if (step === 1) {
     if (!f.nombreFraternidad || !f.instanciaRepresentacion || !f.idCategoria || !f.idTipoDanza) return false
+    if (f.idTipoDanza === 'otro' && f.tipoDanzaOtro.trim().length < 2) return false
     if (f.instanciaRepresentacion === 'Facultad' && !f.idFacultad) return false
     if (f.instanciaRepresentacion === 'Carrera' && (!f.idFacultad || !f.idCarrera)) return false
     if (f.instanciaRepresentacion === 'Externo' && !f.nombreInstitucionExterna) return false
@@ -1396,6 +1414,7 @@ const hidratarFormularioDesdeSolicitud = async (solicitud) => {
     nombreInstitucionExterna: solicitud.nombreInstitucionExterna || fraternidadHeredada.value?.institucionExterna?.nombre || '',
     idCategoria: solicitud.categoria?.idCategoria || fraternidadHeredada.value?.categoria?.idCategoria || null,
     idTipoDanza: solicitud.tipoDanza?.idTipoDanza || null,
+    tipoDanzaOtro: '',
     idFacultad: solicitud.facultad?.idFacultad || fraternidadHeredada.value?.facultad?.idFacultad || null,
     idCarrera: solicitud.carrera?.idCarrera || fraternidadHeredada.value?.carrera?.idCarrera || null,
     ...hidratarPersonasDesdeSolicitud(solicitud),

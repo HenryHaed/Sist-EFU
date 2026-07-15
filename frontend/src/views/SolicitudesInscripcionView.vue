@@ -177,13 +177,25 @@
                           >
                             <option v-for="c in adminOpciones.categorias" :key="c.idCategoria" :value="c.idCategoria">{{ c.nombre }}</option>
                           </select>
-                          <select
-                            v-else-if="item.key === 'tipoDanza'"
-                            v-model="adminFormDraft.idTipoDanza"
-                            class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
-                          >
-                            <option v-for="t in adminOpciones.tiposDanza" :key="t.idTipoDanza" :value="t.idTipoDanza">{{ t.nombre }}</option>
-                          </select>
+                          <div v-else-if="item.key === 'tipoDanza'" class="space-y-2">
+                            <select
+                              v-model="adminFormDraft.idTipoDanza"
+                              class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                              title="Escribe una letra para saltar al primer tipo de danza que comience con ella"
+                            >
+                              <option v-for="t in adminOpciones.tiposDanza" :key="t.idTipoDanza" :value="t.idTipoDanza">{{ t.nombre }}</option>
+                              <option value="otro">Otro</option>
+                            </select>
+                            <input
+                              v-if="adminFormDraft.idTipoDanza === 'otro'"
+                              v-model.trim="adminFormDraft.tipoDanzaOtro"
+                              type="text"
+                              minlength="2"
+                              maxlength="120"
+                              placeholder="Escribe el tipo de danza"
+                              class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                            />
+                          </div>
                           <select
                             v-else-if="item.key === 'facultad'"
                             v-model="adminFormDraft.idFacultad"
@@ -1054,6 +1066,7 @@ const hidratarAdminFormDesdeSolicitud = (s) => {
     nombreInstitucionExterna: s.nombreInstitucionExterna || '',
     idCategoria: s.categoria?.idCategoria || null,
     idTipoDanza: s.tipoDanza?.idTipoDanza || null,
+    tipoDanzaOtro: '',
     idFacultad: s.facultad?.idFacultad || null,
     idCarrera: s.carrera?.idCarrera || null,
   }

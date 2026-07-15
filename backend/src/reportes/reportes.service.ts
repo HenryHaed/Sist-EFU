@@ -49,7 +49,7 @@ export class ReportesService implements OnModuleInit {
     await ensureTiposDanzaDefault(this.tipoDanzaRepo);
     return this.tipoDanzaRepo.find({
       where: { activo: true },
-      order: { orden: 'ASC', nombre: 'ASC' },
+      order: { nombre: 'ASC' },
     });
   }
 
