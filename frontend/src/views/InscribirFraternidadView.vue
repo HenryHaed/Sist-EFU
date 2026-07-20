@@ -146,7 +146,7 @@
       <form v-else @submit.prevent="handleSubmit" novalidate class="form-inscripcion p-8 md:p-12">
         <div ref="wizardAnchor" class="scroll-mt-4" aria-hidden="true"></div>
 
-        <div v-if="solicitudEditable" class="mb-8 p-6 rounded-3xl border border-amber-300 bg-amber-50">
+        <div v-if="solicitudExistente?.estado === 'OBSERVADO'" class="mb-8 p-6 rounded-3xl border border-amber-300 bg-amber-50">
           <p class="text-[10px] font-black uppercase tracking-[0.2em] text-amber-800 mb-2">Solicitud observada por La Comisión</p>
           <p class="text-sm text-slate-800 font-semibold leading-relaxed">
             La Comisión observó tu solicitud. Corrige únicamente los datos señalados a continuación.
@@ -241,6 +241,131 @@
                 :class="[claseInputCampo('idTipoDanza'), 'mt-3']"
                 @input="marcarCampoEditado('idTipoDanza')"
               />
+            </div>
+
+            <!-- Costo de participación por bailar -->
+            <div class="md:col-span-2">
+              <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">
+                Costo de participación por bailarín
+              </label>
+              <div
+                class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5 space-y-4"
+                :class="{ 'opacity-60 pointer-events-none': !puedeEditarCampo('costosParticipacion') }"
+              >
+                <div class="flex flex-col gap-3">
+                  <p class="text-xs font-medium text-slate-600">
+                    ¿Tiene una estructura de costos única o variable según bailarín de la fraternidad?
+                  </p>
+                  <label class="inline-flex items-center justify-center gap-3 cursor-pointer select-none">
+                    <span
+                      class="text-[10px] font-black uppercase tracking-widest transition-colors"
+                      :class="!form.costosParticipacion.multiple ? 'text-primary' : 'text-slate-400'"
+                    >
+                      Costo único
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      :aria-checked="form.costosParticipacion.multiple"
+                      class="relative w-11 h-6 rounded-full transition-colors shrink-0"
+                      :class="form.costosParticipacion.multiple ? 'bg-primary' : 'bg-slate-300'"
+                      :disabled="!puedeEditarCampo('costosParticipacion')"
+                      @click="toggleCostosMultiples"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform"
+                        :class="form.costosParticipacion.multiple ? 'translate-x-5' : ''"
+                      ></span>
+                    </button>
+                    <span
+                      class="text-[10px] font-black uppercase tracking-widest transition-colors"
+                      :class="form.costosParticipacion.multiple ? 'text-primary' : 'text-slate-400'"
+                    >
+                      Costo variado (detallar)
+                    </span>
+                  </label>
+                </div>
+
+                <div v-if="!form.costosParticipacion.multiple" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div class="sm:col-span-1">
+                    <label class="label-xs">Concepto</label>
+                    <input
+                      type="text"
+                      value="Costo por participar"
+                      readonly
+                      class="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label class="label-xs">Monto (Bs)</label>
+                    <input
+                      v-model.number="form.costosParticipacion.items[0].monto"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      placeholder="Ej. 350"
+                      :disabled="!puedeEditarCampo('costosParticipacion')"
+                      :class="claseInputCampo('costosParticipacion')"
+                      @input="marcarCampoEditado('costosParticipacion')"
+                    />
+                  </div>
+                </div>
+
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="(item, idx) in form.costosParticipacion.items"
+                    :key="'costo-' + idx"
+                    class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end"
+                  >
+                    <div class="sm:col-span-6">
+                      <label class="label-xs">Tipo / concepto</label>
+                      <input
+                        v-model.trim="item.concepto"
+                        type="text"
+                        required
+                        placeholder="Ej. Moreno, China, Chola Morena…"
+                        :disabled="!puedeEditarCampo('costosParticipacion')"
+                        :class="claseInputCampo('costosParticipacion')"
+                        @input="marcarCampoEditado('costosParticipacion')"
+                      />
+                    </div>
+                    <div class="sm:col-span-4">
+                      <label class="label-xs">Monto (Bs)</label>
+                      <input
+                        v-model.number="item.monto"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        placeholder="0"
+                        :disabled="!puedeEditarCampo('costosParticipacion')"
+                        :class="claseInputCampo('costosParticipacion')"
+                        @input="marcarCampoEditado('costosParticipacion')"
+                      />
+                    </div>
+                    <div class="sm:col-span-2">
+                      <button
+                        type="button"
+                        class="w-full py-3 rounded-xl border border-red-200 text-red-500 text-xs font-black uppercase tracking-widest hover:bg-red-50 disabled:opacity-40"
+                        :disabled="!puedeEditarCampo('costosParticipacion') || form.costosParticipacion.items.length <= 1"
+                        @click="quitarCostoItem(idx)"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5"
+                    :disabled="!puedeEditarCampo('costosParticipacion')"
+                    @click="agregarCostoItem"
+                  >
+                    <span class="material-symbols-outlined text-sm">add</span>
+                    Agregar otro costo
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- Conditional Selects based on Instancia -->
@@ -854,8 +979,11 @@ let modalObservacionesTimer = null
 let modalObservacionesInterval = null
 
 const solicitudEditable = computed(() => {
-  return solicitudExistente.value?.estado === 'OBSERVADO'
+  const estado = solicitudExistente.value?.estado
+  return estado === 'OBSERVADO' || estado === 'BORRADOR'
 })
+
+const esBorrador = computed(() => solicitudExistente.value?.estado === 'BORRADOR')
 
 const steps = [
   { label: 'Fraternidad' },
@@ -864,6 +992,8 @@ const steps = [
   { label: 'Documentos' }
 ]
 
+const costoItemVacio = (concepto = '') => ({ concepto, monto: null })
+
 const form = ref({
   nombreFraternidad: '',
   instanciaRepresentacion: 'Facultad',
@@ -871,10 +1001,120 @@ const form = ref({
   idCategoria: null,
   idTipoDanza: null,
   tipoDanzaOtro: '',
+  costosParticipacion: {
+    multiple: false,
+    items: [costoItemVacio('Costo por participar')],
+  },
   idFacultad: null,
   idCarrera: null,
   ...crearEstadoVacioPersonas(),
 })
+
+const guardandoBorrador = ref(false)
+const ultimoToastBorrador = ref(0)
+let autosaveTimer = null
+let autosaveEnabled = false
+
+const pasoStorageKey = () => {
+  const uid = authStore.user?.id || authStore.user?.idUsuario || 'anon'
+  const gid = siteInfo.value?.idGestion || 'g'
+  return `efu-inscripcion-paso-${uid}-${gid}`
+}
+
+const guardarPasoLocal = () => {
+  try {
+    localStorage.setItem(pasoStorageKey(), String(currentStep.value))
+  } catch { /* ignore */ }
+}
+
+const leerPasoLocal = () => {
+  try {
+    const n = parseInt(localStorage.getItem(pasoStorageKey()) || '1', 10)
+    return Number.isNaN(n) ? 1 : Math.min(4, Math.max(1, n))
+  } catch {
+    return 1
+  }
+}
+
+const construirPayloadCostos = () => {
+  const c = form.value.costosParticipacion || { multiple: false, items: [] }
+  if (!c.multiple) {
+    return {
+      multiple: false,
+      items: [{
+        concepto: 'Costo por participar',
+        monto: Number(c.items?.[0]?.monto),
+      }],
+    }
+  }
+  return {
+    multiple: true,
+    items: (c.items || []).map((item) => ({
+      concepto: String(item.concepto || '').trim(),
+      monto: Number(item.monto),
+    })),
+  }
+}
+
+const costosValidos = () => {
+  const c = construirPayloadCostos()
+  if (!c.items.length) return false
+  if (!c.multiple && c.items.length !== 1) return false
+  return c.items.every(
+    (item) => item.concepto && !Number.isNaN(item.monto) && item.monto >= 0,
+  )
+}
+
+const toggleCostosMultiples = () => {
+  if (!puedeEditarCampo('costosParticipacion')) return
+  const multiple = !form.value.costosParticipacion.multiple
+  if (multiple) {
+    const monto = form.value.costosParticipacion.items?.[0]?.monto
+    form.value.costosParticipacion = {
+      multiple: true,
+      items: [
+        { concepto: '', monto: monto ?? null },
+        { concepto: '', monto: null },
+      ],
+    }
+  } else {
+    const monto = form.value.costosParticipacion.items?.[0]?.monto
+    form.value.costosParticipacion = {
+      multiple: false,
+      items: [costoItemVacio('Costo por participar')],
+    }
+    form.value.costosParticipacion.items[0].monto = monto ?? null
+  }
+  marcarCampoEditado('costosParticipacion')
+}
+
+const agregarCostoItem = () => {
+  form.value.costosParticipacion.items.push(costoItemVacio(''))
+  marcarCampoEditado('costosParticipacion')
+}
+
+const quitarCostoItem = (idx) => {
+  if (form.value.costosParticipacion.items.length <= 1) return
+  form.value.costosParticipacion.items.splice(idx, 1)
+  marcarCampoEditado('costosParticipacion')
+}
+
+const hidratarCostosDesdeSolicitud = (solicitud) => {
+  const raw = solicitud?.costosParticipacion
+  if (!raw || !Array.isArray(raw.items) || !raw.items.length) {
+    return {
+      multiple: false,
+      items: [costoItemVacio('Costo por participar')],
+    }
+  }
+  return {
+    multiple: Boolean(raw.multiple) || raw.items.length > 1,
+    items: raw.items.map((item) => ({
+      concepto: item.concepto || '',
+      monto: item.monto ?? null,
+    })),
+  }
+}
 
 const files = ref({
   ...crearEstadoVacioArchivosPersona(),
@@ -1043,7 +1283,84 @@ const cerrarModalObservaciones = () => {
 onUnmounted(() => {
   clearTimeout(modalObservacionesTimer)
   clearInterval(modalObservacionesInterval)
+  if (autosaveTimer) clearTimeout(autosaveTimer)
 })
+
+const mostrarToastBorrador = () => {
+  const ahora = Date.now()
+  if (ahora - ultimoToastBorrador.value < 2500) return
+  ultimoToastBorrador.value = ahora
+  Swal.fire({
+    icon: 'success',
+    title: 'Guardado automático exitoso',
+    text: 'Tu progreso se guardó. Puedes continuar más tarde.',
+    toast: true,
+    position: 'top-end',
+    timer: 2200,
+    showConfirmButton: false,
+  })
+}
+
+const puedeAutosave = () => {
+  if (!autosaveEnabled || loadingForm.value || submitting.value || hidratandoFormulario.value) return false
+  const estado = solicitudExistente.value?.estado
+  if (estado && !['BORRADOR'].includes(estado)) return false
+  return true
+}
+
+const guardarBorradorAutomatico = async (forzarToast = false) => {
+  if (!puedeAutosave() || guardandoBorrador.value) return null
+  guardandoBorrador.value = true
+  try {
+    const payload = limpiarComplementosInactivos({ ...form.value }, ciComplementoActivo.value)
+    payload.costosParticipacion = construirPayloadCostos()
+    const formData = new FormData()
+    formData.append('data', JSON.stringify(payload))
+    Object.keys(files.value).forEach((key) => {
+      if (files.value[key]) formData.append(key, files.value[key])
+    })
+    const { data } = await api.post('/inscripciones/borrador', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    solicitudExistente.value = data
+    solicitudEditandoId.value = data.idSolicitud
+    documentosExistentes.value = {
+      ...documentosExistentes.value,
+      ...hidratarArchivosPersonaDesdeSolicitud(data),
+    }
+    // Archivos ya persistidos: quitar del buffer local para no reenviar
+    Object.keys(files.value).forEach((key) => {
+      if (files.value[key] && documentosExistentes.value[key]) {
+        files.value[key] = null
+      }
+    })
+    guardarPasoLocal()
+    mostrarToastBorrador()
+    return data
+  } catch (err) {
+    console.warn('Autosave borrador:', err?.response?.data?.message || err.message)
+    return null
+  } finally {
+    guardandoBorrador.value = false
+  }
+}
+
+const programarAutosave = () => {
+  if (!puedeAutosave()) return
+  if (autosaveTimer) clearTimeout(autosaveTimer)
+  autosaveTimer = setTimeout(() => {
+    guardarBorradorAutomatico(false)
+  }, 1800)
+}
+
+watch(
+  form,
+  () => {
+    if (hidratandoFormulario.value || !autosaveEnabled) return
+    programarAutosave()
+  },
+  { deep: true },
+)
 
 const revisionChecklistParsed = computed(() => {
   let checklist = solicitudExistente.value?.revisionChecklist || {}
@@ -1058,6 +1375,7 @@ const normalizarKeyRevision = (key) => {
   if (key === 'idCarrera') return 'carrera'
   if (key === 'idCategoria') return 'categoria'
   if (key === 'idTipoDanza') return 'tipoDanza'
+  if (key === 'costosParticipacion') return 'costosParticipacion'
   if (key === 'instanciaRepresentacion') return 'instancia'
   if (key === 'nombreInstitucionExterna') return 'institucionExterna'
   return key
@@ -1148,6 +1466,7 @@ const isOriginalValueEmpty = (key) => {
   if (key === 'idCarrera') realKey = 'carrera'
   if (key === 'idCategoria') realKey = 'categoria'
   if (key === 'idTipoDanza') realKey = 'tipoDanza'
+  if (key === 'costosParticipacion') realKey = 'costosParticipacion'
   if (key === 'instancia') realKey = 'instanciaRepresentacion'
   
   if (realKey === 'institucionExterna') {
@@ -1166,7 +1485,7 @@ const isOriginalValueEmpty = (key) => {
 
 const fraternidadHeredada = computed(() => authStore.user?.fraternidad || null)
 const puedeEditarCampo = (key) => {
-  // Si la solicitud NO está en modo edición (OBSERVADO), el formulario está libre
+  if (!solicitudExistente.value || solicitudExistente.value.estado === 'BORRADOR') return true
   if (!solicitudEditable.value) return true
 
   // Si el campo estaba vacío originalmente, permitimos llenarlo por primera vez
@@ -1221,10 +1540,11 @@ onMounted(async () => {
         // Cargar el detalle completo para asegurar que revisionChecklist y todos los campos estén disponibles
         const { data: detalleSol } = await api.get(`/inscripciones/${actual.idSolicitud}`)
         solicitudExistente.value = detalleSol
-        if (detalleSol.estado === 'OBSERVADO') {
+        if (detalleSol.estado === 'OBSERVADO' || detalleSol.estado === 'BORRADOR') {
           hidratarFormularioDesdeSolicitud(detalleSol)
+          currentStep.value = detalleSol.estado === 'BORRADOR' ? leerPasoLocal() : 1
           await nextTick()
-          abrirModalObservaciones()
+          if (detalleSol.estado === 'OBSERVADO') abrirModalObservaciones()
         }
       }
     }
@@ -1236,6 +1556,8 @@ onMounted(async () => {
     console.error('Error loading form data:', err)
   } finally {
     loadingForm.value = false
+    await nextTick()
+    autosaveEnabled = true
   }
 })
 
@@ -1264,10 +1586,12 @@ const onlyNumbers = (e) => {
   if (!/[0-9]/.test(char)) e.preventDefault()
 }
 
-const nextStep = () => {
+const nextStep = async () => {
   if (validateStep(currentStep.value)) {
     currentStep.value++
+    guardarPasoLocal()
     scrollToWizardTop()
+    await guardarBorradorAutomatico(true)
   } else {
     Swal.fire({
       icon: 'warning',
@@ -1284,6 +1608,7 @@ const nextStep = () => {
 const prevStep = () => {
   if (currentStep.value > 1) {
     currentStep.value--
+    guardarPasoLocal()
     scrollToWizardTop()
   }
 }
@@ -1293,6 +1618,7 @@ const validateStep = (step) => {
   if (step === 1) {
     if (!f.nombreFraternidad || !f.instanciaRepresentacion || !f.idCategoria || !f.idTipoDanza) return false
     if (f.idTipoDanza === 'otro' && f.tipoDanzaOtro.trim().length < 2) return false
+    if (!costosValidos()) return false
     if (f.instanciaRepresentacion === 'Facultad' && !f.idFacultad) return false
     if (f.instanciaRepresentacion === 'Carrera' && (!f.idFacultad || !f.idCarrera)) return false
     if (f.instanciaRepresentacion === 'Externo' && !f.nombreInstitucionExterna) return false
@@ -1390,6 +1716,7 @@ const handleFile = (e, key) => {
   }
   files.value[key] = file
   marcarCampoEditado(key)
+  programarAutosave()
 }
 
 const hidratarFormularioDesdeFraternidad = async (fraternidad) => {
@@ -1415,6 +1742,7 @@ const hidratarFormularioDesdeSolicitud = async (solicitud) => {
     idCategoria: solicitud.categoria?.idCategoria || fraternidadHeredada.value?.categoria?.idCategoria || null,
     idTipoDanza: solicitud.tipoDanza?.idTipoDanza || null,
     tipoDanzaOtro: '',
+    costosParticipacion: hidratarCostosDesdeSolicitud(solicitud),
     idFacultad: solicitud.facultad?.idFacultad || fraternidadHeredada.value?.facultad?.idFacultad || null,
     idCarrera: solicitud.carrera?.idCarrera || fraternidadHeredada.value?.carrera?.idCarrera || null,
     ...hidratarPersonasDesdeSolicitud(solicitud),
@@ -1452,11 +1780,18 @@ const handleSubmit = async () => {
     return
   }
 
+  if (!costosValidos()) {
+    Swal.fire('Atención', 'Completa el costo de participación por bailarín antes de enviar.', 'warning')
+    currentStep.value = 1
+    return
+  }
+
   const camposMayusculas = [
     'nombreFraternidad', 'nombreInstitucionExterna',
     ...CAMPOS_NOMBRE_PERSONA,
   ]
   const payload = limpiarComplementosInactivos({ ...form.value }, ciComplementoActivo.value)
+  payload.costosParticipacion = construirPayloadCostos()
   camposMayusculas.forEach((campo) => {
     if (typeof payload[campo] === 'string') {
       payload[campo] = payload[campo].trim().toUpperCase()
@@ -1464,6 +1799,7 @@ const handleSubmit = async () => {
   })
 
   submitting.value = true
+  autosaveEnabled = false
   try {
     const formData = new FormData()
     formData.append('data', JSON.stringify(payload))
@@ -1478,6 +1814,8 @@ const handleSubmit = async () => {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
 
+    try { localStorage.removeItem(pasoStorageKey()) } catch { /* ignore */ }
+
     await Swal.fire({
       title: '¡Solicitud Enviada!',
       text: 'Tu inscripción ha sido recibida y está en proceso de revisión por La Comisión.',
@@ -1489,6 +1827,7 @@ const handleSubmit = async () => {
   } catch (err) {
     console.error('Error enviando inscripcion:', err)
     Swal.fire('Error', err.response?.data?.message || 'No se pudo enviar la solicitud.', 'error')
+    autosaveEnabled = true
   } finally {
     submitting.value = false
   }

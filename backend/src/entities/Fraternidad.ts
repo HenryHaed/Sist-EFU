@@ -44,6 +44,13 @@ export class Fraternidad {
     @JoinColumn({ name: 'id_tipo_danza' })
     tipoDanza: TipoDanza;
 
+    /** Costos de participación por bailarín (copiados desde la solicitud al aprobar). */
+    @Column({ name: 'costos_participacion', type: 'jsonb', nullable: true })
+    costosParticipacion: {
+        multiple: boolean;
+        items: Array<{ concepto: string; monto: number }>;
+    } | null;
+
     @Column({ name: 'tipo_organizacion', length: 100, nullable: true })
     tipoOrganizacion: string;
 

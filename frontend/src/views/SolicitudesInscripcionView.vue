@@ -196,6 +196,56 @@
                               class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
                             />
                           </div>
+                          <div v-else-if="item.key === 'costosParticipacion'" class="space-y-2">
+                            <label class="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 flex-wrap">
+                              <span :class="!adminFormDraft.costosParticipacion?.multiple ? 'text-primary' : ''">Costo único</span>
+                              <input
+                                type="checkbox"
+                                :checked="adminFormDraft.costosParticipacion?.multiple"
+                                class="rounded border-slate-300"
+                                @change="toggleAdminCostosMultiples($event.target.checked)"
+                              />
+                              <span :class="adminFormDraft.costosParticipacion?.multiple ? 'text-primary' : ''">Costo variado (detallar)</span>
+                            </label>
+                            <div
+                              v-for="(cItem, cIdx) in (adminFormDraft.costosParticipacion?.items || [])"
+                              :key="'admin-costo-' + cIdx"
+                              class="flex flex-col sm:flex-row gap-2"
+                            >
+                              <input
+                                v-if="adminFormDraft.costosParticipacion?.multiple"
+                                v-model.trim="cItem.concepto"
+                                type="text"
+                                placeholder="Concepto"
+                                class="flex-1 px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                              />
+                              <input
+                                v-model.number="cItem.monto"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="Monto Bs"
+                                class="w-full sm:w-28 px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
+                              />
+                              <button
+                                v-if="adminFormDraft.costosParticipacion?.multiple"
+                                type="button"
+                                class="px-2 py-2 text-xs font-bold text-red-600"
+                                :disabled="(adminFormDraft.costosParticipacion?.items || []).length <= 1"
+                                @click="quitarAdminCosto(cIdx)"
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                            <button
+                              v-if="adminFormDraft.costosParticipacion?.multiple"
+                              type="button"
+                              class="text-[10px] font-black uppercase tracking-widest text-primary"
+                              @click="agregarAdminCosto"
+                            >
+                              + Agregar costo
+                            </button>
+                          </div>
                           <select
                             v-else-if="item.key === 'facultad'"
                             v-model="adminFormDraft.idFacultad"
@@ -768,6 +818,7 @@ const itemsFraternidad = computed(() => {
   const items = [
     { key: 'nombreFraternidad', label: 'Nombre Fraternidad', value: s.nombreFraternidad || '' },
     { key: 'tipoDanza', label: 'Tipo de danza', value: s.tipoDanza?.nombre || '—' },
+    { key: 'costosParticipacion', label: 'Costo de participación', value: formatearCostosParticipacion(s.costosParticipacion) },
     { key: 'categoria', label: 'Categoría', value: s.categoria?.nombre || '' },
     { key: 'instancia', label: 'Instancia', value: instanciaLabel(s) || '' },
   ]
@@ -776,6 +827,13 @@ const itemsFraternidad = computed(() => {
   if (s.nombreInstitucionExterna) items.push({ key: 'institucionExterna', label: 'Institución Externa', value: s.nombreInstitucionExterna || '' })
   return items
 })
+
+const formatearCostosParticipacion = (costos) => {
+  if (!costos?.items?.length) return '—'
+  return costos.items
+    .map((item) => `${item.concepto || 'Costo'}: ${Number(item.monto)} Bs`)
+    .join(' · ')
+}
 
 const checklistItems = computed(() => {
   if (!solicitudActiva.value) return []
@@ -1048,6 +1106,7 @@ const adminFieldKey = (itemKey) => {
   const map = {
     nombreFraternidad: 'nombreFraternidad',
     tipoDanza: 'idTipoDanza',
+    costosParticipacion: 'costosParticipacion',
     categoria: 'idCategoria',
     instancia: 'instanciaRepresentacion',
     facultad: 'idFacultad',
@@ -1059,6 +1118,50 @@ const adminFieldKey = (itemKey) => {
 
 const adminCampoEditable = (key) => !DELEGADO_KEYS_NO_EDITABLES.has(key)
 
+const hidratarCostosAdmin = (s) => {
+  const raw = s.costosParticipacion
+  if (!raw?.items?.length) {
+    return { multiple: false, items: [{ concepto: 'Costo por participar', monto: null }] }
+  }
+  return {
+    multiple: Boolean(raw.multiple) || raw.items.length > 1,
+    items: raw.items.map((item) => ({
+      concepto: item.concepto || 'Costo por participar',
+      monto: item.monto ?? null,
+    })),
+  }
+}
+
+const toggleAdminCostosMultiples = (multiple) => {
+  const actual = adminFormDraft.value.costosParticipacion || { items: [] }
+  if (multiple) {
+    adminFormDraft.value.costosParticipacion = {
+      multiple: true,
+      items: actual.items?.length
+        ? actual.items.map((i) => ({ ...i }))
+        : [{ concepto: '', monto: null }, { concepto: '', monto: null }],
+    }
+  } else {
+    adminFormDraft.value.costosParticipacion = {
+      multiple: false,
+      items: [{ concepto: 'Costo por participar', monto: actual.items?.[0]?.monto ?? null }],
+    }
+  }
+}
+
+const agregarAdminCosto = () => {
+  if (!adminFormDraft.value.costosParticipacion) {
+    adminFormDraft.value.costosParticipacion = { multiple: true, items: [] }
+  }
+  adminFormDraft.value.costosParticipacion.items.push({ concepto: '', monto: null })
+}
+
+const quitarAdminCosto = (idx) => {
+  const items = adminFormDraft.value.costosParticipacion?.items
+  if (!items || items.length <= 1) return
+  items.splice(idx, 1)
+}
+
 const hidratarAdminFormDesdeSolicitud = (s) => {
   const draft = {
     nombreFraternidad: s.nombreFraternidad || '',
@@ -1067,6 +1170,7 @@ const hidratarAdminFormDesdeSolicitud = (s) => {
     idCategoria: s.categoria?.idCategoria || null,
     idTipoDanza: s.tipoDanza?.idTipoDanza || null,
     tipoDanzaOtro: '',
+    costosParticipacion: hidratarCostosAdmin(s),
     idFacultad: s.facultad?.idFacultad || null,
     idCarrera: s.carrera?.idCarrera || null,
   }
@@ -1133,7 +1237,16 @@ const guardarEdicionAdmin = async () => {
   if (!solicitudActiva.value) return
   guardandoAdmin.value = true
   try {
-    const { data } = await api.put(`/inscripciones/${solicitudActiva.value.idSolicitud}/admin-datos`, adminFormDraft.value)
+    const payload = { ...adminFormDraft.value }
+    if (payload.costosParticipacion) {
+      const multiple = Boolean(payload.costosParticipacion.multiple)
+      const items = (payload.costosParticipacion.items || []).map((item) => ({
+        concepto: multiple ? String(item.concepto || '').trim() : 'Costo por participar',
+        monto: Number(item.monto),
+      }))
+      payload.costosParticipacion = { multiple, items }
+    }
+    const { data } = await api.put(`/inscripciones/${solicitudActiva.value.idSolicitud}/admin-datos`, payload)
     solicitudActiva.value = data
     const idx = solicitudes.value.findIndex((s) => s.idSolicitud === data.idSolicitud)
     if (idx !== -1) solicitudes.value[idx] = { ...solicitudes.value[idx], ...data }

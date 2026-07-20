@@ -69,6 +69,31 @@ export class InscripcionesController {
     return this.inscripcionesService.createSolicitud(data, req.user, files);
   }
 
+  @Post('borrador')
+  @Roles('delegado', 'superusuario', 'admin')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        ...PERSONA_DOC_FILE_FIELDS,
+        ...INSTITUCIONAL_FILE_FIELDS,
+      ],
+      {
+        storage,
+        fileFilter: (req, file, cb) => {
+          if (!file.originalname.match(/\.pdf$/i)) {
+            return cb(new BadRequestException('Solo se permiten archivos PDF.'), false);
+          }
+          cb(null, true);
+        },
+        limits: { fileSize: 5 * 1024 * 1024 },
+      },
+    ),
+  )
+  async saveBorrador(@Body() body: any, @UploadedFiles() files: any, @Request() req: any) {
+    const data = typeof body.data === 'string' ? JSON.parse(body.data) : body;
+    return this.inscripcionesService.saveBorrador(data, req.user, files);
+  }
+
   @Get('verificar-ci-directiva')
   @Roles('delegado', 'superusuario', 'admin')
   async verificarCiDirectiva(

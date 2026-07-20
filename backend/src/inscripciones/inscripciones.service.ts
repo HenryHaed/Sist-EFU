@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets, ILike } from 'typeorm';
-import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
+import { SolicitudInscripcion, EstadoSolicitud, CostosParticipacion, InstanciaRepresentacion } from '../entities/SolicitudInscripcion';
 import { Gestion } from '../entities/Gestion';
 import { CronogramaInscripcion } from '../entities/CronogramaInscripcion';
 import { Usuario } from '../entities/Usuario';
@@ -199,6 +199,68 @@ export class InscripcionesService {
         );
     }
 
+    private normalizarCostosParticipacion(raw: unknown, requerido = false): CostosParticipacion | null {
+        if (raw === undefined || raw === null || raw === '') {
+            if (requerido) throw new BadRequestException('El costo de participación es obligatorio.');
+            return null;
+        }
+        let parsed: any = raw;
+        if (typeof raw === 'string') {
+            try {
+                parsed = JSON.parse(raw);
+            } catch {
+                throw new BadRequestException('El formato de costos de participación no es válido.');
+            }
+        }
+        const multiple = Boolean(parsed?.multiple);
+        const itemsRaw = Array.isArray(parsed?.items) ? parsed.items : [];
+        const items = itemsRaw
+            .map((item: any) => ({
+                concepto: String(item?.concepto || '').trim().replace(/\s+/g, ' '),
+                monto: Number(item?.monto),
+            }))
+            .filter((item: { concepto: string; monto: number }) => item.concepto || !Number.isNaN(item.monto));
+
+        if (requerido) {
+            if (!items.length) {
+                throw new BadRequestException('Debes registrar al menos un costo de participación.');
+            }
+            if (!multiple && items.length !== 1) {
+                throw new BadRequestException('Si no hay múltiples costos, registra exactamente un monto.');
+            }
+            for (const item of items) {
+                if (!item.concepto) {
+                    throw new BadRequestException('Cada costo debe tener un concepto o tipo de bailarín.');
+                }
+                if (Number.isNaN(item.monto) || item.monto < 0) {
+                    throw new BadRequestException('Cada monto debe ser un número válido mayor o igual a 0.');
+                }
+            }
+        } else {
+            // Borrador: guardar solo ítems con algo útil
+            const limpios = items.filter(
+                (item: { concepto: string; monto: number }) =>
+                    item.concepto || (!Number.isNaN(item.monto) && item.monto >= 0),
+            );
+            if (!limpios.length) return null;
+            return {
+                multiple: multiple || limpios.length > 1,
+                items: limpios.map((item: { concepto: string; monto: number }) => ({
+                    concepto: item.concepto || 'Costo por participar',
+                    monto: Number.isNaN(item.monto) ? 0 : item.monto,
+                })),
+            };
+        }
+
+        return {
+            multiple,
+            items: items.map((item: { concepto: string; monto: number }) => ({
+                concepto: multiple ? item.concepto : (item.concepto || 'Costo por participar'),
+                monto: item.monto,
+            })),
+        };
+    }
+
     private async eliminarFraternidadVinculada(idFraternidad: number) {
         await this.evaluacionRepo.delete({ fraternidad: { idFraternidad } });
         await this.incidenciaRepo.delete({ fraternidad: { idFraternidad } });
@@ -366,7 +428,8 @@ export class InscripcionesService {
             relations: ['categoria', 'tipoDanza']
         });
         const puedeReeditar = existente && existente.estado === EstadoSolicitud.OBSERVADO;
-        if (existente && !puedeReeditar) {
+        const puedeContinuarBorrador = existente && existente.estado === EstadoSolicitud.BORRADOR;
+        if (existente && !puedeReeditar && !puedeContinuarBorrador) {
             const msgEstado =
                 existente.estado === EstadoSolicitud.RECHAZADO
                     ? 'Tu solicitud fue rechazada y anulada por La Comisión. No puedes reenviarla en esta gestión.'
@@ -382,6 +445,13 @@ export class InscripcionesService {
             data.tipoDanzaOtro,
         );
         const idTipoDanza = tipoDanza.idTipoDanza;
+
+        const costosParticipacion = this.normalizarCostosParticipacion(
+            data.costosParticipacion !== undefined
+                ? data.costosParticipacion
+                : existente?.costosParticipacion,
+            true,
+        );
 
         let checklistReedicion = existente?.revisionChecklist || {};
         if (typeof checklistReedicion === 'string') {
@@ -437,7 +507,7 @@ export class InscripcionesService {
             }
         }
 
-        // 3. Validar Cronograma según Categoría, salvo cuando se trata de una corrección de una solicitud ya rechazada/observada
+        // 3. Validar Cronograma según Categoría, salvo cuando se trata de una corrección observada
         if (!puedeReeditar) {
             const cronograma = await this.cronogramaRepo.findOne({
                 where: { 
@@ -459,8 +529,9 @@ export class InscripcionesService {
             }
         }
 
-        // 4. Preparar o reutilizar la entidad
-        const solicitud = puedeReeditar ? existente : this.solicitudRepo.create({
+        // 4. Preparar o reutilizar la entidad (OBSERVADO o BORRADOR)
+        const reutilizar = puedeReeditar || puedeContinuarBorrador;
+        const solicitud = reutilizar ? existente : this.solicitudRepo.create({
             gestion,
             delegado: usuario,
             estado: EstadoSolicitud.PENDIENTE,
@@ -479,6 +550,11 @@ export class InscripcionesService {
                     existente?.tipoDanza?.idTipoDanza,
                 ),
             } as any,
+            costosParticipacion: conservarSiNoRechazado(
+                'costosParticipacion',
+                costosParticipacion,
+                existente?.costosParticipacion,
+            ),
             ...camposDirectiva,
             gestion,
             delegado: usuario,
@@ -529,6 +605,18 @@ export class InscripcionesService {
                     (existente as any)?.[doc.url],
                 );
             }
+        } else if (puedeContinuarBorrador && existente) {
+            // Conservar PDFs ya subidos en el borrador
+            for (const doc of DOCUMENTOS_POR_PERSONA) {
+                if (!(solicitud as any)[doc.urlField] && (existente as any)[doc.urlField]) {
+                    (solicitud as any)[doc.urlField] = (existente as any)[doc.urlField];
+                }
+            }
+            for (const doc of DOCUMENTOS_INSTITUCIONALES) {
+                if (!(solicitud as any)[doc.url] && (existente as any)[doc.url]) {
+                    (solicitud as any)[doc.url] = (existente as any)[doc.url];
+                }
+            }
         }
 
         if (puedeReeditar) {
@@ -552,12 +640,122 @@ export class InscripcionesService {
         }
 
         await this.assertCargosObligatorios(data);
-        await this.assertCisDirectivaUnicos(data, puedeReeditar ? existente?.idSolicitud : undefined);
-        this.assertDocumentosObligatorios(solicitud, files, puedeReeditar ? existente : null);
+        await this.assertCisDirectivaUnicos(data, reutilizar ? existente?.idSolicitud : undefined);
+        this.assertDocumentosObligatorios(solicitud, files, reutilizar ? existente : null);
 
         this.normalizarSolicitudInscripcion(solicitud);
 
         return await this.solicitudRepo.save(solicitud);
+    }
+
+    /**
+     * Guardado parcial automático del wizard (estado BORRADOR).
+     * No exige cargos, documentos ni cronograma.
+     */
+    async saveBorrador(data: any, usuario: Usuario, files?: any) {
+        const gestion = await this.gestionRepo.findOne({ where: { activa: true } });
+        if (!gestion) throw new BadRequestException('No hay una gestión activa configurada.');
+
+        const existente = await this.solicitudRepo.findOne({
+            where: {
+                delegado: { idUsuario: usuario.idUsuario },
+                gestion: { idGestion: gestion.idGestion },
+            },
+            relations: ['categoria', 'tipoDanza'],
+        });
+
+        if (existente && existente.estado !== EstadoSolicitud.BORRADOR) {
+            if (existente.estado === EstadoSolicitud.OBSERVADO) {
+                throw new BadRequestException(
+                    'Tu solicitud está observada. Usa el envío formal para corregir y reenviar.',
+                );
+            }
+            throw new BadRequestException(
+                'Ya tienes una solicitud enviada para esta gestión; no se puede guardar como borrador.',
+            );
+        }
+
+        const solicitud = existente || this.solicitudRepo.create({
+            gestion,
+            delegado: usuario,
+            estado: EstadoSolicitud.BORRADOR,
+            revisionChecklist: {},
+            nombreFraternidad: '',
+            instanciaRepresentacion: InstanciaRepresentacion.FACULTAD,
+        });
+
+        if (data.nombreFraternidad !== undefined) {
+            solicitud.nombreFraternidad = String(data.nombreFraternidad || '').trim();
+        } else if (!solicitud.nombreFraternidad) {
+            solicitud.nombreFraternidad = '';
+        }
+
+        if (data.instanciaRepresentacion) {
+            solicitud.instanciaRepresentacion = data.instanciaRepresentacion;
+        } else if (!solicitud.instanciaRepresentacion) {
+            solicitud.instanciaRepresentacion = InstanciaRepresentacion.FACULTAD;
+        }
+
+        if (data.nombreInstitucionExterna !== undefined) {
+            solicitud.nombreInstitucionExterna = data.nombreInstitucionExterna || null;
+        }
+
+        if (data.idCategoria !== undefined && data.idCategoria !== null && data.idCategoria !== '') {
+            const idCategoria = parseInt(String(data.idCategoria), 10);
+            solicitud.categoria = !Number.isNaN(idCategoria) ? ({ idCategoria } as any) : null;
+        }
+
+        if (data.idTipoDanza !== undefined && data.idTipoDanza !== null && data.idTipoDanza !== '') {
+            try {
+                solicitud.tipoDanza = await this.resolverTipoDanza(data.idTipoDanza, data.tipoDanzaOtro);
+            } catch {
+                // En borrador se ignora tipo inválido parcial
+            }
+        }
+
+        if (data.costosParticipacion !== undefined) {
+            solicitud.costosParticipacion = this.normalizarCostosParticipacion(data.costosParticipacion, false);
+        }
+
+        if (data.idFacultad !== undefined) {
+            const idFacultad = data.idFacultad ? parseInt(String(data.idFacultad), 10) : null;
+            solicitud.facultad = idFacultad && !Number.isNaN(idFacultad) ? ({ idFacultad } as any) : null;
+        }
+        if (data.idCarrera !== undefined) {
+            const idCarrera = data.idCarrera ? parseInt(String(data.idCarrera), 10) : null;
+            solicitud.carrera = idCarrera && !Number.isNaN(idCarrera) ? ({ idCarrera } as any) : null;
+        }
+
+        for (const p of PERSONAS_DIRECTIVA) {
+            for (const suffix of ['Nombres', 'PrimerApellido', 'SegundoApellido', 'Ci', 'CiComplemento']) {
+                const key = `${p.prefix}${suffix}`;
+                if (data[key] !== undefined) (solicitud as any)[key] = data[key];
+            }
+            if (p.hasCelular && data[`${p.prefix}Celular`] !== undefined) {
+                (solicitud as any)[`${p.prefix}Celular`] = data[`${p.prefix}Celular`];
+            }
+        }
+
+        if (files) {
+            for (const doc of DOCUMENTOS_POR_PERSONA) {
+                if (files[doc.fileKey]?.[0]) {
+                    (solicitud as any)[doc.urlField] = `/uploads/Docs_Registro/${files[doc.fileKey][0].filename}`;
+                }
+            }
+            for (const doc of DOCUMENTOS_INSTITUCIONALES) {
+                if (files[doc.key]?.[0]) {
+                    (solicitud as any)[doc.url] = `/uploads/Docs_Registro/${files[doc.key][0].filename}`;
+                }
+            }
+        }
+
+        solicitud.estado = EstadoSolicitud.BORRADOR;
+        solicitud.gestion = gestion;
+        solicitud.delegado = usuario;
+        this.normalizarSolicitudInscripcion(solicitud);
+
+        const saved = await this.solicitudRepo.save(solicitud);
+        return this.getSolicitudById(saved.idSolicitud);
     }
 
     async getMisSolicitudes(idUsuario: number) {
@@ -578,13 +776,25 @@ export class InscripcionesService {
     }
 
     async getAllSolicitudes(estado?: string) {
-        const where: any = {};
-        if (estado) where.estado = estado;
-        return await this.solicitudRepo.find({
-            where,
-            relations: ['gestion', 'categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'delegado', 'fraternidadCreada'],
-            order: { createdAt: 'DESC' }
-        });
+        const qb = this.solicitudRepo
+            .createQueryBuilder('s')
+            .leftJoinAndSelect('s.gestion', 'gestion')
+            .leftJoinAndSelect('s.categoria', 'categoria')
+            .leftJoinAndSelect('s.tipoDanza', 'tipoDanza')
+            .leftJoinAndSelect('s.facultad', 'facultad')
+            .leftJoinAndSelect('s.carrera', 'carrera')
+            .leftJoinAndSelect('s.institucionExterna', 'institucionExterna')
+            .leftJoinAndSelect('s.delegado', 'delegado')
+            .leftJoinAndSelect('s.fraternidadCreada', 'fraternidadCreada')
+            .orderBy('s.createdAt', 'DESC');
+
+        if (estado) {
+            qb.where('s.estado = :estado', { estado });
+        } else {
+            qb.where('s.estado != :borrador', { borrador: EstadoSolicitud.BORRADOR });
+        }
+
+        return qb.getMany();
     }
 
     private extraerItemsObservados(
@@ -772,6 +982,9 @@ export class InscripcionesService {
         if (data.idTipoDanza !== undefined) {
             sol.tipoDanza = await this.resolverTipoDanza(data.idTipoDanza, data.tipoDanzaOtro);
         }
+        if (data.costosParticipacion !== undefined) {
+            sol.costosParticipacion = this.normalizarCostosParticipacion(data.costosParticipacion, true);
+        }
         if (data.idFacultad !== undefined) {
             const idFacultad = data.idFacultad ? parseInt(data.idFacultad, 10) : null;
             sol.facultad = idFacultad && !isNaN(idFacultad) ? ({ idFacultad } as Facultad) : null;
@@ -846,6 +1059,12 @@ export class InscripcionesService {
 
         if (solicitud.tipoDanza) {
             fraternidad.tipoDanza = solicitud.tipoDanza;
+        }
+
+        if (solicitud.costosParticipacion) {
+            fraternidad.costosParticipacion = solicitud.costosParticipacion;
+        } else if (data?.costosParticipacion !== undefined) {
+            fraternidad.costosParticipacion = this.normalizarCostosParticipacion(data.costosParticipacion, false);
         }
 
         if (data?.idFacultad) {

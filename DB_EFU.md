@@ -205,11 +205,13 @@ Participación oficial de un grupo folclórico en una gestión.
 | `id_carrera` | INTEGER | FK → `carreras`, ON DELETE SET NULL | Carrera |
 | `id_institucion_externa` | INTEGER | FK → `instituciones_externas`, ON DELETE SET NULL | Institución externa |
 | `id_categoria` | INTEGER | FK → `categorias` | Categoría de concurso |
+| `id_tipo_danza` | INTEGER | FK → `tipos_danza`, NULL | Tipo de danza |
 | `tipo_organizacion` | VARCHAR(100) | NULL | Tipo organizacional |
 | `fecha_fundacion` | DATE | NULL | Fecha fundación |
 | `habilitado_efu` | BOOLEAN | DEFAULT true | Habilitada para EFU |
 | `logo_url` | TEXT | NULL | URL del logo |
 | `promedio_base` | NUMERIC(5,2) | DEFAULT 0 | Promedio base |
+| `costos_participacion` | JSONB | NULL | Costos por bailarín `{ multiple, items: [{ concepto, monto }] }` (copiado al aprobar) |
 | `created_at` | TIMESTAMP | NOT NULL | Creación |
 | `updated_at` | TIMESTAMP | NOT NULL | Actualización |
 
@@ -249,8 +251,10 @@ Formulario de preinscripción enviado por el delegado antes de la inscripción o
 
 **Enums:**
 
-- `estado`: `PENDIENTE` | `OBSERVADO` | `APROBADO` | `RECHAZADO`
+- `estado`: `BORRADOR` | `PENDIENTE` | `OBSERVADO` | `APROBADO` | `RECHAZADO`
 - `instancia_representacion`: `Facultad` | `Carrera` | `UMSA` | `FEDSIDUMSA` | `STUMSA` | `Externo`
+
+**Borrador:** el delegado puede guardar progreso automático (`BORRADOR`) sin enviar a revisión. Los listados de la comisión excluyen `BORRADOR`.
 
 #### Datos generales
 
@@ -265,7 +269,9 @@ Formulario de preinscripción enviado por el delegado antes de la inscripción o
 | `id_carrera` | FK nullable | Carrera |
 | `id_institucion_externa` | FK nullable | Institución externa (catálogo) |
 | `nombre_institucion_externa` | VARCHAR(255) | Nombre libre si es externo |
-| `id_categoria` | FK → `categorias` | Categoría A/B/C de la gestión |
+| `id_categoria` | FK → `categorias` nullable | Categoría A/B/C (nullable en BORRADOR) |
+| `id_tipo_danza` | FK → `tipos_danza` | Tipo de danza |
+| `costos_participacion` | JSONB nullable | Costos por bailarín: `{ multiple: bool, items: [{ concepto, monto }] }`. Obligatorio al enviar (estado ≠ BORRADOR). |
 
 #### Directiva (10 cargos)
 
@@ -313,7 +319,7 @@ Mismo patrón para los 10 cargos (`Vice`, `SecGen`, `SecHaci`, `SecActas`, `SecP
 |---------|------|-------------|
 | `estado` | ENUM | Estado administrativo |
 | `observaciones` | TEXT | Observaciones del admin |
-| `revision_checklist` | JSONB | Checklist `{ key: { estado: PENDIENTE\|OK\|X, label, value, comentario? } }`. Keys unificadas: `{Cargo}-nombres`, `{Cargo}-ci`, `ciPresi`, etc. |
+| `revision_checklist` | JSONB | Checklist `{ key: { estado: PENDIENTE\|OK\|X, label, value, comentario? } }`. Keys unificadas: `{Cargo}-nombres`, `{Cargo}-ci`, `ciPresi`, `costosParticipacion`, `tipoDanza`, etc. |
 | `id_fraternidad_creada` | FK nullable → `fraternidades` | Fraternidad oficial al aprobar |
 | `created_at`, `updated_at` | TIMESTAMP | Auditoría |
 
@@ -543,7 +549,7 @@ Script de referencia equivalente al modelo TypeORM actual.
 -- Tipos enumerados
 -- ------------------------------------------------------------
 DO $$ BEGIN
-    CREATE TYPE estado_solicitud AS ENUM ('PENDIENTE', 'OBSERVADO', 'APROBADO', 'RECHAZADO');
+    CREATE TYPE estado_solicitud AS ENUM ('BORRADOR', 'PENDIENTE', 'OBSERVADO', 'APROBADO', 'RECHAZADO');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -651,6 +657,7 @@ CREATE TABLE IF NOT EXISTS fraternidades (
     habilitado_efu          BOOLEAN NOT NULL DEFAULT TRUE,
     logo_url                TEXT,
     promedio_base           NUMERIC(5,2) NOT NULL DEFAULT 0,
+    costos_participacion    JSONB,
     created_at              TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -724,6 +731,8 @@ CREATE TABLE IF NOT EXISTS solicitudes_inscripcion (
     id_institucion_externa          INTEGER REFERENCES instituciones_externas(id_institucion),
     nombre_institucion_externa      VARCHAR(255),
     id_categoria                    INTEGER NOT NULL REFERENCES categorias(id_categoria),
+    id_tipo_danza                   INTEGER REFERENCES tipos_danza(id_tipo_danza),
+    costos_participacion            JSONB,
     -- Directiva: por cada cargo → {prefix}_nombres, _primer_apellido, _segundo_apellido,
     --            _ci, _ci_complemento, _celular (ver prefijos en sección 4)
     presi_nombres                   VARCHAR(150),

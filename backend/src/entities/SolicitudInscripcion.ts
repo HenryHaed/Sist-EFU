@@ -9,11 +9,22 @@ import { Fraternidad } from './Fraternidad';
 import { TipoDanza } from './TipoDanza';
 
 export enum EstadoSolicitud {
+    BORRADOR = 'BORRADOR',
     PENDIENTE = 'PENDIENTE',
     OBSERVADO = 'OBSERVADO',
     APROBADO = 'APROBADO',
     RECHAZADO = 'RECHAZADO'
 }
+
+export type CostoParticipacionItem = {
+    concepto: string;
+    monto: number;
+};
+
+export type CostosParticipacion = {
+    multiple: boolean;
+    items: CostoParticipacionItem[];
+};
 
 export enum InstanciaRepresentacion {
     FACULTAD = 'Facultad',
@@ -62,13 +73,17 @@ export class SolicitudInscripcion {
     nombreInstitucionExterna: string;
 
     // 3. Categoría a la que pertenece
-    @ManyToOne(() => Categoria)
+    @ManyToOne(() => Categoria, { nullable: true })
     @JoinColumn({ name: 'id_categoria' })
     categoria: Categoria;
 
     @ManyToOne(() => TipoDanza, { nullable: true })
     @JoinColumn({ name: 'id_tipo_danza' })
     tipoDanza: TipoDanza;
+
+    /** Costos de participación por bailarín (único o N conceptos). */
+    @Column({ name: 'costos_participacion', type: 'jsonb', nullable: true })
+    costosParticipacion: CostosParticipacion | null;
 
     // --- Directiva (Puntos 4 al 28) ---
     // Presidente

@@ -28,6 +28,31 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     ALTER TABLE eventos_control
     ADD COLUMN IF NOT EXISTS descripcion text NULL
   `);
+  await dataSource.query(`
+    ALTER TABLE solicitudes_inscripcion
+    ADD COLUMN IF NOT EXISTS costos_participacion jsonb NULL
+  `);
+  await dataSource.query(`
+    ALTER TABLE fraternidades
+    ADD COLUMN IF NOT EXISTS costos_participacion jsonb NULL
+  `);
+  // Permitir borradores sin categoría aún elegida
+  await dataSource.query(`
+    ALTER TABLE solicitudes_inscripcion
+    ALTER COLUMN id_categoria DROP NOT NULL
+  `);
+  // Postgres: agregar BORRADOR al enum de forma idempotente
+  await dataSource.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        WHERE t.typname = 'estado_solicitud' AND e.enumlabel = 'BORRADOR'
+      ) THEN
+        ALTER TYPE estado_solicitud ADD VALUE 'BORRADOR';
+      END IF;
+    END $$;
+  `);
 }
 
 async function bootstrap() {
