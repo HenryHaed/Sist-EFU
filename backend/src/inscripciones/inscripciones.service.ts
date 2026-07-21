@@ -856,6 +856,31 @@ export class InscripcionesService {
         }
     }
 
+    /**
+     * Persiste el checklist de revisión parcial sin cambiar estado ni enviar correo.
+     * Permite a La Comisión continuar la revisión en otra sesión.
+     */
+    async guardarProgresoRevision(id: number, revisionChecklist: any) {
+        const sol = await this.solicitudRepo.findOne({ where: { idSolicitud: id } });
+        if (!sol) throw new NotFoundException('Solicitud no encontrada');
+        if (sol.estado === EstadoSolicitud.BORRADOR) {
+            throw new BadRequestException('No se puede guardar progreso de revisión en un borrador del delegado.');
+        }
+        if (sol.estado === EstadoSolicitud.RECHAZADO) {
+            throw new BadRequestException('No se puede guardar progreso en una solicitud rechazada y anulada.');
+        }
+        if (revisionChecklist === undefined || revisionChecklist === null) {
+            throw new BadRequestException('El checklist de revisión es obligatorio.');
+        }
+        if (typeof revisionChecklist !== 'object' || Array.isArray(revisionChecklist)) {
+            throw new BadRequestException('El checklist de revisión debe ser un objeto.');
+        }
+
+        sol.revisionChecklist = revisionChecklist;
+        await this.solicitudRepo.save(sol);
+        return this.getSolicitudById(id);
+    }
+
     async updateEstadoSolicitud(id: number, estado: string, observaciones?: string, revisionChecklist?: any) {
         const sol = await this.solicitudRepo.findOne({
             where: { idSolicitud: id },

@@ -140,6 +140,16 @@ export class InscripcionesController {
     return this.inscripcionesService.updateEstadoSolicitud(id, estado, observaciones, revisionChecklist);
   }
 
+  /** Guarda el checklist de revisión sin cambiar el estado ni notificar al delegado. */
+  @Put(':id/revision-progreso')
+  @Roles('superusuario', 'admin')
+  async guardarProgresoRevision(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('revisionChecklist') revisionChecklist: any,
+  ) {
+    return this.inscripcionesService.guardarProgresoRevision(id, revisionChecklist);
+  }
+
   @Put(':id/admin-datos')
   @Roles('superusuario', 'admin')
   async updateSolicitudAdmin(

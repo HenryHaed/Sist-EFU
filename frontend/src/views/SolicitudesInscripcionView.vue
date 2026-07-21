@@ -85,11 +85,29 @@
           <div class="shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-100">
             <div class="flex items-center justify-between gap-3 mb-2">
               <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Progreso de revisión</p>
-              <p class="text-[10px] font-black text-primary">{{ revisionProgreso.revisados }} / {{ revisionProgreso.total }}</p>
+              <div class="flex items-center gap-3">
+                <p class="text-[10px] font-black text-primary">{{ revisionProgreso.revisados }} / {{ revisionProgreso.total }}</p>
+                <button
+                  type="button"
+                  @click="guardarProgresoRevision"
+                  :disabled="actualizando || guardandoProgreso || !hayProgresoSinGuardar"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all disabled:opacity-40"
+                  :class="hayProgresoSinGuardar
+                    ? 'bg-primary text-white border-primary hover:bg-primary/90 shadow-sm'
+                    : 'bg-white text-slate-400 border-slate-200'"
+                  title="Guarda las marcas ✓/✕ sin cambiar el estado ni notificar al delegado"
+                >
+                  <span class="material-symbols-outlined text-sm">{{ guardandoProgreso ? 'hourglass_top' : 'save' }}</span>
+                  {{ guardandoProgreso ? 'Guardando…' : (hayProgresoSinGuardar ? 'Guardar progreso' : 'Progreso guardado') }}
+                </button>
+              </div>
             </div>
             <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
               <div class="h-full bg-primary transition-all duration-500 rounded-full" :style="{ width: revisionProgreso.porcentaje + '%' }"></div>
             </div>
+            <p v-if="hayProgresoSinGuardar" class="mt-2 text-[10px] text-amber-700 font-medium">
+              Hay marcas sin guardar. Usa «Guardar progreso» antes de cerrar sesión para no perder la revisión.
+            </p>
             <div class="flex flex-wrap gap-2 mt-3">
               <button
                 v-for="sec in seccionesRevision"
@@ -447,6 +465,15 @@
                 <div class="space-y-4">
                   <div class="flex flex-wrap gap-3">
                     <button
+                      type="button"
+                      @click="guardarProgresoRevision"
+                      :disabled="actualizando || guardandoProgreso || !hayProgresoSinGuardar"
+                      class="flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-primary border-2 border-primary/30 rounded-xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                    >
+                      <span class="material-symbols-outlined text-sm">save</span>
+                      Guardar progreso
+                    </button>
+                    <button
                       v-if="solicitudActiva.estado !== 'APROBADO'"
                       @click="confirmarCambioEstado('APROBADO')"
                       :disabled="actualizando || !puedeAprobarSolicitud"
@@ -777,6 +804,7 @@ const busqueda = ref('')
 const solicitudActiva = ref(null)
 const obsForm = ref('')
 const revisionChecklistDraft = ref({})
+const revisionChecklistGuardado = ref('{}')
 const pdfViewer = ref({ abierto: false, url: '', titulo: '' })
 const pdfSeleccionado = ref(null)
 const mobileTab = ref('datos')
@@ -785,6 +813,7 @@ const seccionActiva = ref('sec-delegado')
 const modoEdicionAdmin = ref(false)
 const adminFormDraft = ref({})
 const guardandoAdmin = ref(false)
+const guardandoProgreso = ref(false)
 const adminOpciones = ref({ categorias: [], tiposDanza: [], facultades: [], carreras: [] })
 const instanciasOpciones = INSTANCIAS_OPCIONES
 
@@ -849,7 +878,9 @@ const abrirDetalle = async (sol) => {
     const { data } = await api.get(`/inscripciones/${sol.idSolicitud}`)
     solicitudActiva.value = data
     obsForm.value = data.estado === 'RECHAZADO' ? (data.observaciones || '') : ''
-    revisionChecklistDraft.value = data.revisionChecklist ? JSON.parse(JSON.stringify(data.revisionChecklist)) : {}
+    const checklist = data.revisionChecklist ? JSON.parse(JSON.stringify(data.revisionChecklist)) : {}
+    revisionChecklistDraft.value = checklist
+    revisionChecklistGuardado.value = JSON.stringify(checklist)
     seccionActiva.value = 'sec-delegado'
     mobileTab.value = 'datos'
     pdfSeleccionado.value = null
@@ -867,12 +898,33 @@ const abrirDetalle = async (sol) => {
     notify.error('Error', 'No se pudo cargar el detalle.')
   }
 }
-const cerrarDetalle = () => {
+const cerrarDetalle = async () => {
+  if (hayProgresoSinGuardar.value) {
+    const result = await Swal.fire({
+      title: 'Progreso sin guardar',
+      text: 'Hay marcas de revisión que aún no se guardaron. Si cierras, se perderán.',
+      icon: 'warning',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Guardar y cerrar',
+      denyButtonText: 'Cerrar sin guardar',
+      cancelButtonText: 'Seguir revisando',
+      confirmButtonColor: '#003399',
+      denyButtonColor: '#dc2626',
+    })
+    if (result.isDismissed) return
+    if (result.isConfirmed) {
+      const ok = await guardarProgresoRevision()
+      if (!ok) return
+    }
+  }
   solicitudActiva.value = null
   pdfSeleccionado.value = null
   pdfViewer.value.abierto = false
   modoEdicionAdmin.value = false
   adminFormDraft.value = {}
+  revisionChecklistDraft.value = {}
+  revisionChecklistGuardado.value = '{}'
 }
 
 const itemsDelegado = computed(() => {
@@ -1079,6 +1131,50 @@ const revisionProgreso = computed(() => {
     porcentaje: total > 0 ? Math.round((revisados / total) * 100) : 0,
   }
 })
+
+const hayProgresoSinGuardar = computed(() => {
+  if (!solicitudActiva.value) return false
+  return JSON.stringify(revisionChecklistDraft.value || {}) !== revisionChecklistGuardado.value
+})
+
+/** Guarda marcas ✓/✕ sin cambiar estado ni notificar. Retorna true si OK. */
+const guardarProgresoRevision = async () => {
+  if (!solicitudActiva.value) return false
+  if (!hayProgresoSinGuardar.value) {
+    notify.success('Sin cambios', 'El progreso de revisión ya está guardado.')
+    return true
+  }
+  guardandoProgreso.value = true
+  try {
+    const { data } = await api.put(
+      `/inscripciones/${solicitudActiva.value.idSolicitud}/revision-progreso`,
+      { revisionChecklist: revisionChecklistDraft.value },
+    )
+    solicitudActiva.value = { ...solicitudActiva.value, ...data }
+    const checklist = data.revisionChecklist
+      ? JSON.parse(JSON.stringify(data.revisionChecklist))
+      : {}
+    revisionChecklistDraft.value = checklist
+    revisionChecklistGuardado.value = JSON.stringify(checklist)
+    const idx = solicitudes.value.findIndex((s) => s.idSolicitud === data.idSolicitud)
+    if (idx !== -1) {
+      solicitudes.value[idx] = {
+        ...solicitudes.value[idx],
+        revisionChecklist: data.revisionChecklist,
+      }
+    }
+    notify.success(
+      'Progreso guardado',
+      `Se guardaron ${revisionProgreso.value.revisados} de ${revisionProgreso.value.total} ítems revisados. Puedes cerrar sesión y continuar después.`,
+    )
+    return true
+  } catch (e) {
+    notify.error('Error', e?.response?.data?.message || 'No se pudo guardar el progreso.')
+    return false
+  } finally {
+    guardandoProgreso.value = false
+  }
+}
 
 // ── Directiva computada ───────────────────────────────────────────────────────
 const directiva = computed(() => {
@@ -1329,9 +1425,11 @@ const guardarEdicionAdmin = async () => {
     notify.success('Datos actualizados', 'Los datos de la preinscripción fueron guardados.')
     const { data: refreshed } = await api.get(`/inscripciones/${solicitudActiva.value.idSolicitud}`)
     solicitudActiva.value = refreshed
-    revisionChecklistDraft.value = refreshed.revisionChecklist
+    const checklist = refreshed.revisionChecklist
       ? JSON.parse(JSON.stringify(refreshed.revisionChecklist))
       : {}
+    revisionChecklistDraft.value = checklist
+    revisionChecklistGuardado.value = JSON.stringify(checklist)
   } catch (e) {
     notify.error('Error', e?.response?.data?.message || 'No se pudieron guardar los datos.')
   } finally {
@@ -1469,6 +1567,11 @@ const cambiarEstado = async (nuevoEstado) => {
       revisionChecklist: revisionChecklistDraft.value,
     })
     solicitudActiva.value = { ...solicitudActiva.value, ...data }
+    const checklist = data.revisionChecklist
+      ? JSON.parse(JSON.stringify(data.revisionChecklist))
+      : JSON.parse(JSON.stringify(revisionChecklistDraft.value || {}))
+    revisionChecklistDraft.value = checklist
+    revisionChecklistGuardado.value = JSON.stringify(checklist)
     const idx = solicitudes.value.findIndex(s => s.idSolicitud === data.idSolicitud)
     if (idx !== -1) solicitudes.value[idx] = { ...solicitudes.value[idx], ...data }
 
