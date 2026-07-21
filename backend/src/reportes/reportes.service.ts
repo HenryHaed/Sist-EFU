@@ -179,6 +179,8 @@ export class ReportesService implements OnModuleInit {
       gestionAnio: f.gestion?.anio || null,
       idGestion: f.gestion?.idGestion || null,
       habilitadoEfu: f.habilitadoEfu,
+      esExcedente: !!f.esExcedente,
+      cupo: f.esExcedente ? 'EXCEDENTE' : 'Dentro de cupo',
     };
   }
 
@@ -190,6 +192,10 @@ export class ReportesService implements OnModuleInit {
     const page = dto.page || 1;
     const limit = Math.min(dto.limit || 50, 500);
     const skip = (page - 1) * limit;
+
+    if (dto.tipoReporte === TipoReporte.COSTOS) {
+      return this.consultarCostos(dto, page, limit, skip);
+    }
 
     const fraternidades = await this.buildFraternidadQuery(dto).getMany();
 
@@ -279,6 +285,198 @@ export class ReportesService implements OnModuleInit {
     };
   }
 
+  /**
+   * Informe de costos desde preinscripción (solicitudes) + fraternidades inscritas.
+   * Una fila por concepto/monto (costo único = 1 fila; variable = N filas).
+   */
+  private async consultarCostos(
+    dto: ConsultarReporteDto,
+    page: number,
+    limit: number,
+    skip: number,
+  ) {
+    const qb = this.solicitudRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.gestion', 'gestion')
+      .leftJoinAndSelect('s.tipoDanza', 'tipoDanza')
+      .leftJoinAndSelect('s.categoria', 'categoria')
+      .leftJoinAndSelect('s.facultad', 'facultad')
+      .leftJoinAndSelect('s.carrera', 'carrera')
+      .leftJoinAndSelect('s.fraternidadCreada', 'fraternidadCreada')
+      .where('s.estado != :borrador', { borrador: EstadoSolicitud.BORRADOR })
+      .andWhere('s.costosParticipacion IS NOT NULL');
+
+    if (dto.idGestion) {
+      qb.andWhere('gestion.id_gestion = :idGestion', { idGestion: dto.idGestion });
+    }
+    if (dto.idTipoDanza) {
+      qb.andWhere('tipoDanza.id_tipo_danza = :idTipoDanza', { idTipoDanza: dto.idTipoDanza });
+    }
+    if (dto.idCategoria) {
+      qb.andWhere('categoria.id_categoria = :idCategoria', { idCategoria: dto.idCategoria });
+    }
+    if (dto.idFacultad) {
+      qb.andWhere('facultad.id_facultad = :idFacultad', { idFacultad: dto.idFacultad });
+    }
+    if (dto.idCarrera) {
+      qb.andWhere('carrera.id_carrera = :idCarrera', { idCarrera: dto.idCarrera });
+    }
+    if (dto.instanciaRepresentacion) {
+      qb.andWhere('s.instancia_representacion = :inst', { inst: dto.instanciaRepresentacion });
+    }
+    if (dto.busqueda?.trim()) {
+      const q = `%${dto.busqueda.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(s.nombre_fraternidad) LIKE :q OR LOWER(tipoDanza.nombre) LIKE :q)',
+        { q },
+      );
+    }
+
+    qb.orderBy('s.nombre_fraternidad', 'ASC').addOrderBy('s.id_solicitud', 'ASC');
+    const solicitudes = await qb.getMany();
+
+    // Fraternidades con costos que no vinieran de solicitud listada (p.ej. creadas manualmente)
+    const fratQb = this.fraternidadRepo
+      .createQueryBuilder('f')
+      .leftJoinAndSelect('f.gestion', 'gestion')
+      .leftJoinAndSelect('f.tipoDanza', 'tipoDanza')
+      .leftJoinAndSelect('f.categoria', 'categoria')
+      .leftJoinAndSelect('f.facultad', 'facultad')
+      .leftJoinAndSelect('f.carrera', 'carrera')
+      .where('f.costosParticipacion IS NOT NULL');
+    if (dto.idGestion) {
+      fratQb.andWhere('gestion.id_gestion = :idGestion', { idGestion: dto.idGestion });
+    }
+    if (dto.idTipoDanza) {
+      fratQb.andWhere('tipoDanza.id_tipo_danza = :idTipoDanza', { idTipoDanza: dto.idTipoDanza });
+    }
+    if (dto.idCategoria) {
+      fratQb.andWhere('categoria.id_categoria = :idCategoria', { idCategoria: dto.idCategoria });
+    }
+    if (dto.busqueda?.trim()) {
+      const q = `%${dto.busqueda.trim().toLowerCase()}%`;
+      fratQb.andWhere('(LOWER(f.nombre) LIKE :q OR LOWER(tipoDanza.nombre) LIKE :q)', { q });
+    }
+    const fraternidades = await fratQb.getMany();
+    const idsFratDesdeSolicitud = new Set(
+      solicitudes
+        .map((s) => s.fraternidadCreada?.idFraternidad)
+        .filter((id): id is number => typeof id === 'number'),
+    );
+
+    type CostoRow = {
+      nombreFraternidad: string;
+      tipoDanza: string;
+      categoria: string;
+      instancia: string;
+      estructura: string;
+      concepto: string;
+      monto: number;
+      estadoSolicitud: string;
+      esExcedente: boolean;
+      fuente: string;
+      gestionAnio: number | null;
+    };
+
+    const rows: CostoRow[] = [];
+
+    const pushCostos = (
+      costos: { multiple?: boolean; items?: Array<{ concepto?: string; monto?: number }> } | null,
+      meta: Omit<CostoRow, 'estructura' | 'concepto' | 'monto'>,
+    ) => {
+      if (!costos?.items?.length) return;
+      const multiple = Boolean(costos.multiple) || costos.items.length > 1;
+      for (const item of costos.items) {
+        const monto = Number(item?.monto);
+        if (Number.isNaN(monto)) continue;
+        rows.push({
+          ...meta,
+          estructura: multiple ? 'Variable' : 'Único',
+          concepto: String(item?.concepto || (multiple ? '—' : 'Costo por participar')).trim() || '—',
+          monto,
+        });
+      }
+    };
+
+    for (const s of solicitudes) {
+      pushCostos(s.costosParticipacion, {
+        nombreFraternidad: s.nombreFraternidad || s.fraternidadCreada?.nombre || '—',
+        tipoDanza: s.tipoDanza?.nombre || '—',
+        categoria: s.categoria?.nombre || '—',
+        instancia: s.instanciaRepresentacion || '—',
+        estadoSolicitud: s.estado,
+        esExcedente: !!s.fraternidadCreada?.esExcedente,
+        fuente: 'Preinscripción',
+        gestionAnio: s.gestion?.anio ?? null,
+      });
+    }
+
+    for (const f of fraternidades) {
+      if (idsFratDesdeSolicitud.has(f.idFraternidad)) continue;
+      pushCostos(f.costosParticipacion as any, {
+        nombreFraternidad: f.nombre,
+        tipoDanza: f.tipoDanza?.nombre || '—',
+        categoria: f.categoria?.nombre || '—',
+        instancia: f.nivelRepresentacion || '—',
+        estadoSolicitud: 'INSCRITA',
+        esExcedente: !!f.esExcedente,
+        fuente: 'Fraternidad',
+        gestionAnio: f.gestion?.anio ?? null,
+      });
+    }
+
+    const ordenarPor = dto.ordenarPor || 'nombreFraternidad';
+    const desc = dto.orden === 'DESC';
+    rows.sort((a, b) => {
+      let va: string | number = a.nombreFraternidad;
+      let vb: string | number = b.nombreFraternidad;
+      if (ordenarPor === 'monto') {
+        va = a.monto;
+        vb = b.monto;
+      } else if (ordenarPor === 'tipoDanza') {
+        va = a.tipoDanza;
+        vb = b.tipoDanza;
+      } else if (ordenarPor === 'concepto') {
+        va = a.concepto;
+        vb = b.concepto;
+      } else if (ordenarPor === 'estructura') {
+        va = a.estructura;
+        vb = b.estructura;
+      }
+      if (typeof va === 'number' && typeof vb === 'number') {
+        return desc ? vb - va : va - vb;
+      }
+      const cmp = String(va).localeCompare(String(vb), 'es');
+      return desc ? -cmp : cmp;
+    });
+
+    let gestion: { anio?: number } | null = null;
+    if (dto.idGestion) {
+      gestion = await this.gestionRepo.findOne({
+        where: { idGestion: dto.idGestion },
+        select: ['idGestion', 'anio'],
+      });
+    }
+
+    const totalMonto = rows.reduce((acc, r) => acc + (Number(r.monto) || 0), 0);
+    const total = rows.length;
+
+    return {
+      tipoReporte: TipoReporte.COSTOS,
+      total,
+      page,
+      limit,
+      filtros: dto,
+      gestion,
+      resumen: {
+        totalItems: total,
+        totalMonto: Math.round(totalMonto * 100) / 100,
+        fraternidadesUnicas: new Set(rows.map((r) => r.nombreFraternidad)).size,
+      },
+      data: rows.slice(skip, skip + limit),
+    };
+  }
+
   async generarPdfConsulta(dto: ConsultarReporteDto, res: Response) {
     const resultado = await this.consultar({ ...dto, page: 1, limit: 500 });
     const PDFDocument = require('pdfkit');
@@ -288,6 +486,7 @@ export class ReportesService implements OnModuleInit {
       fraternidades: 'REPORTE DE FRATERNIDADES',
       directiva: 'REPORTE DE DIRECTIVA',
       calificaciones: 'REPORTE DE CALIFICACIONES',
+      costos: 'INFORME DE COSTOS DE PARTICIPACIÓN',
     };
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -341,8 +540,8 @@ export class ReportesService implements OnModuleInit {
     };
 
     if (dto.tipoReporte === TipoReporte.FRATERNIDADES) {
-      const widths = [120, 95, 55, 80, 55, 40];
-      const headers = ['Fraternidad', 'Tipo de danza', 'Cat.', 'Pertenencia', 'Gestión', 'Estado'];
+      const widths = [110, 85, 50, 70, 45, 55, 80];
+      const headers = ['Fraternidad', 'Tipo de danza', 'Cat.', 'Pertenencia', 'Gestión', 'Cupo', 'Estado'];
       doc.save().rect(50, y, 495, 16).fill('#003399').restore();
       drawRow(headers, widths, y, true);
       doc.fillColor('#ffffff');
@@ -361,6 +560,7 @@ export class ReportesService implements OnModuleInit {
             row.categoria,
             row.pertenencia,
             String(row.gestionAnio || '—'),
+            row.esExcedente ? 'EXCEDENTE' : 'Cupo OK',
             row.habilitadoEfu ? 'Activa' : 'Inactiva',
           ],
           widths,
@@ -391,6 +591,43 @@ export class ReportesService implements OnModuleInit {
         if (i % 2 === 0) doc.save().rect(50, y, 495, rowHeight).fill('#f8fafc').restore();
         drawRow(cells, widths, y, false, rowHeight);
         y += rowHeight;
+      });
+    } else if (dto.tipoReporte === TipoReporte.COSTOS) {
+      const resumen = (resultado as any).resumen;
+      if (resumen) {
+        doc.fontSize(9).fillColor('#334155').font('Helvetica')
+          .text(
+            `Fraternidades: ${resumen.fraternidadesUnicas || 0} · Ítems de costo: ${resumen.totalItems || 0} · Suma montos: ${Number(resumen.totalMonto || 0).toFixed(2)} Bs`,
+            50,
+            y,
+            { width: 495 },
+          );
+        y += 18;
+      }
+      const widths = [120, 70, 50, 110, 55, 55];
+      const headers = ['Fraternidad', 'Tipo danza', 'Estructura', 'Concepto', 'Monto Bs', 'Estado'];
+      doc.save().rect(50, y, 495, 16).fill('#003399').restore();
+      drawRow(headers, widths, y, true);
+      y += 16;
+      (resultado.data as any[]).forEach((row, i) => {
+        if (y > 720) {
+          doc.addPage();
+          y = 50;
+        }
+        if (i % 2 === 0) doc.save().rect(50, y, 495, 14).fill('#f8fafc').restore();
+        drawRow(
+          [
+            row.nombreFraternidad,
+            row.tipoDanza,
+            row.estructura,
+            row.concepto,
+            Number(row.monto).toFixed(2),
+            row.estadoSolicitud || '—',
+          ],
+          widths,
+          y,
+        );
+        y += 14;
       });
     } else {
       const widths = [30, 100, 80, 55, 70, 45, 45, 45];

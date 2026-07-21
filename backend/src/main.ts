@@ -36,6 +36,14 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     ALTER TABLE fraternidades
     ADD COLUMN IF NOT EXISTS costos_participacion jsonb NULL
   `);
+  await dataSource.query(`
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS limite_fraternidades_por_danza integer NOT NULL DEFAULT 6
+  `);
+  await dataSource.query(`
+    ALTER TABLE fraternidades
+    ADD COLUMN IF NOT EXISTS es_excedente boolean NOT NULL DEFAULT false
+  `);
   // Permitir borradores sin categoría aún elegida
   await dataSource.query(`
     ALTER TABLE solicitudes_inscripcion

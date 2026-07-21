@@ -170,6 +170,26 @@
                 <input type="checkbox" v-model="gestion.activa" class="toggle-checkbox primary" />
              </div>
         </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">
+            Límite de fraternidades por tipo de danza
+          </label>
+          <p class="text-[10px] text-slate-400 font-medium mb-3">
+            Por defecto 6. Las fraternidades que se inscriban después del límite se aceptan igual, pero quedan marcadas como
+            <span class="font-black text-amber-700">EXCEDENTE</span>.
+          </p>
+          <div class="flex items-center gap-3 max-w-xs">
+            <input
+              v-model.number="gestion.limiteFraternidadesPorDanza"
+              type="number"
+              min="1"
+              max="999"
+              class="w-28 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-black text-slate-700"
+            />
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">máximo por danza</span>
+          </div>
+        </div>
       </div>
 
       <!-- TAB: MULTIMEDIA -->
@@ -635,6 +655,7 @@ const gestion = ref({
   mostrarRanking: true,
   mostrarHistorico: false,
   permiteInscripcionPublica: false,
+  limiteFraternidadesPorDanza: 6,
   landingFraternidades: DEFAULT_LANDING_FRATERNIDADES(),
 })
 

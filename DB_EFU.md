@@ -142,6 +142,7 @@ Configuración central de cada año EFU.
 | `modo_mantenimiento` | BOOLEAN | DEFAULT false | Sitio en mantenimiento |
 | `mostrar_ranking` | BOOLEAN | DEFAULT true | Mostrar ranking público |
 | `permite_inscripcion_publica` | BOOLEAN | DEFAULT false | Registro público delegados |
+| `limite_fraternidades_por_danza` | INTEGER | DEFAULT 6 | Cupo máximo por tipo de danza; el exceso se marca `es_excedente` |
 | `created_at` | TIMESTAMP | NOT NULL | Creación |
 | `updated_at` | TIMESTAMP | NOT NULL | Actualización |
 
@@ -209,6 +210,7 @@ Participación oficial de un grupo folclórico en una gestión.
 | `tipo_organizacion` | VARCHAR(100) | NULL | Tipo organizacional |
 | `fecha_fundacion` | DATE | NULL | Fecha fundación |
 | `habilitado_efu` | BOOLEAN | DEFAULT true | Habilitada para EFU |
+| `es_excedente` | BOOLEAN | DEFAULT false | Superó el límite de fraternidades por tipo de danza (sigue aceptada) |
 | `logo_url` | TEXT | NULL | URL del logo |
 | `promedio_base` | NUMERIC(5,2) | DEFAULT 0 | Promedio base |
 | `costos_participacion` | JSONB | NULL | Costos por bailarín `{ multiple, items: [{ concepto, monto }] }` (copiado al aprobar) |

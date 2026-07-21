@@ -16,6 +16,7 @@ import { MailService } from '../mail/mail.service';
 import { Evaluacion } from '../entities/Evaluacion';
 import { Incidencia } from '../entities/Incidencia';
 import { Asistencia } from '../entities/Asistencia';
+import { recalcularExcedentesPorTipoDanza } from '../common/cupo-fraternidades';
 
 const PERSONAS_DIRECTIVA = [
     { prefix: 'presi', checklist: 'Presidente', hasCelular: true, required: true },
@@ -1151,6 +1152,9 @@ export class InscripcionesService {
                 }
             }
 
+            // Cupo por tipo de danza: se acepta igual; el sello se recalcula después del save
+            fraternidad.esExcedente = false;
+
             const savedFraternidad = await queryRunner.manager.save(Fraternidad, fraternidad);
 
             solicitud.fraternidadCreada = savedFraternidad;
@@ -1161,6 +1165,32 @@ export class InscripcionesService {
                 if (del) {
                     del.fraternidad = savedFraternidad;
                     await queryRunner.manager.save(Usuario, del);
+                }
+            }
+
+            const idGestion =
+                savedFraternidad.gestion?.idGestion ||
+                solicitud.gestion?.idGestion ||
+                (await this.gestionRepo.findOne({ where: { activa: true } }))?.idGestion;
+            const idTipoDanza = savedFraternidad.tipoDanza?.idTipoDanza || solicitud.tipoDanza?.idTipoDanza;
+            const gestionCupo = idGestion
+                ? await queryRunner.manager.findOne(Gestion, { where: { idGestion } })
+                : null;
+            const limite = gestionCupo?.limiteFraternidadesPorDanza ?? 6;
+
+            if (idGestion && idTipoDanza) {
+                await recalcularExcedentesPorTipoDanza(
+                    queryRunner.manager.getRepository(Fraternidad),
+                    idGestion,
+                    idTipoDanza,
+                    limite,
+                );
+                const refreshed = await queryRunner.manager.findOne(Fraternidad, {
+                    where: { idFraternidad: savedFraternidad.idFraternidad },
+                    relations: ['tipoDanza', 'categoria', 'facultad', 'carrera', 'gestion'],
+                });
+                if (refreshed) {
+                    Object.assign(savedFraternidad, refreshed);
                 }
             }
 

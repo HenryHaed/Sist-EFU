@@ -19,6 +19,7 @@ import { Usuario } from '../entities/Usuario';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { ensureCategoriasDefault } from '../common/categorias-default';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
+import { recalcularExcedentesGestion } from '../common/cupo-fraternidades';
 
 @Injectable()
 export class EvaluacionesService {
@@ -934,6 +935,7 @@ export class EvaluacionesService {
       'anio', 'edicion', 'lema', 'activa', 'nombreSitio', 'tituloPrincipal', 'subtituloPrincipal',
       'urlBanner', 'urlLogo', 'urlImagenLogin', 'urlMapaUbicacion',
       'modoMantenimiento', 'mostrarRanking', 'mostrarHistorico', 'permiteInscripcionPublica',
+      'limiteFraternidadesPorDanza',
       'landingFraternidades',
     ] as const;
 
@@ -941,6 +943,11 @@ export class EvaluacionesService {
       if (data[key] !== undefined) {
         (payload as any)[key] = data[key];
       }
+    }
+
+    if (payload.limiteFraternidadesPorDanza !== undefined) {
+      const n = Number.parseInt(String(payload.limiteFraternidadesPorDanza), 10);
+      payload.limiteFraternidadesPorDanza = Number.isNaN(n) || n < 1 ? 6 : Math.min(n, 999);
     }
 
     if (payload.edicion !== undefined) {
@@ -959,7 +966,15 @@ export class EvaluacionesService {
     }
 
     await this.gestionRepo.update({ idGestion: id }, payload);
-    return this.gestionRepo.findOne({ where: { idGestion: id } });
+    const updated = await this.gestionRepo.findOne({ where: { idGestion: id } });
+    if (updated && payload.limiteFraternidadesPorDanza !== undefined) {
+      await recalcularExcedentesGestion(
+        this.fraternidadRepo,
+        id,
+        updated.limiteFraternidadesPorDanza ?? 6,
+      );
+    }
+    return updated;
   }
 
   async deleteGestion(id: number) {

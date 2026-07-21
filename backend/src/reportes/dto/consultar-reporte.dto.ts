@@ -12,6 +12,7 @@ export enum TipoReporte {
   FRATERNIDADES = 'fraternidades',
   DIRECTIVA = 'directiva',
   CALIFICACIONES = 'calificaciones',
+  COSTOS = 'costos',
 }
 
 export enum OrdenReporte {

@@ -99,7 +99,16 @@
                     {{ f.nombre.substring(0, 2) }}
                   </div>
                   <div>
-                    <p class="font-bold text-slate-900 leading-none mb-1">{{ f.nombre }}</p>
+                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                      <p class="font-bold text-slate-900 leading-none">{{ f.nombre }}</p>
+                      <span
+                        v-if="f.esExcedente"
+                        class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200"
+                        title="Superó el límite de fraternidades para este tipo de danza"
+                      >
+                        Excedente
+                      </span>
+                    </div>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{{ f.nivelRepresentacion || '—' }}</p>
                   </div>
                 </div>
@@ -163,7 +172,15 @@
             </div>
             
             <div class="flex-1">
-              <p class="font-black text-slate-900 leading-tight mb-1">{{ f.nombre }}</p>
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <p class="font-black text-slate-900 leading-tight">{{ f.nombre }}</p>
+                <span
+                  v-if="f.esExcedente"
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200"
+                >
+                  Excedente
+                </span>
+              </div>
               <div class="flex flex-wrap gap-1.5 mt-1">
                 <span class="px-2 py-0.5 bg-white text-slate-600 rounded text-[9px] font-black uppercase tracking-wider border border-slate-200">
                   {{ f.categoria?.nombre || 'General' }}

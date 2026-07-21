@@ -182,7 +182,16 @@
               class="border-b border-slate-50 hover:bg-slate-50/50"
             >
               <td v-for="col in columnas" :key="col.key" class="px-4 py-3 text-sm text-slate-700">
-                {{ formatCell(row, col.key) }}
+                <span
+                  v-if="col.key === 'cupo' || col.key === 'esExcedente'"
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                  :class="row.esExcedente
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'"
+                >
+                  {{ row.esExcedente ? 'Excedente' : 'Dentro de cupo' }}
+                </span>
+                <template v-else>{{ formatCell(row, col.key) }}</template>
               </td>
             </tr>
           </tbody>
@@ -292,6 +301,7 @@ const columnasPorTipo = {
   fraternidades: [
     { key: 'nombreFraternidad', label: 'Fraternidad' },
     { key: 'tipoDanza', label: 'Tipo de danza' },
+    { key: 'cupo', label: 'Cupo' },
     { key: 'categoria', label: 'Categoría' },
     { key: 'instancia', label: 'Instancia' },
     { key: 'pertenencia', label: 'Pertenencia' },

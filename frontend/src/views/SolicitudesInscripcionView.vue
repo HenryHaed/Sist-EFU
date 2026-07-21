@@ -1,6 +1,26 @@
 <template>
   <div class="min-h-full bg-slate-50">
 
+    <!-- Aviso: vista no disponible en móvil -->
+    <div class="lg:hidden dashboard-page max-w-lg w-full mx-auto px-4 py-16 flex flex-col items-center text-center">
+      <div class="size-20 rounded-3xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mb-6">
+        <span class="material-symbols-outlined text-4xl">desktop_windows</span>
+      </div>
+      <h2 class="text-2xl font-black uppercase italic text-primary tracking-tight mb-3">
+        Vista no disponible en móvil
+      </h2>
+      <p class="text-slate-600 text-sm font-medium leading-relaxed max-w-sm">
+        Esta sección de solicitudes de inscripción no está disponible para ver en dispositivos móviles.
+        Favor de acceder desde una
+        <strong class="text-slate-800">computadora</strong>
+        para un manejo óptimo del sistema.
+      </p>
+      <div class="mt-8 px-4 py-3 rounded-2xl bg-slate-100 border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500">
+        Recomendado: pantalla de escritorio o tablet horizontal
+      </div>
+    </div>
+
+    <div class="hidden lg:block">
     <!-- ===== DETALLE SOLICITUD (panel deslizante) ===== -->
     <transition name="slide-right">
       <div v-if="solicitudActiva" class="fixed inset-0 z-50 flex">
@@ -329,24 +349,36 @@
                     </div>
                     <div class="mt-4 pt-4 border-t border-slate-200">
                       <p class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-3">Documentos de respaldo — {{ cargo.label }}</p>
-                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <button
+                      <div class="space-y-2">
+                        <div
                           v-for="doc in cargo.documentos"
                           :key="doc.key"
-                          type="button"
-                          @click="seleccionarPdf(doc)"
-                          class="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-left transition-all"
-                          :class="pdfSeleccionado?.key === doc.key ? 'border-primary bg-primary/5' : 'border-slate-200 bg-white hover:border-primary/30'"
+                          class="rounded-xl border p-3 transition-all"
+                          :class="pdfSeleccionado?.key === doc.key ? 'border-primary bg-primary/5' : 'border-slate-200 bg-white'"
                         >
-                          <span class="text-[10px] font-bold text-slate-700 leading-tight">{{ doc.btnLabel }}</span>
-                          <span class="flex items-center gap-1 shrink-0">
-                            <span
-                              class="size-2 rounded-full"
-                              :class="checklistEstado(doc.key) === 'OK' ? 'bg-emerald-500' : checklistEstado(doc.key) === 'X' ? 'bg-red-500' : 'bg-slate-300'"
-                            ></span>
-                            <span class="material-symbols-outlined text-sm text-primary">visibility</span>
-                          </span>
-                        </button>
+                          <div class="flex flex-wrap items-center justify-between gap-2">
+                            <button type="button" @click="seleccionarPdf(doc)" class="flex-1 min-w-0 text-left">
+                              <p class="text-[10px] font-bold text-slate-700 leading-tight">{{ doc.btnLabel }}</p>
+                              <p class="text-[9px] uppercase tracking-widest mt-0.5" :class="doc.url ? 'text-slate-400' : 'text-amber-600 font-bold'">
+                                {{ doc.url ? 'Adjunto' : 'Sin archivo entregado' }}
+                              </p>
+                            </button>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                              <button type="button" @click="setChecklistEstado(docChecklistItem(doc), 'OK')" :class="['size-8 rounded-lg border text-sm font-black flex items-center justify-center', checklistBotonClase(doc.key, 'OK')]">✓</button>
+                              <button type="button" @click="setChecklistEstado(docChecklistItem(doc), 'X')" :class="['size-8 rounded-lg border text-sm font-black flex items-center justify-center', checklistBotonClase(doc.key, 'X')]">✕</button>
+                            </div>
+                          </div>
+                          <div v-if="checklistEstado(doc.key) === 'X'" class="mt-3 pt-3 border-t border-red-100">
+                            <label class="block text-[9px] font-black uppercase tracking-widest text-red-600 mb-1">Motivo del rechazo</label>
+                            <textarea
+                              :value="checklistComentario(doc.key)"
+                              @input="setChecklistComentario(doc.key, $event.target.value)"
+                              rows="2"
+                              placeholder="Indique por qué se observa o rechaza este documento (ej. no entregado, ilegible, incompleto)..."
+                              class="w-full px-3 py-2 bg-slate-50 border border-red-200 rounded-xl text-xs text-slate-700 resize-none focus:ring-2 focus:ring-red-200 outline-none"
+                            ></textarea>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -372,7 +404,9 @@
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <button type="button" @click="seleccionarPdf(doc)" class="flex-1 min-w-0 text-left">
                         <p class="text-xs font-bold text-slate-700">{{ doc.label }}</p>
-                        <p class="text-[9px] text-slate-400 uppercase tracking-widest">{{ doc.url ? 'Adjunto' : 'Sin archivo' }}</p>
+                        <p class="text-[9px] uppercase tracking-widest" :class="doc.url ? 'text-slate-400' : 'text-amber-600 font-bold'">
+                          {{ doc.url ? 'Adjunto' : 'Sin archivo entregado' }}
+                        </p>
                       </button>
                       <div class="flex items-center gap-1.5 shrink-0">
                         <button type="button" @click="setChecklistEstado(docChecklistItem(doc), 'OK')" :class="['size-8 rounded-lg border text-sm font-black flex items-center justify-center', checklistBotonClase(doc.key, 'OK')]">✓</button>
@@ -385,7 +419,7 @@
                         :value="checklistComentario(doc.key)"
                         @input="setChecklistComentario(doc.key, $event.target.value)"
                         rows="2"
-                        placeholder="Indique por qué se rechaza este documento..."
+                        placeholder="Indique por qué se observa este documento (ej. no entregado, ilegible)..."
                         class="w-full px-3 py-2 bg-slate-50 border border-red-200 rounded-xl text-xs text-slate-700 resize-none focus:ring-2 focus:ring-red-200 outline-none"
                       ></textarea>
                     </div>
@@ -463,6 +497,12 @@
                         <p class="text-xs font-black uppercase text-indigo-800">Fraternidad Registrada</p>
                         <p class="text-[11px] text-indigo-600 font-medium">
                           {{ solicitudActiva.fraternidadCreada.nombre }} ya está disponible en fraternidades y evaluaciones.
+                          <span
+                            v-if="solicitudActiva.fraternidadCreada.esExcedente"
+                            class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200"
+                          >
+                            Excedente
+                          </span>
                         </p>
                       </div>
                     </div>
@@ -479,9 +519,14 @@
               class="flex-1 flex flex-col min-h-0 lg:w-[52%] bg-slate-50"
               :class="mobileTab === 'pdfs' ? 'flex' : 'hidden lg:flex'"
             >
-              <div v-if="pdfSeleccionado?.url" class="shrink-0 flex flex-col gap-2 px-4 py-3 bg-slate-800 text-white border-b border-white/10">
+              <div v-if="pdfSeleccionado" class="shrink-0 flex flex-col gap-2 px-4 py-3 bg-slate-800 text-white border-b border-white/10">
                 <div class="flex items-center justify-between gap-2">
-                  <p class="text-[10px] font-black uppercase tracking-widest truncate flex-1">{{ pdfSeleccionado.titulo || pdfSeleccionado.label }}</p>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[10px] font-black uppercase tracking-widest truncate">{{ pdfSeleccionado.titulo || pdfSeleccionado.label }}</p>
+                    <p v-if="!pdfSeleccionado.url" class="text-[9px] text-amber-300 font-bold uppercase tracking-widest mt-0.5">
+                      Documento no entregado
+                    </p>
+                  </div>
                   <div class="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
@@ -493,8 +538,18 @@
                       @click="setChecklistEstado(pdfChecklistItem, 'X')"
                       :class="['size-8 rounded-lg border text-sm font-black flex items-center justify-center', checklistBotonClase(pdfSeleccionado.key, 'X')]"
                     >✕</button>
-                    <button type="button" @click="ampliarPdf" class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-black uppercase">Ampliar</button>
-                    <a :href="pdfUrlActivo" target="_blank" class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-black uppercase">Abrir</a>
+                    <button
+                      v-if="pdfSeleccionado.url"
+                      type="button"
+                      @click="ampliarPdf"
+                      class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-black uppercase"
+                    >Ampliar</button>
+                    <a
+                      v-if="pdfSeleccionado.url"
+                      :href="pdfUrlActivo"
+                      target="_blank"
+                      class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-black uppercase"
+                    >Abrir</a>
                   </div>
                 </div>
                 <div v-if="checklistEstado(pdfSeleccionado.key) === 'X'" class="pb-1">
@@ -502,7 +557,7 @@
                     :value="checklistComentario(pdfSeleccionado.key)"
                     @input="setChecklistComentario(pdfSeleccionado.key, $event.target.value)"
                     rows="2"
-                    placeholder="Motivo del rechazo de este documento..."
+                    placeholder="Motivo de la observación (ej. no entregado, ilegible, incompleto)..."
                     class="w-full px-3 py-2 bg-slate-900 border border-red-400/50 rounded-lg text-xs text-white placeholder:text-white/40 resize-none focus:ring-2 focus:ring-red-400/30 outline-none"
                   ></textarea>
                 </div>
@@ -518,6 +573,25 @@
                   class="flex-1 w-full border-none bg-white"
                   :title="pdfSeleccionado.label"
                 ></iframe>
+                <div v-else-if="pdfSeleccionado && !pdfSeleccionado.url" class="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3 p-6">
+                  <span class="material-symbols-outlined text-5xl text-amber-400">folder_off</span>
+                  <p class="text-sm font-black text-slate-600 uppercase tracking-widest text-center">Documento no entregado</p>
+                  <p class="text-xs text-slate-400 text-center max-w-xs">
+                    El delegado no adjuntó este archivo. Puedes marcarlo con ✕ e indicar el motivo de la observación.
+                  </p>
+                  <div class="flex items-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      @click="setChecklistEstado(pdfChecklistItem, 'OK')"
+                      :class="['size-10 rounded-xl border text-base font-black flex items-center justify-center', checklistBotonClase(pdfSeleccionado.key, 'OK')]"
+                    >✓</button>
+                    <button
+                      type="button"
+                      @click="setChecklistEstado(pdfChecklistItem, 'X')"
+                      :class="['size-10 rounded-xl border text-base font-black flex items-center justify-center', checklistBotonClase(pdfSeleccionado.key, 'X')]"
+                    >✕</button>
+                  </div>
+                </div>
                 <div v-else class="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 p-6">
                   <span class="material-symbols-outlined text-4xl">picture_as_pdf</span>
                   <p class="text-xs font-bold text-center">Selecciona un documento para previsualizar</p>
@@ -670,6 +744,7 @@
         </div>
       </div>
 
+    </div>
     </div>
   </div>
 </template>

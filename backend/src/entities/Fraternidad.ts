@@ -60,6 +60,10 @@ export class Fraternidad {
     @Column({ name: 'habilitado_efu', default: true })
     habilitadoEfu: boolean;
 
+    /** True si se inscribió después del límite de fraternidades por tipo de danza. */
+    @Column({ name: 'es_excedente', default: false })
+    esExcedente: boolean;
+
     @Column({ name: 'logo_url', type: 'text', nullable: true })
     logoUrl: string;
 
