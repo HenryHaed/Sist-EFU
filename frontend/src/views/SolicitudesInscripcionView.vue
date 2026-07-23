@@ -158,7 +158,12 @@
                   <div v-for="item in itemsDelegado" :key="item.key" class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                       <div class="min-w-0 flex-1">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">{{ item.label }}</p>
+                        <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                            {{ item.label }}<span v-if="item.required" class="text-secondary"> *</span>
+                          </p>
+                          <span :class="badgeRequisitoClase(item.required)">{{ item.required ? 'Obligatorio' : 'Opcional' }}</span>
+                        </div>
                         <p class="text-sm font-medium text-slate-800 break-words">{{ item.value || '—' }}</p>
                       </div>
                       <div class="flex items-center gap-2 shrink-0">
@@ -193,7 +198,12 @@
                   <div v-for="item in itemsFraternidad" :key="item.key" class="rounded-2xl border border-slate-100 bg-white p-3">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                       <div class="min-w-0 flex-1">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">{{ item.label }}</p>
+                        <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                            {{ item.label }}<span v-if="item.required" class="text-secondary"> *</span>
+                          </p>
+                          <span :class="badgeRequisitoClase(item.required)">{{ item.required ? 'Obligatorio' : 'Opcional' }}</span>
+                        </div>
                         <div v-if="modoEdicionAdmin && adminCampoEditable(item.key)" class="mt-1">
                           <input
                             v-if="item.key === 'nombreFraternidad' || item.key === 'institucionExterna'"
@@ -325,11 +335,29 @@
               <!-- DIRECTIVA -->
               <section id="sec-directiva" class="px-5 py-5 border-b border-slate-100">
                 <h3 class="section-title">Directiva</h3>
-                <p class="text-[10px] text-slate-400 font-medium mb-4 -mt-2">Revisa datos y documentos de respaldo por cargo. Puedes aprobar un dato y rechazar su PDF.</p>
+                <p class="text-[10px] text-slate-400 font-medium mb-2 -mt-2">Revisa datos y documentos de respaldo por cargo. Puedes aprobar un dato y rechazar su PDF.</p>
+                <div class="flex flex-wrap gap-2 mb-4">
+                  <span class="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20">
+                    <span class="text-secondary">*</span> Obligatorio
+                  </span>
+                  <span class="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-400 border border-slate-200">
+                    Opcional
+                  </span>
+                </div>
                 <div class="space-y-4">
-                  <div v-for="cargo in directiva" :key="cargo.label" class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div
+                    v-for="cargo in directiva"
+                    :key="cargo.label"
+                    class="rounded-2xl p-4 border"
+                    :class="cargo.required ? 'bg-primary/[0.02] border-primary/20' : 'bg-slate-50 border-slate-100'"
+                  >
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                      <p class="text-[9px] font-black uppercase tracking-widest text-primary">{{ cargo.label }}</p>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-[9px] font-black uppercase tracking-widest" :class="cargo.required ? 'text-primary' : 'text-slate-400'">
+                          {{ cargo.label }}
+                        </p>
+                        <span :class="badgeRequisitoClase(cargo.required)">{{ cargo.required ? 'Obligatorio' : 'Opcional' }}</span>
+                      </div>
                       <div class="flex flex-wrap gap-2 shrink-0">
                         <button type="button" @click="aceptarSeccionCargo(cargo)" class="btn-revision-masiva btn-revision-aceptar">Aceptar todo</button>
                         <button type="button" @click="rechazarSeccionCargo(cargo)" class="btn-revision-masiva btn-revision-rechazar">Rechazar todo</button>
@@ -339,7 +367,12 @@
                       <div v-for="parte in cargo.checklistItems" :key="parte.key" class="bg-white rounded-xl border border-slate-100 p-3">
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                           <div class="min-w-0 flex-1">
-                            <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">{{ parte.label }}</p>
+                            <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                              <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                                {{ parte.label }}<span v-if="parte.required" class="text-secondary"> *</span>
+                              </p>
+                              <span :class="badgeRequisitoClase(parte.required)">{{ parte.required ? 'Obligatorio' : 'Opcional' }}</span>
+                            </div>
                             <input
                               v-if="modoEdicionAdmin && parte.adminField"
                               v-model="adminFormDraft[parte.adminField]"
@@ -376,9 +409,14 @@
                         >
                           <div class="flex flex-wrap items-center justify-between gap-2">
                             <button type="button" @click="seleccionarPdf(doc)" class="flex-1 min-w-0 text-left">
-                              <p class="text-[10px] font-bold text-slate-700 leading-tight">{{ doc.btnLabel }}</p>
-                              <p class="text-[9px] uppercase tracking-widest mt-0.5" :class="doc.url ? 'text-slate-400' : 'text-amber-600 font-bold'">
-                                {{ doc.url ? 'Adjunto' : 'Sin archivo entregado' }}
+                              <div class="flex flex-wrap items-center gap-2">
+                                <p class="text-[10px] font-bold text-slate-700 leading-tight">
+                                  {{ doc.btnLabel }}<span v-if="doc.required" class="text-secondary"> *</span>
+                                </p>
+                                <span :class="badgeRequisitoClase(doc.required)">{{ doc.required ? 'Obligatorio' : 'Opcional' }}</span>
+                              </div>
+                              <p class="text-[9px] uppercase tracking-widest mt-0.5" :class="doc.url ? 'text-slate-400' : (doc.required ? 'text-amber-600 font-bold' : 'text-slate-400')">
+                                {{ doc.url ? 'Adjunto' : (doc.required ? 'Sin archivo entregado' : 'Sin archivo (opcional)') }}
                               </p>
                             </button>
                             <div class="flex items-center gap-1.5 shrink-0">
@@ -421,7 +459,12 @@
                   >
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <button type="button" @click="seleccionarPdf(doc)" class="flex-1 min-w-0 text-left">
-                        <p class="text-xs font-bold text-slate-700">{{ doc.label }}</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <p class="text-xs font-bold text-slate-700">
+                            {{ doc.label }}<span v-if="doc.required" class="text-secondary"> *</span>
+                          </p>
+                          <span :class="badgeRequisitoClase(doc.required)">{{ doc.required ? 'Obligatorio' : 'Opcional' }}</span>
+                        </div>
                         <p class="text-[9px] uppercase tracking-widest" :class="doc.url ? 'text-slate-400' : 'text-amber-600 font-bold'">
                           {{ doc.url ? 'Adjunto' : 'Sin archivo entregado' }}
                         </p>
@@ -549,7 +592,16 @@
               <div v-if="pdfSeleccionado" class="shrink-0 flex flex-col gap-2 px-4 py-3 bg-slate-800 text-white border-b border-white/10">
                 <div class="flex items-center justify-between gap-2">
                   <div class="min-w-0 flex-1">
-                    <p class="text-[10px] font-black uppercase tracking-widest truncate">{{ pdfSeleccionado.titulo || pdfSeleccionado.label }}</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <p class="text-[10px] font-black uppercase tracking-widest truncate">{{ pdfSeleccionado.titulo || pdfSeleccionado.label }}</p>
+                      <span
+                        v-if="pdfSeleccionado.required !== undefined"
+                        class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded shrink-0"
+                        :class="pdfSeleccionado.required ? 'bg-red-500/20 text-red-200' : 'bg-white/10 text-white/60'"
+                      >
+                        {{ pdfSeleccionado.required ? 'Obligatorio' : 'Opcional' }}
+                      </span>
+                    </div>
                     <p v-if="!pdfSeleccionado.url" class="text-[9px] text-amber-300 font-bold uppercase tracking-widest mt-0.5">
                       Documento no entregado
                     </p>
@@ -932,28 +984,55 @@ const itemsDelegado = computed(() => {
   const s = solicitudActiva.value
   const nombre = `${s.delegado?.nombres || ''} ${s.delegado?.primerApellido || ''} ${s.delegado?.segundoApellido || ''}`.trim()
   return [
-    { key: 'delegadoNombre', label: 'Nombre Completo', value: nombre },
-    { key: 'delegadoCi', label: 'CI Delegado', value: s.delegado?.ci || '' },
-    { key: 'fechaSolicitud', label: 'Fecha de Solicitud', value: formatFecha(s.createdAt) || '' },
-    { key: 'gestion', label: 'Gestión', value: String(s.gestion?.anio || '') },
+    { key: 'delegadoNombre', label: 'Nombre Completo', value: nombre, required: true },
+    { key: 'delegadoCi', label: 'CI Delegado', value: s.delegado?.ci || '', required: true },
+    { key: 'fechaSolicitud', label: 'Fecha de Solicitud', value: formatFecha(s.createdAt) || '', required: true },
+    { key: 'gestion', label: 'Gestión', value: String(s.gestion?.anio || ''), required: true },
   ]
 })
 
 const itemsFraternidad = computed(() => {
   if (!solicitudActiva.value) return []
   const s = solicitudActiva.value
+  const instancia = s.instanciaRepresentacion || ''
   const items = [
-    { key: 'nombreFraternidad', label: 'Nombre Fraternidad', value: s.nombreFraternidad || '' },
-    { key: 'tipoDanza', label: 'Tipo de danza', value: s.tipoDanza?.nombre || '—' },
-    { key: 'costosParticipacion', label: 'Costo de participación', value: formatearCostosParticipacion(s.costosParticipacion) },
-    { key: 'categoria', label: 'Categoría', value: s.categoria?.nombre || '' },
-    { key: 'instancia', label: 'Instancia', value: instanciaLabel(s) || '' },
+    { key: 'nombreFraternidad', label: 'Nombre Fraternidad', value: s.nombreFraternidad || '', required: true },
+    { key: 'tipoDanza', label: 'Tipo de danza', value: s.tipoDanza?.nombre || '—', required: true },
+    { key: 'costosParticipacion', label: 'Costo de participación', value: formatearCostosParticipacion(s.costosParticipacion), required: true },
+    { key: 'categoria', label: 'Categoría', value: s.categoria?.nombre || '', required: true },
+    { key: 'instancia', label: 'Instancia', value: instanciaLabel(s) || '', required: true },
   ]
-  if (s.facultad) items.push({ key: 'facultad', label: 'Facultad', value: s.facultad?.nombre || '' })
-  if (s.carrera) items.push({ key: 'carrera', label: 'Carrera', value: s.carrera?.nombre || '' })
-  if (s.nombreInstitucionExterna) items.push({ key: 'institucionExterna', label: 'Institución Externa', value: s.nombreInstitucionExterna || '' })
+  if (s.facultad || instancia === 'Facultad' || instancia === 'Carrera') {
+    items.push({
+      key: 'facultad',
+      label: 'Facultad',
+      value: s.facultad?.nombre || '',
+      required: instancia === 'Facultad' || instancia === 'Carrera',
+    })
+  }
+  if (s.carrera || instancia === 'Carrera') {
+    items.push({
+      key: 'carrera',
+      label: 'Carrera',
+      value: s.carrera?.nombre || '',
+      required: instancia === 'Carrera',
+    })
+  }
+  if (s.nombreInstitucionExterna || instancia === 'Externo') {
+    items.push({
+      key: 'institucionExterna',
+      label: 'Institución Externa',
+      value: s.nombreInstitucionExterna || '',
+      required: instancia === 'Externo',
+    })
+  }
   return items
 })
+
+const badgeRequisitoClase = (required) =>
+  required
+    ? 'text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20'
+    : 'text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-400 border border-slate-200'
 
 const formatearCostosParticipacion = (costos) => {
   if (!costos?.items?.length) return '—'
@@ -1074,12 +1153,13 @@ const documentosDeCargo = (prefix) => {
   const s = solicitudActiva.value
   return DOCUMENTOS_POR_PERSONA
     .filter((d) => d.prefix === prefix)
-    .map(({ fileKey, urlField, label, type, cargoLabel }) => ({
+    .map(({ fileKey, urlField, label, type, cargoLabel, required }) => ({
       key: fileKey,
       label: `${label} — ${cargoLabel}`,
       btnLabel: DOC_BTN_LABELS[type] || label,
       url: s[urlField],
       type,
+      required: !!required,
     }))
 }
 
@@ -1180,14 +1260,15 @@ const guardarProgresoRevision = async () => {
 const directiva = computed(() => {
   if (!solicitudActiva.value) return []
   const s = solicitudActiva.value
-  return PERSONAS_DIRECTIVA.map(({ prefix, label, hasCelular }) => {
+  return PERSONAS_DIRECTIVA.map(({ prefix, label, hasCelular, required }) => {
     const complemento = normalizarComplementoCi(s[`${prefix}CiComplemento`] || '')
     const ciBase = formatCiSoloBase(s[`${prefix}Ci`])
+    const cargoObligatorio = !!required
     const checklistItemsCargo = [
-      { key: `${label}-nombres`, label: 'Nombres', value: s[`${prefix}Nombres`] || '', adminField: `${prefix}Nombres` },
-      { key: `${label}-paterno`, label: 'Paterno', value: s[`${prefix}PrimerApellido`] || '', adminField: `${prefix}PrimerApellido` },
-      { key: `${label}-materno`, label: 'Materno', value: s[`${prefix}SegundoApellido`] || '', adminField: `${prefix}SegundoApellido` },
-      { key: `${label}-ci`, label: 'CI', value: ciBase, adminField: `${prefix}Ci` },
+      { key: `${label}-nombres`, label: 'Nombres', value: s[`${prefix}Nombres`] || '', adminField: `${prefix}Nombres`, required: cargoObligatorio },
+      { key: `${label}-paterno`, label: 'Paterno', value: s[`${prefix}PrimerApellido`] || '', adminField: `${prefix}PrimerApellido`, required: cargoObligatorio },
+      { key: `${label}-materno`, label: 'Materno', value: s[`${prefix}SegundoApellido`] || '', adminField: `${prefix}SegundoApellido`, required: false },
+      { key: `${label}-ci`, label: 'CI', value: ciBase, adminField: `${prefix}Ci`, required: cargoObligatorio },
     ]
     if (complemento) {
       checklistItemsCargo.push({
@@ -1195,6 +1276,7 @@ const directiva = computed(() => {
         label: 'Complemento CI',
         value: complemento,
         adminField: `${prefix}CiComplemento`,
+        required: false,
       })
     }
     if (hasCelular) {
@@ -1203,12 +1285,14 @@ const directiva = computed(() => {
         label: 'Celular',
         value: s[`${prefix}Celular`] || '',
         adminField: `${prefix}Celular`,
+        required: cargoObligatorio,
       })
     }
     return {
       prefix,
       label,
       hasCelular,
+      required: cargoObligatorio,
       nombreCompleto: nombreCompletoPersona(s, prefix),
       ci: s[`${prefix}Ci`],
       complemento,
@@ -1224,10 +1308,11 @@ const directiva = computed(() => {
 const documentosInstitucionales = computed(() => {
   if (!solicitudActiva.value) return []
   const s = solicitudActiva.value
-  return DOCUMENTOS_INSTITUCIONALES.map(({ fileKey, urlField, label }) => ({
+  return DOCUMENTOS_INSTITUCIONALES.map(({ fileKey, urlField, label, required }) => ({
     key: fileKey,
     label,
     url: s[urlField],
+    required: required !== false,
   }))
 })
 
