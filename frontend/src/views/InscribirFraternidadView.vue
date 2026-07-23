@@ -1213,8 +1213,8 @@ const onCiChange = (ciField, cargoLabel) => {
     return
   }
 
-  // Se permite el mismo CI en varios cargos de ESTA fraternidad.
-  // Solo se valida que no figure en OTRA fraternidad (excepto Co-Gobierno en misma facultad/carrera).
+  // Misma fraternidad: CI puede repetirse en varios cargos.
+  // Otras fraternidades: solo Co-Gobierno puede repetirse (solo como Co-Gobierno).
   ciValidacion.value = { ...ciValidacion.value, [ciField]: { estado: 'checking', mensaje: 'Verificando...' } }
   ciTimers[ciField] = setTimeout(async () => {
     try {
@@ -1224,8 +1224,6 @@ const onCiChange = (ciField, cargoLabel) => {
       if (complemento) params.complemento = complemento
       if (solicitudEditandoId.value) params.excludeSolicitudId = solicitudEditandoId.value
       if (cargoPrefix) params.cargoPrefix = cargoPrefix
-      if (form.value.idFacultad) params.idFacultad = form.value.idFacultad
-      if (form.value.idCarrera) params.idCarrera = form.value.idCarrera
       const { data } = await api.get('/inscripciones/verificar-ci-directiva', { params })
       if (!data.disponible) {
         ciValidacion.value = {
@@ -1236,8 +1234,8 @@ const onCiChange = (ciField, cargoLabel) => {
           },
         }
       } else {
-        const msg = data.excepcionCogobAmbitoAcademico || data.excepcionCogobMismaFacultad
-          ? 'CI permitido: Co-Gobierno puede repetirse en otra fraternidad de la misma facultad o carrera.'
+        const msg = data.excepcionCogobLibre || cargoPrefix === 'delCogob'
+          ? 'CI permitido: Co-Gobierno puede repetirse en otras fraternidades solo como Co-Gobierno.'
           : 'CI disponible (puede repetirse en otro cargo de esta fraternidad).'
         ciValidacion.value = {
           ...ciValidacion.value,
@@ -1705,16 +1703,6 @@ watch(() => form.value.instanciaRepresentacion, () => {
   form.value.idFacultad = null
   form.value.idCarrera = null
   form.value.nombreInstitucionExterna = ''
-})
-
-watch(() => form.value.idFacultad, () => {
-  if (hidratandoFormulario.value) return
-  if (form.value.delCogobCi) onCiChange('delCogobCi', 'Delegado a Co-Gobierno')
-})
-
-watch(() => form.value.idCarrera, () => {
-  if (hidratandoFormulario.value) return
-  if (form.value.delCogobCi) onCiChange('delCogobCi', 'Delegado a Co-Gobierno')
 })
 
 const filteredCarreras = computed(() => {
