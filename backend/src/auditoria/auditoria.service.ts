@@ -61,6 +61,15 @@ export class AuditoriaService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<SesionUsuario> {
+    // Cerrar sesiones huérfanas del mismo usuario (p.ej. cierre de pestaña sin logout)
+    await this.sesionRepo
+      .createQueryBuilder()
+      .update()
+      .set({ finSesion: new Date() })
+      .where('id_usuario = :idUsuario', { idUsuario })
+      .andWhere('fin_sesion IS NULL')
+      .execute();
+
     const gestionActiva = await this.getGestionActiva();
     const sesion = this.sesionRepo.create({
       usuario: { idUsuario } as Usuario,

@@ -99,6 +99,68 @@ export class MailService {
     }
   }
 
+  /**
+   * Aviso cuando un administrador actualiza datos del perfil (sin cambio de correo).
+   */
+  async sendAccountUpdatedNotification(
+    email: string,
+    nombre: string,
+    cambios: string[],
+    opciones?: { passwordRestablecida?: boolean; ci?: string },
+  ): Promise<void> {
+    const from = this.configService.get<string>('SMTP_FROM', 'EFU <noreply@efu.test>');
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173');
+    const listaCambios = (cambios.length ? cambios : ['Datos de perfil'])
+      .map((c) => `<li style="margin-bottom:4px;">${escapeHtml(c)}</li>`)
+      .join('');
+
+    const bloques: string[] = [
+      emailParagraph(`Hola <strong>${escapeHtml(nombre)}</strong>,`),
+      emailParagraph(
+        'Un administrador actualizó datos de tu cuenta en el <strong>sistema de la Entrada Folklórica Universitaria</strong>.',
+      ),
+      emailHighlightBox(
+        [emailLabel('Datos modificados'), `<ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#1e293b;">${listaCambios}</ul>`].join(''),
+      ),
+    ];
+
+    if (opciones?.passwordRestablecida && opciones.ci) {
+      bloques.push(
+        emailHighlightBox(
+          [
+            emailLabel('Acceso actualizado'),
+            `<p style="margin: 0 0 8px; font-size: 15px; color: #1e293b;"><strong>Usuario (CI):</strong> ${escapeHtml(opciones.ci)}</p>`,
+            `<p style="margin: 0; font-size: 15px; color: #1e293b;"><strong>Contraseña temporal:</strong> la indicada por el administrador (o tu CI si se restableció al valor inicial).</p>`,
+          ].join(''),
+        ),
+      );
+      bloques.push(
+        emailParagraph(
+          'Si no conoces la nueva contraseña, contacta a La Comisión o usa “Olvidé mi contraseña” en el portal.',
+        ),
+      );
+    }
+
+    bloques.push(emailButton(`${frontendUrl}/login`, 'Ir al portal de acceso'));
+    bloques.push(emailMutedNote('Si no reconoces este cambio, contacta de inmediato al administrador del sistema.'));
+
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        from,
+        subject: 'Actualización de tu cuenta — EFU UMSA',
+        html: buildEmailLayout({
+          title: 'Datos de cuenta actualizados',
+          contentHtml: bloques.join(''),
+          frontendUrl,
+        }),
+      });
+    } catch (error) {
+      this.logger.error(`Error al enviar correo de actualización a ${email}`, error?.stack || error);
+      throw error;
+    }
+  }
+
   private formatRolLabel(rolNombre: string): string {
     const labels: Record<string, string> = {
       superusuario: 'Superusuario',

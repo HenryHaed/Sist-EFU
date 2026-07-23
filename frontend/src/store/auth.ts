@@ -153,7 +153,25 @@ export const useAuthStore = defineStore('auth', {
 
     async logout(clearModal = true) {
       const sessionId = this.sessionId;
-      const hadToken = !!this.token;
+      const token = this.token;
+
+      // Cerrar sesión en servidor ANTES de limpiar token/sessionId (si no, fin_sesion nunca se guarda)
+      if (sessionId && token) {
+        try {
+          await api.post(
+            '/auth/logout',
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'X-Session-Id': String(sessionId),
+              },
+            },
+          );
+        } catch {
+          /* best-effort: igual se limpia el cliente */
+        }
+      }
 
       this.token = null;
       this.user = null;
@@ -168,10 +186,6 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('lastActivityAt');
       localStorage.removeItem('sessionId');
       localStorage.removeItem('gestionContextId');
-
-      if (sessionId && hadToken) {
-        api.post('/auth/logout').catch(() => undefined);
-      }
     },
 
     updatePrimerLogin(val: boolean) {

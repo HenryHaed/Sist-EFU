@@ -100,12 +100,22 @@ export class InscripcionesController {
     @Query('ci') ci: string,
     @Query('complemento') complemento?: string,
     @Query('excludeSolicitudId') excludeSolicitudId?: string,
+    @Query('cargoPrefix') cargoPrefix?: string,
+    @Query('idFacultad') idFacultad?: string,
+    @Query('idCarrera') idCarrera?: string,
   ) {
     const excludeId = excludeSolicitudId ? parseInt(excludeSolicitudId, 10) : undefined;
+    const idFac = idFacultad ? parseInt(idFacultad, 10) : undefined;
+    const idCar = idCarrera ? parseInt(idCarrera, 10) : undefined;
     return this.inscripcionesService.verificarCiDirectiva(
       ci,
       complemento,
       Number.isNaN(excludeId) ? undefined : excludeId,
+      {
+        cargoPrefix: cargoPrefix || undefined,
+        idFacultad: idFac && !Number.isNaN(idFac) ? idFac : null,
+        idCarrera: idCar && !Number.isNaN(idCar) ? idCar : null,
+      },
     );
   }
 

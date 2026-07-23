@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard-page max-w-7xl">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
       <div>
         <h2 class="dashboard-page-title text-primary capitalize">Gestión de {{ tituloVista }}</h2>
         <p class="text-slate-500 font-medium text-sm mt-1">Administra los accesos de los usuarios con el rol {{ tituloVista }}.</p>
@@ -15,6 +15,40 @@
       </button>
     </div>
 
+    <!-- Buscador -->
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-5 mb-6">
+      <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Buscar usuario</label>
+      <div class="relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
+        <input
+          v-model="searchQuery"
+          type="search"
+          autocomplete="off"
+          placeholder="CI, nombre, apellidos, correo o fraternidad..."
+          class="w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all"
+        />
+        <button
+          v-if="searchQuery"
+          type="button"
+          @click="searchQuery = ''"
+          class="absolute right-3 top-1/2 -translate-y-1/2 size-7 rounded-lg bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors"
+          title="Limpiar búsqueda"
+        >
+          <span class="material-symbols-outlined text-base">close</span>
+        </button>
+      </div>
+      <p class="mt-2 text-xs text-slate-500 font-medium">
+        <template v-if="searchQuery.trim()">
+          {{ filteredUsuarios.length }} resultado{{ filteredUsuarios.length === 1 ? '' : 's' }}
+          de {{ totalUsuariosRol }} {{ tituloVista.toLowerCase() }}
+        </template>
+        <template v-else>
+          Busca por CI, nombres, apellidos, correo
+          <span v-if="props.rolFiltro === 'delegado'"> o fraternidad</span>.
+        </template>
+      </p>
+    </div>
+
     <!-- Stats summary -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
       <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-md transition-shadow">
@@ -23,7 +57,7 @@
         </div>
         <div>
           <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Total Registrados</p>
-          <p class="text-2xl font-black text-slate-900 leading-none">{{ filteredUsuarios.length }}</p>
+          <p class="text-2xl font-black text-slate-900 leading-none">{{ totalUsuariosRol }}</p>
         </div>
       </div>
     </div>
@@ -34,15 +68,9 @@
         <h3 class="font-black text-slate-700 uppercase tracking-wider text-xs flex items-center gap-2">
           <span class="material-symbols-outlined text-slate-400">group</span> Listado Actual
         </h3>
-        <div class="relative w-full sm:w-64">
-          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
-          <input 
-            v-model="searchQuery"
-            type="text" 
-            placeholder="Buscar por CI, nombre o correo..." 
-            class="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm outline-none focus:border-primary transition-colors"
-          />
-        </div>
+        <p v-if="searchQuery.trim()" class="text-[10px] font-black uppercase tracking-widest text-primary">
+          Filtrado: {{ filteredUsuarios.length }} / {{ totalUsuariosRol }}
+        </p>
       </div>
       
       <!-- Vista Desktop (Tabla) -->
@@ -279,6 +307,10 @@
                   class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all" />
                 <p v-if="editando && !form.correo" class="text-[9px] text-amber-600 mt-1 font-bold uppercase tracking-wider">
                   Usuario legacy sin correo — complétalo para habilitar recuperación de contraseña.
+                </p>
+                <p v-else-if="editando" class="text-[9px] text-slate-400 mt-1">
+                  Si cambias el correo, se envía un correo de bienvenida (cuenta nueva) al nuevo destinatario y se restablece la contraseña al CI.
+                  Otros cambios se notifican por correo al usuario.
                 </p>
               </div>
 
@@ -528,18 +560,38 @@ const esRolDelegado = computed(() => {
 const fasesEfu = computed(() => todasFases.value.filter(f => f.tipoConcurso === 'EFU'))
 const fasesExternas = computed(() => todasFases.value.filter(f => f.tipoConcurso === 'EXTERNO'))
 
+const usuariosDelRol = computed(() =>
+  usuarios.value.filter((u) => u.rol?.nombre === props.rolFiltro),
+)
+
+const totalUsuariosRol = computed(() => usuariosDelRol.value.length)
+
+const normalizarBusqueda = (valor) =>
+  String(valor || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+
 const filteredUsuarios = computed(() => {
-  let list = usuarios.value.filter(u => u.rol?.nombre === props.rolFiltro)
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    list = list.filter(u =>
-      u.ci.toLowerCase().includes(q) ||
-      u.nombres.toLowerCase().includes(q) ||
-      u.primerApellido.toLowerCase().includes(q) ||
-      (u.correo || '').toLowerCase().includes(q)
-    )
-  }
-  return list
+  let list = usuariosDelRol.value
+  const q = normalizarBusqueda(searchQuery.value)
+  if (!q) return list
+
+  return list.filter((u) => {
+    const nombreCompleto = [u.nombres, u.primerApellido, u.segundoApellido].filter(Boolean).join(' ')
+    const campos = [
+      u.ci,
+      u.nombres,
+      u.primerApellido,
+      u.segundoApellido,
+      nombreCompleto,
+      u.correo,
+      u.fraternidad?.nombre,
+      u.fraternidad?.etiqueta,
+    ]
+    return campos.some((campo) => normalizarBusqueda(campo).includes(q))
+  })
 })
 
 const formatearSugerenciaFraternidad = (frat = {}) => ({
@@ -716,8 +768,24 @@ const guardarUsuario = async () => {
     }
 
     if (editando.value) {
-      await api.put(`/usuarios/${form.value.idUsuario}`, payload)
-      Swal.fire({ title: 'Actualizado', text: 'Usuario actualizado exitosamente', icon: 'success', confirmButtonColor: '#003399' })
+      const { data } = await api.put(`/usuarios/${form.value.idUsuario}`, payload)
+      const n = data?.notificacionCorreo
+      let detalle = 'Usuario actualizado exitosamente.'
+      if (n?.enviado && n.tipo === 'bienvenida') {
+        detalle = `Usuario actualizado. Se envió correo de cuenta nueva a <strong>${n.correo}</strong> (como alta de usuario).`
+      } else if (n?.enviado && n.tipo === 'actualizacion') {
+        detalle = `Usuario actualizado. Se notificó el cambio a <strong>${n.correo}</strong>.`
+      } else if (n && n.enviado === false && n.correo) {
+        detalle = `Usuario actualizado, pero no se pudo enviar el correo a ${n.correo}.`
+      } else if (!form.value.correo?.trim()) {
+        detalle = 'Usuario actualizado. Sin correo registrado: no se envió notificación.'
+      }
+      await Swal.fire({
+        title: 'Actualizado',
+        html: detalle,
+        icon: n?.enviado === false && n?.correo ? 'warning' : 'success',
+        confirmButtonColor: '#003399',
+      })
     } else {
       await api.post('/usuarios', payload)
       Swal.fire({

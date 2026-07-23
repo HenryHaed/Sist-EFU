@@ -114,6 +114,60 @@ function encontrarCargoPorCi(solicitud: SolicitudInscripcion, ci: string, comple
     return null;
 }
 
+function encontrarPrefixPorCi(solicitud: SolicitudInscripcion, ci: string, complemento?: string | null): string | null {
+    const idBuscado = ciIdentificador(ci, complemento);
+    for (const p of PERSONAS_DIRECTIVA) {
+        const valor = ciIdentificador(
+            String((solicitud as any)[`${p.prefix}Ci`] || ''),
+            (solicitud as any)[`${p.prefix}CiComplemento`],
+        );
+        if (valor.replace(/^\|/, '') && valor === idBuscado) return p.prefix;
+    }
+    return null;
+}
+
+function idFacultadDeSolicitud(solicitud: SolicitudInscripcion): number | null {
+    const directa = (solicitud as any).facultad?.idFacultad ?? (solicitud as any).idFacultad;
+    if (directa) return Number(directa);
+    const viaFratFac = (solicitud as any).fraternidadCreada?.facultad?.idFacultad;
+    if (viaFratFac) return Number(viaFratFac);
+    const viaCarrera = (solicitud as any).carrera?.facultad?.idFacultad;
+    if (viaCarrera) return Number(viaCarrera);
+    const viaFratCarrera = (solicitud as any).fraternidadCreada?.carrera?.facultad?.idFacultad;
+    if (viaFratCarrera) return Number(viaFratCarrera);
+    return null;
+}
+
+function idCarreraDeSolicitud(solicitud: SolicitudInscripcion): number | null {
+    const directa = (solicitud as any).carrera?.idCarrera ?? (solicitud as any).idCarrera;
+    if (directa) return Number(directa);
+    const viaFrat = (solicitud as any).fraternidadCreada?.carrera?.idCarrera;
+    if (viaFrat) return Number(viaFrat);
+    return null;
+}
+
+/** Co-Gobierno puede repetirse si comparten facultad o carrera (carrera implica su facultad). */
+function mismoAmbitoAcademicoCogob(
+    actual: { idFacultad: number | null; idCarrera: number | null },
+    otro: { idFacultad: number | null; idCarrera: number | null },
+): boolean {
+    if (
+        actual.idCarrera != null &&
+        otro.idCarrera != null &&
+        Number(actual.idCarrera) === Number(otro.idCarrera)
+    ) {
+        return true;
+    }
+    if (
+        actual.idFacultad != null &&
+        otro.idFacultad != null &&
+        Number(actual.idFacultad) === Number(otro.idFacultad)
+    ) {
+        return true;
+    }
+    return false;
+}
+
 const MAP_DELEGADO_KEY_TO_ADMIN = buildMapDelegadoKeyToAdmin();
 
 function campoEditableEnReedicion(clave: string, checklist: Record<string, any>): boolean {
@@ -303,14 +357,40 @@ export class InscripcionesService {
         }
     }
 
-    async verificarCiDirectiva(ci: string, complemento?: string, excludeSolicitudId?: number) {
+    async verificarCiDirectiva(
+        ci: string,
+        complemento?: string,
+        excludeSolicitudId?: number,
+        opts?: { cargoPrefix?: string; idFacultad?: number | null; idCarrera?: number | null },
+    ) {
         const ciNorm = String(ci || '').trim();
         if (!ciNorm) return { disponible: true };
         const compNorm = normalizarComplementoCi(complemento);
+        const cargoPrefix = opts?.cargoPrefix || null;
+
+        let idFacultadActual = opts?.idFacultad ? Number(opts.idFacultad) : null;
+        let idCarreraActual = opts?.idCarrera ? Number(opts.idCarrera) : null;
+
+        // Si solo viene carrera, inferir facultad (fraternidades de carrera bajo una facultad)
+        if (!idFacultadActual && idCarreraActual) {
+            const carrera = await this.carreraRepo.findOne({
+                where: { idCarrera: idCarreraActual },
+                relations: ['facultad'],
+            });
+            if (carrera?.facultad?.idFacultad) {
+                idFacultadActual = Number(carrera.facultad.idFacultad);
+            }
+        }
 
         const qb = this.solicitudRepo
             .createQueryBuilder('s')
             .leftJoinAndSelect('s.fraternidadCreada', 'fraternidadCreada')
+            .leftJoinAndSelect('fraternidadCreada.facultad', 'fratFacultad')
+            .leftJoinAndSelect('fraternidadCreada.carrera', 'fratCarrera')
+            .leftJoinAndSelect('fratCarrera.facultad', 'fratCarreraFacultad')
+            .leftJoinAndSelect('s.facultad', 'facultad')
+            .leftJoinAndSelect('s.carrera', 'carrera')
+            .leftJoinAndSelect('carrera.facultad', 'carreraFacultad')
             .where('s.estado IN (:...estados)', {
                 estados: [EstadoSolicitud.APROBADO, EstadoSolicitud.PENDIENTE, EstadoSolicitud.OBSERVADO],
             });
@@ -330,25 +410,48 @@ export class InscripcionesService {
             }),
         );
 
-        const conflicto = await qb.getOne();
-        if (!conflicto) return { disponible: true };
+        const conflictos = await qb.getMany();
+        if (!conflictos.length) return { disponible: true };
 
-        const cargo = encontrarCargoPorCi(conflicto, ciNorm, compNorm);
-        const nombreFraternidad =
-            conflicto.fraternidadCreada?.nombre || conflicto.nombreFraternidad || 'Otra fraternidad';
+        for (const conflicto of conflictos) {
+            const prefixConflicto = encontrarPrefixPorCi(conflicto, ciNorm, compNorm);
+            const idFacultadConflicto = idFacultadDeSolicitud(conflicto);
+            const idCarreraConflicto = idCarreraDeSolicitud(conflicto);
 
-        return {
-            disponible: false,
-            nombreFraternidad,
-            cargo,
-            idSolicitud: conflicto.idSolicitud,
-            estado: conflicto.estado,
-        };
+            // Excepción: Co-Gobierno puede repetirse en otra fraternidad de la misma
+            // facultad o de la misma carrera (carrera ∈ facultad).
+            const esCogobAmbos = cargoPrefix === 'delCogob' && prefixConflicto === 'delCogob';
+            const mismoAmbito = mismoAmbitoAcademicoCogob(
+                { idFacultad: idFacultadActual, idCarrera: idCarreraActual },
+                { idFacultad: idFacultadConflicto, idCarrera: idCarreraConflicto },
+            );
+
+            if (esCogobAmbos && mismoAmbito) {
+                continue;
+            }
+
+            const cargo = encontrarCargoPorCi(conflicto, ciNorm, compNorm);
+            const nombreFraternidad =
+                conflicto.fraternidadCreada?.nombre || conflicto.nombreFraternidad || 'Otra fraternidad';
+
+            return {
+                disponible: false,
+                nombreFraternidad,
+                cargo,
+                idSolicitud: conflicto.idSolicitud,
+                estado: conflicto.estado,
+                facultad: idFacultadConflicto,
+                carrera: idCarreraConflicto,
+            };
+        }
+
+        return { disponible: true, excepcionCogobAmbitoAcademico: true };
     }
 
     private async assertCisDirectivaUnicos(data: any, excludeSolicitudId?: number) {
         // Una misma persona PUEDE ocupar varios cargos dentro de la misma fraternidad.
-        // Lo que no se permite es figurar en la directiva de OTRA fraternidad.
+        // Lo que no se permite es figurar en la directiva de OTRA fraternidad,
+        // excepto Delegado a Co-Gobierno en otra fraternidad de la misma facultad o carrera.
         const cisUnicos = new Map<string, string>();
 
         for (const p of PERSONAS_DIRECTIVA) {
@@ -356,15 +459,30 @@ export class InscripcionesService {
             if (!ci) continue;
             const complemento = normalizarComplementoCi(data[`${p.prefix}CiComplemento`]);
             const id = ciIdentificador(ci, complemento);
-            if (!cisUnicos.has(id)) cisUnicos.set(id, p.checklist);
+            if (!cisUnicos.has(id)) {
+                cisUnicos.set(id, p.prefix);
+            } else if (p.prefix === 'delCogob') {
+                cisUnicos.set(id, 'delCogob');
+            }
         }
 
-        for (const [id, cargo] of cisUnicos.entries()) {
+        const idFacultad = data.idFacultad ? Number(data.idFacultad) : null;
+        const idCarrera = data.idCarrera ? Number(data.idCarrera) : null;
+
+        for (const [id, cargoPrefix] of cisUnicos.entries()) {
             const [ci, complemento = ''] = id.split('|');
-            const resultado = await this.verificarCiDirectiva(ci, complemento, excludeSolicitudId);
+            const persona = PERSONAS_DIRECTIVA.find((p) => p.prefix === cargoPrefix);
+            const resultado = await this.verificarCiDirectiva(ci, complemento, excludeSolicitudId, {
+                cargoPrefix,
+                idFacultad,
+                idCarrera,
+            });
             if (!resultado.disponible) {
                 throw new BadRequestException(
-                    `El CI ${ci}${complemento ? ` ${complemento}` : ''} (${cargo}) ya figura como ${resultado.cargo} en la fraternidad "${resultado.nombreFraternidad}". Una persona no puede integrar la directiva de más de una fraternidad.`,
+                    `El CI ${ci}${complemento ? ` ${complemento}` : ''} (${persona?.checklist || cargoPrefix}) ya figura como ${resultado.cargo} en la fraternidad "${resultado.nombreFraternidad}". Una persona no puede integrar la directiva de más de una fraternidad` +
+                        (cargoPrefix === 'delCogob'
+                            ? ' (el Co-Gobierno solo puede repetirse en fraternidades de la misma facultad o de la misma carrera).'
+                            : '.'),
                 );
             }
         }

@@ -48,7 +48,7 @@ export class UsuariosService {
   async findOne(id: number) {
     const user = await this.usuarioRepo.findOne({
       where: { idUsuario: id },
-      relations: ['rol'],
+      relations: ['rol', 'fraternidad'],
     });
     if (!user) throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     return user;
@@ -230,6 +230,53 @@ export class UsuariosService {
     }
   }
 
+  private async notificarActualizacionUsuario(params: {
+    usuario: Usuario;
+    correoAnterior: string | null;
+    correoNuevo: string | null;
+    correoCambio: boolean;
+    cambios: string[];
+    passwordCambiada: boolean;
+    rolNombre: string;
+  }): Promise<{ enviado: boolean; tipo?: 'bienvenida' | 'actualizacion'; correo?: string; error?: string }> {
+    const { usuario, correoAnterior, correoNuevo, correoCambio, cambios, passwordCambiada, rolNombre } = params;
+    const nombre = `${usuario.nombres} ${usuario.primerApellido}`.trim();
+
+    // Cambio de correo → tratar como cuenta nueva en el correo destino
+    if (correoCambio && correoNuevo) {
+      try {
+        await this.mailService.sendAccountCreatedNotification(
+          correoNuevo,
+          nombre,
+          usuario.ci,
+          rolNombre,
+        );
+        return { enviado: true, tipo: 'bienvenida', correo: correoNuevo };
+      } catch (error) {
+        this.logger.warn(
+          `No se pudo enviar correo de bienvenida (cambio de correo) a ${correoNuevo}: ${error?.message}`,
+        );
+        return { enviado: false, tipo: 'bienvenida', correo: correoNuevo, error: error?.message };
+      }
+    }
+
+    const destino = correoNuevo || correoAnterior;
+    if (!destino || !cambios.length) {
+      return { enviado: false };
+    }
+
+    try {
+      await this.mailService.sendAccountUpdatedNotification(destino, nombre, cambios, {
+        passwordRestablecida: passwordCambiada,
+        ci: usuario.ci,
+      });
+      return { enviado: true, tipo: 'actualizacion', correo: destino };
+    } catch (error) {
+      this.logger.warn(`No se pudo enviar correo de actualización a ${destino}: ${error?.message}`);
+      return { enviado: false, tipo: 'actualizacion', correo: destino, error: error?.message };
+    }
+  }
+
   async update(id: number, updateDto: UpdateUsuarioDto & {
     tipoJurado?: string;
     fasesEfuIds?: number[];
@@ -242,10 +289,41 @@ export class UsuariosService {
     const user = await this.findOne(id);
     const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, ...data } = updateDto as any;
 
+    const correoAnterior = user.correo ? String(user.correo).trim().toLowerCase() : null;
+    const fraternidadAnteriorId = user.fraternidad?.idFraternidad ?? null;
+    const ciAnterior = user.ci;
+    const nombresAnterior = user.nombres;
+    const paternoAnterior = user.primerApellido;
+    const maternoAnterior = user.segundoApellido || '';
+    const rolAnteriorId = user.rol?.idRol;
+
     let updateData: any = { ...data };
+    const cambios: string[] = [];
+    let correoCambio = false;
+    let passwordCambiada = false;
+    let correoNuevoNorm: string | null = correoAnterior;
 
     if (data.ci !== undefined && data.ci !== null && String(data.ci).trim() !== '') {
       updateData.ci = validarCiUsuario(data.ci);
+      if (String(updateData.ci) !== String(ciAnterior)) {
+        cambios.push(`CI: ${ciAnterior} → ${updateData.ci}`);
+      }
+    }
+
+    if (data.nombres !== undefined && String(data.nombres).trim() !== String(nombresAnterior || '').trim()) {
+      cambios.push(`Nombres: ${nombresAnterior} → ${String(data.nombres).trim()}`);
+    }
+    if (
+      data.primerApellido !== undefined &&
+      String(data.primerApellido).trim() !== String(paternoAnterior || '').trim()
+    ) {
+      cambios.push(`Apellido paterno: ${paternoAnterior} → ${String(data.primerApellido).trim()}`);
+    }
+    if (data.segundoApellido !== undefined) {
+      const nuevoMaterno = String(data.segundoApellido || '').trim();
+      if (nuevoMaterno !== String(maternoAnterior).trim()) {
+        cambios.push(`Apellido materno: ${maternoAnterior || '(vacío)'} → ${nuevoMaterno || '(vacío)'}`);
+      }
     }
 
     if (data.correo !== undefined) {
@@ -253,6 +331,17 @@ export class UsuariosService {
       if (correoNorm) {
         await this.assertCorreoUnico(correoNorm, id);
         updateData.correo = correoNorm;
+        correoNuevoNorm = correoNorm;
+        if (correoNorm !== correoAnterior) {
+          correoCambio = true;
+          cambios.push(
+            `Correo: ${correoAnterior || '(sin correo)'} → ${correoNorm}`,
+          );
+        }
+      } else if (correoAnterior) {
+        // No permitir vaciar correo si ya tenía uno (mantener)
+        delete updateData.correo;
+        correoNuevoNorm = correoAnterior;
       }
     }
 
@@ -261,10 +350,24 @@ export class UsuariosService {
       rolActualizado = await this.roleRepo.findOne({ where: { idRol } });
       if (!rolActualizado) throw new BadRequestException('Rol no válido');
       updateData.rol = rolActualizado;
+      if (rolActualizado.idRol !== rolAnteriorId) {
+        cambios.push(`Rol: ${user.rol?.nombre || '?'} → ${rolActualizado.nombre}`);
+      }
     }
 
-    if (password && password.trim() !== '') {
+    // Cambio de correo = cuenta nueva: restablecer contraseña al CI (como alta de usuario)
+    if (correoCambio) {
+      const ciAcceso = String(updateData.ci || user.ci);
+      updateData.password = await bcrypt.hash(ciAcceso, 10);
+      updateData.primerLogin = true;
+      passwordCambiada = true;
+      if (!cambios.some((c) => c.toLowerCase().includes('contraseña'))) {
+        cambios.push('Contraseña restablecida al CI (cuenta nueva)');
+      }
+    } else if (password && password.trim() !== '') {
       updateData.password = await bcrypt.hash(password, 10);
+      passwordCambiada = true;
+      cambios.push('Contraseña actualizada por un administrador');
     }
 
     if (idFraternidad || nuevaFraternidad) {
@@ -273,8 +376,18 @@ export class UsuariosService {
         nuevaFraternidad,
         excludeUsuarioId: id,
       });
-      if (frat) user.fraternidad = frat;
+      if (frat) {
+        if (frat.idFraternidad !== fraternidadAnteriorId) {
+          cambios.push(
+            `Fraternidad: ${user.fraternidad?.nombre || '(ninguna)'} → ${frat.nombre}`,
+          );
+        }
+        user.fraternidad = frat;
+      }
     } else if (idFraternidad === null && !nuevaFraternidad) {
+      if (fraternidadAnteriorId) {
+        cambios.push(`Fraternidad: ${user.fraternidad?.nombre || fraternidadAnteriorId} → (ninguna)`);
+      }
       user.fraternidad = null;
     }
 
@@ -305,9 +418,22 @@ export class UsuariosService {
       const allFasesIds = this.mergeAndDedupe(fasesEfuIds || [], fasesExternasIds || [], fasesIds || []);
       const resolvedTipo = this.resolvetipoJurado(tipoJurado, fasesEfuIds || [], fasesExternasIds || []);
       await this.crearOActualizarPerfilJurado(savedUser, resolvedTipo, allFasesIds, fraternidadesIds || []);
+      if (!cambios.some((c) => c.toLowerCase().includes('jurado'))) {
+        cambios.push('Perfil / asignaciones de jurado actualizadas');
+      }
     }
 
-    return savedUser;
+    const notificacionCorreo = await this.notificarActualizacionUsuario({
+      usuario: savedUser,
+      correoAnterior,
+      correoNuevo: correoNuevoNorm || savedUser.correo || null,
+      correoCambio,
+      cambios,
+      passwordCambiada,
+      rolNombre: rolFinal?.nombre || 'usuario',
+    });
+
+    return { ...savedUser, notificacionCorreo };
   }
 
   // HELPER: Determinar el tipo correcto según las fases seleccionadas
