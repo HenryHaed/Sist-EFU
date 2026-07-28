@@ -264,7 +264,7 @@
           <!-- User Profile -->
           <div class="mt-auto pt-6 border-t border-slate-100 dark:border-slate-700">
             <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-600 shadow-[2px_2px_0px_0px_#e2e8f0] dark:shadow-none">
-              <div class="flex items-center gap-3 mb-3">
+              <div class="flex items-center gap-3">
                 <div class="size-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border-2 border-slate-200">
                   <span class="material-symbols-outlined text-2xl">account_circle</span>
                 </div>
@@ -273,8 +273,6 @@
                   <p class="text-[10px] text-slate-500 uppercase font-black tracking-tighter">{{ currentUser ? currentUser.rol : '-' }}</p>
                 </div>
               </div>
-              <v-progress-linear model-value="65" color="secondary" height="6" rounded class="bg-slate-100 mb-1"></v-progress-linear>
-              <p class="text-[10px] text-slate-500 text-right font-bold">65% Completado</p>
             </div>
           </div>
         </div>

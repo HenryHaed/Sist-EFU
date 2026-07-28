@@ -53,6 +53,14 @@
       <p v-if="etiquetaGestion" class="text-xs text-slate-500 mt-2 font-medium">
         Mostrando datos de: <strong class="text-primary">{{ etiquetaGestion }}</strong>
       </p>
+      <p
+        v-if="activeTab === 'acciones'"
+        class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-3 font-medium"
+      >
+        Los cambios en <strong>facultades, carreras e instituciones</strong> se registran en
+        <button type="button" class="underline font-bold" @click="filtrarOrganizacionGlobal">Sistema global</button>
+        con módulo <strong>organizacion</strong>. Use el filtro de método para ver POST, PUT, PATCH y DELETE.
+      </p>
     </div>
 
     <!-- Tabs -->
@@ -84,6 +92,16 @@
         <select v-model="filtros.modulo" class="form-input !py-2 !text-sm">
           <option value="">Todos</option>
           <option v-for="m in modulos" :key="m" :value="m">{{ m }}</option>
+        </select>
+      </div>
+      <div v-if="activeTab === 'acciones'">
+        <label class="label-xs">Método HTTP</label>
+        <select v-model="filtros.metodo" class="form-input !py-2 !text-sm">
+          <option value="">Todos (POST, PUT, PATCH, DELETE)</option>
+          <option value="POST">POST — Creaciones</option>
+          <option value="PUT">PUT — Actualizaciones</option>
+          <option value="PATCH">PATCH — Modificaciones</option>
+          <option value="DELETE">DELETE — Eliminaciones</option>
         </select>
       </div>
       <button
@@ -161,42 +179,83 @@
         <table class="w-full text-sm">
           <thead class="bg-slate-50 border-b border-slate-200">
             <tr>
+              <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 w-8"></th>
               <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Fecha/Hora</th>
               <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Usuario</th>
               <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Gestión</th>
               <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Módulo</th>
-              <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Acción</th>
-              <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Ruta</th>
+              <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Método</th>
+              <th class="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Descripción</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!acciones.length">
-              <td colspan="6" class="px-4 py-10 text-center text-slate-400 font-medium">No hay cambios registrados para este filtro.</td>
+              <td colspan="7" class="px-4 py-10 text-center text-slate-400 font-medium">No hay cambios registrados para este filtro.</td>
             </tr>
-            <tr
-              v-for="a in acciones"
-              :key="a.idRegistro"
-              class="border-b border-slate-100 hover:bg-slate-50/80 transition-colors"
-            >
-              <td class="px-4 py-3 text-xs font-mono text-slate-700 whitespace-nowrap">{{ formatearFecha(a.createdAt) }}</td>
-              <td class="px-4 py-3">
-                <p class="font-bold text-primary text-xs">{{ nombreUsuario(a.usuario) }}</p>
-                <p class="text-[10px] text-slate-400">{{ a.usuario?.rol }}</p>
-              </td>
-              <td class="px-4 py-3 text-xs font-bold text-slate-600">
-                {{ a.gestion ? a.gestion.anio : 'Global' }}
-              </td>
-              <td class="px-4 py-3">
-                <span class="text-[9px] font-black uppercase bg-slate-100 text-slate-600 px-2 py-1 rounded">{{ a.modulo || '—' }}</span>
-              </td>
-              <td class="px-4 py-3">
-                <span
-                  class="text-[9px] font-black uppercase px-2 py-1 rounded"
-                  :class="metodoClass(a.metodo)"
-                >{{ a.metodo }}</span>
-              </td>
-              <td class="px-4 py-3 text-[10px] text-slate-500 font-mono max-w-[200px] truncate" :title="a.ruta">{{ a.ruta }}</td>
-            </tr>
+            <template v-for="a in acciones" :key="a.idRegistro">
+              <tr
+                class="border-b border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer"
+                @click="toggleDetalle(a.idRegistro)"
+              >
+                <td class="px-4 py-3 text-slate-400">
+                  <span class="material-symbols-outlined text-[18px]">
+                    {{ detalleAbierto === a.idRegistro ? 'expand_less' : 'expand_more' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-xs font-mono text-slate-700 whitespace-nowrap">{{ formatearFecha(a.createdAt) }}</td>
+                <td class="px-4 py-3">
+                  <p class="font-bold text-primary text-xs">{{ nombreUsuario(a.usuario) }}</p>
+                  <p class="text-[10px] text-slate-400">{{ a.usuario?.rol }}</p>
+                </td>
+                <td class="px-4 py-3 text-xs font-bold text-slate-600">
+                  {{ a.gestion ? a.gestion.anio : 'Global' }}
+                </td>
+                <td class="px-4 py-3">
+                  <span class="text-[9px] font-black uppercase bg-slate-100 text-slate-600 px-2 py-1 rounded">{{ a.modulo || '—' }}</span>
+                </td>
+                <td class="px-4 py-3">
+                  <span
+                    class="text-[9px] font-black uppercase px-2 py-1 rounded"
+                    :class="metodoClass(a.metodo)"
+                  >{{ a.metodo }}</span>
+                </td>
+                <td class="px-4 py-3 text-xs text-slate-700 max-w-[280px]">
+                  <p class="font-medium leading-snug">{{ a.descripcion || '—' }}</p>
+                  <p class="text-[10px] text-slate-400 font-mono truncate mt-0.5" :title="a.ruta">{{ a.ruta }}</p>
+                </td>
+              </tr>
+              <tr v-if="detalleAbierto === a.idRegistro" class="bg-slate-50/60 border-b border-slate-100">
+                <td colspan="7" class="px-4 py-4">
+                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Detalle de la acción</p>
+                      <dl class="space-y-1.5">
+                        <div class="flex gap-2">
+                          <dt class="font-bold text-slate-500 shrink-0">Ruta:</dt>
+                          <dd class="font-mono text-slate-700 break-all">{{ a.ruta }}</dd>
+                        </div>
+                        <div class="flex gap-2">
+                          <dt class="font-bold text-slate-500 shrink-0">Código HTTP:</dt>
+                          <dd class="text-slate-700">{{ a.codigoRespuesta ?? '—' }}</dd>
+                        </div>
+                        <div class="flex gap-2">
+                          <dt class="font-bold text-slate-500 shrink-0">Sesión:</dt>
+                          <dd class="text-slate-700">#{{ a.idSesion || '—' }}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <div>
+                      <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Datos registrados</p>
+                      <pre
+                        v-if="a.cuerpoSolicitud"
+                        class="bg-white border border-slate-200 rounded-xl p-3 text-[10px] font-mono text-slate-700 overflow-x-auto max-h-48"
+                      >{{ formatearJson(a.cuerpoSolicitud) }}</pre>
+                      <p v-else class="text-slate-400 italic">Sin cuerpo de solicitud (común en DELETE sin payload).</p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -251,12 +310,14 @@ const resumen = ref(null)
 const sesiones = ref([])
 const acciones = ref([])
 const cargando = ref(false)
+const detalleAbierto = ref(null)
 const paginacion = ref({ page: 1, totalPages: 1, total: 0 })
 
 const filtros = ref({
   desde: '',
   hasta: '',
   modulo: '',
+  metodo: '',
   soloActivas: false,
 })
 
@@ -300,8 +361,10 @@ const cargarDatos = async (page = 1) => {
       paginacion.value = { page: data.page, totalPages: data.totalPages, total: data.total }
     } else {
       if (filtros.value.modulo) params.modulo = filtros.value.modulo
+      if (filtros.value.metodo) params.metodo = filtros.value.metodo
       const { data } = await api.get('/auditoria/acciones', { params })
       acciones.value = data.items || []
+      detalleAbierto.value = null
       paginacion.value = { page: data.page, totalPages: data.totalPages, total: data.total }
     }
   } catch {
@@ -319,7 +382,27 @@ const seleccionarGestion = (id) => {
 
 const cambiarTab = (tab) => {
   activeTab.value = tab
+  detalleAbierto.value = null
   cargarDatos(1)
+}
+
+const filtrarOrganizacionGlobal = () => {
+  filtroGestion.value = 'global'
+  filtros.value.modulo = 'organizacion'
+  activeTab.value = 'acciones'
+  cargarDatos(1)
+}
+
+const toggleDetalle = (idRegistro) => {
+  detalleAbierto.value = detalleAbierto.value === idRegistro ? null : idRegistro
+}
+
+const formatearJson = (obj) => {
+  try {
+    return JSON.stringify(obj, null, 2)
+  } catch {
+    return String(obj)
+  }
 }
 
 const nombreUsuario = (u) => {

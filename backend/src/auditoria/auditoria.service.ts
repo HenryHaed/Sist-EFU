@@ -172,7 +172,12 @@ export class AuditoriaService {
     return null;
   }
 
-  private buildDescripcion(metodo: string, ruta: string, modulo: string | null): string {
+  private buildDescripcion(
+    metodo: string,
+    ruta: string,
+    modulo: string | null,
+    cuerpo: Record<string, unknown> | null,
+  ): string {
     const verbo: Record<string, string> = {
       POST: 'Creó',
       PUT: 'Actualizó',
@@ -180,13 +185,54 @@ export class AuditoriaService {
       DELETE: 'Eliminó',
     };
     const accion = verbo[metodo] || metodo;
+
+    const eliminado = cuerpo?.eliminado as Record<string, unknown> | undefined;
+    if (metodo === 'DELETE' && eliminado?.nombre) {
+      const tipo = String(eliminado.tipo || 'registro');
+      const nombre = String(eliminado.nombre);
+      const extra = eliminado.facultad && typeof eliminado.facultad === 'object'
+        ? ` (facultad: ${(eliminado.facultad as Record<string, unknown>).nombre || '—'})`
+        : '';
+      return `${accion} ${tipo} "${nombre}"${extra} en ${modulo || 'sistema'}`;
+    }
+
+    const solicitud = cuerpo?.solicitud as Record<string, unknown> | undefined;
+    const respuesta = cuerpo?.respuesta as Record<string, unknown> | undefined;
+    const nombre =
+      solicitud?.nombre ||
+      respuesta?.nombre ||
+      (respuesta?.eliminado as Record<string, unknown> | undefined)?.nombre;
+    if (nombre && typeof nombre === 'string') {
+      return `${accion} "${nombre}" en ${modulo || 'sistema'}: ${ruta}`;
+    }
+
     return `${accion} en ${modulo || 'sistema'}: ${ruta}`;
+  }
+
+  private buildCuerpoAuditoria(
+    body: unknown,
+    response?: unknown,
+  ): Record<string, unknown> | null {
+    const solicitud = this.sanitizeBody(body);
+    const respuesta = response !== undefined ? this.sanitizeBody(response) : null;
+
+    if (solicitud && respuesta) {
+      return { solicitud, respuesta };
+    }
+    if (respuesta) {
+      if (respuesta.eliminado) {
+        return { eliminado: respuesta.eliminado };
+      }
+      return { respuesta };
+    }
+    return solicitud;
   }
 
   async registrarAccion(
     req: Request,
     statusCode: number,
     bodyOverride?: unknown,
+    responseOverride?: unknown,
   ): Promise<void> {
     const metodo = req.method.toUpperCase();
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(metodo)) return;
@@ -200,7 +246,7 @@ export class AuditoriaService {
     const gestion = await this.resolveGestionForRequest(req);
 
     const body = bodyOverride !== undefined ? bodyOverride : req.body;
-    const cuerpo = this.sanitizeBody(body);
+    const cuerpo = this.buildCuerpoAuditoria(body, responseOverride);
 
     const accion = this.accionRepo.create({
       sesion: idSesion ? ({ idSesion } as SesionUsuario) : null,
@@ -209,7 +255,7 @@ export class AuditoriaService {
       metodo,
       ruta: path,
       modulo,
-      descripcion: this.buildDescripcion(metodo, path, modulo),
+      descripcion: this.buildDescripcion(metodo, path, modulo, cuerpo),
       cuerpoSolicitud: cuerpo,
       codigoRespuesta: statusCode,
     });

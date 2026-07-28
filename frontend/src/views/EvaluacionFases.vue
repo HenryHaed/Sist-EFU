@@ -80,8 +80,6 @@
                 <p class="text-[10px] text-slate-500">ID: #44920</p>
               </div>
             </div>
-            <v-progress-linear model-value="65" color="secondary" height="6" rounded class="bg-slate-100"></v-progress-linear>
-            <p class="text-[10px] text-slate-500 mt-2 text-right font-bold">65% Completado</p>
           </div>
         </div>
       </template>

@@ -38,11 +38,11 @@ export class AuditInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap({
-        next: () => {
+        next: (responseData) => {
           const status = res.statusCode;
           if (status >= 200 && status < 300) {
             this.auditoriaService
-              .registrarAccion(req, status, bodySnapshot)
+              .registrarAccion(req, status, bodySnapshot, responseData)
               .catch(() => undefined);
           }
         },

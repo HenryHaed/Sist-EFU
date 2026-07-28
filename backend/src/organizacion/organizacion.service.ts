@@ -47,8 +47,18 @@ export class OrganizacionService implements OnModuleInit {
   }
 
   async removeFacultad(id: number) {
+    const facultad = await this.facultadRepo.findOne({ where: { idFacultad: id } });
+    if (!facultad) return { success: false, mensaje: 'Facultad no encontrada' };
     await this.facultadRepo.delete(id);
-    return { success: true };
+    return {
+      success: true,
+      eliminado: {
+        tipo: 'facultad',
+        idFacultad: facultad.idFacultad,
+        nombre: facultad.nombre,
+        sigla: facultad.sigla,
+      },
+    };
   }
 
   // --- CARRERAS ---
@@ -82,8 +92,27 @@ export class OrganizacionService implements OnModuleInit {
   }
 
   async removeCarrera(id: number) {
+    const carrera = await this.carreraRepo.findOne({
+      where: { idCarrera: id },
+      relations: ['facultad'],
+    });
+    if (!carrera) return { success: false, mensaje: 'Carrera no encontrada' };
     await this.carreraRepo.delete(id);
-    return { success: true };
+    return {
+      success: true,
+      eliminado: {
+        tipo: 'carrera',
+        idCarrera: carrera.idCarrera,
+        nombre: carrera.nombre,
+        facultad: carrera.facultad
+          ? {
+              idFacultad: carrera.facultad.idFacultad,
+              nombre: carrera.facultad.nombre,
+              sigla: carrera.facultad.sigla,
+            }
+          : null,
+      },
+    };
   }
 
   // --- INSTITUCIONES EXTERNAS ---
@@ -104,7 +133,17 @@ export class OrganizacionService implements OnModuleInit {
   }
 
   async removeInstitucion(id: number) {
+    const institucion = await this.institucionRepo.findOne({ where: { idInstitucion: id } });
+    if (!institucion) return { success: false, mensaje: 'Institución no encontrada' };
     await this.institucionRepo.delete(id);
-    return { success: true };
+    return {
+      success: true,
+      eliminado: {
+        tipo: 'institucion',
+        idInstitucion: institucion.idInstitucion,
+        nombre: institucion.nombre,
+        sigla: institucion.sigla,
+      },
+    };
   }
 }
