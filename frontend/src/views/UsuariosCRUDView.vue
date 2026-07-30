@@ -121,6 +121,7 @@
                     'bg-blue-50 text-primary border-blue-100': user.rol?.nombre === 'jurado',
                     'bg-emerald-50 text-emerald-600 border-emerald-100': user.rol?.nombre === 'delegado',
                     'bg-amber-50 text-amber-600 border-amber-100': user.rol?.nombre === 'controladorhcu',
+                    'bg-violet-50 text-violet-700 border-violet-100': user.rol?.nombre === 'veedor',
                     'bg-gray-50 text-gray-500 border-gray-200': !user.rol?.nombre
                   }"
                 >
@@ -198,6 +199,7 @@
                 'bg-blue-50 text-primary border-blue-100': user.rol?.nombre === 'jurado',
                 'bg-emerald-50 text-emerald-600 border-emerald-100': user.rol?.nombre === 'delegado',
                 'bg-amber-50 text-amber-600 border-amber-100': user.rol?.nombre === 'controladorhcu',
+                'bg-violet-50 text-violet-700 border-violet-100': user.rol?.nombre === 'veedor',
                 'bg-gray-50 text-gray-500 border-gray-200': !user.rol?.nombre
               }"
             >
@@ -512,6 +514,7 @@ const props = defineProps({
 const tituloVista = computed(() => {
   if (props.rolFiltro === 'admin') return 'Administradores'
   if (props.rolFiltro === 'controladorhcu') return 'Controladores HCU'
+  if (props.rolFiltro === 'veedor') return 'Veedores'
   return props.rolFiltro + 's'
 })
 

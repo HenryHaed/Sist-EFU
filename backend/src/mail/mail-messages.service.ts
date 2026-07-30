@@ -15,7 +15,7 @@ import {
   RolComunicado,
 } from './dto/send-message.dto';
 
-const ROLES_ADMIN = ['controladorhcu', 'delegado', 'jurado'] as const;
+const ROLES_ADMIN = ['controladorhcu', 'delegado', 'jurado', 'veedor'] as const;
 
 @Injectable()
 export class MailMessagesService {

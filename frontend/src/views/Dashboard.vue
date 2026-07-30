@@ -142,7 +142,17 @@
               class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left mt-1"
             >
               <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'auditoria_reportes' ? 'text-secondary' : 'text-slate-400'">fact_check</span>
-              <span class="text-sm">Auditoría y Reportes</span>
+              <span class="text-sm">{{ can('auditoria') ? 'Auditoría y Reportes' : 'Reportes' }}</span>
+            </button>
+
+            <button
+              v-if="can('ver_monografias')"
+              @click="setVista('veedor_monografias')"
+              :class="vistaActual === 'veedor_monografias' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'veedor_monografias' ? 'text-secondary' : 'text-slate-400'">menu_book</span>
+              <span class="text-sm">Monografías Fraternidades</span>
             </button>
 
             <p v-if="can('ajustes') || can('gestion_sistema')" class="text-[9px] font-black text-slate-400 uppercase tracking-widest px-4 mt-6 mb-2">Configuración</p>
@@ -197,6 +207,14 @@
                 >
                   <span class="material-symbols-outlined text-[16px]">gavel</span>
                   Jurados
+                </button>
+                <button
+                  @click="setVista('usuarios_veedor')"
+                  :class="vistaActual === 'usuarios_veedor' ? 'text-secondary font-bold' : 'text-slate-500 hover:text-primary'"
+                  class="flex items-center gap-2 py-2 text-xs transition-colors text-left w-full"
+                >
+                  <span class="material-symbols-outlined text-[16px]">visibility</span>
+                  Veedores
                 </button>
               </div>
             </div>
@@ -504,6 +522,12 @@
               key="subir_monografia"
             />
 
+            <!-- Vista: Monografías (Veedor / solo lectura) -->
+            <VeedorMonografiasView
+              v-else-if="vistaActual === 'veedor_monografias'"
+              key="veedor_monografias"
+            />
+
             <AsistenciaView
               v-else-if="vistaActual === 'asistencias'"
               key="asistencias"
@@ -660,6 +684,7 @@ import SolicitudesInscripcionView from './SolicitudesInscripcionView.vue'
 import AsistenciaView from './AsistenciaView.vue'
 import DirectivaFraternidadView from './DirectivaFraternidadView.vue'
 import SubirMonografiaView from './SubirMonografiaView.vue'
+import VeedorMonografiasView from './VeedorMonografiasView.vue'
 
 import { getImageUrl } from '../utils/url'
 import { applySiteTitle } from '../utils/siteTitle'
@@ -763,11 +788,12 @@ const passPolicyRules = computed(() => {
 const can = (permission) => {
   const role = authStore.userRole?.toLowerCase()
   const permissions = {
-    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'auditoria_reportes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin'],
-    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria_reportes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios'],
+    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'auditoria_reportes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin', 'ver_monografias'],
+    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria_reportes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'ver_monografias'],
     jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
-    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'gestionar_participantes', 'inscripcion_fraternidad']
+    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'gestionar_participantes', 'inscripcion_fraternidad'],
+    veedor: ['estadisticas', 'reglamento', 'ver_monografias'],
   }
   return permissions[role]?.includes(permission) || false
 }
@@ -865,6 +891,7 @@ const tituloVista = computed(() => {
     const rol = vistaActual.value.replace('usuarios_', '')
     if (rol === 'admin') return 'Gestión de Administradores'
     if (rol === 'controladorhcu') return 'Gestión de Controladores HCU'
+    if (rol === 'veedor') return 'Gestión de Veedores'
     return `Gestión de ${rol.charAt(0).toUpperCase() + rol.slice(1)}s`
   }
 
@@ -890,6 +917,7 @@ const tituloVista = computed(() => {
     solicitudes_inscripcion: 'Solicitudes de Preinscripción',
     asistencias: 'Directorio de Delegados',
     subir_monografia: 'Subir Monografía',
+    veedor_monografias: 'Monografías de Fraternidades',
     seleccionar_fase_disciplina: 'Control de Disciplina HCU'
   }
 

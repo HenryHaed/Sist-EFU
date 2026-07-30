@@ -3,10 +3,17 @@
     <div class="mb-6 sm:mb-8">
       <div class="flex items-center gap-3 mb-2">
         <span class="h-6 sm:h-8 w-2 bg-secondary rounded-full shrink-0"></span>
-        <h2 class="dashboard-page-title italic uppercase text-primary">Auditoría y Reportes</h2>
+        <h2 class="dashboard-page-title italic uppercase text-primary">
+          {{ canAuditoria ? 'Auditoría y Reportes' : 'Reportes' }}
+        </h2>
       </div>
       <p class="text-slate-500 font-medium text-sm">
-        Consulta el registro de actividad del sistema, la auditoría de calificaciones, reportes filtrados e informe de costos.
+        <template v-if="esVeedor">
+          Consulta de solo lectura: reportes filtrados e informe de costos de la gestión.
+        </template>
+        <template v-else>
+          Consulta el registro de actividad del sistema, la auditoría de calificaciones, reportes filtrados e informe de costos.
+        </template>
       </p>
     </div>
 
@@ -22,6 +29,7 @@
         <div v-if="activeTab === 'auditoria'" class="absolute bottom-0 left-0 w-full h-0.5 bg-secondary rounded-t-full"></div>
       </button>
       <button
+        v-if="canCalificaciones"
         type="button"
         @click="activeTab = 'calificaciones'"
         class="pb-3 px-3 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all relative"
@@ -51,7 +59,7 @@
     </div>
 
     <AuditoriaView v-if="activeTab === 'auditoria' && canAuditoria" embedded />
-    <AuditoriaCalificacionesView v-else-if="activeTab === 'calificaciones'" />
+    <AuditoriaCalificacionesView v-else-if="activeTab === 'calificaciones' && canCalificaciones" />
     <ReportesConsultaView v-else-if="activeTab === 'reportes'" />
     <InformeCostosView v-else-if="activeTab === 'costos'" />
   </div>
@@ -67,12 +75,19 @@ import InformeCostosView from './InformeCostosView.vue'
 
 const authStore = useAuthStore()
 const role = computed(() => authStore.userRole?.toLowerCase() || '')
+const esVeedor = computed(() => role.value === 'veedor')
 const canAuditoria = computed(() => role.value === 'superusuario')
-const activeTab = ref(canAuditoria.value ? 'auditoria' : 'calificaciones')
+const canCalificaciones = computed(() => ['superusuario', 'admin'].includes(role.value))
+const activeTab = ref(
+  canAuditoria.value ? 'auditoria' : (canCalificaciones.value ? 'calificaciones' : 'reportes'),
+)
 
 onMounted(() => {
   if (!canAuditoria.value && activeTab.value === 'auditoria') {
-    activeTab.value = 'calificaciones'
+    activeTab.value = canCalificaciones.value ? 'calificaciones' : 'reportes'
+  }
+  if (!canCalificaciones.value && activeTab.value === 'calificaciones') {
+    activeTab.value = 'reportes'
   }
 })
 </script>

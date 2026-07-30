@@ -1,6 +1,6 @@
 import { IsEmail, IsIn, IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
 
-export const ROLES_COMUNICADO = ['controladorhcu', 'delegado', 'jurado', 'admin'] as const;
+export const ROLES_COMUNICADO = ['controladorhcu', 'delegado', 'jurado', 'admin', 'veedor'] as const;
 export type RolComunicado = (typeof ROLES_COMUNICADO)[number];
 
 export class EnviarComunicadoDto {

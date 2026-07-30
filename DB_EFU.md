@@ -1,11 +1,11 @@
 # Entrada Universitaria (EFU) — Diccionario y Esquema de Base de Datos
 
-Documentación generada a partir de las **22 entidades TypeORM** en `backend/src/entities/`.
+Documentación generada a partir de las **26 entidades TypeORM** en `backend/src/entities/` (+ 2 tablas junction).
 
 - **Motor:** PostgreSQL  
 - **Base de datos:** `efu_db` (configurable vía `.env`)  
-- **ORM:** TypeORM con `synchronize: true` (el esquema se alinea automáticamente al iniciar el backend)  
-- **Última revisión:** julio 2026  
+- **ORM:** TypeORM (`synchronize` según entorno; en producción se usan patches idempotentes en `ensureSchemaPatches`)  
+- **Última revisión:** 30 julio 2026  
 
 ---
 
@@ -15,9 +15,10 @@ Documentación generada a partir de las **22 entidades TypeORM** en `backend/src
 
 | Tipo | Tablas |
 |------|--------|
-| **Globales** (no dependen del año) | `roles`, `facultades`, `carreras`, `instituciones_externas`, `usuarios`, `eventos_control` |
-| **Por gestión** (año del evento) | `gestiones`, `categorias`, `fraternidades`, `fases`, `criterios`, `jurados`, `evaluaciones`, `participantes_concurso`, `infracciones`, `incidencias`, `asistencias`, `solicitudes_inscripcion`, `cronograma_inscripciones`, `documentos_gestion` |
+| **Globales** (no dependen del año) | `roles`, `facultades`, `carreras`, `instituciones_externas`, `tipos_danza`, `usuarios`, `eventos_control`, `password_reset_tokens` |
+| **Por gestión** (año del evento) | `gestiones`, `categorias`, `fraternidades`, `fases`, `criterios`, `jurados`, `evaluaciones`, `participantes_concurso`, `infracciones`, `incidencias`, `asistencias`, `solicitudes_inscripcion`, `cronograma_inscripciones`, `documentos_gestion`, `sesiones_usuario` (opcional), `auditoria_acciones` (opcional) |
 | **Por fraternidad** | `documentos_fraternidad`, `monografias` |
+| **Auditoría / sesiones** | `sesiones_usuario`, `auditoria_acciones` (pueden ser globales si `id_gestion` es NULL: usuarios, organización, mail) |
 
 ### Reglas de negocio relevantes (aplicación)
 
@@ -27,8 +28,10 @@ Documentación generada a partir de las **22 entidades TypeORM** en `backend/src
 - **Preinscripción — documentos:** **4 PDFs por integrante** (CI, Matrícula, No deudas fraternidad, No deudas áreas). Sin certificados globales de deuda. **3 PDFs institucionales** globales (carta, resolución, acta).
 - Al **aprobar** una solicitud se crea o reutiliza la fraternidad oficial y se vincula al delegado.
 - **Directorio de delegados:** solo delegado **titular** y **suplente** (datos en `solicitudes_inscripcion`).
-- **Monografía:** cada fraternidad sube **un único PDF** vía su delegado; admin/jurado/superusuario lo consultan al calificar la fase Monografía.
+- **Monografía:** cada fraternidad sube **un único PDF** vía su delegado (`uploads/Doc_Monografia/`). Admin/jurado/superusuario la consultan al calificar; el rol **`veedor`** (solo lectura) lista fraternidades y ve/descarga la monografía real subida. Si no hay fila en `monografias`, se informa que aún no subieron.
+- **DELETE físico:** las eliminaciones en organización (facultad/carrera/institución) borran filas de la BD (hard delete); no hay soft-delete. Las facultades eliminan carreras en cascada (`ON DELETE CASCADE`).
 - **Asistencia:** basta con que asista titular o suplente; si ninguno asiste → incidencia de −10 pts en disciplina.
+- **Rol `veedor`:** acceso de solo lectura a Estadísticas, Reglamento y listado de monografías. Sin permisos de escritura, calificación, reportes, gestión de usuarios ni ajustes.
 
 ### Diagrama de relaciones (resumen)
 
@@ -130,6 +133,7 @@ Configuración central de cada año EFU.
 |---------|------|---------------|-------------|
 | `id_gestion` | SERIAL | PK | Identificador |
 | `anio` | INTEGER | NOT NULL, UNIQUE | Año (ej. 2026) |
+| `edicion` | VARCHAR(20) | NULL | Etiqueta de edición (ej. XXXI) |
 | `lema` | TEXT | NULL | Lema del evento |
 | `activa` | BOOLEAN | DEFAULT false | Gestión en curso |
 | `nombre_sitio` | VARCHAR(255) | NULL | Nombre público del sitio |
@@ -141,8 +145,10 @@ Configuración central de cada año EFU.
 | `url_mapa_ubicacion` | VARCHAR(500) | NULL | Mapa |
 | `modo_mantenimiento` | BOOLEAN | DEFAULT false | Sitio en mantenimiento |
 | `mostrar_ranking` | BOOLEAN | DEFAULT true | Mostrar ranking público |
+| `mostrar_historico` | BOOLEAN | DEFAULT false | Mostrar archivo histórico en landing |
 | `permite_inscripcion_publica` | BOOLEAN | DEFAULT false | Registro público delegados |
 | `limite_fraternidades_por_danza` | INTEGER | DEFAULT 6 | Cupo máximo por tipo de danza; el exceso se marca `es_excedente` |
+| `landing_fraternidades` | JSONB | NULL | Tarjetas destacadas del landing (`titulo`, `subtitulo`, `descripcion`, `urlImagen`) |
 | `created_at` | TIMESTAMP | NOT NULL | Creación |
 | `updated_at` | TIMESTAMP | NOT NULL | Actualización |
 
@@ -241,7 +247,7 @@ Monografía única por fraternidad, subida por el delegado. Archivo en `uploads/
 | `fecha_subida` | TIMESTAMP | NOT NULL | Primera subida |
 | `updated_at` | TIMESTAMP | NOT NULL | Última actualización |
 
-**Reglas:** una fraternidad solo puede tener una monografía; solo el delegado asignado puede subirla o reemplazarla; admin, jurado y superusuario pueden consultarla al calificar.
+**Reglas:** una fraternidad solo puede tener una monografía; solo el delegado asignado puede subirla o reemplazarla; admin, jurado, superusuario y **veedor** pueden consultarla. El listado `GET /monografias/listado-fraternidades` (veedor/admin/superusuario) incluye el estado `tieneMonografia` y los metadatos del PDF realmente subido.
 
 ---
 
@@ -336,7 +342,7 @@ Mismo patrón para los 10 cargos (`Vice`, `SecGen`, `SecHaci`, `SecActas`, `SecP
 | Columna | Tipo | Restricciones | Descripción |
 |---------|------|---------------|-------------|
 | `id_rol` | SERIAL | PK | Identificador |
-| `nombre` | VARCHAR(100) | NOT NULL, UNIQUE | `superusuario`, `admin`, `controladorhcu`, `delegado`, `jurado` |
+| `nombre` | VARCHAR(100) | NOT NULL, UNIQUE | `superusuario`, `admin`, `controladorhcu`, `delegado`, `jurado`, `veedor` |
 | `descripcion` | TEXT | NULL | Descripción del rol |
 | `created_at`, `updated_at` | TIMESTAMP | NOT NULL | Auditoría |
 
@@ -370,6 +376,41 @@ Tokens OTP para recuperación de contraseña.
 | `used_at` | TIMESTAMP | NULL | Fecha de consumo del token |
 | `reset_session_id` | VARCHAR(64) | NULL | Sesión de un solo uso para JWT de reset |
 | `created_at` | TIMESTAMP | NOT NULL | Auditoría / rate limit (3 solicitudes/hora) |
+
+### `sesiones_usuario`
+
+Registro de inicios de sesión (auditoría). Una sesión se cierra en logout o al abrir una nueva sesión del mismo usuario.
+
+| Columna | Tipo | Restricciones | Descripción |
+|---------|------|---------------|-------------|
+| `id_sesion` | SERIAL | PK | Identificador |
+| `id_usuario` | INTEGER | FK → `usuarios`, ON DELETE CASCADE | Usuario |
+| `id_gestion` | INTEGER | FK → `gestiones`, ON DELETE SET NULL, NULL | Gestión activa al iniciar (o NULL) |
+| `inicio_sesion` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Inicio |
+| `fin_sesion` | TIMESTAMP | NULL | Cierre (`NULL` = activa) |
+| `ip_address` | VARCHAR(45) | NULL | IP |
+| `user_agent` | TEXT | NULL | Navegador |
+| `created_at` | TIMESTAMP | NOT NULL | Auditoría |
+
+### `auditoria_acciones`
+
+Mutaciones HTTP (POST/PUT/PATCH/DELETE) registradas por `AuditInterceptor`. Módulos globales (`usuarios`, `organizacion`, `mail`, `auth`) quedan con `id_gestion` NULL (“Sistema global”).
+
+| Columna | Tipo | Restricciones | Descripción |
+|---------|------|---------------|-------------|
+| `id_registro` | SERIAL | PK | Identificador |
+| `id_sesion` | INTEGER | FK → `sesiones_usuario`, ON DELETE SET NULL | Sesión |
+| `id_usuario` | INTEGER | FK → `usuarios`, ON DELETE SET NULL | Quién ejecutó |
+| `id_gestion` | INTEGER | FK → `gestiones`, ON DELETE SET NULL | Gestión o NULL (global) |
+| `metodo` | VARCHAR(10) | NOT NULL | POST / PUT / PATCH / DELETE |
+| `ruta` | VARCHAR(500) | NOT NULL | Path API |
+| `modulo` | VARCHAR(100) | NULL | Primer segmento de ruta |
+| `descripcion` | TEXT | NULL | Texto legible de la acción |
+| `cuerpo_solicitud` | JSONB | NULL | Payload sanitizado (+ respuesta en DELETE organizacion) |
+| `codigo_respuesta` | INTEGER | NULL | HTTP status 2xx |
+| `created_at` | TIMESTAMP | NOT NULL | Momento |
+
+**Índices:** `created_at`, `modulo`.
 
 ---
 
@@ -513,7 +554,10 @@ Reuniones / eventos de control (global, no por gestión en entidad actual).
 | `id_evento` | SERIAL PK | Identificador |
 | `nombre` | VARCHAR(255) | Nombre del evento |
 | `fecha_hora` | TIMESTAMP | Fecha y hora |
-| `puntos_penalizacion` | NUMERIC(5,2) | Penalización por defecto |
+| `ubicacion` | VARCHAR(500) | Lugar (opcional) |
+| `descripcion` | TEXT | Detalle / citación |
+| `es_publico` | BOOLEAN DEFAULT false | Visible en landing; si false, solo citación a delegados |
+| `puntos_penalizacion` | NUMERIC(5,2) DEFAULT 3 | Penalización por inasistencia |
 | `created_at`, `updated_at` | TIMESTAMP | Auditoría |
 
 ### `asistencias`
@@ -925,46 +969,53 @@ CREATE INDEX IF NOT EXISTS idx_participantes_fase ON participantes_concurso(id_f
 
 ---
 
-## 11. Inventario de tablas (22 entidades + 2 junction)
+## 11. Inventario de tablas (26 entidades + 2 junction)
 
 | # | Tabla SQL | Entidad TypeORM |
 |---|-----------|-----------------|
 | 1 | `facultades` | Facultad |
 | 2 | `carreras` | Carrera |
 | 3 | `instituciones_externas` | InstitucionExterna |
-| 4 | `gestiones` | Gestion |
-| 5 | `categorias` | Categoria |
-| 6 | `cronograma_inscripciones` | CronogramaInscripcion |
-| 7 | `documentos_gestion` | DocumentoGestion |
-| 8 | `fraternidades` | Fraternidad |
-| 9 | `documentos_fraternidad` | DocumentoFraternidad |
-| 10 | `monografias` | Monografia |
-| 11 | `roles` | Role |
-| 12 | `usuarios` | Usuario |
-| 13 | `solicitudes_inscripcion` | SolicitudInscripcion |
-| 14 | `fases` | Fase |
-| 15 | `criterios` | Criterio |
-| 16 | `jurados` | Jurado |
-| 17 | `jurado_fases` | (M:N Jurado ↔ Fase) |
-| 18 | `jurado_fraternidades` | (M:N Jurado ↔ Fraternidad) |
-| 19 | `evaluaciones` | Evaluacion |
-| 20 | `participantes_concurso` | Participante |
-| 21 | `infracciones` | Infraccion |
-| 22 | `incidencias` | Incidencia |
-| 23 | `eventos_control` | EventoControl |
-| 24 | `asistencias` | Asistencia |
+| 4 | `tipos_danza` | TipoDanza |
+| 5 | `gestiones` | Gestion |
+| 6 | `categorias` | Categoria |
+| 7 | `cronograma_inscripciones` | CronogramaInscripcion |
+| 8 | `documentos_gestion` | DocumentoGestion |
+| 9 | `fraternidades` | Fraternidad |
+| 10 | `documentos_fraternidad` | DocumentoFraternidad |
+| 11 | `monografias` | Monografia |
+| 12 | `roles` | Role |
+| 13 | `usuarios` | Usuario |
+| 14 | `password_reset_tokens` | PasswordResetToken |
+| 15 | `sesiones_usuario` | SesionUsuario |
+| 16 | `auditoria_acciones` | AuditoriaAccion |
+| 17 | `solicitudes_inscripcion` | SolicitudInscripcion |
+| 18 | `fases` | Fase |
+| 19 | `criterios` | Criterio |
+| 20 | `jurados` | Jurado |
+| 21 | `jurado_fases` | (M:N Jurado ↔ Fase) |
+| 22 | `jurado_fraternidades` | (M:N Jurado ↔ Fraternidad) |
+| 23 | `evaluaciones` | Evaluacion |
+| 24 | `participantes_concurso` | Participante |
+| 25 | `infracciones` | Infraccion |
+| 26 | `incidencias` | Incidencia |
+| 27 | `eventos_control` | EventoControl |
+| 28 | `asistencias` | Asistencia |
 
 ---
 
-## 12. Roles del sistema (seed)
+## 12. Roles del sistema (seed + patch de producción)
 
-| Rol | Descripción |
-|-----|-------------|
-| `superusuario` | Acceso total |
-| `admin` | Administración general y usuarios |
-| `controladorhcu` | Asistencia y disciplina HCU |
-| `delegado` | Inscripción de fraternidad y participantes externos |
-| `jurado` | Calificación de fases |
+| Rol | Descripción | Acceso típico UI |
+|-----|-------------|------------------|
+| `superusuario` | Acceso total | Todo + auditoría de sistema + gestión de admins |
+| `admin` | Administración general y usuarios | Evento, usuarios (excepto crear superusuario), reportes |
+| `controladorhcu` | Asistencia y disciplina HCU | Directorio delegados, disciplina, estadísticas |
+| `delegado` | Inscripción de fraternidad y participantes | Inscripción, subir monografía, participantes |
+| `jurado` | Calificación de fases | Calificar EFU/concursos, estadísticas |
+| `veedor` | **Solo lectura** | Estadísticas, Reglamento, Monografías de fraternidades (ver/descargar PDF subido) |
+
+**Alta del rol en producción:** `ensureSchemaPatches` inserta `veedor` si no existe (`INSERT … WHERE NOT EXISTS`). No hace falta re-ejecutar `seed.ts`.
 
 ---
 
@@ -978,8 +1029,9 @@ Tabla global (no por gestión) con los tipos folklóricos de Bolivia usados en i
 |-------|------|-------------|
 | `id_tipo_danza` | PK | Identificador |
 | `nombre` | VARCHAR(120) UNIQUE | Ej. La Morenada, El Tinku |
-| `orden` | INT | Orden de visualización |
-| `activo` | BOOL | Catálogo activo |
+| `orden` | INT DEFAULT 0 | Orden de visualización |
+| `activo` | BOOL DEFAULT true | Catálogo activo |
+| `created_at`, `updated_at` | TIMESTAMP | Auditoría |
 
 **FK:**
 - `solicitudes_inscripcion.id_tipo_danza` — obligatorio en nuevas solicitudes de inscripción.
@@ -994,22 +1046,34 @@ Rutas bajo `/api/v1/reportes` (JWT + roles indicados):
 | Método | Ruta | Roles | Uso |
 |--------|------|-------|-----|
 | `GET` | `/reportes/tipos-danza` | superusuario, admin, delegado, controladorhcu | Catálogo para inscripción y filtros |
-| `GET` | `/reportes/opciones-filtro?idGestion=` | superusuario, admin | Gestiones, facultades, carreras, categorías (por gestión), instancias, tipos de danza |
+| `GET` | `/reportes/opciones-filtro?idGestion=` | superusuario, admin | Gestiones, facultades, carreras, categorías, instancias, tipos de danza |
 | `POST` | `/reportes/consultar` | superusuario, admin | Búsqueda paginada con filtros y orden |
-| `POST` | `/reportes/consultar/pdf` | superusuario, admin | Mismo criterio → PDF (logo institucional 25pt) |
+| `POST` | `/reportes/consultar/pdf` | superusuario, admin | Mismo criterio → PDF |
 
 **Tipos de reporte (`tipoReporte`):**
 - `fraternidades` — nombre, tipo de danza, categoría, instancia, pertenencia, gestión.
 - `directiva` — filas por cargo (nombre, CI, celular) desde solicitud APROBADA vinculada.
 - `calificaciones` — requiere `idGestion`; puesto, promedio jurado, sanciones, puntaje final.
+- `costos` — informe de costos de participación.
 
 **Filtros opcionales:** `idGestion`, `idTipoDanza`, `idFacultad`, `idCarrera`, `idCategoria`, `instanciaRepresentacion`, `busqueda`, `ordenarPor`, `orden`, `page`, `limit`.
 
 ### UI: Auditoría y Reportes
 
-Vista lateral **Auditoría y Reportes** (`auditoria_reportes`) para **superusuario** y **admin**:
-- Tab **Auditoría** — solo superusuario (registro de sesiones y cambios).
-- Tab **Reportes** — consulta multi-filtro + descarga PDF.
+Vista lateral **Auditoría y Reportes** (`auditoria_reportes`):
+- **superusuario / admin:** tabs de auditoría (solo super), auditoría de calificaciones (admin+), reportes e informe de costos.
+- **veedor:** no tiene acceso a reportes; usa Estadísticas, Reglamento y Monografías.
+
+### Módulo monografías (API)
+
+| Método | Ruta | Roles | Uso |
+|--------|------|-------|-----|
+| `GET` | `/monografias/mi-fraternidad` | delegado | Monografía propia |
+| `GET` | `/monografias/listado-fraternidades` | superusuario, admin, **veedor** | Listado con `tieneMonografia` + metadatos del PDF |
+| `GET` | `/monografias/fraternidad/:id` | superusuario, admin, jurado, **veedor** | PDF de una fraternidad |
+| `POST` | `/monografias/upload` | delegado | Subir/reemplazar PDF |
+
+Archivos en disco: `uploads/Doc_Monografia/monografia-{idFraternidad}-{timestamp}.pdf`. URL en BD: `/uploads/Doc_Monografia/...`.
 
 ### Matriz de viabilidad (actualizada)
 
@@ -1021,13 +1085,15 @@ Vista lateral **Auditoría y Reportes** (`auditoria_reportes`) para **superusuar
 | Directiva por fraternidad | **Sí** | `solicitudes_inscripcion` APROBADA | `tipoReporte=directiva` o `GET /fraternidades/:id/directiva`. |
 | Calificaciones / ranking por gestión | **Sí** | `evaluaciones` + agregación | `tipoReporte=calificaciones` o `GET /evaluaciones/reporte/:idGestion`. |
 | Ganadores (1.er puesto) por gestión | **Sí (calculado)** | Ranking EFU | Sin tabla `resultados_oficiales` persistida. |
+| Monografías subidas / pendientes | **Sí** | `monografias` 1:1 | `GET /monografias/listado-fraternidades` (veedor). |
 
 ### Pendientes opcionales
 
 1. **Tabla `resultados` / snapshot de puestos** — persistir puesto oficial al cerrar evaluación.
 2. **Fraternidades legacy** — pueden tener `id_tipo_danza` NULL hasta edición manual.
 3. **Ganadores por fase EFU** — agregación por `evaluaciones.id_fase` (no expuesta aún en reportes).
+4. **Soft-delete / backups** — el DELETE de organización es físico; se recomienda `pg_dump` periódico en producción.
 
 ### Conclusión
 
-El módulo de reportes parametrizable está implementado en backend y frontend. El eje **tipo de danza** queda cubierto por `tipos_danza`. El ranking histórico sigue disponible en `GET /evaluaciones/reporte/:idGestion` y en reportes de calificaciones filtrados.
+El esquema actual contempla **26 entidades TypeORM**, auditoría de sesiones/acciones, catálogo `tipos_danza`, monografías 1:1 y el rol **`veedor`** de solo lectura (estadísticas, reglamento y monografías). El ranking histórico sigue disponible en `GET /evaluaciones/reporte/:idGestion` y en reportes de calificaciones filtrados.

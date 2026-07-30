@@ -11,6 +11,8 @@ import * as fs from 'fs';
 import { Monografia } from '../entities/Monografia';
 import { Fraternidad } from '../entities/Fraternidad';
 import { Usuario } from '../entities/Usuario';
+import { Gestion } from '../entities/Gestion';
+import { findGestionActivaOrLatest } from '../common/gestion.utils';
 
 @Injectable()
 export class MonografiasService {
@@ -21,6 +23,8 @@ export class MonografiasService {
     private readonly fraternidadRepo: Repository<Fraternidad>,
     @InjectRepository(Usuario)
     private readonly usuarioRepo: Repository<Usuario>,
+    @InjectRepository(Gestion)
+    private readonly gestionRepo: Repository<Gestion>,
   ) {}
 
   private ensureUploadDir(): string {
@@ -72,12 +76,55 @@ export class MonografiasService {
     return monografia ? this.toResponse(monografia) : null;
   }
 
+  /**
+   * Listado de fraternidades de la gestión activa con estado de monografía.
+   * Solo lectura — usado por veedores (y admin/superusuario).
+   */
+  async listadoFraternidadesConMonografia(user: { rol: string }) {
+    const rol = user.rol?.toLowerCase();
+    if (!['superusuario', 'admin', 'veedor'].includes(rol)) {
+      throw new ForbiddenException('No tienes permiso para ver este listado.');
+    }
+
+    const gestion = await findGestionActivaOrLatest(this.gestionRepo);
+    const fraternidades = await this.fraternidadRepo.find({
+      where: {
+        habilitadoEfu: true,
+        ...(gestion ? { gestion: { idGestion: gestion.idGestion } } : {}),
+      },
+      relations: ['facultad', 'carrera', 'categoria', 'tipoDanza', 'institucionExterna'],
+      order: { nombre: 'ASC' },
+    });
+
+    const monografias = await this.monografiaRepo.find({
+      relations: ['fraternidad', 'subidoPor'],
+    });
+    const monoByFrat = new Map(
+      monografias.map((m) => [m.fraternidad?.idFraternidad, m]),
+    );
+
+    return fraternidades.map((f) => {
+      const mono = monoByFrat.get(f.idFraternidad);
+      return {
+        idFraternidad: f.idFraternidad,
+        nombre: f.nombre,
+        categoria: f.categoria?.nombre || null,
+        tipoDanza: f.tipoDanza?.nombre || null,
+        facultad: f.facultad?.nombre || null,
+        carrera: f.carrera?.nombre || null,
+        institucionExterna: f.institucionExterna?.nombre || null,
+        tieneMonografia: !!mono,
+        monografia: mono ? this.toResponse(mono) : null,
+      };
+    });
+  }
+
   async getByFraternidad(
     idFraternidad: number,
     user: { rol: string },
   ) {
     const rol = user.rol?.toLowerCase();
-    if (!['superusuario', 'admin', 'jurado'].includes(rol)) {
+    if (!['superusuario', 'admin', 'jurado', 'veedor'].includes(rol)) {
       throw new ForbiddenException('No tienes permiso para ver esta monografía.');
     }
 
@@ -117,6 +164,8 @@ export class MonografiasService {
     if (!fraternidad) {
       throw new NotFoundException('Fraternidad no encontrada.');
     }
+
+    this.ensureUploadDir();
 
     const delegado = await this.usuarioRepo.findOne({ where: { idUsuario: user.idUsuario } });
     const urlArchivo = `/uploads/Doc_Monografia/${file.filename}`;

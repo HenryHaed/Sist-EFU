@@ -34,9 +34,18 @@ export class MonografiasController {
     return this.monografiasService.getMiMonografia(req.user);
   }
 
+  @Get('listado-fraternidades')
+  @Roles('superusuario', 'admin', 'veedor')
+  @ApiOperation({
+    summary: 'Listado de fraternidades con estado de monografía (solo lectura)',
+  })
+  listadoFraternidades(@Request() req: any) {
+    return this.monografiasService.listadoFraternidadesConMonografia(req.user);
+  }
+
   @Get('fraternidad/:idFraternidad')
-  @Roles('superusuario', 'admin', 'jurado')
-  @ApiOperation({ summary: 'Obtener la monografía de una fraternidad (jurado/admin)' })
+  @Roles('superusuario', 'admin', 'jurado', 'veedor')
+  @ApiOperation({ summary: 'Obtener la monografía de una fraternidad (jurado/admin/veedor)' })
   getByFraternidad(
     @Param('idFraternidad', ParseIntPipe) idFraternidad: number,
     @Request() req: any,

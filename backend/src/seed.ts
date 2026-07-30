@@ -221,6 +221,7 @@ async function sembrarProduccion(dataSource: DataSource) {
     { nombre: 'controladorhcu', descripcion: 'Control de asistencia y disciplina.' },
     { nombre: 'delegado', descripcion: 'Delegado de fraternidad.' },
     { nombre: 'jurado', descripcion: 'Jurado calificador del evento.' },
+    { nombre: 'veedor', descripcion: 'Veedor de solo lectura: estadísticas, reglamento y monografías de fraternidades.' },
   ]);
 
   const rolSuper = roles.find((r) => r.nombre === 'superusuario');

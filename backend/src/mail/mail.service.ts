@@ -168,6 +168,7 @@ export class MailService {
       controladorhcu: 'Controlador HCU',
       delegado: 'Delegado',
       jurado: 'Jurado',
+      veedor: 'Veedor',
     };
     return labels[rolNombre] || rolNombre;
   }

@@ -61,6 +61,16 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       END IF;
     END $$;
   `);
+  // Rol veedor (solo lectura) — idempotente en bases ya existentes
+  await dataSource.query(`
+    INSERT INTO roles (nombre, descripcion, created_at, updated_at)
+    SELECT
+      'veedor',
+      'Veedor de solo lectura: estadísticas, reglamento y monografías de fraternidades.',
+      NOW(),
+      NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM roles WHERE nombre = 'veedor')
+  `);
 }
 
 async function bootstrap() {

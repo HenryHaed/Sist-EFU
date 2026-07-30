@@ -5,9 +5,10 @@ import { MonografiasController } from './monografias.controller';
 import { Monografia } from '../entities/Monografia';
 import { Fraternidad } from '../entities/Fraternidad';
 import { Usuario } from '../entities/Usuario';
+import { Gestion } from '../entities/Gestion';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Monografia, Fraternidad, Usuario])],
+  imports: [TypeOrmModule.forFeature([Monografia, Fraternidad, Usuario, Gestion])],
   controllers: [MonografiasController],
   providers: [MonografiasService],
   exports: [MonografiasService],

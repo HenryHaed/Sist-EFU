@@ -82,7 +82,7 @@ Guía detallada: [DEPLOY.md](./DEPLOY.md)
 ## 📋 Características
 
 - Gestión de fraternidades, inscripciones, evaluaciones y disciplina
-- Roles: superusuario, admin, jurado, delegado, controlador HCU
+- Roles: superusuario, admin, jurado, delegado, controlador HCU, veedor (solo lectura)
 - Reportes PDF, auditoría, correo (SMTP) y recuperación de contraseña
 - Landing pública con estadísticas e histórico
 
