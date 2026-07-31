@@ -15,6 +15,14 @@ export enum TipoReporte {
   COSTOS = 'costos',
 }
 
+/** Alcance del listado de fraternidades / preinscripciones */
+export enum AlcanceListadoFraternidades {
+  INSCRITAS = 'inscritas',
+  PENDIENTES = 'pendientes',
+  OBSERVADAS = 'observadas',
+  TODOS = 'todos',
+}
+
 export enum OrdenReporte {
   ASC = 'ASC',
   DESC = 'DESC',
@@ -23,6 +31,10 @@ export enum OrdenReporte {
 export class ConsultarReporteDto {
   @IsEnum(TipoReporte)
   tipoReporte: TipoReporte;
+
+  @IsOptional()
+  @IsEnum(AlcanceListadoFraternidades)
+  alcanceListado?: AlcanceListadoFraternidades;
 
   @IsOptional()
   @Type(() => Number)

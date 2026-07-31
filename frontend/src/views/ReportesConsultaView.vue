@@ -108,6 +108,26 @@
           <input v-model="filtros.busqueda" type="text" class="form-input !py-2 !text-sm" placeholder="Ej. Morenada, Tinku..." />
         </div>
 
+        <!-- Alcance listado fraternidades -->
+        <div v-if="filtros.tipoReporte === 'fraternidades'" class="sm:col-span-2 lg:col-span-3">
+          <label class="label-xs mb-2 block">Listado de fraternidades</label>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="alcance in alcancesListado"
+              :key="alcance.id"
+              type="button"
+              @click="seleccionarAlcance(alcance.id)"
+              class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all"
+              :class="filtros.alcanceListado === alcance.id
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40'"
+            >
+              {{ alcance.label }}
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2">{{ alcanceDescripcion }}</p>
+        </div>
+
         <div>
           <label class="label-xs">Ordenar por</label>
           <select v-model="filtros.ordenarPor" class="form-input !py-2 !text-sm">
@@ -183,13 +203,24 @@
             >
               <td v-for="col in columnas" :key="col.key" class="px-4 py-3 text-sm text-slate-700">
                 <span
-                  v-if="col.key === 'cupo' || col.key === 'esExcedente'"
+                  v-if="(col.key === 'cupo' || col.key === 'esExcedente') && row.estadoInscripcion === 'INSCRITA'"
                   class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
                   :class="row.esExcedente
                     ? 'bg-amber-50 text-amber-800 border-amber-200'
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200'"
                 >
                   {{ row.esExcedente ? 'Excedente' : 'Dentro de cupo' }}
+                </span>
+                <span
+                  v-else-if="col.key === 'cupo' || col.key === 'esExcedente'"
+                  class="text-slate-400"
+                >—</span>
+                <span
+                  v-else-if="col.key === 'estadoLabel' || col.key === 'estadoInscripcion'"
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                  :class="estadoBadgeClass(row.estadoInscripcion)"
+                >
+                  {{ row.estadoLabel || row.estadoInscripcion || '—' }}
                 </span>
                 <template v-else>{{ formatCell(row, col.key) }}</template>
               </td>
@@ -238,8 +269,16 @@ const tiposReporte = [
   { id: 'calificaciones', label: 'Calificaciones', icon: 'leaderboard', desc: 'Puesto y puntaje final por gestión.' },
 ]
 
+const alcancesListado = [
+  { id: 'inscritas', label: 'Inscritas', desc: 'Fraternidades ya inscritas / aprobadas en la gestión.' },
+  { id: 'pendientes', label: 'Pendientes', desc: 'Solicitudes de preinscripción en estado PENDIENTE.' },
+  { id: 'observadas', label: 'Observadas', desc: 'Solicitudes en estado OBSERVADO.' },
+  { id: 'todos', label: 'Todos los casos', desc: 'Inscritas + pendientes + observadas en un solo listado.' },
+]
+
 const filtros = ref({
   tipoReporte: 'fraternidades',
+  alcanceListado: 'inscritas',
   idGestion: null,
   idTipoDanza: null,
   idFacultad: null,
@@ -251,6 +290,10 @@ const filtros = ref({
   orden: 'ASC',
   page: 1,
   limit: 50,
+})
+
+const alcanceDescripcion = computed(() => {
+  return alcancesListado.find((a) => a.id === filtros.value.alcanceListado)?.desc || ''
 })
 
 const opciones = ref({
@@ -301,6 +344,7 @@ const columnasPorTipo = {
   fraternidades: [
     { key: 'nombreFraternidad', label: 'Fraternidad' },
     { key: 'tipoDanza', label: 'Tipo de danza' },
+    { key: 'estadoLabel', label: 'Estado' },
     { key: 'cupo', label: 'Cupo' },
     { key: 'categoria', label: 'Categoría' },
     { key: 'instancia', label: 'Instancia' },
@@ -353,7 +397,39 @@ const formatCell = (row, key) => {
   if (key === 'fechaHoraCalificacion' && val) {
     return new Date(val).toLocaleString('es-BO')
   }
+  if ((key === 'cupo' || key === 'esExcedente') && row.estadoInscripcion && row.estadoInscripcion !== 'INSCRITA') {
+    return '—'
+  }
   return val
+}
+
+const estadoBadgeClass = (estado) => {
+  if (estado === 'INSCRITA') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (estado === 'PENDIENTE') return 'bg-amber-50 text-amber-800 border-amber-200'
+  if (estado === 'OBSERVADO') return 'bg-orange-50 text-orange-800 border-orange-200'
+  return 'bg-slate-50 text-slate-600 border-slate-200'
+}
+
+const seleccionarAlcance = (id) => {
+  filtros.value.alcanceListado = id
+  resultado.value = null
+  error.value = ''
+}
+
+const seleccionarTipo = (id) => {
+  filtros.value.tipoReporte = id
+  if (id === 'calificaciones') {
+    filtros.value.ordenarPor = 'puesto'
+    filtros.value.orden = 'ASC'
+  } else {
+    filtros.value.ordenarPor = 'nombreFraternidad'
+    filtros.value.orden = 'ASC'
+  }
+  if (id !== 'fraternidades') {
+    filtros.value.alcanceListado = 'inscritas'
+  }
+  resultado.value = null
+  error.value = ''
 }
 
 const buildPayload = (page) => {
@@ -368,6 +444,9 @@ const buildPayload = (page) => {
     delete p.idCarrera
   } else if (inst === 'Facultad') {
     delete p.idCarrera
+  }
+  if (p.tipoReporte !== 'fraternidades') {
+    delete p.alcanceListado
   }
   Object.keys(p).forEach((k) => {
     if (p[k] === null || p[k] === '' || p[k] === TODOS) delete p[k]
@@ -392,19 +471,6 @@ const onGestionChange = async () => {
   const idGestion = esValorFiltroActivo(filtros.value.idGestion) ? filtros.value.idGestion : null
   await cargarOpciones(idGestion)
   filtros.value.idCategoria = null
-}
-
-const seleccionarTipo = (id) => {
-  filtros.value.tipoReporte = id
-  if (id === 'calificaciones') {
-    filtros.value.ordenarPor = 'puesto'
-    filtros.value.orden = 'ASC'
-  } else {
-    filtros.value.ordenarPor = 'nombreFraternidad'
-    filtros.value.orden = 'ASC'
-  }
-  resultado.value = null
-  error.value = ''
 }
 
 const buscar = async (page = 1) => {

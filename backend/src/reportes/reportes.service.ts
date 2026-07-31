@@ -16,7 +16,7 @@ import { Categoria } from '../entities/Categoria';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { ensureTiposDanzaDefault } from '../common/tipos-danza-default';
 import { buildMiembrosDirectiva } from '../common/personas-directiva';
-import { ConsultarReporteDto, TipoReporte } from './dto/consultar-reporte.dto';
+import { ConsultarReporteDto, TipoReporte, AlcanceListadoFraternidades } from './dto/consultar-reporte.dto';
 import { EvaluacionesService } from '../evaluaciones/evaluaciones.service';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 import { InstanciaRepresentacion } from '../entities/SolicitudInscripcion';
@@ -168,6 +168,7 @@ export class ReportesService implements OnModuleInit {
       '—';
     return {
       idFraternidad: f.idFraternidad,
+      idSolicitud: null as number | null,
       nombreFraternidad: f.nombre,
       tipoDanza: f.tipoDanza?.nombre || '—',
       idTipoDanza: f.tipoDanza?.idTipoDanza || null,
@@ -181,6 +182,168 @@ export class ReportesService implements OnModuleInit {
       habilitadoEfu: f.habilitadoEfu,
       esExcedente: !!f.esExcedente,
       cupo: f.esExcedente ? 'EXCEDENTE' : 'Dentro de cupo',
+      estadoInscripcion: 'INSCRITA',
+      estadoLabel: 'Inscrita',
+    };
+  }
+
+  private mapSolicitudListadoRow(s: SolicitudInscripcion) {
+    const pertenencia =
+      s.facultad?.nombre ||
+      s.carrera?.nombre ||
+      s.institucionExterna?.nombre ||
+      s.nombreInstitucionExterna ||
+      s.instanciaRepresentacion ||
+      '—';
+    const estado = s.estado;
+    return {
+      idFraternidad: s.fraternidadCreada?.idFraternidad || null,
+      idSolicitud: s.idSolicitud,
+      nombreFraternidad: s.nombreFraternidad,
+      tipoDanza: s.tipoDanza?.nombre || '—',
+      idTipoDanza: s.tipoDanza?.idTipoDanza || null,
+      categoria: s.categoria?.nombre || '—',
+      instancia: s.instanciaRepresentacion || '—',
+      facultad: s.facultad?.nombre || null,
+      carrera: s.carrera?.nombre || null,
+      pertenencia,
+      gestionAnio: s.gestion?.anio || null,
+      idGestion: s.gestion?.idGestion || null,
+      habilitadoEfu: null as boolean | null,
+      esExcedente: false,
+      cupo: '—',
+      estadoInscripcion: estado,
+      estadoLabel:
+        estado === EstadoSolicitud.PENDIENTE
+          ? 'Pendiente'
+          : estado === EstadoSolicitud.OBSERVADO
+            ? 'Observada'
+            : String(estado),
+    };
+  }
+
+  private buildSolicitudListadoQuery(
+    dto: ConsultarReporteDto,
+    estados: EstadoSolicitud[],
+  ): SelectQueryBuilder<SolicitudInscripcion> {
+    const qb = this.solicitudRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.tipoDanza', 'tipoDanza')
+      .leftJoinAndSelect('s.categoria', 'categoria')
+      .leftJoinAndSelect('s.facultad', 'facultad')
+      .leftJoinAndSelect('s.carrera', 'carrera')
+      .leftJoinAndSelect('s.institucionExterna', 'institucionExterna')
+      .leftJoinAndSelect('s.gestion', 'gestion')
+      .leftJoinAndSelect('s.fraternidadCreada', 'fraternidadCreada')
+      .andWhere('s.estado IN (:...estados)', { estados });
+
+    const instancia = dto.instanciaRepresentacion;
+    const esCentral = instancia && this.INSTANCIAS_CENTRALES.includes(instancia);
+    const esExterno = instancia === 'Externo';
+    const esFacultad = instancia === 'Facultad';
+    const esCarrera = instancia === 'Carrera';
+
+    if (dto.idGestion) {
+      qb.andWhere('gestion.id_gestion = :idGestion', { idGestion: dto.idGestion });
+    }
+    if (dto.idTipoDanza) {
+      qb.andWhere('tipoDanza.id_tipo_danza = :idTipoDanza', { idTipoDanza: dto.idTipoDanza });
+    }
+    const puedeFiltrarFacultad =
+      !esCentral && !esExterno && (esFacultad || esCarrera || !instancia);
+    if (dto.idFacultad && puedeFiltrarFacultad) {
+      qb.andWhere('facultad.id_facultad = :idFacultad', { idFacultad: dto.idFacultad });
+    }
+    const puedeFiltrarCarrera = esCarrera || (!instancia && dto.idFacultad);
+    if (dto.idCarrera && puedeFiltrarCarrera) {
+      qb.andWhere('carrera.id_carrera = :idCarrera', { idCarrera: dto.idCarrera });
+    }
+    if (dto.idCategoria) {
+      qb.andWhere('categoria.id_categoria = :idCategoria', { idCategoria: dto.idCategoria });
+    }
+    if (instancia) {
+      qb.andWhere('s.instancia_representacion = :instancia', { instancia });
+    }
+    if (dto.busqueda?.trim()) {
+      qb.andWhere(
+        '(LOWER(s.nombre_fraternidad) LIKE LOWER(:q) OR LOWER(tipoDanza.nombre) LIKE LOWER(:q))',
+        { q: `%${dto.busqueda.trim()}%` },
+      );
+    }
+
+    const orden = dto.orden === 'DESC' ? 'DESC' : 'ASC';
+    const ordenarPor = dto.ordenarPor || 'nombreFraternidad';
+    const sortMap: Record<string, string> = {
+      nombreFraternidad: 's.nombre_fraternidad',
+      tipoDanza: 'tipoDanza.nombre',
+      facultad: 'facultad.nombre',
+      categoria: 'categoria.nombre',
+      gestion: 'gestion.anio',
+    };
+    qb.orderBy(sortMap[ordenarPor] || 's.nombre_fraternidad', orden as 'ASC' | 'DESC');
+
+    return qb;
+  }
+
+  private async consultarListadoFraternidades(
+    dto: ConsultarReporteDto,
+    page: number,
+    limit: number,
+    skip: number,
+  ) {
+    const alcance = dto.alcanceListado || AlcanceListadoFraternidades.INSCRITAS;
+    let rows: ReturnType<ReportesService['mapFraternidadRow']>[] = [];
+
+    if (
+      alcance === AlcanceListadoFraternidades.INSCRITAS ||
+      alcance === AlcanceListadoFraternidades.TODOS
+    ) {
+      const fraternidades = await this.buildFraternidadQuery(dto).getMany();
+      rows = rows.concat(fraternidades.map((f) => this.mapFraternidadRow(f)));
+    }
+
+    if (alcance === AlcanceListadoFraternidades.PENDIENTES) {
+      const solicitudes = await this.buildSolicitudListadoQuery(dto, [
+        EstadoSolicitud.PENDIENTE,
+      ]).getMany();
+      rows = solicitudes.map((s) => this.mapSolicitudListadoRow(s));
+    } else if (alcance === AlcanceListadoFraternidades.OBSERVADAS) {
+      const solicitudes = await this.buildSolicitudListadoQuery(dto, [
+        EstadoSolicitud.OBSERVADO,
+      ]).getMany();
+      rows = solicitudes.map((s) => this.mapSolicitudListadoRow(s));
+    } else if (alcance === AlcanceListadoFraternidades.TODOS) {
+      const solicitudes = await this.buildSolicitudListadoQuery(dto, [
+        EstadoSolicitud.PENDIENTE,
+        EstadoSolicitud.OBSERVADO,
+      ]).getMany();
+      rows = rows.concat(solicitudes.map((s) => this.mapSolicitudListadoRow(s)));
+    }
+
+    const orden = dto.orden === 'DESC' ? -1 : 1;
+    const key = dto.ordenarPor || 'nombreFraternidad';
+    rows.sort((a, b) => {
+      const av = String((a as any)[key] ?? a.nombreFraternidad ?? '').toLowerCase();
+      const bv = String((b as any)[key] ?? b.nombreFraternidad ?? '').toLowerCase();
+      return av.localeCompare(bv, 'es') * orden;
+    });
+
+    const total = rows.length;
+    const data = rows.slice(skip, skip + limit);
+    let gestion: { anio?: number } | null = null;
+    if (dto.idGestion) {
+      const g = await this.gestionRepo.findOne({ where: { idGestion: dto.idGestion } });
+      if (g) gestion = { anio: g.anio };
+    }
+    return {
+      tipoReporte: dto.tipoReporte,
+      alcanceListado: alcance,
+      total,
+      page,
+      limit,
+      filtros: dto,
+      gestion,
+      data,
     };
   }
 
@@ -197,21 +360,11 @@ export class ReportesService implements OnModuleInit {
       return this.consultarCostos(dto, page, limit, skip);
     }
 
-    const fraternidades = await this.buildFraternidadQuery(dto).getMany();
-
     if (dto.tipoReporte === TipoReporte.FRATERNIDADES) {
-      const rows = fraternidades.map((f) => this.mapFraternidadRow(f));
-      const total = rows.length;
-      const data = rows.slice(skip, skip + limit);
-      return {
-        tipoReporte: dto.tipoReporte,
-        total,
-        page,
-        limit,
-        filtros: dto,
-        data,
-      };
+      return this.consultarListadoFraternidades(dto, page, limit, skip);
     }
+
+    const fraternidades = await this.buildFraternidadQuery(dto).getMany();
 
     if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
       const rows: any[] = [];
@@ -499,7 +652,7 @@ export class ReportesService implements OnModuleInit {
     const { contentStartY } = drawPdfInstitutionalHeader(
       doc,
       titulos[dto.tipoReporte] || 'REPORTE EFU',
-      resultado.gestion?.anio ? `Gestión ${resultado.gestion.anio}` : undefined,
+      (resultado as any).gestion?.anio ? `Gestión ${(resultado as any).gestion.anio}` : undefined,
     );
 
     let y = contentStartY;
@@ -516,9 +669,10 @@ export class ReportesService implements OnModuleInit {
       startY: number,
       bold = false,
       rowHeight = 14,
+      textColor = '#0f172a',
     ) => {
       let x = 50;
-      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8).fillColor('#0f172a');
+      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8).fillColor(textColor);
       cells.forEach((cell, i) => {
         doc.text(cell || '—', x + 2, startY + 4, {
           width: widths[i] - 4,
@@ -527,6 +681,12 @@ export class ReportesService implements OnModuleInit {
         });
         x += widths[i];
       });
+    };
+
+    const drawTableHeader = (headers: string[], widths: number[], startY: number) => {
+      // Azul medio + texto blanco (antes: #003399 + texto negro, ilegible)
+      doc.save().rect(50, startY, 495, 16).fill('#3b82f6').restore();
+      drawRow(headers, widths, startY, true, 16, '#ffffff');
     };
 
     const getRowHeight = (cells: string[], widths: number[], minHeight = 14) => {
@@ -540,11 +700,9 @@ export class ReportesService implements OnModuleInit {
     };
 
     if (dto.tipoReporte === TipoReporte.FRATERNIDADES) {
-      const widths = [110, 85, 50, 70, 45, 55, 80];
-      const headers = ['Fraternidad', 'Tipo de danza', 'Cat.', 'Pertenencia', 'Gestión', 'Cupo', 'Estado'];
-      doc.save().rect(50, y, 495, 16).fill('#003399').restore();
-      drawRow(headers, widths, y, true);
-      doc.fillColor('#ffffff');
+      const w = [110, 80, 45, 70, 40, 50, 100];
+      const h = ['Fraternidad', 'Tipo de danza', 'Cat.', 'Pertenencia', 'Gestión', 'Cupo', 'Estado'];
+      drawTableHeader(h, w, y);
       y += 16;
       (resultado.data as any[]).forEach((row, i) => {
         const rowHeight = 14
@@ -560,10 +718,12 @@ export class ReportesService implements OnModuleInit {
             row.categoria,
             row.pertenencia,
             String(row.gestionAnio || '—'),
-            row.esExcedente ? 'EXCEDENTE' : 'Cupo OK',
-            row.habilitadoEfu ? 'Activa' : 'Inactiva',
+            row.estadoInscripcion === 'INSCRITA'
+              ? (row.esExcedente ? 'EXCEDENTE' : 'Cupo OK')
+              : '—',
+            row.estadoLabel || row.estadoInscripcion || '—',
           ],
-          widths,
+          w,
           y,
         );
         y += 14;
@@ -571,8 +731,7 @@ export class ReportesService implements OnModuleInit {
     } else if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
       const widths = [82, 68, 78, 132, 55, 80];
       const headers = ['Fraternidad', 'Tipo danza', 'Cargo', 'Nombre', 'CI', 'Celular'];
-      doc.save().rect(50, y, 495, 16).fill('#003399').restore();
-      drawRow(headers, widths, y, true);
+      drawTableHeader(headers, widths, y);
       y += 16;
       (resultado.data as any[]).forEach((row, i) => {
         const cells = [
@@ -606,8 +765,7 @@ export class ReportesService implements OnModuleInit {
       }
       const widths = [120, 70, 50, 110, 55, 55];
       const headers = ['Fraternidad', 'Tipo danza', 'Estructura', 'Concepto', 'Monto Bs', 'Estado'];
-      doc.save().rect(50, y, 495, 16).fill('#003399').restore();
-      drawRow(headers, widths, y, true);
+      drawTableHeader(headers, widths, y);
       y += 16;
       (resultado.data as any[]).forEach((row, i) => {
         if (y > 720) {
@@ -632,8 +790,7 @@ export class ReportesService implements OnModuleInit {
     } else {
       const widths = [30, 100, 80, 55, 70, 45, 45, 45];
       const headers = ['#', 'Fraternidad', 'Tipo danza', 'Cat.', 'Pertenencia', 'Jur.', 'Sanc.', 'Final'];
-      doc.save().rect(50, y, 495, 16).fill('#003399').restore();
-      drawRow(headers, widths, y, true);
+      drawTableHeader(headers, widths, y);
       y += 16;
       (resultado.data as any[]).forEach((row, i) => {
         if (y > 720) {
