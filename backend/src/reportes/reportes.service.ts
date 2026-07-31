@@ -18,7 +18,7 @@ import { ensureTiposDanzaDefault } from '../common/tipos-danza-default';
 import { buildMiembrosDirectiva } from '../common/personas-directiva';
 import { ConsultarReporteDto, TipoReporte, AlcanceListadoFraternidades } from './dto/consultar-reporte.dto';
 import { EvaluacionesService } from '../evaluaciones/evaluaciones.service';
-import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
+import { drawPdfInstitutionalHeader, PDF_UMSA_BLUE, PDF_UMSA_RED } from '../common/pdf-layout';
 import { InstanciaRepresentacion } from '../entities/SolicitudInscripcion';
 
 @Injectable()
@@ -633,13 +633,32 @@ export class ReportesService implements OnModuleInit {
   async generarPdfConsulta(dto: ConsultarReporteDto, res: Response) {
     const resultado = await this.consultar({ ...dto, page: 1, limit: 500 });
     const PDFDocument = require('pdfkit');
-    const doc = new PDFDocument({ margin: 50, size: 'A4', autoFirstPage: true });
+
+    const doc = new PDFDocument({
+      margin: 36,
+      size: 'A4',
+      layout: 'landscape',
+      autoFirstPage: true,
+    });
+
+    const pageW = 841.89;
+    const pageH = 595.28;
+    const margin = 36;
+    const contentW = pageW - margin * 2;
+    const bottomLimit = pageH - 40;
 
     const titulos: Record<string, string> = {
       fraternidades: 'REPORTE DE FRATERNIDADES',
       directiva: 'REPORTE DE DIRECTIVA',
       calificaciones: 'REPORTE DE CALIFICACIONES',
       costos: 'INFORME DE COSTOS DE PARTICIPACIÓN',
+    };
+
+    const alcanceLabel: Record<string, string> = {
+      inscritas: 'Inscritas',
+      pendientes: 'Pendientes',
+      observadas: 'Observadas',
+      todos: 'Todos los casos',
     };
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -649,172 +668,249 @@ export class ReportesService implements OnModuleInit {
     );
     doc.pipe(res);
 
-    const { contentStartY } = drawPdfInstitutionalHeader(
-      doc,
-      titulos[dto.tipoReporte] || 'REPORTE EFU',
-      (resultado as any).gestion?.anio ? `Gestión ${(resultado as any).gestion.anio}` : undefined,
-    );
+    const subtitleParts = [
+      (resultado as any).gestion?.anio ? `Gestión ${(resultado as any).gestion.anio}` : null,
+      dto.tipoReporte === TipoReporte.FRATERNIDADES && dto.alcanceListado
+        ? `Alcance: ${alcanceLabel[dto.alcanceListado] || dto.alcanceListado}`
+        : null,
+    ].filter(Boolean);
+    const subtitle = subtitleParts.length ? subtitleParts.join(' · ') : undefined;
 
-    let y = contentStartY;
-    doc.fontSize(9).fillColor('#64748b').font('Helvetica').text(
-      `Generado: ${new Date().toLocaleString('es-BO')} · Total registros: ${resultado.total}`,
-      50,
-      y,
-    );
-    y += 20;
+    let pageNum = 1;
 
-    const drawRow = (
-      cells: string[],
-      widths: number[],
-      startY: number,
-      bold = false,
-      rowHeight = 14,
-      textColor = '#0f172a',
-    ) => {
-      let x = 50;
-      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8).fillColor(textColor);
-      cells.forEach((cell, i) => {
-        doc.text(cell || '—', x + 2, startY + 4, {
-          width: widths[i] - 4,
-          height: rowHeight - 6,
-          ellipsis: true,
-        });
-        x += widths[i];
+    const drawDocHeader = () =>
+      drawPdfInstitutionalHeader(doc, titulos[dto.tipoReporte] || 'REPORTE EFU', subtitle, {
+        pageWidth: pageW,
+        margin,
+        compact: true,
       });
+
+    let { contentStartY } = drawDocHeader();
+    let y = contentStartY;
+
+    doc
+      .fontSize(7)
+      .fillColor('#64748b')
+      .font('Helvetica')
+      .text(
+        `Generado: ${new Date().toLocaleString('es-BO')}  |  Total registros: ${resultado.total}  |  Formato: horizontal`,
+        margin,
+        y,
+        { width: contentW },
+      );
+    y += 14;
+
+    const fontSize = 6.5;
+    const headerFontSize = 7;
+
+    const measureRowHeight = (cells: string[], widths: number[], minH = 12) => {
+      let maxH = minH;
+      doc.font('Helvetica').fontSize(fontSize);
+      cells.forEach((cell, i) => {
+        const h = doc.heightOfString(String(cell ?? '—'), {
+          width: Math.max(8, widths[i] - 4),
+        });
+        maxH = Math.max(maxH, Math.ceil(h) + 6);
+      });
+      return Math.min(maxH, 80);
+    };
+
+    const drawCellBorders = (
+      startX: number,
+      startY: number,
+      widths: number[],
+      rowH: number,
+    ) => {
+      let x = startX;
+      doc.save().lineWidth(0.35).strokeColor('#94a3b8');
+      widths.forEach((w) => {
+        doc.rect(x, startY, w, rowH).stroke();
+        x += w;
+      });
+      doc.restore();
     };
 
     const drawTableHeader = (headers: string[], widths: number[], startY: number) => {
-      // Azul medio + texto blanco (antes: #003399 + texto negro, ilegible)
-      doc.save().rect(50, startY, 495, 16).fill('#3b82f6').restore();
-      drawRow(headers, widths, startY, true, 16, '#ffffff');
+      const rowH = Math.max(14, measureRowHeight(headers, widths, 14));
+      doc.save().rect(margin, startY, contentW, rowH).fill(PDF_UMSA_BLUE).restore();
+      doc
+        .save()
+        .moveTo(margin, startY + rowH - 1)
+        .lineTo(margin + contentW, startY + rowH - 1)
+        .lineWidth(1.2)
+        .strokeColor(PDF_UMSA_RED)
+        .stroke()
+        .restore();
+
+      let x = margin;
+      doc.font('Helvetica-Bold').fontSize(headerFontSize).fillColor('#ffffff');
+      headers.forEach((cell, i) => {
+        doc.text(cell, x + 2, startY + 3, {
+          width: widths[i] - 4,
+          height: rowH - 4,
+          align: i === 0 ? 'center' : 'left',
+        });
+        x += widths[i];
+      });
+      drawCellBorders(margin, startY, widths, rowH);
+      return rowH;
     };
 
-    const getRowHeight = (cells: string[], widths: number[], minHeight = 14) => {
-      let maxHeight = minHeight;
-      doc.fontSize(8).font('Helvetica');
+    const drawDataRow = (
+      cells: string[],
+      widths: number[],
+      startY: number,
+      stripe: boolean,
+    ) => {
+      const rowH = measureRowHeight(cells, widths, 12);
+      if (stripe) {
+        doc.save().rect(margin, startY, contentW, rowH).fill('#f1f5f9').restore();
+      }
+      let x = margin;
+      doc.font('Helvetica').fontSize(fontSize).fillColor('#0f172a');
       cells.forEach((cell, i) => {
-        const height = doc.heightOfString(cell || '—', { width: widths[i] - 4 });
-        maxHeight = Math.max(maxHeight, Math.ceil(height) + 8);
+        doc.text(String(cell ?? '—'), x + 2, startY + 3, {
+          width: widths[i] - 4,
+          align: i === 0 ? 'center' : 'left',
+        });
+        x += widths[i];
       });
-      return maxHeight;
+      drawCellBorders(margin, startY, widths, rowH);
+      return rowH;
     };
+
+    const ensureSpace = (needed: number, headers: string[], widths: number[]) => {
+      if (y + needed <= bottomLimit) return;
+      doc
+        .fontSize(6)
+        .fillColor('#94a3b8')
+        .font('Helvetica')
+        .text(`Página ${pageNum}`, margin, pageH - 28, {
+          width: contentW,
+          align: 'center',
+        });
+      doc.addPage({ size: 'A4', layout: 'landscape', margin });
+      pageNum += 1;
+      ({ contentStartY } = drawDocHeader());
+      y = contentStartY + 4;
+      doc
+        .fontSize(6.5)
+        .fillColor('#64748b')
+        .font('Helvetica-Oblique')
+        .text(`Continuación — ${titulos[dto.tipoReporte] || 'REPORTE'}`, margin, y, {
+          width: contentW,
+        });
+      y += 12;
+      y += drawTableHeader(headers, widths, y);
+    };
+
+    const renderTable = (headers: string[], widths: number[], tableRows: string[][]) => {
+      const sum = widths.reduce((a, b) => a + b, 0);
+      const scaled = widths.map((w) => (w / sum) * contentW);
+
+      y += drawTableHeader(headers, scaled, y);
+      tableRows.forEach((cells, i) => {
+        const previewH = measureRowHeight(cells, scaled, 12);
+        ensureSpace(previewH + 2, headers, scaled);
+        y += drawDataRow(cells, scaled, y, i % 2 === 0);
+      });
+    };
+
+    const rows = (resultado.data as any[]) || [];
 
     if (dto.tipoReporte === TipoReporte.FRATERNIDADES) {
-      const w = [110, 80, 45, 70, 40, 50, 100];
-      const h = ['Fraternidad', 'Tipo de danza', 'Cat.', 'Pertenencia', 'Gestión', 'Cupo', 'Estado'];
-      drawTableHeader(h, w, y);
-      y += 16;
-      (resultado.data as any[]).forEach((row, i) => {
-        const rowHeight = 14
-        if (y + rowHeight > 720) {
-          doc.addPage();
-          y = 50;
-        }
-        if (i % 2 === 0) doc.save().rect(50, y, 495, 14).fill('#f8fafc').restore();
-        drawRow(
-          [
-            row.nombreFraternidad,
-            row.tipoDanza,
-            row.categoria,
-            row.pertenencia,
-            String(row.gestionAnio || '—'),
-            row.estadoInscripcion === 'INSCRITA'
-              ? (row.esExcedente ? 'EXCEDENTE' : 'Cupo OK')
-              : '—',
-            row.estadoLabel || row.estadoInscripcion || '—',
-          ],
-          w,
-          y,
-        );
-        y += 14;
-      });
+      const headers = ['N°', 'Fraternidad', 'Tipo de danza', 'Categoría', 'Pertenencia', 'Gestión', 'Cupo', 'Estado'];
+      const widths = [28, 150, 110, 70, 160, 45, 55, 70];
+      const dataRows = rows.map((row, i) => [
+        String(i + 1),
+        row.nombreFraternidad || '—',
+        row.tipoDanza || '—',
+        row.categoria || '—',
+        row.pertenencia || '—',
+        String(row.gestionAnio || '—'),
+        row.estadoInscripcion === 'INSCRITA'
+          ? row.esExcedente
+            ? 'EXCEDENTE'
+            : 'Cupo OK'
+          : '—',
+        row.estadoLabel || row.estadoInscripcion || '—',
+      ]);
+      renderTable(headers, widths, dataRows);
     } else if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
-      const widths = [82, 68, 78, 132, 55, 80];
-      const headers = ['Fraternidad', 'Tipo danza', 'Cargo', 'Nombre', 'CI', 'Celular'];
-      drawTableHeader(headers, widths, y);
-      y += 16;
-      (resultado.data as any[]).forEach((row, i) => {
-        const cells = [
-          row.nombreFraternidad,
-          row.tipoDanza,
-          row.cargo,
-          row.nombreIntegrante,
-          row.ci,
-          row.celular,
-        ];
-        const rowHeight = getRowHeight(cells, widths, 16);
-        if (y > 720) {
-          doc.addPage();
-          y = 50;
-        }
-        if (i % 2 === 0) doc.save().rect(50, y, 495, rowHeight).fill('#f8fafc').restore();
-        drawRow(cells, widths, y, false, rowHeight);
-        y += rowHeight;
-      });
+      const headers = ['N°', 'Fraternidad', 'Tipo de danza', 'Cargo', 'Nombre completo', 'CI', 'Celular'];
+      const widths = [28, 130, 95, 100, 180, 70, 80];
+      const dataRows = rows.map((row, i) => [
+        String(i + 1),
+        row.nombreFraternidad || '—',
+        row.tipoDanza || '—',
+        row.cargo || '—',
+        row.nombreIntegrante || '—',
+        row.ci || '—',
+        row.celular || '—',
+      ]);
+      renderTable(headers, widths, dataRows);
     } else if (dto.tipoReporte === TipoReporte.COSTOS) {
       const resumen = (resultado as any).resumen;
       if (resumen) {
-        doc.fontSize(9).fillColor('#334155').font('Helvetica')
+        doc
+          .fontSize(7)
+          .fillColor('#334155')
+          .font('Helvetica')
           .text(
-            `Fraternidades: ${resumen.fraternidadesUnicas || 0} · Ítems de costo: ${resumen.totalItems || 0} · Suma montos: ${Number(resumen.totalMonto || 0).toFixed(2)} Bs`,
-            50,
+            `Resumen: ${resumen.fraternidadesUnicas || 0} fraternidad(es) · ${resumen.totalItems || 0} ítem(s) · Total: ${Number(resumen.totalMonto || 0).toFixed(2)} Bs`,
+            margin,
             y,
-            { width: 495 },
+            { width: contentW },
           );
-        y += 18;
+        y += 12;
       }
-      const widths = [120, 70, 50, 110, 55, 55];
-      const headers = ['Fraternidad', 'Tipo danza', 'Estructura', 'Concepto', 'Monto Bs', 'Estado'];
-      drawTableHeader(headers, widths, y);
-      y += 16;
-      (resultado.data as any[]).forEach((row, i) => {
-        if (y > 720) {
-          doc.addPage();
-          y = 50;
-        }
-        if (i % 2 === 0) doc.save().rect(50, y, 495, 14).fill('#f8fafc').restore();
-        drawRow(
-          [
-            row.nombreFraternidad,
-            row.tipoDanza,
-            row.estructura,
-            row.concepto,
-            Number(row.monto).toFixed(2),
-            row.estadoSolicitud || '—',
-          ],
-          widths,
-          y,
-        );
-        y += 14;
-      });
+      const headers = ['N°', 'Fraternidad', 'Tipo de danza', 'Estructura', 'Concepto', 'Monto Bs', 'Estado'];
+      const widths = [28, 150, 100, 70, 180, 60, 70];
+      const dataRows = rows.map((row, i) => [
+        String(i + 1),
+        row.nombreFraternidad || '—',
+        row.tipoDanza || '—',
+        row.estructura || '—',
+        row.concepto || '—',
+        Number(row.monto).toFixed(2),
+        row.estadoSolicitud || '—',
+      ]);
+      renderTable(headers, widths, dataRows);
     } else {
-      const widths = [30, 100, 80, 55, 70, 45, 45, 45];
-      const headers = ['#', 'Fraternidad', 'Tipo danza', 'Cat.', 'Pertenencia', 'Jur.', 'Sanc.', 'Final'];
-      drawTableHeader(headers, widths, y);
-      y += 16;
-      (resultado.data as any[]).forEach((row, i) => {
-        if (y > 720) {
-          doc.addPage();
-          y = 50;
-        }
-        if (i % 2 === 0) doc.save().rect(50, y, 495, 14).fill('#f8fafc').restore();
-        drawRow(
-          [
-            String(row.puesto ?? '—'),
-            row.nombreFraternidad,
-            row.tipoDanza,
-            row.categoria,
-            row.pertenencia,
-            String(row.promedioJurado ?? '—'),
-            String(row.impactoSanciones ?? '—'),
-            String(row.puntajeFinal ?? '—'),
-          ],
-          widths,
-          y,
-        );
-        y += 14;
-      });
+      const headers = [
+        'N°',
+        'Puesto',
+        'Fraternidad',
+        'Tipo de danza',
+        'Categoría',
+        'Pertenencia',
+        'Jurado',
+        'Sanciones',
+        'Final',
+      ];
+      const widths = [28, 36, 140, 100, 70, 150, 45, 50, 45];
+      const dataRows = rows.map((row, i) => [
+        String(i + 1),
+        String(row.puesto ?? '—'),
+        row.nombreFraternidad || '—',
+        row.tipoDanza || '—',
+        row.categoria || '—',
+        row.pertenencia || '—',
+        String(row.promedioJurado ?? '—'),
+        String(row.impactoSanciones ?? '—'),
+        String(row.puntajeFinal ?? '—'),
+      ]);
+      renderTable(headers, widths, dataRows);
     }
+
+    doc
+      .fontSize(6)
+      .fillColor('#94a3b8')
+      .font('Helvetica')
+      .text(`Página ${pageNum}`, margin, pageH - 28, {
+        width: contentW,
+        align: 'center',
+      });
 
     doc.end();
   }
