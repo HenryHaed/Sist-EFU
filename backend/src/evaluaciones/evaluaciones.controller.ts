@@ -348,8 +348,14 @@ export class EvaluacionesController {
 
   @Public()
   @Get('documentos-gestion')
-  getDocumentosGestion(@Query('idGestion') idGestion?: string) {
-    return this.evaluacionesService.getDocumentosGestion(idGestion ? parseInt(idGestion) : undefined);
+  getDocumentosGestion(
+    @Query('idGestion') idGestion?: string,
+    @Query('soloPublicos') soloPublicos?: string,
+  ) {
+    return this.evaluacionesService.getDocumentosGestion(
+      idGestion ? parseInt(idGestion) : undefined,
+      soloPublicos === 'true',
+    );
   }
 
   @Post('documentos-gestion')
@@ -384,6 +390,7 @@ export class EvaluacionesController {
       tipo: body.tipo || 'otro',
       orden: body.orden ? parseInt(body.orden) : 0,
       urlPdf: `/api/v1/archivos/doc-gestion/${file.filename}`,
+      esPublico: body.esPublico === 'true' || body.esPublico === true,
     };
     return this.evaluacionesService.createDocumentoGestion(dto, idGestion ? parseInt(idGestion) : undefined);
   }

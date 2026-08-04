@@ -657,14 +657,14 @@
                 <div class="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100/50">
                   <div class="flex items-center justify-between mb-4">
                     <p class="text-[10px] font-black uppercase text-indigo-800">Delegado a Co-Gobierno HCF o HCC (20-22)</p>
-                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-secondary/10 text-secondary">Obligatorio</span>
+                    <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-400">Opcional</span>
                   </div>
                   <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div class="md:col-span-4">
-                      <input v-model="form.delCogobNombres" @input="upperCase('delCogobNombres')" placeholder="20. Nombres *" type="text" required :disabled="!puedeEditarCampo('delCogobNombres')" :class="claseInputCampo('delCogobNombres')" />
+                      <input v-model="form.delCogobNombres" @input="upperCase('delCogobNombres')" placeholder="20. Nombres" type="text" :disabled="!puedeEditarCampo('delCogobNombres')" :class="claseInputCampo('delCogobNombres')" />
                     </div>
                     <div class="md:col-span-4">
-                      <input v-model="form.delCogobPrimerApellido" @input="upperCase('delCogobPrimerApellido')" placeholder="Paterno *" type="text" required :disabled="!puedeEditarCampo('delCogobPrimerApellido')" :class="claseInputCampo('delCogobPrimerApellido')" />
+                      <input v-model="form.delCogobPrimerApellido" @input="upperCase('delCogobPrimerApellido')" placeholder="Paterno" type="text" :disabled="!puedeEditarCampo('delCogobPrimerApellido')" :class="claseInputCampo('delCogobPrimerApellido')" />
                     </div>
                     <div class="md:col-span-4">
                       <input v-model="form.delCogobSegundoApellido" @input="upperCase('delCogobSegundoApellido')" placeholder="Materno" type="text" :disabled="!puedeEditarCampo('delCogobSegundoApellido')" :class="claseInputCampo('delCogobSegundoApellido')" />
@@ -674,8 +674,7 @@
                         v-model:ci="form.delCogobCi"
                         v-model:complemento="form.delCogobCiComplemento"
                         v-model:activo="ciComplementoActivo.delCogob"
-                        label="21. Carnet CI *"
-                        required
+                        label="21. Carnet CI"
                         :disabled="!puedeEditarCampo('delCogobCi')"
                         :clase-input="claseInputCampo('delCogobCi')"
                         :mensaje-error="mensajeCi('delCogobCi')"
@@ -684,7 +683,7 @@
                       />
                     </div>
                     <div class="md:col-span-6">
-                      <input v-model="form.delCogobCelular" @keypress="onlyNumbers" placeholder="22. Celular *" type="text" required :disabled="!puedeEditarCampo('delCogobCelular')" :class="claseInputCampo('delCogobCelular')" />
+                      <input v-model="form.delCogobCelular" @keypress="onlyNumbers" placeholder="22. Celular" type="text" :disabled="!puedeEditarCampo('delCogobCelular')" :class="claseInputCampo('delCogobCelular')" />
                     </div>
                   </div>
                 </div>

@@ -24,6 +24,10 @@ export class DocumentoGestion {
     @Column({ default: 0 })
     orden: number;
 
+    // Si el documento es visible en el landing público (false = solo para usuarios del sistema)
+    @Column({ name: 'es_publico', default: false })
+    esPublico: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

@@ -74,6 +74,17 @@
                   class="text-[10px] font-black uppercase tracking-wider mt-0.5 truncate"
                   :class="docActivo?.idDocumento === doc.idDocumento ? 'text-white/60' : 'text-slate-400'"
                 >{{ etiquetaTipo(doc.tipo) }}</p>
+                <!-- Badge visibilidad (solo visible para admins) -->
+                <span
+                  v-if="esAdmin"
+                  class="inline-flex items-center gap-0.5 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full mt-1"
+                  :class="doc.esPublico
+                    ? (docActivo?.idDocumento === doc.idDocumento ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700')
+                    : (docActivo?.idDocumento === doc.idDocumento ? 'bg-white/10 text-white/60' : 'bg-slate-100 text-slate-400')"
+                >
+                  <span class="material-symbols-outlined" style="font-size:9px">{{ doc.esPublico ? 'public' : 'lock' }}</span>
+                  {{ doc.esPublico ? 'Público' : 'Solo sistema' }}
+                </span>
               </div>
               <!-- Indicador activo -->
               <span
@@ -169,16 +180,90 @@
       </main>
     </div>
   </div>
+
+  <!-- Modal de Aviso de Nuevos Comunicados/Reglamentos -->
+  <v-dialog v-model="mostrarAvisoNuevoDoc" max-width="600" transition="dialog-bottom-transition" persistent>
+    <v-card class="rounded-3xl overflow-hidden border-4 border-secondary">
+      <v-card-title class="bg-secondary text-white d-flex align-center gap-3 pa-4 relative">
+        <div class="d-flex align-center gap-2 font-black italic uppercase tracking-tighter">
+          <span class="material-symbols-outlined animate-bounce">campaign</span>
+          ¡Nuevo Comunicado Oficial!
+        </div>
+        <v-btn icon="close" variant="text" color="white" class="absolute right-2 top-2" @click="cerrarAvisoNuevoDoc"></v-btn>
+      </v-card-title>
+      
+      <v-card-text class="pa-6 bg-slate-50 text-left">
+        <div v-if="nuevoDocumento" class="flex flex-col gap-4">
+          <div class="d-flex align-center justify-space-between gap-4">
+            <span class="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
+              <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+              {{ etiquetaTipo(nuevoDocumento.tipo) }}
+            </span>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Publicado recientemente
+            </span>
+          </div>
+          
+          <h3 class="text-2xl font-black text-slate-900 italic uppercase leading-tight mt-2">
+            {{ nuevoDocumento.titulo }}
+          </h3>
+          
+          <p v-if="nuevoDocumento.descripcion" class="text-slate-600 font-medium text-sm leading-relaxed my-2">
+            {{ nuevoDocumento.descripcion }}
+          </p>
+          
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 mt-2">
+            <span class="material-symbols-outlined text-amber-500 shrink-0">info</span>
+            <p class="text-xs text-amber-800 font-medium leading-relaxed">
+              Este documento ha sido publicado recientemente por la Comisión Organizadora. Puedes abrirlo ahora o consultarlo en tu panel.
+            </p>
+          </div>
+        </div>
+      </v-card-text>
+
+      <v-card-actions class="bg-white pa-4 border-t border-slate-100">
+        <v-spacer></v-spacer>
+        <v-btn
+          color="slate-400"
+          variant="outlined"
+          rounded="pill"
+          class="font-black px-6 text-slate-600 hover:bg-slate-50"
+          @click="cerrarAvisoNuevoDoc"
+        >
+          Cerrar
+        </v-btn>
+        <v-btn
+          v-if="nuevoDocumento"
+          color="primary"
+          variant="flat"
+          rounded="pill"
+          class="font-black px-6 bg-primary text-white"
+          @click="verNuevoDoc"
+        >
+          <span class="material-symbols-outlined mr-1">visibility</span>
+          Ver en el panel
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import api from '../services/api'
 import { getImageUrl } from '../utils/url'
+import { useAuthStore } from '../store/auth'
+
+const auth = useAuthStore()
+const esAdmin = computed(() =>
+  ['superusuario', 'admin'].includes(auth.user?.rol?.nombre)
+)
 
 const documentos = ref([])
 const docActivo = ref(null)
 const loading = ref(true)
+const mostrarAvisoNuevoDoc = ref(false)
+const nuevoDocumento = ref(null)
 
 const cargarDocumentos = async () => {
   loading.value = true
@@ -188,6 +273,32 @@ const cargarDocumentos = async () => {
     // Seleccionar el primero automáticamente
     if (documentos.value.length > 0) {
       docActivo.value = documentos.value[0]
+
+      // Buscar el documento público más reciente
+      const docsPublicos = documentos.value.filter(doc => doc.esPublico === true)
+      if (docsPublicos.length > 0) {
+        const docsSortedById = [...docsPublicos].sort((a, b) => b.idDocumento - a.idDocumento)
+        const latestDoc = docsSortedById[0]
+        const ultimoVistoId = localStorage.getItem('ultimo_doc_visto_id')
+
+        if (latestDoc) {
+          if (!ultimoVistoId) {
+            // Si nunca ha entrado, mostrar si se creó hace poco (ej. menos de 3 días)
+            const fechaCreacion = new Date(latestDoc.createdAt)
+            const haceTresDias = new Date()
+            haceTresDias.setDate(haceTresDias.getDate() - 3)
+            if (fechaCreacion >= haceTresDias) {
+              nuevoDocumento.value = latestDoc
+              mostrarAvisoNuevoDoc.value = true
+            } else {
+              localStorage.setItem('ultimo_doc_visto_id', String(latestDoc.idDocumento))
+            }
+          } else if (latestDoc.idDocumento > parseInt(ultimoVistoId)) {
+            nuevoDocumento.value = latestDoc
+            mostrarAvisoNuevoDoc.value = true
+          }
+        }
+      }
     }
   } catch (err) {
     console.error('Error al cargar documentos:', err)
@@ -195,6 +306,20 @@ const cargarDocumentos = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const cerrarAvisoNuevoDoc = () => {
+  mostrarAvisoNuevoDoc.value = false
+  if (nuevoDocumento.value) {
+    localStorage.setItem('ultimo_doc_visto_id', String(nuevoDocumento.value.idDocumento))
+  }
+}
+
+const verNuevoDoc = () => {
+  if (nuevoDocumento.value) {
+    seleccionar(nuevoDocumento.value)
+  }
+  cerrarAvisoNuevoDoc()
 }
 
 const seleccionar = (doc) => {

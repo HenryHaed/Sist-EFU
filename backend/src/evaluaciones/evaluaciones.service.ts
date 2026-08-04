@@ -1097,7 +1097,7 @@ export class EvaluacionesService {
 
   // ── Documentos de Gestión (Reglamentos, circulares, etc.) ──────────────────
 
-  async getDocumentosGestion(idGestion?: number) {
+  async getDocumentosGestion(idGestion?: number, soloPublicos?: boolean) {
     let gestion: any;
     if (idGestion) {
       gestion = await this.gestionRepo.findOne({ where: { idGestion } });
@@ -1105,13 +1105,15 @@ export class EvaluacionesService {
       gestion = await this.gestionRepo.findOne({ where: { activa: true } });
     }
     if (!gestion) return [];
+    const where: any = { gestion: { idGestion: gestion.idGestion } };
+    if (soloPublicos) where.esPublico = true;
     return this.documentoGestionRepo.find({
-      where: { gestion: { idGestion: gestion.idGestion } },
+      where,
       order: { orden: 'ASC', createdAt: 'ASC' },
     });
   }
 
-  async createDocumentoGestion(dto: { titulo: string; descripcion?: string; tipo?: string; urlPdf: string; orden?: number }, idGestion?: number) {
+  async createDocumentoGestion(dto: { titulo: string; descripcion?: string; tipo?: string; urlPdf: string; orden?: number; esPublico?: boolean }, idGestion?: number) {
     let gestion: any;
     if (idGestion) {
       gestion = await this.gestionRepo.findOne({ where: { idGestion } });

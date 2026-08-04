@@ -402,6 +402,37 @@
                 </div>
               </div>
             </div>
+            <!-- Visibilidad pública -->
+            <div class="md:col-span-2">
+              <div
+                class="flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer"
+                :class="docForm.esPublico ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50'"
+                @click="docForm.esPublico = !docForm.esPublico"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="size-10 rounded-xl flex items-center justify-center shrink-0" :class="docForm.esPublico ? 'bg-emerald-500' : 'bg-slate-300'">
+                    <span class="material-symbols-outlined text-white text-xl">{{ docForm.esPublico ? 'public' : 'lock' }}</span>
+                  </div>
+                  <div>
+                    <p class="font-black text-sm" :class="docForm.esPublico ? 'text-emerald-800' : 'text-slate-600'">
+                      {{ docForm.esPublico ? 'Visible en el landing público' : 'Solo para usuarios del sistema' }}
+                    </p>
+                    <p class="text-[10px] font-medium" :class="docForm.esPublico ? 'text-emerald-600' : 'text-slate-400'">
+                      {{ docForm.esPublico ? 'Cualquier visitante podrá ver y descargar este documento' : 'Solo usuarios con acceso al sistema podrán verlo' }}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  class="w-12 h-6 rounded-full transition-all relative shrink-0"
+                  :class="docForm.esPublico ? 'bg-emerald-500' : 'bg-slate-300'"
+                >
+                  <div
+                    class="absolute top-1 size-4 rounded-full bg-white shadow transition-all"
+                    :class="docForm.esPublico ? 'left-7' : 'left-1'"
+                  ></div>
+                </div>
+              </div>
+            </div>
             <div class="md:col-span-2 flex justify-end">
               <button type="button" @click="subirDocumento"
                 :disabled="uploadingDoc || !docForm.titulo || !docForm.archivo"
@@ -436,11 +467,32 @@
                 <span class="material-symbols-outlined text-primary text-xl">picture_as_pdf</span>
               </div>
               <div class="flex-1 min-w-0">
-                <p class="font-bold text-slate-800 text-sm truncate">{{ doc.titulo }}</p>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="font-bold text-slate-800 text-sm truncate">{{ doc.titulo }}</p>
+                  <span
+                    class="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0"
+                    :class="doc.esPublico ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                  >
+                    <span class="material-symbols-outlined text-[10px]">{{ doc.esPublico ? 'public' : 'lock' }}</span>
+                    {{ doc.esPublico ? 'Público' : 'Solo sistema' }}
+                  </span>
+                </div>
                 <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{{ etiquetaTipoDoc(doc.tipo) }}</p>
                 <p v-if="doc.descripcion" class="text-xs text-slate-500 mt-0.5 truncate">{{ doc.descripcion }}</p>
               </div>
               <div class="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  @click="togglePublicoDoc(doc)"
+                  :title="doc.esPublico ? 'Hacer privado (solo sistema)' : 'Hacer público (visible en landing)'"
+                  class="h-9 px-3 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
+                  :class="doc.esPublico
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                    : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'"
+                >
+                  <span class="material-symbols-outlined text-[14px]">{{ doc.esPublico ? 'public' : 'lock' }}</span>
+                  {{ doc.esPublico ? 'Público' : 'Privado' }}
+                </button>
                 <a :href="getImageUrl(doc.urlPdf)" target="_blank"
                   class="size-9 bg-slate-100 hover:bg-primary hover:text-white text-slate-600 rounded-xl flex items-center justify-center transition-all">
                   <span class="material-symbols-outlined text-[18px]">open_in_new</span>
@@ -800,7 +852,7 @@ watch(gestion, () => {
 const documentos = ref([])
 const loadingDocs = ref(false)
 const uploadingDoc = ref(false)
-const docForm = ref({ titulo: '', tipo: 'reglamento_efu', descripcion: '', archivo: null })
+const docForm = ref({ titulo: '', tipo: 'reglamento_efu', descripcion: '', archivo: null, esPublico: false })
 
 const handleDocFile = (e) => {
   docForm.value.archivo = e.target.files[0] || null
@@ -828,11 +880,12 @@ const subirDocumento = async () => {
     fd.append('titulo', docForm.value.titulo)
     fd.append('tipo', docForm.value.tipo)
     fd.append('descripcion', docForm.value.descripcion)
+    fd.append('esPublico', String(docForm.value.esPublico))
     const params = props.gestionId ? `?idGestion=${props.gestionId}` : ''
     await api.post(`/evaluaciones/documentos-gestion${params}`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-    docForm.value = { titulo: '', tipo: 'reglamento_efu', descripcion: '', archivo: null }
+    docForm.value = { titulo: '', tipo: 'reglamento_efu', descripcion: '', archivo: null, esPublico: false }
     Swal.fire({ icon: 'success', title: 'Documento publicado', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
     cargarDocumentos()
   } catch (e) {
@@ -861,6 +914,24 @@ const eliminarDocumento = async (doc) => {
     Swal.fire('Error', 'No se pudo eliminar el documento.', 'error')
   }
 }
+
+const togglePublicoDoc = async (doc) => {
+  try {
+    const { data } = await api.put(`/evaluaciones/documentos-gestion/${doc.idDocumento}`, { esPublico: !doc.esPublico })
+    doc.esPublico = data.esPublico
+    Swal.fire({
+      icon: 'success',
+      title: doc.esPublico ? 'Documento publicado en el landing' : 'Documento marcado como privado',
+      toast: true,
+      position: 'top-end',
+      timer: 2200,
+      showConfirmButton: false
+    })
+  } catch (e) {
+    Swal.fire('Error', 'No se pudo cambiar la visibilidad del documento.', 'error')
+  }
+}
+
 
 const etiquetaTipoDoc = (tipo) => {
   const map = {

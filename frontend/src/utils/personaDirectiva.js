@@ -6,7 +6,7 @@ export const PERSONAS_DIRECTIVA = [
   { prefix: 'secActas', label: 'Secretario de Actas', hasCelular: false, required: false },
   { prefix: 'secPrensa', label: 'Secretario de Prensa', hasCelular: false, required: false },
   { prefix: 'vocal', label: 'Vocal', hasCelular: false, required: false },
-  { prefix: 'delCogob', label: 'Delegado a Co-Gobierno', hasCelular: true, required: true },
+  { prefix: 'delCogob', label: 'Delegado a Co-Gobierno', hasCelular: true, required: false },
   { prefix: 'delTitular', label: 'Delegado Titular', hasCelular: true, required: true },
   { prefix: 'delSuplente', label: 'Delegado Suplente', hasCelular: true, required: true },
 ]

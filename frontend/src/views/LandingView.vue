@@ -57,6 +57,15 @@
             <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">history</span>
             <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Histórico</p>
           </a>
+          <a
+            v-if="documentosPublicos.length > 0"
+            @click.prevent="scrollTo('reglamentos')"
+            href="#reglamentos"
+            class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">description</span>
+            <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Reglamentos</p>
+          </a>
         </nav>
       </div>
 
@@ -98,6 +107,14 @@
       >
         <span class="material-symbols-outlined text-[22px]">history</span>
         <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Histórico</span>
+      </button>
+      <button
+        v-if="documentosPublicos.length > 0"
+        @click="scrollTo('reglamentos')"
+        class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors"
+      >
+        <span class="material-symbols-outlined text-[22px]">description</span>
+        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Docs</span>
       </button>
       </nav>
     </div>
@@ -381,6 +398,100 @@
             </v-card-actions>
           </v-card>
         </v-dialog>
+
+        <!-- Modal de Aviso de Nuevos Comunicados/Reglamentos -->
+        <v-dialog v-model="mostrarAvisoNuevoDoc" max-width="600" transition="dialog-bottom-transition" persistent>
+          <v-card class="rounded-3xl overflow-hidden border-4 border-secondary">
+            <v-card-title class="bg-secondary text-white d-flex align-center gap-3 pa-4 relative">
+              <div class="d-flex align-center gap-2 font-black italic uppercase tracking-tighter">
+                <span class="material-symbols-outlined animate-bounce">campaign</span>
+                ¡Nuevo Comunicado Oficial!
+              </div>
+              <v-btn icon="close" variant="text" color="white" class="absolute right-2 top-2" @click="cerrarAvisoNuevoDoc"></v-btn>
+            </v-card-title>
+            
+            <v-card-text class="pa-6 bg-slate-50 text-left">
+              <div v-if="nuevoDocumento" class="flex flex-col gap-4">
+                <div class="d-flex align-center justify-space-between gap-4">
+                  <span class="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                    <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+                    {{ etiquetaTipoDoc(nuevoDocumento.tipo) }}
+                  </span>
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Publicado recientemente
+                  </span>
+                </div>
+                
+                <h3 class="text-2xl font-black text-slate-900 italic uppercase leading-tight mt-2">
+                  {{ nuevoDocumento.titulo }}
+                </h3>
+                
+                <p v-if="nuevoDocumento.descripcion" class="text-slate-600 font-medium text-sm leading-relaxed my-2">
+                  {{ nuevoDocumento.descripcion }}
+                </p>
+                
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 mt-2">
+                  <span class="material-symbols-outlined text-amber-500 shrink-0">info</span>
+                  <p class="text-xs text-amber-800 font-medium leading-relaxed">
+                    Este documento ha sido publicado recientemente por la Comisión Organizadora de la Entrada Folklórica Universitaria. Haz clic abajo para abrir o descargar el archivo PDF oficial.
+                  </p>
+                </div>
+              </div>
+            </v-card-text>
+
+            <v-card-actions class="bg-white pa-4 border-t border-slate-100">
+              <v-spacer></v-spacer>
+              <v-btn
+                color="slate-400"
+                variant="outlined"
+                rounded="pill"
+                class="font-black px-6 text-slate-600 hover:bg-slate-50"
+                @click="cerrarAvisoNuevoDoc"
+              >
+                Cerrar
+              </v-btn>
+              <v-btn
+                v-if="nuevoDocumento"
+                color="primary"
+                variant="flat"
+                rounded="pill"
+                class="font-black px-6 bg-primary text-white"
+                @click="verNuevoDoc"
+              >
+                <span class="material-symbols-outlined mr-1">visibility</span>
+                Ver Documento
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
+        <!-- Modal Visor de PDF -->
+        <v-dialog v-model="mostrarPdfModal" max-width="1000" transition="dialog-bottom-transition">
+          <v-card class="rounded-3xl overflow-hidden border-4 border-primary">
+            <v-card-title class="bg-primary text-white d-flex align-center justify-space-between pa-4">
+              <div class="d-flex align-center gap-2 font-black italic uppercase tracking-tighter">
+                <span class="material-symbols-outlined">picture_as_pdf</span>
+                {{ pdfModalTitulo }}
+              </div>
+              <v-btn icon="close" variant="text" color="white" @click="mostrarPdfModal = false"></v-btn>
+            </v-card-title>
+            <v-card-text class="pa-0 bg-slate-900" style="height: 700px; max-height: 80vh;">
+              <iframe
+                v-if="mostrarPdfModal"
+                :src="pdfModalUrl + '#toolbar=1&navpanes=0'"
+                width="100%"
+                height="100%"
+                style="border:0;"
+                loading="lazy"
+              ></iframe>
+            </v-card-text>
+            <v-card-actions class="bg-white pa-4">
+              <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">© 2026 UMSA - Entrada Universitaria</p>
+              <v-spacer></v-spacer>
+              <v-btn color="secondary" variant="flat" rounded="pill" class="font-black px-6" @click="mostrarPdfModal = false">Cerrar Visor</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
       </section>
 
       <!-- ===== EVENTOS PÚBLICOS ===== -->
@@ -427,6 +538,66 @@
             <div class="flex items-center gap-2 text-slate-600 font-bold text-sm">
               <span class="material-symbols-outlined text-secondary text-lg">location_on</span>
               {{ ev.ubicacion || 'Ubicación por confirmar' }}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ===== REGLAMENTOS Y CONVOCATORIAS VIGENTES ===== -->
+      <section v-if="documentosPublicos.length > 0" class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-slate-50 border-t border-slate-100" id="reglamentos">
+        <div class="text-center mb-12 md:mb-16 reveal">
+          <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">
+            REGLAMENTOS Y <span class="text-primary">CONVOCATORIAS</span>
+          </h2>
+          <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">
+            Documentación oficial vigente para todo el público
+          </p>
+        </div>
+
+        <div v-if="loadingDocumentos" class="flex justify-center py-16">
+          <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+        </div>
+
+        <div v-else class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          <article
+            v-for="doc in documentosPublicos"
+            :key="doc.idDocumento"
+            class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-lg shadow-slate-100/60 p-6 sm:p-8 reveal reveal-left flex flex-col justify-between"
+          >
+            <div>
+              <div class="flex items-center justify-between gap-4 mb-4">
+                <span class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                  <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+                  {{ etiquetaTipoDoc(doc.tipo) }}
+                </span>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  PDF Oficial
+                </span>
+              </div>
+              <h3 class="text-xl md:text-2xl font-black text-slate-900 italic uppercase tracking-tight mb-3">
+                {{ doc.titulo }}
+              </h3>
+              <p v-if="doc.descripcion" class="text-slate-500 font-medium text-sm leading-relaxed mb-6">
+                {{ doc.descripcion }}
+              </p>
+            </div>
+            <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
+              <button
+                @click="abrirPdfEnModal(doc.urlPdf, doc.titulo)"
+                class="flex-1 bg-primary hover:bg-blue-900 text-white py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all"
+              >
+                <span class="material-symbols-outlined text-base">visibility</span>
+                Ver Documento
+              </button>
+              <a
+                :href="getImageUrl(doc.urlPdf)"
+                download
+                target="_blank"
+                class="bg-slate-100 hover:bg-slate-200 text-slate-700 p-3 rounded-xl transition-colors flex items-center justify-center"
+                title="Descargar PDF"
+              >
+                <span class="material-symbols-outlined text-base">download</span>
+              </a>
             </div>
           </article>
         </div>
@@ -806,6 +977,91 @@ const cargarDatos = async () => {
 
   await cargarEventosPublicos()
   await cargarGestionesPublicas()
+  await cargarDocumentosPublicos()
+}
+
+const documentosPublicos = ref([])
+const loadingDocumentos = ref(false)
+const mostrarAvisoNuevoDoc = ref(false)
+const nuevoDocumento = ref(null)
+
+const cargarDocumentosPublicos = async () => {
+  loadingDocumentos.value = true
+  try {
+    const { data } = await api.get('/evaluaciones/documentos-gestion?soloPublicos=true')
+    documentosPublicos.value = Array.isArray(data) ? data : []
+
+    // Si hay documentos públicos, verifiquemos si el último es nuevo
+    if (documentosPublicos.value.length > 0) {
+      // Ordenar por ID descendente para obtener el más reciente
+      const docsSortedById = [...documentosPublicos.value].sort((a, b) => b.idDocumento - a.idDocumento)
+      const latestDoc = docsSortedById[0]
+      const ultimoVistoId = localStorage.getItem('ultimo_doc_visto_id')
+
+      if (latestDoc) {
+        if (!ultimoVistoId) {
+          // Si nunca ha entrado, mostrar si se creó hace poco (ej. menos de 3 días) para no saturar con docs muy viejos
+          const fechaCreacion = new Date(latestDoc.createdAt)
+          const haceTresDias = new Date()
+          haceTresDias.setDate(haceTresDias.getDate() - 3)
+          if (fechaCreacion >= haceTresDias) {
+            nuevoDocumento.value = latestDoc
+            mostrarAvisoNuevoDoc.value = true
+          } else {
+            // Guardar para evitar avisarle por este doc antiguo en la siguiente recarga
+            localStorage.setItem('ultimo_doc_visto_id', String(latestDoc.idDocumento))
+          }
+        } else if (latestDoc.idDocumento > parseInt(ultimoVistoId)) {
+          // Si el ID es mayor al último visto
+          nuevoDocumento.value = latestDoc
+          mostrarAvisoNuevoDoc.value = true
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error al cargar documentos públicos:', err)
+    documentosPublicos.value = []
+  } finally {
+    loadingDocumentos.value = false
+  }
+}
+
+const mostrarPdfModal = ref(false)
+const pdfModalUrl = ref('')
+const pdfModalTitulo = ref('')
+
+const abrirPdfEnModal = (url, titulo) => {
+  pdfModalUrl.value = getImageUrl(url)
+  pdfModalTitulo.value = titulo
+  mostrarPdfModal.value = true
+}
+
+const cerrarAvisoNuevoDoc = () => {
+  mostrarAvisoNuevoDoc.value = false
+  if (nuevoDocumento.value) {
+    localStorage.setItem('ultimo_doc_visto_id', String(nuevoDocumento.value.idDocumento))
+  }
+}
+
+const verNuevoDoc = () => {
+  if (nuevoDocumento.value) {
+    abrirPdfEnModal(nuevoDocumento.value.urlPdf, nuevoDocumento.value.titulo)
+  }
+  cerrarAvisoNuevoDoc()
+}
+
+
+const etiquetaTipoDoc = (tipo) => {
+  const map = {
+    reglamento_efu: 'Reglamento EFU',
+    reglamento_afiche: 'Reglamento Afiche',
+    reglamento_chachawarmi: 'Reglamento Chachawarmi',
+    reglamento_fotografia: 'Reglamento Fotografía',
+    circular: 'Circular Oficial',
+    convocatoria: 'Convocatoria',
+    otro: 'Otro Documento'
+  }
+  return map[tipo] || 'Documento'
 }
 
 const gestionesPublicas = ref([])
