@@ -4,6 +4,7 @@ import { Jurado } from './Jurado';
 import { Incidencia } from './Incidencia';
 import { Asistencia } from './Asistencia';
 import { Fraternidad } from './Fraternidad';
+import { Fase } from './Fase';
 
 @Entity('usuarios')
 export class Usuario {
@@ -35,6 +36,11 @@ export class Usuario {
     @ManyToOne(() => Fraternidad, { nullable: true })
     @JoinColumn({ name: 'id_fraternidad' })
     fraternidad: Fraternidad;
+
+    /** Concurso EXTERNO asignado al rol concursante (1 usuario → 1 fase) */
+    @ManyToOne(() => Fase, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'id_fase_concurso' })
+    faseConcurso: Fase;
 
     @Column({ name: 'primer_login', default: true })
     primerLogin: boolean;

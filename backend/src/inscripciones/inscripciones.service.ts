@@ -26,7 +26,7 @@ const PERSONAS_DIRECTIVA = [
     { prefix: 'secActas', checklist: 'Secretario de Actas', hasCelular: false, required: false },
     { prefix: 'secPrensa', checklist: 'Secretario de Prensa', hasCelular: false, required: false },
     { prefix: 'vocal', checklist: 'Vocal', hasCelular: false, required: false },
-    { prefix: 'delCogob', checklist: 'Delegado a Co-Gobierno', hasCelular: true, required: true },
+    { prefix: 'delCogob', checklist: 'Delegado a Co-Gobierno', hasCelular: true, required: false },
     { prefix: 'delTitular', checklist: 'Delegado Titular', hasCelular: true, required: true },
     { prefix: 'delSuplente', checklist: 'Delegado Suplente', hasCelular: true, required: true },
 ] as const;

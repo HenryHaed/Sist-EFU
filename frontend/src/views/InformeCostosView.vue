@@ -91,7 +91,7 @@
       </div>
     </div>
 
-    <div v-if="resultado?.resumen" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+    <div v-if="resultado?.resumen" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       <div class="bg-white rounded-2xl border border-slate-200 p-4">
         <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Fraternidades</p>
         <p class="text-2xl font-black text-primary mt-1">{{ resultado.resumen.fraternidadesUnicas }}</p>
@@ -101,8 +101,83 @@
         <p class="text-2xl font-black text-slate-800 mt-1">{{ resultado.resumen.totalItems }}</p>
       </div>
       <div class="bg-white rounded-2xl border border-slate-200 p-4">
-        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Suma de montos</p>
-        <p class="text-2xl font-black text-amber-700 mt-1">{{ formatMonto(resultado.resumen.totalMonto) }} <span class="text-sm">Bs</span></p>
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Promedio general</p>
+        <p class="text-2xl font-black text-indigo-700 mt-1">{{ formatMonto(resultado.resumen.promedioGeneral) }} <span class="text-sm">Bs</span></p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4">
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Mínimo / Máximo</p>
+        <p class="text-lg font-black text-slate-800 mt-1">
+          <span class="text-emerald-700">{{ formatMonto(resultado.resumen.montoMin) }}</span>
+          <span class="text-slate-300 mx-1">/</span>
+          <span class="text-secondary">{{ formatMonto(resultado.resumen.montoMax) }}</span>
+          <span class="text-sm font-bold text-slate-400"> Bs</span>
+        </p>
+      </div>
+    </div>
+
+    <div v-if="resultado?.resumen" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4">
+        <p class="text-[10px] font-black uppercase tracking-widest text-emerald-700 mb-2">Menor costo</p>
+        <p v-if="resultado.resumen.fraternidadMenorCosto" class="text-sm font-bold text-slate-800">
+          {{ resultado.resumen.fraternidadMenorCosto.nombre }}
+          <span class="text-emerald-700">· {{ formatMonto(resultado.resumen.fraternidadMenorCosto.monto) }} Bs</span>
+        </p>
+        <p v-if="resultado.resumen.fraternidadMenorCosto" class="text-xs text-slate-500 mt-1">
+          {{ resultado.resumen.fraternidadMenorCosto.concepto }}
+        </p>
+        <p v-else class="text-xs text-slate-400">Sin datos</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-4">
+        <p class="text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Mayor costo</p>
+        <p v-if="resultado.resumen.fraternidadMayorCosto" class="text-sm font-bold text-slate-800">
+          {{ resultado.resumen.fraternidadMayorCosto.nombre }}
+          <span class="text-secondary">· {{ formatMonto(resultado.resumen.fraternidadMayorCosto.monto) }} Bs</span>
+        </p>
+        <p v-if="resultado.resumen.fraternidadMayorCosto" class="text-xs text-slate-500 mt-1">
+          {{ resultado.resumen.fraternidadMayorCosto.concepto }}
+        </p>
+        <p v-else class="text-xs text-slate-400">Sin datos</p>
+      </div>
+    </div>
+
+    <div v-if="resultado?.resumen" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+          <p class="text-[10px] font-black uppercase tracking-widest text-primary">Promedio por facultad</p>
+        </div>
+        <div class="max-h-64 overflow-y-auto divide-y divide-slate-50">
+          <div
+            v-for="f in (resultado.resumen.promedioPorFacultad || [])"
+            :key="'fac-'+f.nombre"
+            class="px-4 py-2.5 flex items-center justify-between gap-3 text-sm"
+          >
+            <div class="min-w-0">
+              <p class="font-bold text-slate-800 truncate">{{ f.nombre }}</p>
+              <p class="text-[10px] text-slate-400 font-medium">{{ f.cantidad }} ítem(s) · min {{ formatMonto(f.minimo) }} · máx {{ formatMonto(f.maximo) }}</p>
+            </div>
+            <p class="font-black text-indigo-700 tabular-nums shrink-0">{{ formatMonto(f.promedio) }} Bs</p>
+          </div>
+          <p v-if="!(resultado.resumen.promedioPorFacultad || []).length" class="px-4 py-6 text-center text-xs text-slate-400">Sin facultades con costos</p>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+          <p class="text-[10px] font-black uppercase tracking-widest text-primary">Promedio por carrera</p>
+        </div>
+        <div class="max-h-64 overflow-y-auto divide-y divide-slate-50">
+          <div
+            v-for="c in (resultado.resumen.promedioPorCarrera || [])"
+            :key="'car-'+c.nombre"
+            class="px-4 py-2.5 flex items-center justify-between gap-3 text-sm"
+          >
+            <div class="min-w-0">
+              <p class="font-bold text-slate-800 truncate">{{ c.nombre }}</p>
+              <p class="text-[10px] text-slate-400 font-medium">{{ c.cantidad }} ítem(s) · min {{ formatMonto(c.minimo) }} · máx {{ formatMonto(c.maximo) }}</p>
+            </div>
+            <p class="font-black text-indigo-700 tabular-nums shrink-0">{{ formatMonto(c.promedio) }} Bs</p>
+          </div>
+          <p v-if="!(resultado.resumen.promedioPorCarrera || []).length" class="px-4 py-6 text-center text-xs text-slate-400">Sin carreras con costos</p>
+        </div>
       </div>
     </div>
 
@@ -112,11 +187,11 @@
           <thead class="bg-slate-50 border-b border-slate-100">
             <tr>
               <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Fraternidad</th>
+              <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Facultad</th>
+              <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Carrera</th>
               <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Tipo danza</th>
-              <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Estructura</th>
               <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Concepto</th>
               <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Monto (Bs)</th>
-              <th class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Estado</th>
             </tr>
           </thead>
           <tbody>
@@ -140,23 +215,12 @@
                   class="ml-1 inline-flex px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase bg-amber-50 text-amber-800 border border-amber-200"
                 >Excedente</span>
               </td>
+              <td class="px-4 py-3 text-sm text-slate-600">{{ row.facultad || '—' }}</td>
+              <td class="px-4 py-3 text-sm text-slate-600">{{ row.carrera || '—' }}</td>
               <td class="px-4 py-3 text-sm text-slate-600">{{ row.tipoDanza }}</td>
-              <td class="px-4 py-3">
-                <span
-                  class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border"
-                  :class="row.estructura === 'Variable'
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : 'bg-slate-100 text-slate-600 border-slate-200'"
-                >
-                  {{ row.estructura }}
-                </span>
-              </td>
               <td class="px-4 py-3 text-sm text-slate-700">{{ row.concepto }}</td>
               <td class="px-4 py-3 text-sm font-black text-right text-slate-900 tabular-nums">
                 {{ formatMonto(row.monto) }}
-              </td>
-              <td class="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-500">
-                {{ row.estadoSolicitud }}
               </td>
             </tr>
           </tbody>

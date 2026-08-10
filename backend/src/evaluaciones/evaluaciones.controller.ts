@@ -287,6 +287,24 @@ export class EvaluacionesController {
     return this.evaluacionesService.getJuradosDisponibles();
   }
 
+  @Get('plantillas-requisitos-concurso')
+  @Roles('superusuario', 'admin')
+  getPlantillasRequisitos() {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const {
+      PLANTILLAS_META,
+      PLANTILLAS_REQUISITOS,
+      CATALOGO_CAMPOS,
+      CATALOGO_DOCUMENTOS,
+    } = require('../common/requisitos-concurso');
+    return {
+      plantillas: PLANTILLAS_META,
+      porPlantilla: PLANTILLAS_REQUISITOS,
+      catalogoCampos: CATALOGO_CAMPOS,
+      catalogoDocumentos: CATALOGO_DOCUMENTOS,
+    };
+  }
+
   @Post('fases')
   @Roles('superusuario', 'admin')
   @UseInterceptors(FileInterceptor('imagen', multerOptions))

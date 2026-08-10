@@ -294,7 +294,8 @@ Por cada prefijo (`presi`, `vice`, `secGen`, `secHaci`, `secActas`, `secPrensa`,
 | `{prefix}_ci_complemento` | Complemento SEGIP (ej. `-1A`) |
 | `{prefix}_celular` | Celular (solo cargos con celular: presi, vice, delCogob, delTitular, delSuplente) |
 
-**Cargos obligatorios:** Presidente, Vicepresidente, Secretario de Hacienda, Delegado Co-Gobierno, Delegado Titular, Delegado Suplente.  
+**Cargos obligatorios:** Presidente, Vicepresidente, Secretario de Hacienda, Delegado Titular, Delegado Suplente.  
+**Cargos opcionales:** Secretario General, Secretario de Actas, Secretario de Prensa, Vocal, **Delegado a Co-Gobierno**.  
 **Cargos opcionales:** Secretario General, Secretario de Actas, Secretario de Prensa, Vocal.
 
 #### Documentos PDF
@@ -1014,8 +1015,19 @@ CREATE INDEX IF NOT EXISTS idx_participantes_fase ON participantes_concurso(id_f
 | `delegado` | Inscripción de fraternidad y participantes | Inscripción, subir monografía, participantes |
 | `jurado` | Calificación de fases | Calificar EFU/concursos, estadísticas |
 | `veedor` | **Solo lectura** | Estadísticas, Reglamento, Monografías de fraternidades (ver/descargar PDF subido) |
+| `concursante` | Concursos externos | Completa inscripción y sube documentos de su fase EXTERNO asignada |
 
-**Alta del rol en producción:** `ensureSchemaPatches` inserta `veedor` si no existe (`INSERT … WHERE NOT EXISTS`). No hace falta re-ejecutar `seed.ts`.
+**Alta del rol en producción:** `ensureSchemaPatches` inserta `veedor` y `concursante` si no existen (`INSERT … WHERE NOT EXISTS`). **No re-ejecutar `seed.ts` en producción.**
+
+### Concursos externos — inscripción de concursantes
+
+- `fases.plantilla_requisitos` / `fases.requisitos_inscripcion` (JSONB): qué campos y archivos pide el concurso.
+- `usuarios.id_fase_concurso`: concurso EXTERNO del rol `concursante` (1:1). Fraternidad **opcional**.
+- Tablas `inscripciones_concurso` + `inscripcion_concurso_archivos`: expediente del concursante; al **aprobar** se sincroniza `participantes_concurso` para el jurado.
+
+### Ficha técnica monografía
+
+Tabla `fichas_tecnicas_monografia` (1:1 con fraternidad): datos del formulario oficial + `expositores` / `representantes_traje` (JSONB, 2 personas c/u). Estados `BORRADOR` | `GENERADA`. El delegado llena y genera PDF carta; **Corregir** borra el PDF y vuelve a borrador. Admin lista/descarga en dashboard.
 
 ---
 

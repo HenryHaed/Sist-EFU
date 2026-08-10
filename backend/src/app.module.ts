@@ -8,8 +8,10 @@ import { EvaluacionesModule } from './evaluaciones/evaluaciones.module';
 import { ParticipantesModule } from './participantes/participantes.module';
 import { OrganizacionModule } from './organizacion/organizacion.module';
 import { InscripcionesModule } from './inscripciones/inscripciones.module';
+import { InscripcionesConcursoModule } from './inscripciones-concurso/inscripciones-concurso.module';
 import { AsistenciasModule } from './asistencias/asistencias.module';
 import { MonografiasModule } from './monografias/monografias.module';
+import { FichaTecnicaModule } from './ficha-tecnica/ficha-tecnica.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -55,8 +57,10 @@ import { join } from 'path';
     ParticipantesModule,
     OrganizacionModule,
     InscripcionesModule,
+    InscripcionesConcursoModule,
     AsistenciasModule,
     MonografiasModule,
+    FichaTecnicaModule,
     AuditoriaModule,
     ReportesModule,
   ],

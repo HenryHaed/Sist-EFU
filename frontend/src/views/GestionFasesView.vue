@@ -299,7 +299,7 @@
     </v-dialog>
 
     <!-- MODAL CREAR / EDITAR FASE -->
-    <v-dialog v-model="modalOpen" max-width="520px">
+    <v-dialog v-model="modalOpen" max-width="720px">
       <v-card class="rounded-2xl">
         <v-card-title class="bg-primary text-white pa-6">
           <h3 class="text-xl font-black italic uppercase tracking-tighter">{{ editandoId ? 'Editar Fase' : 'Nueva Fase' }}</h3>
@@ -324,7 +324,7 @@
             <div>
               <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Categoría *</label>
               <div class="grid grid-cols-2 gap-3">
-                <button type="button" @click="form.tipoConcurso = 'EFU'"
+                <button type="button" @click="form.tipoConcurso = 'EFU'; resetRequisitosSiEfu()"
                   :class="form.tipoConcurso === 'EFU' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-400 hover:border-primary/30'"
                   class="flex flex-col items-center gap-2 border-2 rounded-xl py-4 px-2 transition-all">
                   <span class="material-symbols-outlined text-2xl">school</span>
@@ -333,7 +333,7 @@
                     <p class="text-[9px] text-slate-400 mt-0.5">Evaluación Folklórica Universitaria</p>
                   </div>
                 </button>
-                <button type="button" @click="form.tipoConcurso = 'EXTERNO'"
+                <button type="button" @click="onSeleccionarExterno()"
                   :class="form.tipoConcurso === 'EXTERNO' ? 'border-secondary bg-secondary/5 text-secondary' : 'border-slate-200 text-slate-400 hover:border-secondary/30'"
                   class="flex flex-col items-center gap-2 border-2 rounded-xl py-4 px-2 transition-all">
                   <span class="material-symbols-outlined text-2xl">emoji_events</span>
@@ -343,6 +343,57 @@
                   </div>
                 </button>
               </div>
+            </div>
+
+            <!-- Requisitos inscripción (solo EXTERNO) -->
+            <div v-if="form.tipoConcurso === 'EXTERNO'" class="border-2 border-amber-100 bg-amber-50/40 rounded-2xl p-4 space-y-4">
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-amber-800 mb-2">Plantilla de datos a solicitar *</label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    v-for="p in plantillasMeta"
+                    :key="p.id"
+                    type="button"
+                    @click="aplicarPlantilla(p.id)"
+                    class="text-left border-2 rounded-xl p-3 transition-all"
+                    :class="form.plantillaRequisitos === p.id ? 'border-secondary bg-white shadow-sm' : 'border-slate-200 bg-white/60 hover:border-secondary/40'"
+                  >
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-800">{{ p.etiqueta }}</p>
+                    <p class="text-[9px] text-slate-500 mt-1 leading-snug">{{ p.descripcion }}</p>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Campos de datos</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                  <label
+                    v-for="c in catalogoCampos"
+                    :key="c.clave"
+                    class="flex items-start gap-2 bg-white border border-slate-100 rounded-lg p-2 cursor-pointer hover:border-primary/30"
+                  >
+                    <input type="checkbox" class="mt-0.5 accent-primary" :value="c.clave" v-model="form.clavesCampos" />
+                    <span class="text-xs font-medium text-slate-700 leading-tight">{{ c.etiqueta }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Documentos / archivos</p>
+                <div class="grid grid-cols-1 gap-2 max-h-44 overflow-y-auto">
+                  <label
+                    v-for="d in catalogoDocumentos"
+                    :key="d.clave"
+                    class="flex items-start gap-2 bg-white border border-slate-100 rounded-lg p-2 cursor-pointer hover:border-primary/30"
+                  >
+                    <input type="checkbox" class="mt-0.5 accent-secondary" :value="d.clave" v-model="form.clavesDocumentos" />
+                    <span class="text-xs font-medium text-slate-700 leading-tight">{{ d.etiqueta }}</span>
+                  </label>
+                </div>
+              </div>
+              <p class="text-[9px] text-slate-500 font-medium">
+                Estos requisitos se pedirán al concursante asignado a este concurso al completar su inscripción.
+              </p>
             </div>
 
             <!-- Ponderación + Indicador en tiempo real -->
@@ -525,8 +576,50 @@ const form = ref({
   fechaFin: '',
   estaActiva: true,
   urlImagen: '',
-  juradosIds: []
+  juradosIds: [],
+  plantillaRequisitos: 'generico',
+  clavesCampos: [],
+  clavesDocumentos: [],
 })
+
+const plantillasMeta = ref([])
+const catalogoCampos = ref([])
+const catalogoDocumentos = ref([])
+const plantillasPorId = ref({})
+
+const cargarPlantillas = async () => {
+  try {
+    const { data } = await api.get('/evaluaciones/plantillas-requisitos-concurso')
+    plantillasMeta.value = data.plantillas || []
+    catalogoCampos.value = data.catalogoCampos || []
+    catalogoDocumentos.value = data.catalogoDocumentos || []
+    plantillasPorId.value = data.porPlantilla || {}
+  } catch (e) {
+    console.error('Error cargando plantillas', e)
+  }
+}
+
+const aplicarPlantilla = (id) => {
+  form.value.plantillaRequisitos = id
+  const plantilla = plantillasPorId.value[id]
+  if (!plantilla) return
+  form.value.clavesCampos = (plantilla.campos || []).map((c) => c.clave)
+  form.value.clavesDocumentos = (plantilla.documentos || []).map((d) => d.clave)
+}
+
+const onSeleccionarExterno = () => {
+  form.value.tipoConcurso = 'EXTERNO'
+  if (!form.value.plantillaRequisitos) form.value.plantillaRequisitos = 'generico'
+  if (!form.value.clavesCampos?.length && !form.value.clavesDocumentos?.length) {
+    aplicarPlantilla(form.value.plantillaRequisitos || 'generico')
+  }
+}
+
+const resetRequisitosSiEfu = () => {
+  form.value.plantillaRequisitos = 'generico'
+  form.value.clavesCampos = []
+  form.value.clavesDocumentos = []
+}
 
 // ── Computed validación en tiempo real ────────────────────────────────────
 const pesoEFUSinActual = computed(() => {
@@ -643,6 +736,7 @@ const toLocalISOString = (dateString) => {
 const abrirModal = (item = null) => {
   if (item) {
     editandoId.value = item.idFase
+    const req = item.requisitosInscripcion || {}
     form.value = {
       nombre: item.nombre,
       tipoConcurso: item.tipoConcurso || 'EFU',
@@ -651,20 +745,27 @@ const abrirModal = (item = null) => {
       fechaFin: toLocalISOString(item.fechaFin),
       estaActiva: item.estaActiva,
       urlImagen: item.urlImagen || '',
-      juradosIds: item.jurados?.map(j => j.idJurado) || []
+      juradosIds: item.jurados?.map(j => j.idJurado) || [],
+      plantillaRequisitos: item.plantillaRequisitos || 'generico',
+      clavesCampos: (req.campos || []).map((c) => c.clave),
+      clavesDocumentos: (req.documentos || []).map((d) => d.clave),
+    }
+    if (form.value.tipoConcurso === 'EXTERNO' && !form.value.clavesCampos.length && !form.value.clavesDocumentos.length) {
+      aplicarPlantilla(form.value.plantillaRequisitos)
     }
   } else {
     editandoId.value = null
     form.value = {
       nombre: '', tipoConcurso: 'EFU', pesoPorcentaje: 20,
-      fechaInicio: '', fechaFin: '', estaActiva: true, urlImagen: '', juradosIds: []
+      fechaInicio: '', fechaFin: '', estaActiva: true, urlImagen: '', juradosIds: [],
+      plantillaRequisitos: 'generico', clavesCampos: [], clavesDocumentos: [],
     }
   }
   
   archivoImagen.value = null
   archivoPreview.value = null
   modalOpen.value = true
-
+  if (!plantillasMeta.value.length) cargarPlantillas()
 }
 
 const guardar = async () => {
@@ -677,6 +778,11 @@ const guardar = async () => {
   if (form.value.tipoConcurso === 'EFU' && pesoEFUConActual.value > 100) {
     return notify.error('Error', `La suma de fases EFU no puede superar el 100%. Disponible: ${disponibleEFUCalc.value + Number(form.value.pesoPorcentaje || 0)}%`)
   }
+  if (form.value.tipoConcurso === 'EXTERNO') {
+    if (!form.value.clavesCampos?.length && !form.value.clavesDocumentos?.length) {
+      return notify.error('Error', 'Selecciona al menos un campo o documento a solicitar en el concurso externo.')
+    }
+  }
   if (form.value.fechaInicio && form.value.fechaFin) {
     if (new Date(form.value.fechaFin) < new Date(form.value.fechaInicio)) {
       return notify.error('Error Lógico', 'La fecha de fin debe ser estrictamente posterior o igual a la fecha de inicio.')
@@ -686,7 +792,12 @@ const guardar = async () => {
   try {
     const payloadInfo = {
       ...form.value,
-      gestionId: props.gestionSeleccionada?.idGestion || null
+      gestionId: props.gestionSeleccionada?.idGestion || null,
+    }
+    if (payloadInfo.tipoConcurso !== 'EXTERNO') {
+      delete payloadInfo.plantillaRequisitos
+      delete payloadInfo.clavesCampos
+      delete payloadInfo.clavesDocumentos
     }
     
     const formData = new FormData()

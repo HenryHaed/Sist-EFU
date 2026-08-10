@@ -71,6 +71,131 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       NOW()
     WHERE NOT EXISTS (SELECT 1 FROM roles WHERE nombre = 'veedor')
   `);
+
+  // Documentos de gestión: visibilidad pública (landing)
+  await dataSource.query(`
+    ALTER TABLE documentos_gestion
+    ADD COLUMN IF NOT EXISTS es_publico boolean NOT NULL DEFAULT false
+  `);
+
+  // Rol concursante — idempotente (NO re-ejecutar seed en producción)
+  await dataSource.query(`
+    INSERT INTO roles (nombre, descripcion, created_at, updated_at)
+    SELECT
+      'concursante',
+      'Concursante de concurso externo: completa inscripción y sube documentos de su fase asignada.',
+      NOW(),
+      NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM roles WHERE nombre = 'concursante')
+  `);
+
+  // Fase EXTERNO: plantilla y requisitos de inscripción
+  await dataSource.query(`
+    ALTER TABLE fases
+    ADD COLUMN IF NOT EXISTS plantilla_requisitos varchar(50) NULL
+  `);
+  await dataSource.query(`
+    ALTER TABLE fases
+    ADD COLUMN IF NOT EXISTS requisitos_inscripcion jsonb NULL
+  `);
+
+  // Usuario concursante → un concurso (fase EXTERNO)
+  await dataSource.query(`
+    ALTER TABLE usuarios
+    ADD COLUMN IF NOT EXISTS id_fase_concurso integer NULL
+  `);
+  await dataSource.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_usuarios_fase_concurso'
+          AND table_name = 'usuarios'
+      ) THEN
+        ALTER TABLE usuarios
+          ADD CONSTRAINT fk_usuarios_fase_concurso
+          FOREIGN KEY (id_fase_concurso) REFERENCES fases(id_fase)
+          ON DELETE SET NULL;
+      END IF;
+    END $$;
+  `);
+
+  // Inscripciones de concursantes a concursos externos
+  await dataSource.query(`
+    CREATE TABLE IF NOT EXISTS inscripciones_concurso (
+      id_inscripcion SERIAL PRIMARY KEY,
+      id_usuario INTEGER NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+      id_fase INTEGER NOT NULL REFERENCES fases(id_fase) ON DELETE CASCADE,
+      id_gestion INTEGER NOT NULL REFERENCES gestiones(id_gestion) ON DELETE CASCADE,
+      estado VARCHAR(20) NOT NULL DEFAULT 'BORRADOR',
+      datos JSONB NULL,
+      observacion_admin TEXT NULL,
+      id_participante INTEGER NULL REFERENCES participantes_concurso(id_participante) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      CONSTRAINT uq_inscripcion_usuario_fase UNIQUE (id_usuario, id_fase)
+    )
+  `);
+  await dataSource.query(`
+    CREATE TABLE IF NOT EXISTS inscripcion_concurso_archivos (
+      id_archivo SERIAL PRIMARY KEY,
+      id_inscripcion INTEGER NOT NULL REFERENCES inscripciones_concurso(id_inscripcion) ON DELETE CASCADE,
+      clave_documento VARCHAR(100) NOT NULL,
+      url VARCHAR(500) NOT NULL,
+      mime VARCHAR(120) NULL,
+      nombre_original VARCHAR(255) NULL,
+      orden INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+  await dataSource.query(`
+    CREATE INDEX IF NOT EXISTS idx_inscripciones_concurso_fase ON inscripciones_concurso(id_fase)
+  `);
+  await dataSource.query(`
+    CREATE INDEX IF NOT EXISTS idx_inscripciones_concurso_usuario ON inscripciones_concurso(id_usuario)
+  `);
+
+  // Ficha técnica monografía (delegado llena / admin lista) — sin borrar datos
+  await dataSource.query(`
+    CREATE TABLE IF NOT EXISTS fichas_tecnicas_monografia (
+      id_ficha SERIAL PRIMARY KEY,
+      id_fraternidad INTEGER NOT NULL UNIQUE REFERENCES fraternidades(id_fraternidad) ON DELETE CASCADE,
+      id_gestion INTEGER NOT NULL REFERENCES gestiones(id_gestion) ON DELETE CASCADE,
+      nombre_fraternidad VARCHAR(255) NOT NULL,
+      categoria VARCHAR(150) NULL,
+      facultad_carrera TEXT NULL,
+      instancia_representacion VARCHAR(50) NULL,
+      danza VARCHAR(255) NULL,
+      lugar_origen_danza TEXT NULL,
+      sinopsis_danza TEXT NULL,
+      resena_historica TEXT NULL,
+      fecha_fundacion DATE NULL,
+      fundadores TEXT NULL,
+      premios TEXT NULL,
+      nombre_firmante VARCHAR(255) NULL,
+      expositores JSONB NULL,
+      representantes_traje JSONB NULL,
+      estado VARCHAR(20) NOT NULL DEFAULT 'BORRADOR',
+      url_pdf VARCHAR(500) NULL,
+      fecha_generacion TIMESTAMP NULL,
+      id_usuario_actualizo INTEGER NULL REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+  await dataSource.query(`
+    CREATE INDEX IF NOT EXISTS idx_fichas_tecnicas_gestion ON fichas_tecnicas_monografia(id_gestion)
+  `);
+  await dataSource.query(`
+    CREATE INDEX IF NOT EXISTS idx_fichas_tecnicas_estado ON fichas_tecnicas_monografia(estado)
+  `);
+  await dataSource.query(`
+    ALTER TABLE fichas_tecnicas_monografia
+    ADD COLUMN IF NOT EXISTS nombre_firmante varchar(255) NULL
+  `);
+  await dataSource.query(`
+    ALTER TABLE fichas_tecnicas_monografia
+    ADD COLUMN IF NOT EXISTS instancia_representacion varchar(50) NULL
+  `);
 }
 
 async function bootstrap() {

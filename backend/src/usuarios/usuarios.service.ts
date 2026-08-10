@@ -36,7 +36,7 @@ export class UsuariosService {
 
   async findAll() {
     return this.usuarioRepo.find({
-      relations: ['rol', 'fraternidad'],
+      relations: ['rol', 'fraternidad', 'faseConcurso'],
       order: { idUsuario: 'DESC' },
     });
   }
@@ -48,10 +48,24 @@ export class UsuariosService {
   async findOne(id: number) {
     const user = await this.usuarioRepo.findOne({
       where: { idUsuario: id },
-      relations: ['rol', 'fraternidad'],
+      relations: ['rol', 'fraternidad', 'faseConcurso'],
     });
     if (!user) throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
     return user;
+  }
+
+  private async resolverFaseConcurso(idFaseConcurso?: number | null) {
+    if (idFaseConcurso === undefined || idFaseConcurso === null || idFaseConcurso === ('' as any)) {
+      return null;
+    }
+    const id = Number(idFaseConcurso);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    const fase = await this.faseRepo.findOne({ where: { idFase: id } });
+    if (!fase) throw new BadRequestException('El concurso (fase) indicado no existe.');
+    if (fase.tipoConcurso !== 'EXTERNO') {
+      throw new BadRequestException('El concursante solo puede asignarse a un concurso externo (fase EXTERNO).');
+    }
+    return fase;
   }
 
   private async assertFraternidadDisponibleParaDelegado(idFraternidad: number, excludeUsuarioId?: number) {
@@ -161,8 +175,9 @@ export class UsuariosService {
     fasesIds?: number[];
     fraternidadesIds?: number[];
     idFraternidad?: number;
+    idFaseConcurso?: number;
   }) {
-    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, ...data } = createDto as any;
+    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, idFaseConcurso, ...data } = createDto as any;
 
     const role = await this.roleRepo.findOne({ where: { idRol } });
     if (!role) throw new BadRequestException('Rol no válido');
@@ -189,6 +204,20 @@ export class UsuariosService {
       throw new BadRequestException('El delegado debe estar asociado a una fraternidad o proveer el nombre de una nueva.');
     }
 
+    if (role.nombre === 'concursante') {
+      const fase = await this.resolverFaseConcurso(idFaseConcurso);
+      if (!fase) {
+        throw new BadRequestException(
+          'El concursante debe estar asignado a un concurso externo. Crea primero la fase EXTERNO en Gestión de Fases.',
+        );
+      }
+      newUser.faseConcurso = fase;
+      // Fraternidad opcional para concursante
+      if (idFraternidad || nuevaFraternidad) {
+        newUser.fraternidad = await this.resolverFraternidadDelegado({ idFraternidad, nuevaFraternidad }) as any;
+      }
+    }
+
     let savedUser: Usuario;
     try {
       savedUser = (await this.usuarioRepo.save(newUser as any)) as unknown as Usuario;
@@ -211,7 +240,7 @@ export class UsuariosService {
 
     await this.enviarCorreoCuentaCreada(savedUser, role.nombre);
 
-    return savedUser;
+    return this.findOne(savedUser.idUsuario);
   }
 
   private async enviarCorreoCuentaCreada(usuario: Usuario, rolNombre: string) {
@@ -285,9 +314,10 @@ export class UsuariosService {
     fraternidadesIds?: number[];
     idFraternidad?: number;
     nuevaFraternidad?: string;
+    idFaseConcurso?: number;
   }) {
     const user = await this.findOne(id);
-    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, ...data } = updateDto as any;
+    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, idFaseConcurso, ...data } = updateDto as any;
 
     const correoAnterior = user.correo ? String(user.correo).trim().toLowerCase() : null;
     const fraternidadAnteriorId = user.fraternidad?.idFraternidad ?? null;
@@ -394,6 +424,27 @@ export class UsuariosService {
     const rolEvaluado = rolActualizado || user.rol;
     if (rolEvaluado?.nombre === 'delegado' && !user.fraternidad) {
       throw new BadRequestException('El delegado debe estar asociado a una fraternidad o proveer el nombre de una nueva.');
+    }
+
+    if (rolEvaluado?.nombre === 'concursante') {
+      if (idFaseConcurso !== undefined) {
+        const fase = await this.resolverFaseConcurso(idFaseConcurso);
+        if (!fase) {
+          throw new BadRequestException(
+            'El concursante debe estar asignado a un concurso externo. Crea primero la fase EXTERNO en Gestión de Fases.',
+          );
+        }
+        if (user.faseConcurso?.idFase !== fase.idFase) {
+          cambios.push(
+            `Concurso: ${user.faseConcurso?.nombre || '(ninguno)'} → ${fase.nombre}`,
+          );
+        }
+        user.faseConcurso = fase;
+      } else if (!user.faseConcurso) {
+        throw new BadRequestException(
+          'El concursante debe estar asignado a un concurso externo.',
+        );
+      }
     }
 
     Object.assign(user, updateData);

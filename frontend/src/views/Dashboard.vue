@@ -135,6 +135,28 @@
               <span class="text-sm font-bold">Inscribir Fraternidad</span>
             </button>
 
+            <!-- CONCURSANTE: Inscripción -->
+            <button
+              v-if="can('mi_inscripcion_concurso')"
+              @click="setVista('mi_inscripcion_concurso')"
+              :class="vistaActual === 'mi_inscripcion_concurso' ? 'bg-slate-50 text-secondary border-l-4 border-l-primary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'mi_inscripcion_concurso' ? 'text-primary' : 'text-slate-400'">emoji_events</span>
+              <span class="text-sm font-bold">Mi inscripción</span>
+            </button>
+
+            <!-- ADMIN: Revisar inscripciones concurso -->
+            <button
+              v-if="can('revision_inscripciones_concurso')"
+              @click="setVista('revision_inscripciones_concurso')"
+              :class="vistaActual === 'revision_inscripciones_concurso' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'revision_inscripciones_concurso' ? 'text-secondary' : 'text-slate-400'">fact_check</span>
+              <span class="text-sm font-bold">Inscripciones concurso</span>
+            </button>
+
             <button
               v-if="can('auditoria_reportes')"
               @click="setVista('auditoria_reportes')"
@@ -201,6 +223,14 @@
                   Delegados
                 </button>
                 <button
+                  @click="setVista('usuarios_concursante')"
+                  :class="vistaActual === 'usuarios_concursante' ? 'text-secondary font-bold' : 'text-slate-500 hover:text-primary'"
+                  class="flex items-center gap-2 py-2 text-xs transition-colors text-left w-full"
+                >
+                  <span class="material-symbols-outlined text-[16px]">emoji_events</span>
+                  Concursantes
+                </button>
+                <button
                   @click="setVista('usuarios_jurado')"
                   :class="vistaActual === 'usuarios_jurado' ? 'text-secondary font-bold' : 'text-slate-500 hover:text-primary'"
                   class="flex items-center gap-2 py-2 text-xs transition-colors text-left w-full"
@@ -247,6 +277,26 @@
             >
               <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'subir_monografia' ? 'text-primary' : 'text-slate-400'">description</span>
               <span class="text-sm font-bold">Subir Monografía</span>
+            </button>
+
+            <button
+              v-if="can('ficha_tecnica')"
+              @click="setVista('ficha_tecnica')"
+              :class="vistaActual === 'ficha_tecnica' ? 'bg-slate-50 text-secondary border-l-4 border-l-primary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'ficha_tecnica' ? 'text-primary' : 'text-slate-400'">article</span>
+              <span class="text-sm font-bold">Ficha Técnica</span>
+            </button>
+
+            <button
+              v-if="can('admin_fichas_tecnicas')"
+              @click="setVista('admin_fichas_tecnicas')"
+              :class="vistaActual === 'admin_fichas_tecnicas' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'admin_fichas_tecnicas' ? 'text-secondary' : 'text-slate-400'">folder_special</span>
+              <span class="text-sm font-bold">Fichas Técnicas</span>
             </button>
 
 
@@ -504,6 +554,16 @@
               :key="`inscripcion-${currentUser?.idUsuario}`"
             />
 
+            <InscripcionConcursoView
+              v-else-if="vistaActual === 'mi_inscripcion_concurso'"
+              :key="`insc-concurso-${currentUser?.idUsuario}`"
+            />
+
+            <RevisionInscripcionesConcursoView
+              v-else-if="vistaActual === 'revision_inscripciones_concurso'"
+              key="revision_inscripciones_concurso"
+            />
+
             <!-- Vista: Reglamento (todos los roles) -->
             <ReglamentoView
               v-else-if="vistaActual === 'reglamento'"
@@ -520,6 +580,16 @@
             <SubirMonografiaView
               v-else-if="vistaActual === 'subir_monografia'"
               key="subir_monografia"
+            />
+
+            <FichaTecnicaMonografiaView
+              v-else-if="vistaActual === 'ficha_tecnica'"
+              key="ficha_tecnica"
+            />
+
+            <AdminFichasTecnicasView
+              v-else-if="vistaActual === 'admin_fichas_tecnicas'"
+              key="admin_fichas_tecnicas"
             />
 
             <!-- Vista: Monografías (Veedor / solo lectura) -->
@@ -679,11 +749,15 @@ import EnviarMensajeView from './EnviarMensajeView.vue'
 import AuditoriaReportesView from './AuditoriaReportesView.vue'
 import AjustesView from './AjustesView.vue'
 import InscribirFraternidadView from './InscribirFraternidadView.vue'
+import InscripcionConcursoView from './InscripcionConcursoView.vue'
+import RevisionInscripcionesConcursoView from './RevisionInscripcionesConcursoView.vue'
 import ReglamentoView from './ReglamentoView.vue'
 import SolicitudesInscripcionView from './SolicitudesInscripcionView.vue'
 import AsistenciaView from './AsistenciaView.vue'
 import DirectivaFraternidadView from './DirectivaFraternidadView.vue'
 import SubirMonografiaView from './SubirMonografiaView.vue'
+import FichaTecnicaMonografiaView from './FichaTecnicaMonografiaView.vue'
+import AdminFichasTecnicasView from './AdminFichasTecnicasView.vue'
 import VeedorMonografiasView from './VeedorMonografiasView.vue'
 
 import { getImageUrl } from '../utils/url'
@@ -788,12 +862,13 @@ const passPolicyRules = computed(() => {
 const can = (permission) => {
   const role = authStore.userRole?.toLowerCase()
   const permissions = {
-    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'auditoria_reportes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin', 'ver_monografias'],
-    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria_reportes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'ver_monografias'],
+    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'auditoria_reportes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin', 'ver_monografias', 'revision_inscripciones_concurso', 'admin_fichas_tecnicas'],
+    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria_reportes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'ver_monografias', 'revision_inscripciones_concurso', 'admin_fichas_tecnicas'],
     jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
-    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'gestionar_participantes', 'inscripcion_fraternidad'],
+    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'ficha_tecnica', 'gestionar_participantes', 'inscripcion_fraternidad'],
     veedor: ['estadisticas', 'reglamento', 'ver_monografias'],
+    concursante: ['reglamento', 'mi_inscripcion_concurso'],
   }
   return permissions[role]?.includes(permission) || false
 }
@@ -846,6 +921,9 @@ onMounted(async () => {
   // Vista inicial según rol (si no hay query)
   if (!queryVista && authStore.userRole?.toLowerCase() === 'delegado') {
     vistaActual.value = 'inscripcion_fraternidad'
+  }
+  if (!queryVista && authStore.userRole?.toLowerCase() === 'concursante') {
+    vistaActual.value = 'mi_inscripcion_concurso'
   }
 
   await cargarCitasDelegado()
@@ -913,10 +991,14 @@ const tituloVista = computed(() => {
     enviar_mensaje: 'Enviar un Mensaje',
     auditoria_reportes: 'Auditoría y Reportes',
     inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad',
+    mi_inscripcion_concurso: 'Inscripción al Concurso',
+    revision_inscripciones_concurso: 'Inscripciones de Concursantes',
     reglamento: 'Reglamentos y Documentos Oficiales',
     solicitudes_inscripcion: 'Solicitudes de Preinscripción',
     asistencias: 'Directorio de Delegados',
     subir_monografia: 'Subir Monografía',
+    ficha_tecnica: 'Ficha Técnica Monografía',
+    admin_fichas_tecnicas: 'Fichas Técnicas Monografía',
     veedor_monografias: 'Monografías de Fraternidades',
     seleccionar_fase_disciplina: 'Control de Disciplina HCU'
   }

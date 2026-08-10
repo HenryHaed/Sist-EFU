@@ -108,6 +108,8 @@ export class EvaluacionesService {
         fechaFin: f.fechaFin,
         estaActiva: f.estaActiva,
         urlImagen: f.urlImagen,
+        plantillaRequisitos: f.plantillaRequisitos || null,
+        requisitosInscripcion: f.requisitosInscripcion || null,
         jurados: (f as any).jurados || [],
       }))
     };
@@ -1069,9 +1071,30 @@ export class EvaluacionesService {
   async createFase(data: any) {
     const gestion = data.gestionId ? await this.gestionRepo.findOne({ where: { idGestion: data.gestionId } }) : await this.getGestionActiva();
     if (!gestion) throw new NotFoundException('No gestion');
-    const f = await this.faseRepo.save(this.faseRepo.create({ ...data, gestion }));
-    if (data.juradosIds) {
-      const jurados = await this.juradoRepo.find({ where: { idJurado: In(data.juradosIds) }, relations: ['fasesHabilitadas'] });
+
+    const { gestionId, juradosIds, clavesCampos, clavesDocumentos, ...rest } = data;
+    const payload: any = { ...rest, gestion };
+
+    if (payload.tipoConcurso === 'EXTERNO') {
+      const { buildRequisitosFromSeleccion, normalizarRequisitos } = await import('../common/requisitos-concurso');
+      if (payload.requisitosInscripcion) {
+        payload.requisitosInscripcion = normalizarRequisitos(payload.requisitosInscripcion);
+      } else {
+        payload.requisitosInscripcion = buildRequisitosFromSeleccion(
+          payload.plantillaRequisitos || 'generico',
+          clavesCampos,
+          clavesDocumentos,
+        );
+      }
+      if (!payload.plantillaRequisitos) payload.plantillaRequisitos = 'generico';
+    } else {
+      payload.plantillaRequisitos = null;
+      payload.requisitosInscripcion = null;
+    }
+
+    const f = await this.faseRepo.save(this.faseRepo.create(payload));
+    if (juradosIds?.length) {
+      const jurados = await this.juradoRepo.find({ where: { idJurado: In(juradosIds) }, relations: ['fasesHabilitadas'] });
       for (const j of jurados) { j.fasesHabilitadas.push(f as any); await this.juradoRepo.save(j); }
     }
     return f;
@@ -1081,7 +1104,24 @@ export class EvaluacionesService {
     const f = await this.faseRepo.findOne({ where: { idFase: id } });
     if (!f) throw new NotFoundException('Fase no encontrada');
     if (data.urlImagen && f.urlImagen && data.urlImagen !== f.urlImagen) this.eliminarImagenSiExiste(f.urlImagen);
-    Object.assign(f, data);
+
+    const { gestionId, juradosIds, clavesCampos, clavesDocumentos, ...rest } = data;
+    const payload: any = { ...rest };
+
+    if ((payload.tipoConcurso || f.tipoConcurso) === 'EXTERNO') {
+      const { buildRequisitosFromSeleccion, normalizarRequisitos } = await import('../common/requisitos-concurso');
+      if (payload.requisitosInscripcion) {
+        payload.requisitosInscripcion = normalizarRequisitos(payload.requisitosInscripcion);
+      } else if (clavesCampos || clavesDocumentos || payload.plantillaRequisitos) {
+        payload.requisitosInscripcion = buildRequisitosFromSeleccion(
+          payload.plantillaRequisitos || f.plantillaRequisitos || 'generico',
+          clavesCampos,
+          clavesDocumentos,
+        );
+      }
+    }
+
+    Object.assign(f, payload);
     return this.faseRepo.save(f);
   }
 

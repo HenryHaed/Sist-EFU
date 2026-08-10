@@ -41,6 +41,14 @@ export class Fase {
     @Column({ name: 'url_imagen', length: 500, nullable: true })
     urlImagen: string;
 
+    /** Plantilla de requisitos para concursos EXTERNO: fotografia | chacha_warmi | generico */
+    @Column({ name: 'plantilla_requisitos', type: 'varchar', length: 50, nullable: true })
+    plantillaRequisitos: string;
+
+    /** Campos y documentos solicitados al concursante (JSONB) */
+    @Column({ name: 'requisitos_inscripcion', type: 'jsonb', nullable: true })
+    requisitosInscripcion: any;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

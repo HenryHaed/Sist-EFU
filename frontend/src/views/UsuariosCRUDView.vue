@@ -122,6 +122,7 @@
                     'bg-emerald-50 text-emerald-600 border-emerald-100': user.rol?.nombre === 'delegado',
                     'bg-amber-50 text-amber-600 border-amber-100': user.rol?.nombre === 'controladorhcu',
                     'bg-violet-50 text-violet-700 border-violet-100': user.rol?.nombre === 'veedor',
+                    'bg-indigo-50 text-indigo-700 border-indigo-100': user.rol?.nombre === 'concursante',
                     'bg-gray-50 text-gray-500 border-gray-200': !user.rol?.nombre
                   }"
                 >
@@ -130,6 +131,10 @@
                 <p v-if="user.rol?.nombre === 'delegado'" class="text-[9px] font-black mt-1 uppercase tracking-tighter"
                   :class="user.fraternidad ? 'text-slate-400' : 'text-amber-500'">
                    {{ user.fraternidad?.nombre || 'Sin fraternidad asignada' }}
+                </p>
+                <p v-if="user.rol?.nombre === 'concursante'" class="text-[9px] font-black mt-1 uppercase tracking-tighter text-indigo-500">
+                   {{ user.faseConcurso?.nombre || 'Sin concurso' }}
+                   <span v-if="user.fraternidad" class="text-slate-400"> · {{ user.fraternidad.nombre }}</span>
                 </p>
               </td>
               <!-- Columna perfil de jurado -->
@@ -466,6 +471,70 @@
                 </div>
               </div>
 
+              <!-- ════ PANEL CONCURSANTE ════ -->
+              <div v-if="esRolConcursante" class="border-t border-slate-100 pt-5 space-y-6">
+                <p class="text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[16px]">emoji_events</span>
+                  Configuración de Concursante
+                </p>
+
+                <div>
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Concurso externo asignado
+                    <span class="text-secondary font-medium normal-case">(Obligatorio)</span>
+                  </label>
+                  <div v-if="fasesExternas.length === 0" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800 font-medium">
+                    No hay concursos externos. Crea primero una fase de tipo <b>Concurso Externo</b> en Gestión de Fases (con los datos a solicitar).
+                  </div>
+                  <select
+                    v-else
+                    v-model="form.idFaseConcurso"
+                    required
+                    class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none font-bold text-slate-700"
+                  >
+                    <option :value="null" disabled>Selecciona el concurso…</option>
+                    <option v-for="fase in fasesExternas" :key="fase.idFase" :value="fase.idFase">
+                      {{ fase.nombre }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Fraternidad
+                    <span class="text-slate-400 font-medium normal-case">(Opcional)</span>
+                  </label>
+                  <v-combobox
+                    v-model="form.idFraternidad"
+                    v-model:search="fraternidadBusqueda"
+                    :items="fraternidadSugerencias"
+                    item-title="label"
+                    item-value="idFraternidad"
+                    :loading="cargandoFraternidades"
+                    :no-filter="true"
+                    clearable
+                    density="comfortable"
+                    variant="outlined"
+                    placeholder="Si pertenece a una fraternidad, búscala aquí"
+                    class="text-sm w-full"
+                    menu-icon="mdi-chevron-down"
+                    no-data-text="Escribe para buscar"
+                    :menu-props="{ maxWidth: 760, minWidth: 560, contentClass: 'fraternidad-menu-elevado' }"
+                  >
+                    <template #item="{ props, item }">
+                      <v-list-item v-bind="props" class="py-2">
+                        <v-list-item-title class="font-bold text-slate-800">
+                          {{ item.raw?.nombre || item.title }}
+                        </v-list-item-title>
+                        <v-list-item-subtitle class="text-xs text-slate-500 whitespace-normal">
+                          {{ item.raw?.etiqueta || 'Coincidencia histórica' }}
+                        </v-list-item-subtitle>
+                      </v-list-item>
+                    </template>
+                  </v-combobox>
+                </div>
+              </div>
+
             </div>
             
             <p v-if="errorFormulario" class="text-secondary text-xs font-bold mt-4 flex items-center gap-1 text-center justify-center">
@@ -515,6 +584,7 @@ const tituloVista = computed(() => {
   if (props.rolFiltro === 'admin') return 'Administradores'
   if (props.rolFiltro === 'controladorhcu') return 'Controladores HCU'
   if (props.rolFiltro === 'veedor') return 'Veedores'
+  if (props.rolFiltro === 'concursante') return 'Concursantes'
   return props.rolFiltro + 's'
 })
 
@@ -546,7 +616,8 @@ const form = ref({
   fasesEfuIds: [],
   fasesExternasIds: [],
   fraternidadesIds: [],
-  idFraternidad: null
+  idFraternidad: null,
+  idFaseConcurso: null,
 })
 
 // ── Computed ──────────────────────────────────────────────────────────────
@@ -558,6 +629,11 @@ const esRolJurado = computed(() => {
 const esRolDelegado = computed(() => {
   const rolSeleccionado = roles.value.find(r => r.idRol == form.value.idRol)
   return rolSeleccionado?.nombre === 'delegado' || props.rolFiltro === 'delegado'
+})
+
+const esRolConcursante = computed(() => {
+  const rolSeleccionado = roles.value.find(r => r.idRol == form.value.idRol)
+  return rolSeleccionado?.nombre === 'concursante' || props.rolFiltro === 'concursante'
 })
 
 const fasesEfu = computed(() => todasFases.value.filter(f => f.tipoConcurso === 'EFU'))
@@ -592,6 +668,7 @@ const filteredUsuarios = computed(() => {
       u.correo,
       u.fraternidad?.nombre,
       u.fraternidad?.etiqueta,
+      u.faseConcurso?.nombre,
     ]
     return campos.some((campo) => normalizarBusqueda(campo).includes(q))
   })
@@ -645,16 +722,27 @@ watch(fraternidadBusqueda, (valor) => {
 const cargarDatos = async () => {
   loading.value = true
   try {
-    const [resUsuarios, resRoles, resFases, resFraternidades] = await Promise.all([
+    const [resUsuarios, resRoles, resGestion, resFraternidades] = await Promise.all([
       api.get('/usuarios'),
       api.get('/usuarios/roles'),
-      api.get('/evaluaciones/fases-auth').catch(() => ({ data: [] })),
+      api.get('/evaluaciones/gestion-activa').catch(() => ({ data: null })),
       api.get('/fraternidades').catch(() => ({ data: [] }))
     ])
     usuarios.value = resUsuarios.data
     roles.value = resRoles.data
-    todasFases.value = resFases.data
     todasFraternidades.value = resFraternidades.data
+
+    // Fases de la gestión activa (para jurado y concursante)
+    todasFases.value = []
+    const idGestion = resGestion.data?.idGestion
+    if (idGestion) {
+      try {
+        const { data } = await api.get(`/evaluaciones/gestiones/${idGestion}/fases`)
+        todasFases.value = data?.fases || []
+      } catch {
+        todasFases.value = []
+      }
+    }
 
     // Enriquecer usuarios jurado con su perfil
     if (props.rolFiltro === 'jurado') {
@@ -693,7 +781,8 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       fasesEfuIds: usuario._perfil?.fasesEfu?.map(f => f.idFase) || [],
       fasesExternasIds: usuario._perfil?.fasesExternas?.map(f => f.idFase) || [],
       fraternidadesIds: usuario._perfil?.fraternidadesHabilitadas?.map(f => f.idFraternidad) || [],
-      idFraternidad: usuario.fraternidad?.idFraternidad || null
+      idFraternidad: usuario.fraternidad?.idFraternidad || null,
+      idFaseConcurso: usuario.faseConcurso?.idFase || null,
     }
     fraternidadBusqueda.value = usuario.fraternidad?.nombre || ''
     fraternidadSugerencias.value = []
@@ -706,7 +795,8 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       ci: '', nombres: '', primerApellido: '', segundoApellido: '', correo: '',
       password: '', idRol: rolDefault?.idRol || '',
       fasesEfuIds: [], fasesExternasIds: [], fraternidadesIds: [],
-      idFraternidad: null
+      idFraternidad: null,
+      idFaseConcurso: null,
     }
     fraternidadBusqueda.value = ''
     fraternidadSugerencias.value = []
@@ -761,6 +851,23 @@ const guardarUsuario = async () => {
 
     if (esRolDelegado.value) {
       if (typeof form.value.idFraternidad === 'string') {
+        payload.nuevaFraternidad = form.value.idFraternidad
+        payload.idFraternidad = null
+      } else if (typeof form.value.idFraternidad === 'object' && form.value.idFraternidad !== null) {
+        payload.idFraternidad = form.value.idFraternidad.idFraternidad
+      } else {
+        payload.idFraternidad = form.value.idFraternidad || null
+      }
+    }
+
+    if (esRolConcursante.value) {
+      if (!form.value.idFaseConcurso) {
+        errorFormulario.value = 'Selecciona el concurso externo. Si no hay ninguno, créalo primero en Gestión de Fases.'
+        saving.value = false
+        return
+      }
+      payload.idFaseConcurso = form.value.idFaseConcurso
+      if (typeof form.value.idFraternidad === 'string' && form.value.idFraternidad.trim()) {
         payload.nuevaFraternidad = form.value.idFraternidad
         payload.idFraternidad = null
       } else if (typeof form.value.idFraternidad === 'object' && form.value.idFraternidad !== null) {

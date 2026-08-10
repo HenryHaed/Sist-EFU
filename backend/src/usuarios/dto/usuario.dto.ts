@@ -56,6 +56,11 @@ export class CreateUsuarioDto {
   @IsString()
   @IsOptional()
   nuevaFraternidad?: string;
+
+  @ApiProperty({ required: false, description: 'Fase EXTERNO asignada al concursante' })
+  @IsNumber()
+  @IsOptional()
+  idFaseConcurso?: number;
 }
 
 export class UpdateUsuarioDto {
@@ -110,4 +115,9 @@ export class UpdateUsuarioDto {
   @IsString()
   @IsOptional()
   nuevaFraternidad?: string;
+
+  @ApiProperty({ required: false, description: 'Fase EXTERNO asignada al concursante' })
+  @IsNumber()
+  @IsOptional()
+  idFaseConcurso?: number;
 }

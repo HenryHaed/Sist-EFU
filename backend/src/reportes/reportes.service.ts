@@ -521,6 +521,8 @@ export class ReportesService implements OnModuleInit {
       nombreFraternidad: string;
       tipoDanza: string;
       categoria: string;
+      facultad: string;
+      carrera: string;
       instancia: string;
       estructura: string;
       concepto: string;
@@ -556,6 +558,8 @@ export class ReportesService implements OnModuleInit {
         nombreFraternidad: s.nombreFraternidad || s.fraternidadCreada?.nombre || '—',
         tipoDanza: s.tipoDanza?.nombre || '—',
         categoria: s.categoria?.nombre || '—',
+        facultad: s.facultad?.nombre || '—',
+        carrera: s.carrera?.nombre || '—',
         instancia: s.instanciaRepresentacion || '—',
         estadoSolicitud: s.estado,
         esExcedente: !!s.fraternidadCreada?.esExcedente,
@@ -570,6 +574,8 @@ export class ReportesService implements OnModuleInit {
         nombreFraternidad: f.nombre,
         tipoDanza: f.tipoDanza?.nombre || '—',
         categoria: f.categoria?.nombre || '—',
+        facultad: f.facultad?.nombre || '—',
+        carrera: f.carrera?.nombre || '—',
         instancia: f.nivelRepresentacion || '—',
         estadoSolicitud: 'INSCRITA',
         esExcedente: !!f.esExcedente,
@@ -613,6 +619,35 @@ export class ReportesService implements OnModuleInit {
 
     const totalMonto = rows.reduce((acc, r) => acc + (Number(r.monto) || 0), 0);
     const total = rows.length;
+    const montos = rows.map((r) => Number(r.monto) || 0);
+    const montoMin = montos.length ? Math.min(...montos) : 0;
+    const montoMax = montos.length ? Math.max(...montos) : 0;
+    const promedioGeneral = total ? Math.round((totalMonto / total) * 100) / 100 : 0;
+
+    const rowMin = rows.find((r) => Number(r.monto) === montoMin) || null;
+    const rowMax = rows.find((r) => Number(r.monto) === montoMax) || null;
+
+    const promedioPorGrupo = (campo: 'facultad' | 'carrera') => {
+      const map = new Map<string, number[]>();
+      for (const r of rows) {
+        const key = String(r[campo] || '—').trim() || '—';
+        if (key === '—') continue;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(Number(r.monto) || 0);
+      }
+      return Array.from(map.entries())
+        .map(([nombre, vals]) => {
+          const sum = vals.reduce((a, b) => a + b, 0);
+          return {
+            nombre,
+            cantidad: vals.length,
+            promedio: Math.round((sum / vals.length) * 100) / 100,
+            minimo: Math.min(...vals),
+            maximo: Math.max(...vals),
+          };
+        })
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    };
 
     return {
       tipoReporte: TipoReporte.COSTOS,
@@ -623,8 +658,18 @@ export class ReportesService implements OnModuleInit {
       gestion,
       resumen: {
         totalItems: total,
-        totalMonto: Math.round(totalMonto * 100) / 100,
         fraternidadesUnicas: new Set(rows.map((r) => r.nombreFraternidad)).size,
+        promedioGeneral,
+        montoMin: Math.round(montoMin * 100) / 100,
+        montoMax: Math.round(montoMax * 100) / 100,
+        fraternidadMenorCosto: rowMin
+          ? { nombre: rowMin.nombreFraternidad, monto: rowMin.monto, concepto: rowMin.concepto }
+          : null,
+        fraternidadMayorCosto: rowMax
+          ? { nombre: rowMax.nombreFraternidad, monto: rowMax.monto, concepto: rowMax.concepto }
+          : null,
+        promedioPorFacultad: promedioPorGrupo('facultad'),
+        promedioPorCarrera: promedioPorGrupo('carrera'),
       },
       data: rows.slice(skip, skip + limit),
     };
@@ -852,28 +897,81 @@ export class ReportesService implements OnModuleInit {
     } else if (dto.tipoReporte === TipoReporte.COSTOS) {
       const resumen = (resultado as any).resumen;
       if (resumen) {
+        const lineas = [
+          `Fraternidades: ${resumen.fraternidadesUnicas || 0} · Ítems: ${resumen.totalItems || 0}`,
+          `Promedio general: ${Number(resumen.promedioGeneral || 0).toFixed(2)} Bs · Mín: ${Number(resumen.montoMin || 0).toFixed(2)} Bs · Máx: ${Number(resumen.montoMax || 0).toFixed(2)} Bs`,
+        ];
+        if (resumen.fraternidadMenorCosto) {
+          lineas.push(
+            `Menor: ${resumen.fraternidadMenorCosto.nombre} (${Number(resumen.fraternidadMenorCosto.monto).toFixed(2)} Bs)`,
+          );
+        }
+        if (resumen.fraternidadMayorCosto) {
+          lineas.push(
+            `Mayor: ${resumen.fraternidadMayorCosto.nombre} (${Number(resumen.fraternidadMayorCosto.monto).toFixed(2)} Bs)`,
+          );
+        }
         doc
           .fontSize(7)
           .fillColor('#334155')
           .font('Helvetica')
-          .text(
-            `Resumen: ${resumen.fraternidadesUnicas || 0} fraternidad(es) · ${resumen.totalItems || 0} ítem(s) · Total: ${Number(resumen.totalMonto || 0).toFixed(2)} Bs`,
-            margin,
-            y,
-            { width: contentW },
-          );
-        y += 12;
+          .text(lineas.join('  ·  '), margin, y, { width: contentW });
+        y += 14;
+
+        const facs = resumen.promedioPorFacultad || [];
+        if (facs.length) {
+          doc
+            .fontSize(7)
+            .fillColor(PDF_UMSA_BLUE)
+            .font('Helvetica-Bold')
+            .text('Promedio por facultad:', margin, y, { width: contentW });
+          y += 10;
+          doc.font('Helvetica').fillColor('#334155').fontSize(6.5);
+          for (const f of facs.slice(0, 12)) {
+            doc.text(
+              `• ${f.nombre}: prom. ${Number(f.promedio).toFixed(2)} Bs (n=${f.cantidad}, min ${Number(f.minimo).toFixed(2)}, máx ${Number(f.maximo).toFixed(2)})`,
+              margin,
+              y,
+              { width: contentW },
+            );
+            y += 9;
+            if (y > bottomLimit - 80) break;
+          }
+          y += 4;
+        }
+
+        const cars = resumen.promedioPorCarrera || [];
+        if (cars.length && y < bottomLimit - 60) {
+          doc
+            .fontSize(7)
+            .fillColor(PDF_UMSA_BLUE)
+            .font('Helvetica-Bold')
+            .text('Promedio por carrera:', margin, y, { width: contentW });
+          y += 10;
+          doc.font('Helvetica').fillColor('#334155').fontSize(6.5);
+          for (const c of cars.slice(0, 12)) {
+            doc.text(
+              `• ${c.nombre}: prom. ${Number(c.promedio).toFixed(2)} Bs (n=${c.cantidad}, min ${Number(c.minimo).toFixed(2)}, máx ${Number(c.maximo).toFixed(2)})`,
+              margin,
+              y,
+              { width: contentW },
+            );
+            y += 9;
+            if (y > bottomLimit - 50) break;
+          }
+          y += 6;
+        }
       }
-      const headers = ['N°', 'Fraternidad', 'Tipo de danza', 'Estructura', 'Concepto', 'Monto Bs', 'Estado'];
-      const widths = [28, 150, 100, 70, 180, 60, 70];
+      const headers = ['N°', 'Fraternidad', 'Facultad', 'Carrera', 'Tipo danza', 'Concepto', 'Monto Bs'];
+      const widths = [26, 130, 110, 110, 90, 150, 55];
       const dataRows = rows.map((row, i) => [
         String(i + 1),
         row.nombreFraternidad || '—',
+        row.facultad || '—',
+        row.carrera || '—',
         row.tipoDanza || '—',
-        row.estructura || '—',
         row.concepto || '—',
         Number(row.monto).toFixed(2),
-        row.estadoSolicitud || '—',
       ]);
       renderTable(headers, widths, dataRows);
     } else {

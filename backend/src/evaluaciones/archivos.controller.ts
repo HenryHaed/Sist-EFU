@@ -61,4 +61,13 @@ export class ArchivosController {
     }
     return res.sendFile(filePath);
   }
+
+  @Get('doc-inscripcion-concurso/:filename')
+  serveDocInscripcionConcurso(@Param('filename') filename: string, @Res() res: Response) {
+    const filePath = join(process.cwd(), 'uploads', 'Doc_Inscripcion_Concurso', filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send('Documento no encontrado');
+    }
+    return res.sendFile(filePath);
+  }
 }
