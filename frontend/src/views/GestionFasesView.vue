@@ -299,64 +299,66 @@
     </v-dialog>
 
     <!-- MODAL CREAR / EDITAR FASE -->
-    <v-dialog v-model="modalOpen" max-width="720px">
-      <v-card class="rounded-2xl">
-        <v-card-title class="bg-primary text-white pa-6">
-          <h3 class="text-xl font-black italic uppercase tracking-tighter">{{ editandoId ? 'Editar Fase' : 'Nueva Fase' }}</h3>
-          <p class="text-blue-200 text-xs font-medium mt-0.5">Gestión {{ resumen.gestion?.anio }}</p>
+    <v-dialog v-model="modalOpen" max-width="1100px" scrollable persistent>
+      <v-card class="rounded-2xl flex flex-col max-h-[92vh]">
+        <v-card-title class="bg-primary text-white pa-5 sm:pa-6 shrink-0">
+          <div class="flex items-start justify-between gap-3 w-full">
+            <div>
+              <h3 class="text-xl sm:text-2xl font-black italic uppercase tracking-tighter">{{ editandoId ? 'Editar Fase' : 'Nueva Fase' }}</h3>
+              <p class="text-blue-200 text-xs font-medium mt-0.5">Gestión {{ resumen.gestion?.anio }} · completa todos los datos necesarios</p>
+            </div>
+            <button type="button" @click="modalOpen = false" class="text-white/80 hover:text-white shrink-0">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
         </v-card-title>
 
-        <v-card-text class="pa-6 max-h-[70vh] overflow-y-auto">
-          <div class="space-y-5">
-
-            <!-- Nombre -->
-            <div>
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Nombre de la Fase *</label>
-              <input
-                v-model="form.nombre"
-                type="text"
-                placeholder="Ej: Primer Convite, Fotografía, Monografía…"
-                class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none font-bold transition-all"
-              />
-            </div>
-
-            <!-- Tipo de Concurso -->
-            <div>
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Categoría *</label>
-              <div class="grid grid-cols-2 gap-3">
-                <button type="button" @click="form.tipoConcurso = 'EFU'; resetRequisitosSiEfu()"
-                  :class="form.tipoConcurso === 'EFU' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-400 hover:border-primary/30'"
-                  class="flex flex-col items-center gap-2 border-2 rounded-xl py-4 px-2 transition-all">
-                  <span class="material-symbols-outlined text-2xl">school</span>
-                  <div class="text-center">
+        <v-card-text class="pa-5 sm:pa-6 overflow-y-auto flex-1 min-h-0">
+          <div class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Nombre de la Fase *</label>
+                <input
+                  v-model="form.nombre"
+                  type="text"
+                  placeholder="Ej: Primer Convite, Fotografía, Chacha Warmi…"
+                  class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none font-bold transition-all"
+                />
+              </div>
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Categoría *</label>
+                <div class="grid grid-cols-2 gap-3">
+                  <button type="button" @click="form.tipoConcurso = 'EFU'; resetRequisitosSiEfu()"
+                    :class="form.tipoConcurso === 'EFU' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-400 hover:border-primary/30'"
+                    class="flex flex-col items-center gap-1.5 border-2 rounded-xl py-3 px-2 transition-all">
+                    <span class="material-symbols-outlined text-xl">school</span>
                     <p class="text-[10px] font-black uppercase tracking-widest">EFU</p>
-                    <p class="text-[9px] text-slate-400 mt-0.5">Evaluación Folklórica Universitaria</p>
-                  </div>
-                </button>
-                <button type="button" @click="onSeleccionarExterno()"
-                  :class="form.tipoConcurso === 'EXTERNO' ? 'border-secondary bg-secondary/5 text-secondary' : 'border-slate-200 text-slate-400 hover:border-secondary/30'"
-                  class="flex flex-col items-center gap-2 border-2 rounded-xl py-4 px-2 transition-all">
-                  <span class="material-symbols-outlined text-2xl">emoji_events</span>
-                  <div class="text-center">
-                    <p class="text-[10px] font-black uppercase tracking-widest">Concurso Externo</p>
-                    <p class="text-[9px] text-slate-400 mt-0.5">Independiente de la EFU</p>
-                  </div>
-                </button>
+                  </button>
+                  <button type="button" @click="onSeleccionarExterno()"
+                    :class="form.tipoConcurso === 'EXTERNO' ? 'border-secondary bg-secondary/5 text-secondary' : 'border-slate-200 text-slate-400 hover:border-secondary/30'"
+                    class="flex flex-col items-center gap-1.5 border-2 rounded-xl py-3 px-2 transition-all">
+                    <span class="material-symbols-outlined text-xl">emoji_events</span>
+                    <p class="text-[10px] font-black uppercase tracking-widest">Externo</p>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <!-- Requisitos inscripción (solo EXTERNO) -->
-            <div v-if="form.tipoConcurso === 'EXTERNO'" class="border-2 border-amber-100 bg-amber-50/40 rounded-2xl p-4 space-y-4">
+            <div v-if="form.tipoConcurso === 'EXTERNO'" class="border-2 border-amber-100 bg-amber-50/50 rounded-2xl p-4 sm:p-5 space-y-5">
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-amber-800 mb-2">Plantilla de datos a solicitar *</label>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-amber-800 mb-2">Plantilla base *</label>
+                <p class="text-[10px] text-amber-900/80 font-medium mb-3 leading-relaxed">
+                  Elige una plantilla y luego <b>agrega o quita</b> campos/documentos del catálogo según necesites.
+                  Fotografía/Otros → rol concursante · Chacha Warmi → delegado.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <button
                     v-for="p in plantillasMeta"
                     :key="p.id"
                     type="button"
                     @click="aplicarPlantilla(p.id)"
-                    class="text-left border-2 rounded-xl p-3 transition-all"
-                    :class="form.plantillaRequisitos === p.id ? 'border-secondary bg-white shadow-sm' : 'border-slate-200 bg-white/60 hover:border-secondary/40'"
+                    class="text-left border-2 rounded-xl p-3.5 transition-all"
+                    :class="form.plantillaRequisitos === p.id ? 'border-secondary bg-white shadow-sm' : 'border-slate-200 bg-white/70 hover:border-secondary/40'"
                   >
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-800">{{ p.etiqueta }}</p>
                     <p class="text-[9px] text-slate-500 mt-1 leading-snug">{{ p.descripcion }}</p>
@@ -364,87 +366,87 @@
                 </div>
               </div>
 
-              <div>
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Campos de datos</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                  <label
-                    v-for="c in catalogoCampos"
-                    :key="c.clave"
-                    class="flex items-start gap-2 bg-white border border-slate-100 rounded-lg p-2 cursor-pointer hover:border-primary/30"
-                  >
-                    <input type="checkbox" class="mt-0.5 accent-primary" :value="c.clave" v-model="form.clavesCampos" />
-                    <span class="text-xs font-medium text-slate-700 leading-tight">{{ c.etiqueta }}</span>
-                  </label>
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div>
+                  <div class="flex items-center justify-between gap-2 mb-2">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Campos de datos a pedir</p>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-primary">{{ form.clavesCampos?.length || 0 }} seleccionados</span>
+                  </div>
+                  <p class="text-[9px] text-slate-400 font-medium mb-2">Marca los que deben aparecer en el formulario de inscripción.</p>
+                  <div class="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-1 bg-white rounded-xl border border-slate-100 p-2">
+                    <label
+                      v-for="c in catalogoCampos"
+                      :key="c.clave"
+                      class="flex items-start gap-2.5 rounded-lg p-2.5 cursor-pointer transition-colors"
+                      :class="form.clavesCampos.includes(c.clave) ? 'bg-primary/5 border border-primary/20' : 'hover:bg-slate-50 border border-transparent'"
+                    >
+                      <input type="checkbox" class="mt-0.5 accent-primary size-4" :value="c.clave" v-model="form.clavesCampos" />
+                      <span class="min-w-0">
+                        <span class="text-xs font-bold text-slate-800 leading-tight block">{{ c.etiqueta }}</span>
+                        <span class="text-[9px] text-slate-400 font-medium">{{ c.clave }} · {{ c.tipo }}</span>
+                      </span>
+                    </label>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Documentos / archivos</p>
-                <div class="grid grid-cols-1 gap-2 max-h-44 overflow-y-auto">
-                  <label
-                    v-for="d in catalogoDocumentos"
-                    :key="d.clave"
-                    class="flex items-start gap-2 bg-white border border-slate-100 rounded-lg p-2 cursor-pointer hover:border-primary/30"
-                  >
-                    <input type="checkbox" class="mt-0.5 accent-secondary" :value="d.clave" v-model="form.clavesDocumentos" />
-                    <span class="text-xs font-medium text-slate-700 leading-tight">{{ d.etiqueta }}</span>
-                  </label>
-                </div>
-              </div>
-              <p class="text-[9px] text-slate-500 font-medium">
-                Estos requisitos se pedirán al concursante asignado a este concurso al completar su inscripción.
-              </p>
-            </div>
-
-            <!-- Ponderación + Indicador en tiempo real -->
-            <div>
-              <div class="flex items-end justify-between mb-2">
-                <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Ponderación (%) *</label>
-                <!-- Indicador solo para EFU -->
-                <div v-if="form.tipoConcurso === 'EFU'" class="flex items-center gap-1.5 text-[10px] font-black">
-                  <span :class="disponibleEFUCalc < 0 ? 'text-secondary' : 'text-primary'">
-                    {{ disponibleEFUCalc < 0 ? '⚠ Techo Excedido' : 'Disponible en Gestión:' }}
-                    {{ Math.max(0, disponibleEFUCalc) }}%
-                  </span>
-                </div>
-                <span v-else class="text-[10px] font-black text-secondary uppercase tracking-widest">Independiente</span>
-              </div>
-
-              <input
-                v-model.number="form.pesoPorcentaje"
-                type="number"
-                min="1"
-                max="100"
-                :class="form.tipoConcurso === 'EFU' && disponibleEFUCalc < 0 ? 'border-red-400 bg-red-50' : 'border-slate-100 bg-slate-50 focus:border-primary'"
-                class="w-full px-4 py-3 border-2 rounded-xl outline-none font-bold transition-all"
-              />
-
-              <!-- Barra visual en tiempo real (solo EFU) -->
-              <div v-if="form.tipoConcurso === 'EFU'" class="mt-2">
-                <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all duration-300"
-                    :class="pesoEFUConActual > 100 ? 'bg-secondary' : 'bg-primary'"
-                    :style="{ width: Math.min(pesoEFUConActual, 100) + '%' }"
-                  ></div>
-                </div>
-                <div class="flex justify-between text-[9px] text-slate-400 font-black mt-1">
-                  <span>0%</span>
-                  <span :class="pesoEFUConActual > 100 ? 'text-secondary' : ''">{{ pesoEFUConActual }}% usado</span>
-                  <span>100%</span>
+                <div>
+                  <div class="flex items-center justify-between gap-2 mb-2">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Documentos / archivos</p>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-secondary">{{ form.clavesDocumentos?.length || 0 }} seleccionados</span>
+                  </div>
+                  <p class="text-[9px] text-slate-400 font-medium mb-2">PDFs, imágenes o audio que deberá subir el inscrito.</p>
+                  <div class="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-1 bg-white rounded-xl border border-slate-100 p-2">
+                    <label
+                      v-for="d in catalogoDocumentos"
+                      :key="d.clave"
+                      class="flex items-start gap-2.5 rounded-lg p-2.5 cursor-pointer transition-colors"
+                      :class="form.clavesDocumentos.includes(d.clave) ? 'bg-secondary/5 border border-secondary/20' : 'hover:bg-slate-50 border border-transparent'"
+                    >
+                      <input type="checkbox" class="mt-0.5 accent-secondary size-4" :value="d.clave" v-model="form.clavesDocumentos" />
+                      <span class="min-w-0">
+                        <span class="text-xs font-bold text-slate-800 leading-tight block">{{ d.etiqueta }}</span>
+                        <span class="text-[9px] text-slate-400 font-medium">{{ d.clave }} · máx {{ d.maxArchivos || 1 }}</span>
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- Estado + Fechas -->
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha y Hora Inicio</label>
-                <input v-model="form.fechaInicio" type="datetime-local" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+                <div class="flex items-end justify-between mb-2">
+                  <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Ponderación (%) *</label>
+                  <div v-if="form.tipoConcurso === 'EFU'" class="text-[10px] font-black" :class="disponibleEFUCalc < 0 ? 'text-secondary' : 'text-primary'">
+                    Disp. {{ Math.max(0, disponibleEFUCalc) }}%
+                  </div>
+                  <span v-else class="text-[9px] font-black text-secondary uppercase">Indep.</span>
+                </div>
+                <input
+                  v-model.number="form.pesoPorcentaje"
+                  type="number"
+                  min="1"
+                  max="100"
+                  :class="form.tipoConcurso === 'EFU' && disponibleEFUCalc < 0 ? 'border-red-400 bg-red-50' : 'border-slate-100 bg-slate-50 focus:border-primary'"
+                  class="w-full px-4 py-3 border-2 rounded-xl outline-none font-bold transition-all"
+                />
+                <div v-if="form.tipoConcurso === 'EFU'" class="mt-2">
+                  <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all duration-300"
+                      :class="pesoEFUConActual > 100 ? 'bg-secondary' : 'bg-primary'"
+                      :style="{ width: Math.min(pesoEFUConActual, 100) + '%' }"
+                    ></div>
+                  </div>
+                </div>
               </div>
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha y Hora Fin</label>
-                <input v-model="form.fechaFin" type="datetime-local" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha y hora inicio</label>
+                <input v-model="form.fechaInicio" type="datetime-local" class="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha y hora fin</label>
+                <input v-model="form.fechaFin" type="datetime-local" class="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
               </div>
             </div>
 
@@ -454,45 +456,43 @@
               <span class="text-xs font-bold text-slate-600">{{ form.estaActiva ? 'Activa' : 'Inactiva' }}</span>
             </div>
 
-            <!-- URL Imagen -->
             <div>
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Imagen de Portada (.png, .jpg)</label>
-              <div 
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Imagen de portada (.png, .jpg)</label>
+              <div
                 class="w-full relative border-2 border-dashed rounded-xl overflow-hidden group transition-all"
                 :class="archivoPreview || form.urlImagen ? 'border-primary' : 'border-slate-300 hover:border-primary bg-slate-50'"
               >
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   accept="image/png, image/jpeg"
                   @change="handleFileChange"
                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
-                <div v-if="archivoPreview || form.urlImagen" class="h-32 w-full relative">
+                <div v-if="archivoPreview || form.urlImagen" class="h-36 w-full relative">
                   <img :src="archivoPreview || getImageUrl(form.urlImagen)" class="w-full h-full object-cover" />
                   <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span class="text-white font-bold text-[10px] uppercase tracking-widest flex items-center gap-2"><span class="material-symbols-outlined text-[16px]">upload</span> Cambiar Imagen</span>
+                    <span class="text-white font-bold text-[10px] uppercase tracking-widest flex items-center gap-2"><span class="material-symbols-outlined text-[16px]">upload</span> Cambiar imagen</span>
                   </div>
                 </div>
-                <div v-else class="h-32 flex flex-col items-center justify-center text-slate-400 group-hover:text-primary transition-colors">
+                <div v-else class="h-36 flex flex-col items-center justify-center text-slate-400 group-hover:text-primary transition-colors">
                   <span class="material-symbols-outlined text-3xl mb-1">add_photo_alternate</span>
                   <span class="text-[10px] font-black uppercase tracking-widest">Arrastra o haz clic para subir</span>
                 </div>
               </div>
             </div>
 
-            <!-- Asignación de Jurados -->
-            <div class="border-t border-slate-100 pt-4">
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center justify-between">
-                <span>Asignar Jurados Especialistas</span>
-                <span v-if="editandoId && form.tipoConcurso === 'EFU'" class="text-[9px] text-primary italic lowercase font-bold tracking-normal">Filtrados por especialidad en "{{ form.nombre }}"</span>
+            <div class="border-t border-slate-100 pt-5">
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center justify-between gap-2">
+                <span>Asignar jurados especialistas</span>
+                <span class="text-[9px] text-primary font-black">{{ form.juradosIds?.length || 0 }} seleccionados</span>
               </label>
-              <div class="bg-slate-50 border-2 border-slate-100 p-3 rounded-xl max-h-40 overflow-y-auto space-y-1">
-                <div v-if="juradosDisponibles.length === 0" class="text-xs text-slate-400 italic py-4 text-center">
+              <div class="bg-slate-50 border-2 border-slate-100 p-3 rounded-xl max-h-52 overflow-y-auto space-y-1">
+                <div v-if="juradosDisponibles.length === 0" class="text-xs text-slate-400 italic py-6 text-center">
                   <span class="material-symbols-outlined block mb-1 opacity-50">person_search</span>
                   No hay jurados de tipo {{ form.tipoConcurso }} registrados{{ editandoId && form.tipoConcurso === 'EFU' ? ' y habilitados para esta fase' : '' }}.
                 </div>
                 <label v-for="jurado in juradosDisponibles" :key="jurado.idJurado"
-                  class="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition-all">
+                  class="flex items-center gap-3 cursor-pointer p-2.5 hover:bg-white rounded-lg transition-all">
                   <input type="checkbox" :value="jurado.idJurado" v-model="form.juradosIds" class="size-4 accent-primary rounded" />
                   <div>
                     <p class="font-bold text-sm text-slate-700">{{ jurado.nombre }}</p>
@@ -501,14 +501,14 @@
                 </label>
               </div>
             </div>
-
           </div>
         </v-card-text>
 
-        <v-card-actions class="pa-6 border-t border-slate-100">
+        <v-card-actions class="pa-5 sm:pa-6 border-t border-slate-100 shrink-0 bg-white">
           <v-spacer></v-spacer>
-          <button @click="modalOpen = false" class="px-6 py-2 text-slate-500 font-bold hover:text-primary transition-all">Cancelar</button>
+          <button type="button" @click="modalOpen = false" class="px-6 py-2.5 text-slate-500 font-bold hover:text-primary transition-all">Cancelar</button>
           <button
+            type="button"
             @click="guardar"
             class="bg-primary hover:bg-blue-900 shadow-lg shadow-primary/20 text-white px-8 py-2.5 rounded-xl font-black uppercase tracking-tighter transition-all"
           >

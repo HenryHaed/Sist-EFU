@@ -483,8 +483,8 @@
                     Concurso externo asignado
                     <span class="text-secondary font-medium normal-case">(Obligatorio)</span>
                   </label>
-                  <div v-if="fasesExternas.length === 0" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800 font-medium">
-                    No hay concursos externos. Crea primero una fase de tipo <b>Concurso Externo</b> en Gestión de Fases (con los datos a solicitar).
+                  <div v-if="fasesConcursante.length === 0" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800 font-medium">
+                    No hay concursos de fotografía u otros. Crea una fase EXTERNO con plantilla Fotografía u Otros (Chacha-Warmi lo inscribe el delegado).
                   </div>
                   <select
                     v-else
@@ -493,7 +493,7 @@
                     class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none font-bold text-slate-700"
                   >
                     <option :value="null" disabled>Selecciona el concurso…</option>
-                    <option v-for="fase in fasesExternas" :key="fase.idFase" :value="fase.idFase">
+                    <option v-for="fase in fasesConcursante" :key="fase.idFase" :value="fase.idFase">
                       {{ fase.nombre }}
                     </option>
                   </select>
@@ -637,7 +637,15 @@ const esRolConcursante = computed(() => {
 })
 
 const fasesEfu = computed(() => todasFases.value.filter(f => f.tipoConcurso === 'EFU'))
-const fasesExternas = computed(() => todasFases.value.filter(f => f.tipoConcurso === 'EXTERNO'))
+const fasesExternas = computed(() =>
+  todasFases.value.filter((f) => f.tipoConcurso === 'EXTERNO'),
+)
+/** Concursos que puede usar el rol concursante (no Chacha-Warmi). */
+const fasesConcursante = computed(() =>
+  fasesExternas.value.filter(
+    (f) => String(f.plantillaRequisitos || '').toLowerCase() !== 'chacha_warmi',
+  ),
+)
 
 const usuariosDelRol = computed(() =>
   usuarios.value.filter((u) => u.rol?.nombre === props.rolFiltro),
@@ -790,10 +798,19 @@ const abrirModal = async (modoEdicion, usuario = null) => {
   } else {
     ciOriginalAlAbrir.value = ''
     const rolDefault = roles.value.find(r => r.nombre === props.rolFiltro)
+    if (!rolDefault?.idRol) {
+      Swal.fire({
+        title: 'Rol no disponible',
+        text: `No se encontró el rol «${props.rolFiltro}» en el sistema. Recarga la página; si persiste, verifica que el rol exista en la base de datos.`,
+        icon: 'warning',
+        confirmButtonColor: '#003399',
+      })
+      return
+    }
     form.value = {
       idUsuario: null,
       ci: '', nombres: '', primerApellido: '', segundoApellido: '', correo: '',
-      password: '', idRol: rolDefault?.idRol || '',
+      password: '', idRol: rolDefault.idRol,
       fasesEfuIds: [], fasesExternasIds: [], fraternidadesIds: [],
       idFraternidad: null,
       idFaseConcurso: null,
@@ -815,8 +832,22 @@ const guardarUsuario = async () => {
   saving.value = true
   errorFormulario.value = ''
   try {
+    // Resolver idRol: el filtro de vista / roles cargados (evita enviar '' → 500 en Postgres)
+    let idRolResuelto = Number(form.value.idRol)
+    if (!Number.isFinite(idRolResuelto) || idRolResuelto <= 0) {
+      const rolDefault = roles.value.find(r => r.nombre === props.rolFiltro)
+      idRolResuelto = Number(rolDefault?.idRol)
+    }
+    if (!Number.isFinite(idRolResuelto) || idRolResuelto <= 0) {
+      errorFormulario.value = `No se pudo determinar el rol «${props.rolFiltro}». Recarga la página e intenta de nuevo.`
+      saving.value = false
+      return
+    }
+    form.value.idRol = idRolResuelto
+
     const payload = {
       ...form.value,
+      idRol: idRolResuelto,
       fasesEfuIds: form.value.fasesEfuIds,
       fasesExternasIds: form.value.fasesExternasIds,
       fraternidadesIds: form.value.fraternidadesIds

@@ -171,6 +171,57 @@
              </div>
         </div>
 
+        <!-- Mapa del recorrido (Google My Maps / iframe) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest">
+            Mapa del recorrido (Landing)
+          </label>
+          <p class="text-[10px] text-slate-400 font-medium leading-relaxed">
+            Pega la <b>URL de embed</b> de Google My Maps o el <b>código iframe</b> completo
+            (Google Maps → Compartir → Insertar mapa). Se usa en la sección Recorrido oficial del landing.
+          </p>
+          <textarea
+            v-model="gestion.urlMapaUbicacion"
+            rows="4"
+            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-mono text-xs text-slate-700 transition-all resize-y"
+            placeholder="https://www.google.com/maps/d/embed?mid=... o <iframe src=&quot;...&quot;></iframe>"
+            @blur="normalizarMapaEmbed"
+          ></textarea>
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              @click="normalizarMapaEmbed"
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest"
+            >
+              Extraer URL del iframe
+            </button>
+            <button
+              type="button"
+              @click="usarMapaPorDefecto"
+              class="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest"
+            >
+              Restaurar mapa actual
+            </button>
+            <p v-if="mapaEmbedUrlPreview" class="text-[10px] text-emerald-700 font-bold truncate max-w-full">
+              URL lista: {{ mapaEmbedUrlPreview }}
+            </p>
+          </div>
+          <div
+            v-if="mapaEmbedUrlPreview"
+            class="rounded-xl overflow-hidden border border-slate-200 bg-slate-900 h-48"
+          >
+            <iframe
+              :src="mapaEmbedUrlPreview"
+              width="100%"
+              height="100%"
+              style="border:0;"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+              allowfullscreen
+            ></iframe>
+          </div>
+        </div>
+
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">
             Límite de fraternidades por tipo de danza
@@ -620,11 +671,27 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, computed } from 'vue'
 import api from '../services/api'
 import Swal from 'sweetalert2'
 import { getImageUrl } from '../utils/url'
 import { applySiteTitle } from '../utils/siteTitle'
+
+/** Extrae src de un iframe pegado, o limpia una URL de embed de Google Maps / My Maps. */
+const extractMapEmbedUrl = (raw) => {
+  const text = String(raw || '').trim()
+  if (!text) return ''
+  const iframeSrc = text.match(/src\s*=\s*["']([^"']+)["']/i)
+  if (iframeSrc?.[1]) return iframeSrc[1].trim()
+  // Si pegaron solo la URL
+  if (/^https?:\/\//i.test(text)) {
+    return text.split(/\s/)[0].trim()
+  }
+  return text.slice(0, 500)
+}
+
+const MAPA_RECORRIDO_DEFAULT =
+  'https://www.google.com/maps/d/embed?mid=1-YtosxPGnmPvgFZ2NelW2cREgouvfb4&ehbc=2E312F&noprof=1'
 
 const props = defineProps({
   gestionId: { type: Number, default: null },
@@ -703,6 +770,7 @@ const gestion = ref({
   urlLogo: '',
   urlBanner: '',
   urlImagenLogin: '',
+  urlMapaUbicacion: '',
   modoMantenimiento: false,
   mostrarRanking: true,
   mostrarHistorico: false,
@@ -717,6 +785,17 @@ const files = ref({
   loginImg: null,
   ...emptyLandingFiles(),
 })
+
+const mapaEmbedUrlPreview = computed(() => extractMapEmbedUrl(gestion.value.urlMapaUbicacion))
+
+const normalizarMapaEmbed = () => {
+  const url = extractMapEmbedUrl(gestion.value.urlMapaUbicacion)
+  if (url) gestion.value.urlMapaUbicacion = url.slice(0, 500)
+}
+
+const usarMapaPorDefecto = () => {
+  gestion.value.urlMapaUbicacion = MAPA_RECORRIDO_DEFAULT
+}
 
 const previews = ref({
   logo: null,
@@ -799,11 +878,13 @@ const saveSettings = async () => {
     }
 
     const formData = new FormData()
+    normalizarMapaEmbed()
     const payload = {
       ...gestion.value,
       urlLogo: toStoredAssetPath(gestion.value.urlLogo),
       urlBanner: toStoredAssetPath(gestion.value.urlBanner),
       urlImagenLogin: toStoredAssetPath(gestion.value.urlImagenLogin),
+      urlMapaUbicacion: extractMapEmbedUrl(gestion.value.urlMapaUbicacion).slice(0, 500) || null,
       landingFraternidades: (gestion.value.landingFraternidades || []).map((card) => ({
         titulo: card.titulo || '',
         subtitulo: card.subtitulo || '',

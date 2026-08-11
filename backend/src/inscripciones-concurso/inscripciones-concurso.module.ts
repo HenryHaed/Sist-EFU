@@ -8,6 +8,7 @@ import { Usuario } from '../entities/Usuario';
 import { Fase } from '../entities/Fase';
 import { Gestion } from '../entities/Gestion';
 import { Participante } from '../entities/Participante';
+import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { Participante } from '../entities/Participante';
       Fase,
       Gestion,
       Participante,
+      SolicitudInscripcion,
     ]),
   ],
   controllers: [InscripcionesConcursoController],

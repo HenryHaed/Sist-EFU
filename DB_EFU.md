@@ -142,7 +142,7 @@ Configuración central de cada año EFU.
 | `url_banner` | VARCHAR(500) | NULL | Banner |
 | `url_logo` | VARCHAR(500) | NULL | Logo |
 | `url_imagen_login` | VARCHAR(500) | NULL | Imagen login |
-| `url_mapa_ubicacion` | VARCHAR(500) | NULL | Mapa |
+| `url_mapa_ubicacion` | VARCHAR(500) | NULL | URL embed del mapa de recorrido (Google My Maps) en el landing |
 | `modo_mantenimiento` | BOOLEAN | DEFAULT false | Sitio en mantenimiento |
 | `mostrar_ranking` | BOOLEAN | DEFAULT true | Mostrar ranking público |
 | `mostrar_historico` | BOOLEAN | DEFAULT false | Mostrar archivo histórico en landing |
@@ -1012,18 +1012,19 @@ CREATE INDEX IF NOT EXISTS idx_participantes_fase ON participantes_concurso(id_f
 | `superusuario` | Acceso total | Todo + auditoría de sistema + gestión de admins |
 | `admin` | Administración general y usuarios | Evento, usuarios (excepto crear superusuario), reportes |
 | `controladorhcu` | Asistencia y disciplina HCU | Directorio delegados, disciplina, estadísticas |
-| `delegado` | Inscripción de fraternidad y participantes | Inscripción, subir monografía, participantes |
+| `delegado` | Fraternidad, monografía, Chacha-Warmi | Inscripción EFU, monografía/ficha, inscripción pareja Chacha-Warmi |
 | `jurado` | Calificación de fases | Calificar EFU/concursos, estadísticas |
 | `veedor` | **Solo lectura** | Estadísticas, Reglamento, Monografías de fraternidades (ver/descargar PDF subido) |
-| `concursante` | Concursos externos | Completa inscripción y sube documentos de su fase EXTERNO asignada |
+| `concursante` | Concursos externos (fotografía / otros) | Completa inscripción de su fase EXTERNO asignada (no Chacha-Warmi) |
 
 **Alta del rol en producción:** `ensureSchemaPatches` inserta `veedor` y `concursante` si no existen (`INSERT … WHERE NOT EXISTS`). **No re-ejecutar `seed.ts` en producción.**
 
-### Concursos externos — inscripción de concursantes
+### Concursos externos — inscripción
 
-- `fases.plantilla_requisitos` / `fases.requisitos_inscripcion` (JSONB): qué campos y archivos pide el concurso.
-- `usuarios.id_fase_concurso`: concurso EXTERNO del rol `concursante` (1:1). Fraternidad **opcional**.
-- Tablas `inscripciones_concurso` + `inscripcion_concurso_archivos`: expediente del concursante; al **aprobar** se sincroniza `participantes_concurso` para el jurado.
+- `fases.plantilla_requisitos`: `fotografia` | `chacha_warmi` | `generico` (Otros) + `requisitos_inscripcion` (JSONB).
+- **Concursante:** `usuarios.id_fase_concurso` → solo fases EXTERNO con plantilla `fotografia` o `generico`. Fraternidad opcional.
+- **Chacha-Warmi:** lo inscribe el **delegado** (1 expediente por fraternidad+fase). Columnas `inscripciones_concurso.id_fraternidad`, `id_participante` (Chacha), `id_participante_pareja` (Warmi). Índice único parcial `(id_fraternidad, id_fase) WHERE id_fraternidad IS NOT NULL`.
+- Al **aprobar** Chacha: 2 filas en `participantes_concurso` (`tipo` Chacha / Warmi). En fotografía/otros: 1 participante.
 
 ### Ficha técnica monografía
 

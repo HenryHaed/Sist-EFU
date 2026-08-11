@@ -16,19 +16,19 @@ export class ParticipantesController {
   }
 
   @Post()
-  @Roles('superusuario', 'admin', 'delegado')
+  @Roles('superusuario', 'admin')
   create(@Body() data: any, @Request() req: any) {
     return this.service.create(data, req.user);
   }
 
   @Put(':id')
-  @Roles('superusuario', 'admin', 'delegado')
+  @Roles('superusuario', 'admin')
   update(@Param('id', ParseIntPipe) id: number, @Body() data: any, @Request() req: any) {
     return this.service.update(id, data, req.user);
   }
 
   @Delete(':id')
-  @Roles('superusuario', 'admin', 'delegado')
+  @Roles('superusuario', 'admin')
   remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.service.remove(id, req.user);
   }

@@ -154,6 +154,57 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     CREATE INDEX IF NOT EXISTS idx_inscripciones_concurso_usuario ON inscripciones_concurso(id_usuario)
   `);
 
+  // Chacha-Warmi por fraternidad (delegado): fraternidad + pareja
+  await dataSource.query(`
+    ALTER TABLE inscripciones_concurso
+    ADD COLUMN IF NOT EXISTS id_fraternidad integer NULL
+  `);
+  await dataSource.query(`
+    ALTER TABLE inscripciones_concurso
+    ADD COLUMN IF NOT EXISTS id_participante_pareja integer NULL
+  `);
+  await dataSource.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_insc_concurso_fraternidad'
+          AND table_name = 'inscripciones_concurso'
+      ) THEN
+        ALTER TABLE inscripciones_concurso
+          ADD CONSTRAINT fk_insc_concurso_fraternidad
+          FOREIGN KEY (id_fraternidad) REFERENCES fraternidades(id_fraternidad)
+          ON DELETE SET NULL;
+      END IF;
+    END $$;
+  `);
+  await dataSource.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_insc_concurso_participante_pareja'
+          AND table_name = 'inscripciones_concurso'
+      ) THEN
+        ALTER TABLE inscripciones_concurso
+          ADD CONSTRAINT fk_insc_concurso_participante_pareja
+          FOREIGN KEY (id_participante_pareja) REFERENCES participantes_concurso(id_participante)
+          ON DELETE SET NULL;
+      END IF;
+    END $$;
+  `);
+  await dataSource.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_insc_concurso_fraternidad_fase
+    ON inscripciones_concurso (id_fraternidad, id_fase)
+    WHERE id_fraternidad IS NOT NULL
+  `);
+  await dataSource.query(`
+    CREATE INDEX IF NOT EXISTS idx_inscripciones_concurso_fraternidad
+    ON inscripciones_concurso(id_fraternidad)
+  `);
+  await dataSource.query(`
+    ALTER TABLE inscripciones_concurso
+    ADD COLUMN IF NOT EXISTS revision_checklist jsonb NULL DEFAULT '{}'::jsonb
+  `);
+
   // Ficha técnica monografía (delegado llena / admin lista) — sin borrar datos
   await dataSource.query(`
     CREATE TABLE IF NOT EXISTS fichas_tecnicas_monografia (

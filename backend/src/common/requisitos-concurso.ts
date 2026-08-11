@@ -111,10 +111,34 @@ export const PLANTILLAS_REQUISITOS: Record<PlantillaRequisitos, RequisitosInscri
 };
 
 export const PLANTILLAS_META: { id: PlantillaRequisitos; etiqueta: string; descripcion: string }[] = [
-  { id: 'fotografia', etiqueta: 'Fotografía', descripcion: 'CI, matrícula, JPEGs, carta y datos generales' },
-  { id: 'chacha_warmi', etiqueta: 'Chacha Warmi', descripcion: 'Pareja: CI ambos, foto postal, MP3' },
-  { id: 'generico', etiqueta: 'Otro / Genérico', descripcion: 'CI, matrícula y datos generales' },
+  {
+    id: 'fotografia',
+    etiqueta: 'Fotografía',
+    descripcion: 'Inscripción por rol concursante: CI, matrícula, JPEGs, carta y datos generales',
+  },
+  {
+    id: 'chacha_warmi',
+    etiqueta: 'Chacha Warmi (por delegado)',
+    descripcion: 'Inscripción por el delegado de la fraternidad: pareja, CI ambos, foto postal, MP3',
+  },
+  {
+    id: 'generico',
+    etiqueta: 'Otros concursos',
+    descripcion: 'Inscripción por rol concursante: CI, matrícula y datos generales',
+  },
 ];
+
+/** Plantillas que puede usar el rol concursante (no Chacha-Warmi). */
+export const PLANTILLAS_CONCURSANTE: PlantillaRequisitos[] = ['fotografia', 'generico'];
+
+export function esPlantillaChachaWarmi(plantilla?: string | null): boolean {
+  return String(plantilla || '').toLowerCase() === 'chacha_warmi';
+}
+
+export function esPlantillaParaConcursante(plantilla?: string | null): boolean {
+  const p = String(plantilla || '').toLowerCase() as PlantillaRequisitos;
+  return PLANTILLAS_CONCURSANTE.includes(p);
+}
 
 export function normalizarRequisitos(raw: any): RequisitosInscripcion {
   const camposIn = Array.isArray(raw?.campos) ? raw.campos : [];

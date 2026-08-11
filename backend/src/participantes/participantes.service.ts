@@ -8,6 +8,7 @@ import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
+import { InscripcionConcurso } from '../entities/InscripcionConcurso';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
 
 @Injectable()
@@ -27,6 +28,8 @@ export class ParticipantesService {
     private gestionRepo: Repository<Gestion>,
     @InjectRepository(Usuario)
     private usuarioRepo: Repository<Usuario>,
+    @InjectRepository(InscripcionConcurso)
+    private inscConcursoRepo: Repository<InscripcionConcurso>,
   ) {}
 
   async getGestionActiva() {
@@ -65,10 +68,78 @@ export class ParticipantesService {
       where.fraternidad = { idFraternidad: frat.idFraternidad };
     }
 
-    return this.participanteRepo.find({
+    const participantes = await this.participanteRepo.find({
       where,
-      relations: ['fraternidad', 'facultad', 'carrera'],
+      relations: [
+        'fraternidad',
+        'fraternidad.facultad',
+        'fraternidad.carrera',
+        'fraternidad.tipoDanza',
+        'fraternidad.categoria',
+        'fraternidad.institucionExterna',
+        'facultad',
+        'carrera',
+      ],
       order: { nombre: 'ASC' },
+    });
+
+    const inscs = await this.inscConcursoRepo.find({
+      where: { fase: { idFase } },
+      relations: ['fraternidad', 'participante', 'participantePareja'],
+    });
+
+    const inscPorParticipante = new Map<number, InscripcionConcurso>();
+    const inscPorFraternidad = new Map<number, InscripcionConcurso>();
+    for (const insc of inscs) {
+      if (insc.participante?.idParticipante) {
+        inscPorParticipante.set(insc.participante.idParticipante, insc);
+      }
+      if (insc.participantePareja?.idParticipante) {
+        inscPorParticipante.set(insc.participantePareja.idParticipante, insc);
+      }
+      if (insc.fraternidad?.idFraternidad) {
+        inscPorFraternidad.set(insc.fraternidad.idFraternidad, insc);
+      }
+    }
+
+    return participantes.map((p) => {
+      const insc =
+        inscPorParticipante.get(p.idParticipante) ||
+        (p.fraternidad?.idFraternidad
+          ? inscPorFraternidad.get(p.fraternidad.idFraternidad)
+          : null);
+      const datos = insc?.datos || {};
+      const esPareja = /pareja|warmi/i.test(String(p.tipo || ''));
+      const facultadCarreraDatos = esPareja
+        ? datos.facultadCarreraPareja || datos.facultadCarrera
+        : datos.facultadCarrera;
+      const instancia =
+        datos.instanciaRepresentacion ||
+        p.fraternidad?.nivelRepresentacion ||
+        '';
+      const facultadLabel =
+        facultadCarreraDatos ||
+        [p.facultad?.nombre || p.fraternidad?.facultad?.nombre, p.carrera?.nombre || p.fraternidad?.carrera?.nombre]
+          .filter(Boolean)
+          .join(' — ') ||
+        (instancia === 'Externo'
+          ? p.fraternidad?.institucionExterna?.nombre || p.institucionExterna || 'Externo'
+          : instancia || (p.esUmsa ? 'UMSA' : p.institucionExterna || ''));
+
+      return {
+        ...p,
+        instanciaRepresentacion: instancia || null,
+        facultadCarreraLabel: facultadLabel || null,
+        tipoDanzaNombre: p.fraternidad?.tipoDanza?.nombre || null,
+        categoriaNombre: p.fraternidad?.categoria?.nombre || null,
+        ci: esPareja ? datos.ciPareja || null : datos.ci || null,
+        celular: esPareja ? datos.celularPareja || null : datos.celular || null,
+        correo: esPareja ? datos.correoPareja || null : datos.correo || null,
+        datosExpediente: {
+          facultadCarrera: facultadCarreraDatos || null,
+          instanciaRepresentacion: datos.instanciaRepresentacion || null,
+        },
+      };
     });
   }
 

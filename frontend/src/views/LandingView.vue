@@ -59,12 +59,12 @@
           </a>
           <a
             v-if="documentosPublicos.length > 0"
-            @click.prevent="scrollTo('reglamentos')"
-            href="#reglamentos"
+            @click.prevent="scrollTo('comunicados')"
+            href="#comunicados"
             class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer"
           >
-            <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">description</span>
-            <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Reglamentos</p>
+            <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">campaign</span>
+            <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Comunicados</p>
           </a>
         </nav>
       </div>
@@ -110,11 +110,11 @@
       </button>
       <button
         v-if="documentosPublicos.length > 0"
-        @click="scrollTo('reglamentos')"
+        @click="scrollTo('comunicados')"
         class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors"
       >
-        <span class="material-symbols-outlined text-[22px]">description</span>
-        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Docs</span>
+        <span class="material-symbols-outlined text-[22px]">campaign</span>
+        <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Comunicados</span>
       </button>
       </nav>
     </div>
@@ -382,13 +382,14 @@
               <v-btn icon="close" variant="text" color="white" @click="mostrarMapa = false"></v-btn>
             </v-card-title>
             <v-card-text class="pa-0 bg-slate-900" style="height: 600px;">
-              <iframe 
-                src="https://www.google.com/maps/d/embed?mid=1-YtosxPGnmPvgFZ2NelW2cREgouvfb4&ehbc=2E312F&noprof=1" 
-                width="100%" 
-                height="100%" 
-                style="border:0;" 
-                allowfullscreen="" 
+              <iframe
+                :src="mapaRecorridoUrl"
+                width="100%"
+                height="100%"
+                style="border:0;"
+                allowfullscreen=""
                 loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
               ></iframe>
             </v-card-text>
             <v-card-actions class="bg-white pa-4">
@@ -543,18 +544,18 @@
         </div>
       </section>
 
-      <!-- ===== REGLAMENTOS Y CONVOCATORIAS VIGENTES ===== -->
-      <section v-if="documentosPublicos.length > 0" class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-slate-50 border-t border-slate-100" id="reglamentos">
+      <!-- ===== COMUNICADOS ===== -->
+      <section v-if="documentosPublicos.length > 0" class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-slate-50 border-t border-slate-100" id="comunicados">
         <div class="text-center mb-12 md:mb-16 reveal">
           <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">
-            REGLAMENTOS Y <span class="text-primary">CONVOCATORIAS</span>
+            <span class="text-primary">COMUNICADOS</span>
           </h2>
           <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">
-            Documentación oficial vigente para todo el público
+            Documentación y avisos oficiales vigentes
           </p>
         </div>
 
-        <div v-if="loadingDocumentos" class="flex justify-center py-16">
+        <div v-if="loadingDocumentos && documentosPublicos.length === 0" class="flex justify-center py-16">
           <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
         </div>
 
@@ -879,6 +880,23 @@ import { defaultLogo, defaultHeroBanner } from '../assets/defaultImages'
 
 const siteInfo = ref({})
 const mostrarMapa = ref(false)
+
+/** Mapa hardcodeado histórico; se usa si el admin aún no configuró urlMapaUbicacion. */
+const MAPA_RECORRIDO_DEFAULT =
+  'https://www.google.com/maps/d/embed?mid=1-YtosxPGnmPvgFZ2NelW2cREgouvfb4&ehbc=2E312F&noprof=1'
+
+const extractMapEmbedUrl = (raw) => {
+  const text = String(raw || '').trim()
+  if (!text) return ''
+  const iframeSrc = text.match(/src\s*=\s*["']([^"']+)["']/i)
+  if (iframeSrc?.[1]) return iframeSrc[1].trim()
+  if (/^https?:\/\//i.test(text)) return text.split(/\s/)[0].trim()
+  return ''
+}
+
+const mapaRecorridoUrl = computed(
+  () => extractMapEmbedUrl(siteInfo.value?.urlMapaUbicacion) || MAPA_RECORRIDO_DEFAULT,
+)
 const mainRef = ref(null)
 
 const DEFAULT_LANDING_FRATERNIDADES = [
@@ -942,20 +960,22 @@ const formatearFechaEvento = (fechaHora) => {
   })
 }
 
-const cargarEventosPublicos = async () => {
-  loadingEventos.value = true
+const cargarEventosPublicos = async (opts = {}) => {
+  const silent = !!opts.silent
+  if (!silent) loadingEventos.value = true
   try {
     const { data } = await api.get('/asistencias/eventos-publicos')
     eventosPublicos.value = Array.isArray(data) ? data : []
   } catch (err) {
     console.error('Error al cargar eventos públicos:', err)
-    eventosPublicos.value = []
+    if (!silent) eventosPublicos.value = []
   } finally {
-    loadingEventos.value = false
+    if (!silent) loadingEventos.value = false
   }
 }
 
-const cargarDatos = async () => {
+const cargarDatos = async (opts = {}) => {
+  const silent = !!opts.silent
   try {
     const { data } = await api.get('/evaluaciones/gestion-activa')
     if (data) {
@@ -975,9 +995,9 @@ const cargarDatos = async () => {
     loadingRanking.value = false
   }
 
-  await cargarEventosPublicos()
+  await cargarEventosPublicos({ silent })
   await cargarGestionesPublicas()
-  await cargarDocumentosPublicos()
+  await cargarDocumentosPublicos({ silent })
 }
 
 const documentosPublicos = ref([])
@@ -985,16 +1005,18 @@ const loadingDocumentos = ref(false)
 const mostrarAvisoNuevoDoc = ref(false)
 const nuevoDocumento = ref(null)
 
-const cargarDocumentosPublicos = async () => {
-  loadingDocumentos.value = true
+const cargarDocumentosPublicos = async (opts = {}) => {
+  const silent = !!opts.silent
+  if (!silent) loadingDocumentos.value = true
   try {
     const { data } = await api.get('/evaluaciones/documentos-gestion?soloPublicos=true')
-    documentosPublicos.value = Array.isArray(data) ? data : []
+    const lista = Array.isArray(data) ? data : []
+    documentosPublicos.value = lista
 
     // Si hay documentos públicos, verifiquemos si el último es nuevo
-    if (documentosPublicos.value.length > 0) {
+    if (lista.length > 0) {
       // Ordenar por ID descendente para obtener el más reciente
-      const docsSortedById = [...documentosPublicos.value].sort((a, b) => b.idDocumento - a.idDocumento)
+      const docsSortedById = [...lista].sort((a, b) => b.idDocumento - a.idDocumento)
       const latestDoc = docsSortedById[0]
       const ultimoVistoId = localStorage.getItem('ultimo_doc_visto_id')
 
@@ -1020,9 +1042,9 @@ const cargarDocumentosPublicos = async () => {
     }
   } catch (err) {
     console.error('Error al cargar documentos públicos:', err)
-    documentosPublicos.value = []
+    if (!silent) documentosPublicos.value = []
   } finally {
-    loadingDocumentos.value = false
+    if (!silent) loadingDocumentos.value = false
   }
 }
 
@@ -1107,8 +1129,8 @@ const descargarPdfReporte = (idGestion, anio) => {
 
 onMounted(() => {
   cargarDatos()
-  // Actualizar cada 15 segundos para "tiempo real"
-  refreshInterval = setInterval(cargarDatos, 15000)
+  // Actualizar datos en segundo plano (sin spinner ni parpadeo de secciones)
+  refreshInterval = setInterval(() => cargarDatos({ silent: true }), 15000)
 
   // Reveal Animations
   const observerOptions = { threshold: 0.1 };
@@ -1120,18 +1142,29 @@ onMounted(() => {
     });
   }, observerOptions);
 
-  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  const observeReveals = () => {
+    document.querySelectorAll('.reveal:not(.reveal-active)').forEach(el => observer.observe(el));
+  }
 
-  // Watch for dynamic elements (ranking)
+  // Tras el primer paint de datos
+  setTimeout(observeReveals, 300);
+
+  // Watch for dynamic elements (ranking / comunicados)
   watch(rankingPublico, () => {
-    setTimeout(() => {
-      document.querySelectorAll('.reveal:not(.reveal-active)').forEach(el => observer.observe(el));
-    }, 500);
+    setTimeout(observeReveals, 200);
+  });
+  watch(documentosPublicos, () => {
+    setTimeout(observeReveals, 200);
   });
 
   // Escuchar flechas del navegador para navegación por hash
   window.addEventListener('popstate', () => {
     const hash = window.location.hash.replace('#', '')
+    if (hash === 'reglamentos') {
+      // compatibilidad con enlaces antiguos
+      document.getElementById('comunicados')?.scrollIntoView({ behavior: 'smooth' })
+      return
+    }
     if (hash) {
       document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
     }
@@ -1143,11 +1176,12 @@ onUnmounted(() => {
 })
 
 const scrollTo = (id) => {
-  const el = document.getElementById(id)
+  const targetId = id === 'reglamentos' ? 'comunicados' : id
+  const el = document.getElementById(targetId)
   if (el) {
     el.scrollIntoView({ behavior: 'smooth' })
     // Actualizar hash en URL para habilitar flechas del navegador
-    history.pushState(null, null, `#${id}`)
+    history.pushState(null, null, `#${targetId}`)
   }
 }
 

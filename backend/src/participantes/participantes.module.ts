@@ -9,10 +9,20 @@ import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
+import { InscripcionConcurso } from '../entities/InscripcionConcurso';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Participante, Fase, Fraternidad, Facultad, Carrera, Gestion, Usuario])
+    TypeOrmModule.forFeature([
+      Participante,
+      Fase,
+      Fraternidad,
+      Facultad,
+      Carrera,
+      Gestion,
+      Usuario,
+      InscripcionConcurso,
+    ]),
   ],
   controllers: [ParticipantesController],
   providers: [ParticipantesService],

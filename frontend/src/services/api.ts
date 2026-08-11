@@ -31,9 +31,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      const authStore = useAuthStore();
-      if (authStore.isAuthenticated) {
-        authStore.triggerExpiry('unauthorized');
+      const url = String(error.config?.url || '');
+      // No disparar modal de sesión al fallar el propio logout
+      if (!url.includes('/auth/logout')) {
+        const authStore = useAuthStore();
+        if (authStore.isAuthenticated) {
+          authStore.triggerExpiry('unauthorized');
+        }
       }
     }
     return Promise.reject(error);

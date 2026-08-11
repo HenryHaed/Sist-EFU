@@ -182,6 +182,7 @@ export class EvaluacionesService {
           pesoPorcentaje: fase.pesoPorcentaje,
           tipoConcurso: fase.tipoConcurso || 'EFU',
           categoriaEfu: fase.categoriaEfu || null,
+          plantillaRequisitos: fase.plantillaRequisitos || null,
           fechaInicio: fase.fechaInicio,
           fechaFin: fase.fechaFin,
           jurados: (fase as any).jurados || [],
@@ -232,10 +233,27 @@ export class EvaluacionesService {
       const mapEv = new Map(evaluaciones.map(ev => [ev.participante?.idParticipante, ev]));
 
       return {
-        fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: 'EXTERNO', categoriaEfu: fase.categoriaEfu || null },
+        fase: {
+          idFase: fase.idFase,
+          nombre: fase.nombre,
+          tipoConcurso: 'EXTERNO',
+          categoriaEfu: fase.categoriaEfu || null,
+          plantillaRequisitos: fase.plantillaRequisitos || null,
+        },
         listado: participantes.map(p => {
           const ev = mapEv.get(p.idParticipante);
-          return { idParticipante: p.idParticipante, nombre: p.nombre, tipo: p.tipo, fraternidad: p.fraternidad?.nombre || 'EXTERNO', estadoEvaluacion: ev ? ev.estado : 'PENDIENTE', idEvaluacion: ev ? ev.idEvaluacion : null, puntajeActual: ev ? ev.puntajeTotal : 0 };
+          return {
+            idParticipante: p.idParticipante,
+            nombre: p.nombre,
+            tipo: p.tipo,
+            idFraternidad: p.fraternidad?.idFraternidad ?? null,
+            fraternidad: p.fraternidad?.nombre || 'Sin fraternidad',
+            estadoEvaluacion: ev ? ev.estado : 'PENDIENTE',
+            idEvaluacion: ev ? ev.idEvaluacion : null,
+            puntajeActual: ev ? ev.puntajeTotal : 0,
+            fechaApertura: ev?.fechaApertura || null,
+            fechaCierre: ev?.fechaCierre || null,
+          };
         })
       };
     }
@@ -1077,16 +1095,22 @@ export class EvaluacionesService {
 
     if (payload.tipoConcurso === 'EXTERNO') {
       const { buildRequisitosFromSeleccion, normalizarRequisitos } = await import('../common/requisitos-concurso');
+      const plantilla = String(payload.plantillaRequisitos || 'generico').toLowerCase();
+      if (!['fotografia', 'chacha_warmi', 'generico'].includes(plantilla)) {
+        throw new BadRequestException(
+          'Plantilla inválida. Usa: fotografia, chacha_warmi u otros (generico).',
+        );
+      }
+      payload.plantillaRequisitos = plantilla;
       if (payload.requisitosInscripcion) {
         payload.requisitosInscripcion = normalizarRequisitos(payload.requisitosInscripcion);
       } else {
         payload.requisitosInscripcion = buildRequisitosFromSeleccion(
-          payload.plantillaRequisitos || 'generico',
+          plantilla,
           clavesCampos,
           clavesDocumentos,
         );
       }
-      if (!payload.plantillaRequisitos) payload.plantillaRequisitos = 'generico';
     } else {
       payload.plantillaRequisitos = null;
       payload.requisitosInscripcion = null;

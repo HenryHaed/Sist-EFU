@@ -65,6 +65,11 @@ export class UsuariosService {
     if (fase.tipoConcurso !== 'EXTERNO') {
       throw new BadRequestException('El concursante solo puede asignarse a un concurso externo (fase EXTERNO).');
     }
+    if (String(fase.plantillaRequisitos || '').toLowerCase() === 'chacha_warmi') {
+      throw new BadRequestException(
+        'Chacha-Warmi lo inscribe el delegado de la fraternidad. Asigna al concursante un concurso de fotografía u otros.',
+      );
+    }
     return fase;
   }
 
@@ -168,6 +173,18 @@ export class UsuariosService {
     };
   }
 
+  /** Evita QueryFailedError cuando el cliente manda idRol vacío (''). */
+  private parseIdRolRequerido(idRol: unknown): number {
+    if (idRol === undefined || idRol === null || String(idRol).trim() === '') {
+      throw new BadRequestException('Debes seleccionar un rol válido.');
+    }
+    const id = Number(idRol);
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new BadRequestException('Debes seleccionar un rol válido.');
+    }
+    return id;
+  }
+
   async create(createDto: CreateUsuarioDto & {
     tipoJurado?: string;
     fasesEfuIds?: number[];
@@ -179,7 +196,8 @@ export class UsuariosService {
   }) {
     const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, idFaseConcurso, ...data } = createDto as any;
 
-    const role = await this.roleRepo.findOne({ where: { idRol } });
+    const idRolNum = this.parseIdRolRequerido(idRol);
+    const role = await this.roleRepo.findOne({ where: { idRol: idRolNum } });
     if (!role) throw new BadRequestException('Rol no válido');
 
     const correoNorm = this.prepareCorreo(data.correo);
@@ -376,8 +394,9 @@ export class UsuariosService {
     }
 
     let rolActualizado: Role | null = null;
-    if (idRol) {
-      rolActualizado = await this.roleRepo.findOne({ where: { idRol } });
+    if (idRol !== undefined && idRol !== null && String(idRol).trim() !== '') {
+      const idRolNum = this.parseIdRolRequerido(idRol);
+      rolActualizado = await this.roleRepo.findOne({ where: { idRol: idRolNum } });
       if (!rolActualizado) throw new BadRequestException('Rol no válido');
       updateData.rol = rolActualizado;
       if (rolActualizado.idRol !== rolAnteriorId) {

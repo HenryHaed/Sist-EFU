@@ -17,8 +17,18 @@ import { Usuario } from '../entities/Usuario';
 import { Fase } from '../entities/Fase';
 import { Gestion } from '../entities/Gestion';
 import { Participante } from '../entities/Participante';
+import { Fraternidad } from '../entities/Fraternidad';
+import {
+  SolicitudInscripcion,
+  EstadoSolicitud,
+} from '../entities/SolicitudInscripcion';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
-import { normalizarRequisitos, requisitosDesdePlantilla } from '../common/requisitos-concurso';
+import {
+  normalizarRequisitos,
+  requisitosDesdePlantilla,
+  esPlantillaChachaWarmi,
+  esPlantillaParaConcursante,
+} from '../common/requisitos-concurso';
 
 @Injectable()
 export class InscripcionesConcursoService {
@@ -35,6 +45,8 @@ export class InscripcionesConcursoService {
     private readonly gestionRepo: Repository<Gestion>,
     @InjectRepository(Participante)
     private readonly participanteRepo: Repository<Participante>,
+    @InjectRepository(SolicitudInscripcion)
+    private readonly solicitudRepo: Repository<SolicitudInscripcion>,
   ) {}
 
   private async getUsuarioConFase(idUsuario: number) {
@@ -51,6 +63,48 @@ export class InscripcionesConcursoService {
     return requisitosDesdePlantilla(fase.plantillaRequisitos || 'generico');
   }
 
+  private assertEditable(estado: EstadoInscripcionConcurso) {
+    if (
+      ![
+        EstadoInscripcionConcurso.BORRADOR,
+        EstadoInscripcionConcurso.OBSERVADO,
+      ].includes(estado)
+    ) {
+      throw new BadRequestException(
+        'Solo puedes editar la inscripción en estado BORRADOR u OBSERVADO.',
+      );
+    }
+  }
+
+  private validarMime(docReq: { etiqueta: string; mime?: string[] }, file: Express.Multer.File) {
+    if (!docReq.mime?.length) return;
+    const ok = docReq.mime.some((m) => {
+      const a = m.toLowerCase();
+      const b = (file.mimetype || '').toLowerCase();
+      return (
+        a === b ||
+        (a.includes('jpeg') && b.includes('jpeg')) ||
+        (a.includes('mpeg') && b.includes('mpeg')) ||
+        (a.includes('mp3') && (b.includes('mpeg') || b.includes('mp3')))
+      );
+    });
+    if (!ok) {
+      throw new BadRequestException(
+        `Tipo de archivo no permitido para ${docReq.etiqueta}. Se espera: ${docReq.mime.join(', ')}`,
+      );
+    }
+  }
+
+  private toResponse(insc: InscripcionConcurso, extra: Record<string, any> = {}) {
+    return {
+      ...insc,
+      requisitos: this.requisitosDeFase(insc.fase),
+      ...extra,
+    };
+  }
+
+  // ── Concursante (fotografía / otros) ─────────────────────────────────────
+
   async getMiInscripcion(idUsuario: number) {
     const usuario = await this.getUsuarioConFase(idUsuario);
     if (usuario.rol?.nombre !== 'concursante') {
@@ -59,13 +113,23 @@ export class InscripcionesConcursoService {
     if (!usuario.faseConcurso) {
       throw new BadRequestException('No tienes un concurso asignado. Contacta al administrador.');
     }
+    if (esPlantillaChachaWarmi(usuario.faseConcurso.plantillaRequisitos)) {
+      throw new BadRequestException(
+        'Chacha-Warmi lo inscribe el delegado de la fraternidad, no el rol concursante.',
+      );
+    }
+    if (!esPlantillaParaConcursante(usuario.faseConcurso.plantillaRequisitos)) {
+      throw new BadRequestException(
+        'Tu concurso asignado no admite inscripción por concursante. Contacta al administrador.',
+      );
+    }
 
     let insc = await this.inscRepo.findOne({
       where: {
         usuario: { idUsuario },
         fase: { idFase: usuario.faseConcurso.idFase },
       },
-      relations: ['fase', 'archivos', 'gestion', 'participante'],
+      relations: ['fase', 'archivos', 'gestion', 'participante', 'fraternidad'],
     });
 
     if (!insc) {
@@ -81,19 +145,16 @@ export class InscripcionesConcursoService {
           gestion: { idGestion: (gestion as any).idGestion } as any,
           estado: EstadoInscripcionConcurso.BORRADOR,
           datos: {},
+          fraternidad: usuario.fraternidad || null,
         }),
       );
       insc = await this.inscRepo.findOne({
         where: { idInscripcion: insc.idInscripcion },
-        relations: ['fase', 'archivos', 'gestion'],
+        relations: ['fase', 'archivos', 'gestion', 'fraternidad'],
       });
     }
 
-    return {
-      ...insc,
-      requisitos: this.requisitosDeFase(insc.fase),
-      fraternidad: usuario.fraternidad || null,
-    };
+    return this.toResponse(insc, { fraternidad: usuario.fraternidad || insc.fraternidad || null });
   }
 
   async guardarDatos(idUsuario: number, datos: Record<string, any>) {
@@ -109,16 +170,7 @@ export class InscripcionesConcursoService {
       where: { idInscripcion: wrap.idInscripcion },
       relations: ['fase', 'archivos', 'usuario'],
     });
-    if (
-      ![
-        EstadoInscripcionConcurso.BORRADOR,
-        EstadoInscripcionConcurso.OBSERVADO,
-      ].includes(insc.estado)
-    ) {
-      throw new BadRequestException(
-        'Solo puedes editar la inscripción en estado BORRADOR u OBSERVADO.',
-      );
-    }
+    this.assertEditable(insc.estado);
     return insc;
   }
 
@@ -129,36 +181,379 @@ export class InscripcionesConcursoService {
   ) {
     if (!file) throw new BadRequestException('Archivo requerido.');
     const insc = await this.getMiInscripcionEditable(idUsuario);
+    return this.guardarArchivoEnInscripcion(insc, claveDocumento, file);
+  }
+
+  async eliminarArchivo(idUsuario: number, idArchivo: number) {
+    const insc = await this.getMiInscripcionEditable(idUsuario);
+    return this.borrarArchivoDeInscripcion(insc, idArchivo);
+  }
+
+  async enviar(idUsuario: number) {
+    const wrap = await this.getMiInscripcion(idUsuario);
+    const insc = await this.inscRepo.findOne({
+      where: { idInscripcion: wrap.idInscripcion },
+      relations: ['fase', 'archivos'],
+    });
+    this.validarYMarcarPendiente(insc);
+    await this.inscRepo.save(insc);
+    return this.getMiInscripcion(idUsuario);
+  }
+
+  // ── Delegado Chacha-Warmi ────────────────────────────────────────────────
+
+  private async getDelegadoConFraternidad(idUsuario: number) {
+    const usuario = await this.usuarioRepo.findOne({
+      where: { idUsuario },
+      relations: [
+        'rol',
+        'fraternidad',
+        'fraternidad.gestion',
+        'fraternidad.facultad',
+        'fraternidad.carrera',
+        'fraternidad.institucionExterna',
+        'fraternidad.categoria',
+        'fraternidad.tipoDanza',
+      ],
+    });
+    if (!usuario || usuario.rol?.nombre !== 'delegado') {
+      throw new ForbiddenException('Solo el delegado puede gestionar la inscripción Chacha-Warmi.');
+    }
+    if (!usuario.fraternidad) {
+      throw new BadRequestException(
+        'No tienes fraternidad asignada. La inscripción Chacha-Warmi se habilita cuando el administrador aprueba tu inscripción oficial.',
+      );
+    }
+    return usuario;
+  }
+
+  /** Solicitud oficial APROBADA que creó la fraternidad del delegado. */
+  private async findSolicitudAprobadaFraternidad(
+    idFraternidad: number,
+  ): Promise<SolicitudInscripcion | null> {
+    return this.solicitudRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.categoria', 'categoria')
+      .leftJoinAndSelect('s.facultad', 'facultad')
+      .leftJoinAndSelect('s.carrera', 'carrera')
+      .leftJoinAndSelect('s.institucionExterna', 'institucionExterna')
+      .leftJoinAndSelect('s.tipoDanza', 'tipoDanza')
+      .leftJoinAndSelect('s.fraternidadCreada', 'fraternidadCreada')
+      .where('fraternidadCreada.id_fraternidad = :idFrat', { idFrat: idFraternidad })
+      .andWhere('s.estado = :aprobado', { aprobado: EstadoSolicitud.APROBADO })
+      .orderBy('s.id_solicitud', 'DESC')
+      .getOne();
+  }
+
+  /**
+   * Instancia (Facultad / Carrera / UMSA / …) heredada de la inscripción oficial
+   * de la fraternidad, igual que en ficha técnica.
+   */
+  private herenciaInstanciaFraternidad(
+    frat: Fraternidad,
+    sol: SolicitudInscripcion | null,
+  ) {
+    const instancia =
+      sol?.instanciaRepresentacion || frat.nivelRepresentacion || '';
+
+    const facultadNombre = sol?.facultad?.nombre || frat.facultad?.nombre || '';
+    const carreraNombre = sol?.carrera?.nombre || frat.carrera?.nombre || '';
+    const institucionNombre =
+      sol?.institucionExterna?.nombre ||
+      sol?.nombreInstitucionExterna ||
+      frat.institucionExterna?.nombre ||
+      '';
+
+    let facultadCarrera = '';
+    switch (instancia) {
+      case 'Facultad':
+        facultadCarrera = facultadNombre || 'Facultad';
+        break;
+      case 'Carrera':
+        facultadCarrera =
+          [facultadNombre, carreraNombre].filter(Boolean).join(' — ') || 'Carrera';
+        break;
+      case 'UMSA':
+        facultadCarrera = 'UMSA (Nivel Central)';
+        break;
+      case 'FEDSIDUMSA':
+        facultadCarrera = 'FEDSIDUMSA';
+        break;
+      case 'STUMSA':
+        facultadCarrera = 'STUMSA';
+        break;
+      case 'Externo':
+        facultadCarrera = institucionNombre || 'Externo';
+        break;
+      default:
+        facultadCarrera =
+          [facultadNombre, carreraNombre, institucionNombre].filter(Boolean).join(' — ') ||
+          instancia ||
+          '';
+    }
+
+    return {
+      nombreFraternidad: sol?.nombreFraternidad || frat.nombre || '',
+      categoria: sol?.categoria?.nombre || frat.categoria?.nombre || '',
+      instanciaRepresentacion: instancia || '',
+      facultadNombre,
+      carreraNombre,
+      institucionNombre,
+      facultadCarrera: facultadCarrera || '',
+      danza: sol?.tipoDanza?.nombre || frat.tipoDanza?.nombre || '',
+      desdeSolicitudAprobada: sol?.estado === EstadoSolicitud.APROBADO,
+    };
+  }
+
+  private aplicarHerenciaEnDatos(
+    datos: Record<string, any> | null | undefined,
+    herencia: ReturnType<InscripcionesConcursoService['herenciaInstanciaFraternidad']>,
+  ) {
+    const next = { ...(datos || {}) };
+    if (herencia.facultadCarrera) {
+      next.facultadCarrera = herencia.facultadCarrera;
+      next.facultadCarreraPareja = herencia.facultadCarrera;
+    }
+    if (herencia.instanciaRepresentacion) {
+      next.instanciaRepresentacion = herencia.instanciaRepresentacion;
+    }
+    return next;
+  }
+
+  private async findFaseChachaActiva(gestionId: number): Promise<Fase | null> {
+    return this.faseRepo
+      .createQueryBuilder('f')
+      .leftJoinAndSelect('f.gestion', 'gestion')
+      .where('gestion.id_gestion = :gid', { gid: gestionId })
+      .andWhere('f.tipo_concurso = :tipo', { tipo: 'EXTERNO' })
+      .andWhere('LOWER(COALESCE(f.plantilla_requisitos, \'\')) = :plantilla', {
+        plantilla: 'chacha_warmi',
+      })
+      .orderBy('f.id_fase', 'DESC')
+      .getOne();
+  }
+
+  async getMiChacha(idUsuario: number) {
+    const usuario = await this.getDelegadoConFraternidad(idUsuario);
+    const frat = usuario.fraternidad;
+
+    const solicitudAprobada = await this.findSolicitudAprobadaFraternidad(
+      frat.idFraternidad,
+    );
+    if (!solicitudAprobada) {
+      return {
+        sinFase: false,
+        fraternidadNoAprobada: true,
+        mensaje:
+          'La inscripción Chacha-Warmi solo está disponible cuando tu fraternidad ha sido aprobada oficialmente por el administrador. Completa primero la inscripción de fraternidad y espera la aprobación.',
+        requisitos: null,
+        insc: null,
+        fraternidad: {
+          idFraternidad: frat.idFraternidad,
+          nombre: frat.nombre,
+          habilitadoEfu: frat.habilitadoEfu,
+        },
+      };
+    }
+
+    if (frat.habilitadoEfu === false) {
+      return {
+        sinFase: false,
+        fraternidadNoAprobada: true,
+        mensaje:
+          'Tu fraternidad no está habilitada para la EFU. Contacta al administrador para habilitarla antes de inscribir Chacha-Warmi.',
+        requisitos: null,
+        insc: null,
+        fraternidad: {
+          idFraternidad: frat.idFraternidad,
+          nombre: frat.nombre,
+          habilitadoEfu: false,
+        },
+      };
+    }
+
+    const herencia = this.herenciaInstanciaFraternidad(frat, solicitudAprobada);
+
+    const gestion =
+      frat.gestion || (await findGestionActivaOrLatest(this.gestionRepo));
+    if (!gestion) throw new BadRequestException('No hay gestión activa.');
+
+    const fase = await this.findFaseChachaActiva((gestion as any).idGestion);
+    if (!fase) {
+      return {
+        sinFase: true,
+        fraternidadNoAprobada: false,
+        mensaje:
+          'Aún no hay fase Chacha-Warmi en esta gestión. El administrador debe crearla en Gestión de Fases (plantilla Chacha Warmi).',
+        requisitos: null,
+        insc: null,
+        herencia,
+      };
+    }
+
+    let insc = await this.inscRepo.findOne({
+      where: {
+        fraternidad: { idFraternidad: frat.idFraternidad },
+        fase: { idFase: fase.idFase },
+      },
+      relations: [
+        'fase',
+        'archivos',
+        'gestion',
+        'fraternidad',
+        'participante',
+        'participantePareja',
+        'usuario',
+      ],
+    });
+
+    const datosConHerencia = this.aplicarHerenciaEnDatos(insc?.datos, herencia);
+
+    if (!insc) {
+      insc = await this.inscRepo.save(
+        this.inscRepo.create({
+          usuario,
+          fase,
+          gestion: { idGestion: (gestion as any).idGestion } as any,
+          fraternidad: frat,
+          estado: EstadoInscripcionConcurso.BORRADOR,
+          datos: datosConHerencia,
+        }),
+      );
+      insc = await this.inscRepo.findOne({
+        where: { idInscripcion: insc.idInscripcion },
+        relations: [
+          'fase',
+          'archivos',
+          'gestion',
+          'fraternidad',
+          'participante',
+          'participantePareja',
+        ],
+      });
+    } else if (
+      insc.datos?.facultadCarrera !== herencia.facultadCarrera ||
+      insc.datos?.facultadCarreraPareja !== herencia.facultadCarrera ||
+      insc.datos?.instanciaRepresentacion !== herencia.instanciaRepresentacion
+    ) {
+      insc.datos = datosConHerencia;
+      await this.inscRepo.save(insc);
+    }
+
+    return this.toResponse(insc, {
+      sinFase: false,
+      fraternidadNoAprobada: false,
+      fraternidad: frat,
+      herencia,
+      camposHeredados: ['facultadCarrera', 'facultadCarreraPareja', 'instanciaRepresentacion'],
+    });
+  }
+
+  private async getMiChachaEditable(idUsuario: number) {
+    const wrap = await this.getMiChacha(idUsuario);
+    if ((wrap as any).fraternidadNoAprobada) {
+      throw new BadRequestException(
+        (wrap as any).mensaje ||
+          'La fraternidad aún no está aprobada para inscribir Chacha-Warmi.',
+      );
+    }
+    if ((wrap as any).sinFase || !(wrap as any).idInscripcion) {
+      throw new BadRequestException(
+        (wrap as any).mensaje || 'No hay fase Chacha-Warmi disponible.',
+      );
+    }
+    const insc = await this.inscRepo.findOne({
+      where: { idInscripcion: (wrap as any).idInscripcion },
+      relations: ['fase', 'archivos', 'usuario', 'fraternidad'],
+    });
+    this.assertEditable(insc.estado);
+    return insc;
+  }
+
+  async guardarDatosChacha(idUsuario: number, datos: Record<string, any>) {
+    const insc = await this.getMiChachaEditable(idUsuario);
+    const usuario = await this.getDelegadoConFraternidad(idUsuario);
+    const sol = await this.findSolicitudAprobadaFraternidad(
+      usuario.fraternidad.idFraternidad,
+    );
+    const herencia = this.herenciaInstanciaFraternidad(usuario.fraternidad, sol);
+    insc.datos = this.aplicarHerenciaEnDatos(
+      { ...(insc.datos || {}), ...(datos || {}) },
+      herencia,
+    );
+    await this.inscRepo.save(insc);
+    return this.getMiChacha(idUsuario);
+  }
+
+  async subirArchivoChacha(
+    idUsuario: number,
+    claveDocumento: string,
+    file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Archivo requerido.');
+    const insc = await this.getMiChachaEditable(idUsuario);
+    await this.guardarArchivoEnInscripcion(insc, claveDocumento, file);
+    return this.getMiChacha(idUsuario);
+  }
+
+  async eliminarArchivoChacha(idUsuario: number, idArchivo: number) {
+    const insc = await this.getMiChachaEditable(idUsuario);
+    await this.borrarArchivoDeInscripcion(insc, idArchivo);
+    return this.getMiChacha(idUsuario);
+  }
+
+  async enviarChacha(idUsuario: number) {
+    const wrap = await this.getMiChacha(idUsuario);
+    if ((wrap as any).fraternidadNoAprobada) {
+      throw new BadRequestException(
+        (wrap as any).mensaje ||
+          'La fraternidad aún no está aprobada para inscribir Chacha-Warmi.',
+      );
+    }
+    if ((wrap as any).sinFase || !(wrap as any).idInscripcion) {
+      throw new BadRequestException(
+        (wrap as any).mensaje || 'No hay fase Chacha-Warmi disponible.',
+      );
+    }
+    const insc = await this.inscRepo.findOne({
+      where: { idInscripcion: (wrap as any).idInscripcion },
+      relations: ['fase', 'archivos'],
+    });
+    this.validarYMarcarPendiente(insc);
+    await this.inscRepo.save(insc);
+    return this.getMiChacha(idUsuario);
+  }
+
+  // ── Shared file / validate ───────────────────────────────────────────────
+
+  private async guardarArchivoEnInscripcion(
+    insc: InscripcionConcurso,
+    claveDocumento: string,
+    file: Express.Multer.File,
+  ) {
     const requisitos = this.requisitosDeFase(insc.fase);
     const docReq = requisitos.documentos.find((d) => d.clave === claveDocumento);
     if (!docReq) {
-      throw new BadRequestException(`El documento "${claveDocumento}" no es requerido en este concurso.`);
+      throw new BadRequestException(
+        `El documento "${claveDocumento}" no es requerido en este concurso.`,
+      );
     }
-    if (docReq.mime?.length && !docReq.mime.includes(file.mimetype) && !docReq.mime.some((m) => file.mimetype?.includes(m.split('/')[1]))) {
-      // permitir image/jpeg vs image/jpg
-      const ok = docReq.mime.some((m) => {
-        const a = m.toLowerCase();
-        const b = (file.mimetype || '').toLowerCase();
-        return a === b || (a.includes('jpeg') && b.includes('jpeg')) || (a.includes('mpeg') && b.includes('mpeg')) || (a.includes('mp3') && (b.includes('mpeg') || b.includes('mp3')));
-      });
-      if (!ok) {
-        throw new BadRequestException(`Tipo de archivo no permitido para ${docReq.etiqueta}. Se espera: ${docReq.mime.join(', ')}`);
-      }
-    }
+    this.validarMime(docReq, file);
 
     const existentes = (insc.archivos || []).filter((a) => a.claveDocumento === claveDocumento);
     if (existentes.length >= (docReq.maxArchivos || 1)) {
-      // reemplazar el primero si max=1
       if ((docReq.maxArchivos || 1) === 1 && existentes[0]) {
         this.borrarArchivoFisico(existentes[0].url);
         await this.archivoRepo.delete(existentes[0].idArchivo);
       } else {
-        throw new BadRequestException(`Ya alcanzaste el máximo de archivos para ${docReq.etiqueta}.`);
+        throw new BadRequestException(
+          `Ya alcanzaste el máximo de archivos para ${docReq.etiqueta}.`,
+        );
       }
     }
 
     const url = `/api/v1/archivos/doc-inscripcion-concurso/${file.filename}`;
-    const archivo = await this.archivoRepo.save(
+    return this.archivoRepo.save(
       this.archivoRepo.create({
         inscripcion: insc,
         claveDocumento,
@@ -168,11 +563,9 @@ export class InscripcionesConcursoService {
         orden: existentes.length,
       }),
     );
-    return archivo;
   }
 
-  async eliminarArchivo(idUsuario: number, idArchivo: number) {
-    const insc = await this.getMiInscripcionEditable(idUsuario);
+  private async borrarArchivoDeInscripcion(insc: InscripcionConcurso, idArchivo: number) {
     const archivo = await this.archivoRepo.findOne({
       where: { idArchivo, inscripcion: { idInscripcion: insc.idInscripcion } },
     });
@@ -182,12 +575,7 @@ export class InscripcionesConcursoService {
     return { ok: true };
   }
 
-  async enviar(idUsuario: number) {
-    const wrap = await this.getMiInscripcion(idUsuario);
-    const insc = await this.inscRepo.findOne({
-      where: { idInscripcion: wrap.idInscripcion },
-      relations: ['fase', 'archivos'],
-    });
+  private validarYMarcarPendiente(insc: InscripcionConcurso) {
     if (
       ![
         EstadoInscripcionConcurso.BORRADOR,
@@ -210,21 +598,32 @@ export class InscripcionesConcursoService {
       if (!tiene) faltantes.push(doc.etiqueta);
     }
     if (faltantes.length) {
-      throw new BadRequestException(`Completa los requisitos obligatorios: ${faltantes.join(', ')}`);
+      throw new BadRequestException(
+        `Completa los requisitos obligatorios: ${faltantes.join(', ')}`,
+      );
     }
 
     insc.estado = EstadoInscripcionConcurso.PENDIENTE;
     insc.observacionAdmin = null;
-    await this.inscRepo.save(insc);
-    return this.getMiInscripcion(idUsuario);
   }
+
+  // ── Admin ────────────────────────────────────────────────────────────────
 
   async listarAdmin(idFase?: number) {
     const where: any = {};
     if (idFase) where.fase = { idFase };
     return this.inscRepo.find({
       where,
-      relations: ['usuario', 'usuario.fraternidad', 'fase', 'archivos', 'gestion'],
+      relations: [
+        'usuario',
+        'usuario.fraternidad',
+        'fraternidad',
+        'fase',
+        'archivos',
+        'gestion',
+        'participante',
+        'participantePareja',
+      ],
       order: { updatedAt: 'DESC' },
     });
   }
@@ -232,71 +631,255 @@ export class InscripcionesConcursoService {
   async getDetalleAdmin(idInscripcion: number) {
     const insc = await this.inscRepo.findOne({
       where: { idInscripcion },
-      relations: ['usuario', 'usuario.fraternidad', 'fase', 'archivos', 'gestion', 'participante'],
+      relations: [
+        'usuario',
+        'usuario.fraternidad',
+        'fraternidad',
+        'fase',
+        'archivos',
+        'gestion',
+        'participante',
+        'participantePareja',
+      ],
     });
     if (!insc) throw new NotFoundException('Inscripción no encontrada');
-    return {
-      ...insc,
-      requisitos: this.requisitosDeFase(insc.fase),
-    };
+    return this.toResponse(insc);
+  }
+
+  private extraerItemsObservados(
+    checklist: Record<string, { estado?: string; label?: string; comentario?: string }> = {},
+  ) {
+    return Object.entries(checklist)
+      .filter(([, item]) => item?.estado === 'X')
+      .map(([, item]) => {
+        const etiqueta = item?.label || 'Dato observado';
+        const motivo = item?.comentario?.trim();
+        return motivo ? `${etiqueta}: ${motivo}` : etiqueta;
+      })
+      .filter(Boolean);
+  }
+
+  async guardarProgresoRevision(idInscripcion: number, revisionChecklist: any) {
+    const insc = await this.inscRepo.findOne({ where: { idInscripcion } });
+    if (!insc) throw new NotFoundException('Inscripción no encontrada');
+    if (insc.estado === EstadoInscripcionConcurso.BORRADOR) {
+      throw new BadRequestException('No se puede guardar progreso en un borrador.');
+    }
+    if (insc.estado === EstadoInscripcionConcurso.RECHAZADO) {
+      throw new BadRequestException('No se puede guardar progreso en una inscripción rechazada.');
+    }
+    if (revisionChecklist === undefined || revisionChecklist === null) {
+      throw new BadRequestException('El checklist de revisión es obligatorio.');
+    }
+    if (typeof revisionChecklist !== 'object' || Array.isArray(revisionChecklist)) {
+      throw new BadRequestException('El checklist de revisión debe ser un objeto.');
+    }
+    insc.revisionChecklist = revisionChecklist;
+    await this.inscRepo.save(insc);
+    return this.getDetalleAdmin(idInscripcion);
   }
 
   async revisar(
     idInscripcion: number,
     accion: 'aprobar' | 'observar' | 'rechazar',
     observacion?: string,
+    revisionChecklist?: any,
   ) {
     const insc = await this.inscRepo.findOne({
       where: { idInscripcion },
-      relations: ['usuario', 'usuario.fraternidad', 'fase', 'fase.gestion', 'participante', 'archivos'],
+      relations: [
+        'usuario',
+        'usuario.fraternidad',
+        'fraternidad',
+        'fase',
+        'fase.gestion',
+        'participante',
+        'participantePareja',
+        'archivos',
+        'gestion',
+      ],
     });
     if (!insc) throw new NotFoundException('Inscripción no encontrada');
 
+    const checklistNormalizado =
+      revisionChecklist !== undefined && revisionChecklist !== null
+        ? revisionChecklist
+        : insc.revisionChecklist || {};
+
+    if (revisionChecklist !== undefined && revisionChecklist !== null) {
+      if (typeof revisionChecklist !== 'object' || Array.isArray(revisionChecklist)) {
+        throw new BadRequestException('El checklist de revisión debe ser un objeto.');
+      }
+      insc.revisionChecklist = revisionChecklist;
+    }
+
     if (accion === 'observar') {
-      if (!observacion?.trim()) {
-        throw new BadRequestException('Indica la observación para el concursante.');
+      const itemsObservados = Object.values(checklistNormalizado).filter(
+        (item: any) => item?.estado === 'X',
+      );
+      if (!itemsObservados.length && !observacion?.trim()) {
+        throw new BadRequestException(
+          'Marca con ✕ al menos un dato o documento, o escribe una observación.',
+        );
+      }
+      const sinMotivo = itemsObservados.filter((item: any) => !item?.comentario?.trim());
+      if (sinMotivo.length) {
+        throw new BadRequestException(
+          'Indica el motivo en cada dato o documento marcado con ✕.',
+        );
+      }
+      const desdeChecklist = this.extraerItemsObservados(checklistNormalizado);
+      const texto =
+        observacion?.trim() ||
+        (desdeChecklist.length
+          ? `Observaciones:\n• ${desdeChecklist.join('\n• ')}`
+          : '');
+      if (!texto) {
+        throw new BadRequestException('Indica la observación para el inscrito.');
       }
       insc.estado = EstadoInscripcionConcurso.OBSERVADO;
-      insc.observacionAdmin = observacion.trim();
+      insc.observacionAdmin = texto;
       await this.inscRepo.save(insc);
       return this.getDetalleAdmin(idInscripcion);
     }
 
     if (accion === 'rechazar') {
+      if (!observacion?.trim()) {
+        throw new BadRequestException(
+          'Indica el motivo del rechazo. La inscripción quedará anulada.',
+        );
+      }
       insc.estado = EstadoInscripcionConcurso.RECHAZADO;
-      insc.observacionAdmin = observacion?.trim() || insc.observacionAdmin;
+      insc.observacionAdmin = observacion.trim();
       await this.inscRepo.save(insc);
       return this.getDetalleAdmin(idInscripcion);
     }
 
-    // aprobar → sync participante
+    // aprobar: todos los campos y documentos del concurso deben estar ✓
+    const requisitos = this.requisitosDeFase(insc.fase);
+    const clavesEsperadas = [
+      ...requisitos.campos.map((c) => c.clave),
+      ...requisitos.documentos.map((d) => d.clave),
+    ];
+    if (!clavesEsperadas.length) {
+      // sin plantilla de requisitos: exigir checklist no vacío y todo OK
+      const items = Object.values(checklistNormalizado || {});
+      if (!items.length || !items.every((item: any) => item?.estado === 'OK')) {
+        throw new BadRequestException(
+          'Marca todos los datos y documentos con ✓ antes de aprobar.',
+        );
+      }
+    } else {
+      const incompletos = clavesEsperadas.filter(
+        (clave) => (checklistNormalizado as any)?.[clave]?.estado !== 'OK',
+      );
+      if (incompletos.length) {
+        throw new BadRequestException(
+          'Marca todos los datos y documentos del expediente con ✓ antes de aprobar.',
+        );
+      }
+      const hayX = Object.values(checklistNormalizado || {}).some(
+        (item: any) => item?.estado === 'X',
+      );
+      if (hayX) {
+        throw new BadRequestException(
+          'No se puede aprobar mientras haya ítems marcados con ✕. Observa o corrige el checklist.',
+        );
+      }
+    }
+
     insc.estado = EstadoInscripcionConcurso.APROBADO;
     insc.observacionAdmin = observacion?.trim() || null;
 
-    const nombre =
-      String(insc.datos?.nombreCompleto || '').trim() ||
-      `${insc.usuario.nombres} ${insc.usuario.primerApellido}`.trim();
+    const frat = insc.fraternidad || insc.usuario?.fraternidad || null;
+    const gestion = insc.fase.gestion || insc.gestion;
 
-    let participante = insc.participante;
-    if (!participante) {
-      participante = this.participanteRepo.create({
-        nombre,
-        tipo: insc.fase.plantillaRequisitos || 'Participante',
-        fase: insc.fase,
-        gestion: insc.fase.gestion || insc.gestion,
-        perteneceFraternidad: !!insc.usuario.fraternidad,
-        fraternidad: insc.usuario.fraternidad || null,
-        esUmsa: true,
-      });
+    if (esPlantillaChachaWarmi(insc.fase.plantillaRequisitos)) {
+      const nombreChacha =
+        String(insc.datos?.nombreCompleto || '').trim() ||
+        `${insc.usuario.nombres} ${insc.usuario.primerApellido}`.trim();
+      const nombreWarmi = String(insc.datos?.nombreCompletoPareja || '').trim();
+      if (!nombreWarmi) {
+        throw new BadRequestException(
+          'La inscripción Chacha-Warmi debe incluir el nombre del segundo postulante (Warmi).',
+        );
+      }
+
+      let chacha = insc.participante;
+      if (!chacha) {
+        chacha = this.participanteRepo.create({
+          nombre: nombreChacha,
+          tipo: 'Chacha',
+          fase: insc.fase,
+          gestion,
+          perteneceFraternidad: !!frat,
+          fraternidad: frat,
+          esUmsa: true,
+        });
+      } else {
+        chacha.nombre = nombreChacha;
+        chacha.tipo = 'Chacha';
+        chacha.fraternidad = frat;
+        chacha.perteneceFraternidad = !!frat;
+      }
+      chacha = await this.participanteRepo.save(chacha);
+
+      let warmi = insc.participantePareja;
+      if (!warmi) {
+        warmi = this.participanteRepo.create({
+          nombre: nombreWarmi,
+          tipo: 'Warmi',
+          fase: insc.fase,
+          gestion,
+          perteneceFraternidad: !!frat,
+          fraternidad: frat,
+          esUmsa: true,
+        });
+      } else {
+        warmi.nombre = nombreWarmi;
+        warmi.tipo = 'Warmi';
+        warmi.fraternidad = frat;
+        warmi.perteneceFraternidad = !!frat;
+      }
+      warmi = await this.participanteRepo.save(warmi);
+
+      insc.participante = chacha;
+      insc.participantePareja = warmi;
     } else {
-      participante.nombre = nombre;
-      participante.fraternidad = insc.usuario.fraternidad || null;
-      participante.perteneceFraternidad = !!insc.usuario.fraternidad;
-    }
-    participante = await this.participanteRepo.save(participante);
-    insc.participante = participante;
-    await this.inscRepo.save(insc);
+      const nombre =
+        String(insc.datos?.nombreCompleto || '').trim() ||
+        `${insc.usuario.nombres} ${insc.usuario.primerApellido}`.trim();
 
+      const plantilla = String(insc.fase.plantillaRequisitos || '').toLowerCase();
+      const tipoParticipante =
+        plantilla === 'fotografia'
+          ? 'Fotógrafo'
+          : plantilla === 'generico'
+            ? 'Participante'
+            : insc.fase.plantillaRequisitos || 'Participante';
+
+      let participante = insc.participante;
+      if (!participante) {
+        participante = this.participanteRepo.create({
+          nombre,
+          tipo: tipoParticipante,
+          fase: insc.fase,
+          gestion,
+          perteneceFraternidad: !!frat,
+          fraternidad: frat,
+          esUmsa: true,
+        });
+      } else {
+        participante.nombre = nombre;
+        participante.tipo = tipoParticipante;
+        participante.fraternidad = frat;
+        participante.perteneceFraternidad = !!frat;
+      }
+      participante = await this.participanteRepo.save(participante);
+      insc.participante = participante;
+    }
+
+    await this.inscRepo.save(insc);
     return this.getDetalleAdmin(idInscripcion);
   }
 

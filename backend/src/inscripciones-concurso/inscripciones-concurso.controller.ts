@@ -25,10 +25,26 @@ import { InscripcionesConcursoService } from './inscripciones-concurso.service';
 
 const uploadPath = './uploads/Doc_Inscripcion_Concurso';
 
+const fileInterceptor = FileInterceptor('archivo', {
+  storage: diskStorage({
+    destination: (_req, _file, cb) => {
+      if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
+      cb(null, uploadPath);
+    },
+    filename: (_req, file, cb) => {
+      const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      cb(null, `insc-${unique}${extname(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
 @Controller('inscripciones-concurso')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class InscripcionesConcursoController {
   constructor(private readonly service: InscripcionesConcursoService) {}
+
+  // ── Concursante ──────────────────────────────────────────────────────────
 
   @Get('mi')
   @Roles('concursante')
@@ -44,21 +60,7 @@ export class InscripcionesConcursoController {
 
   @Post('mi/archivos')
   @Roles('concursante')
-  @UseInterceptors(
-    FileInterceptor('archivo', {
-      storage: diskStorage({
-        destination: (_req, _file, cb) => {
-          if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
-          cb(null, uploadPath);
-        },
-        filename: (_req, file, cb) => {
-          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `insc-${unique}${extname(file.originalname)}`);
-        },
-      }),
-      limits: { fileSize: 20 * 1024 * 1024 },
-    }),
-  )
+  @UseInterceptors(fileInterceptor)
   subirArchivo(
     @Request() req,
     @UploadedFile() file: Express.Multer.File,
@@ -80,6 +82,46 @@ export class InscripcionesConcursoController {
     return this.service.enviar(req.user.idUsuario);
   }
 
+  // ── Delegado Chacha-Warmi ────────────────────────────────────────────────
+
+  @Get('mi-chacha')
+  @Roles('delegado')
+  getMiChacha(@Request() req) {
+    return this.service.getMiChacha(req.user.idUsuario);
+  }
+
+  @Put('mi-chacha/datos')
+  @Roles('delegado')
+  guardarDatosChacha(@Request() req, @Body() body: any) {
+    return this.service.guardarDatosChacha(req.user.idUsuario, body?.datos || body);
+  }
+
+  @Post('mi-chacha/archivos')
+  @Roles('delegado')
+  @UseInterceptors(fileInterceptor)
+  subirArchivoChacha(
+    @Request() req,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('claveDocumento') claveDocumento: string,
+  ) {
+    if (!claveDocumento) throw new BadRequestException('claveDocumento es requerido');
+    return this.service.subirArchivoChacha(req.user.idUsuario, claveDocumento, file);
+  }
+
+  @Delete('mi-chacha/archivos/:id')
+  @Roles('delegado')
+  eliminarArchivoChacha(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    return this.service.eliminarArchivoChacha(req.user.idUsuario, id);
+  }
+
+  @Post('mi-chacha/enviar')
+  @Roles('delegado')
+  enviarChacha(@Request() req) {
+    return this.service.enviarChacha(req.user.idUsuario);
+  }
+
+  // ── Admin ────────────────────────────────────────────────────────────────
+
   @Get()
   @Roles('superusuario', 'admin')
   listar(@Query('idFase') idFase?: string) {
@@ -92,13 +134,27 @@ export class InscripcionesConcursoController {
     return this.service.getDetalleAdmin(id);
   }
 
+  @Put(':id/revision-checklist')
+  @Roles('superusuario', 'admin')
+  guardarProgreso(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('revisionChecklist') revisionChecklist: any,
+  ) {
+    return this.service.guardarProgresoRevision(id, revisionChecklist);
+  }
+
   @Post(':id/revisar')
   @Roles('superusuario', 'admin')
   revisar(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { accion: 'aprobar' | 'observar' | 'rechazar'; observacion?: string },
+    @Body()
+    body: {
+      accion: 'aprobar' | 'observar' | 'rechazar';
+      observacion?: string;
+      revisionChecklist?: any;
+    },
   ) {
     if (!body?.accion) throw new BadRequestException('accion es requerida');
-    return this.service.revisar(id, body.accion, body.observacion);
+    return this.service.revisar(id, body.accion, body.observacion, body.revisionChecklist);
   }
 }

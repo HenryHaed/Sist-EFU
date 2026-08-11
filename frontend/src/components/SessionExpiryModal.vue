@@ -67,8 +67,9 @@ const hasUnsavedChanges = computed(() => {
   return localStorage.getItem('evaluacion_draft_active') === 'true';
 });
 
-const irALogin = () => {
-  authStore.logout();
+const irALogin = async () => {
+  authStore.showExpiryModal = false;
+  await authStore.logout();
   router.replace('/login');
 };
 </script>

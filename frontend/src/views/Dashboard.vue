@@ -73,7 +73,7 @@
               <span v-if="(vistaActual === 'seleccionar_concurso' || vistaActual === 'listado_competidores' || vistaActual === 'wizard_concurso')" class="size-1.5 rounded-full bg-primary ml-auto animate-pulse"></span>
             </button>
 
-            <!-- ADMINISTRACIÓN -->
+            <!-- ADMINISTRACIÓN: participantes (admin) -->
             <button
               v-if="can('gestionar_participantes')"
               @click="setVista('participantes_concurso')"
@@ -82,6 +82,17 @@
             >
               <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'participantes_concurso' ? 'text-secondary' : 'text-slate-400'">group_add</span>
               <span class="text-sm">Participantes Concursos</span>
+            </button>
+
+            <!-- DELEGADO: Inscripción Chacha-Warmi -->
+            <button
+              v-if="can('inscripcion_chacha_warmi')"
+              @click="setVista('inscripcion_chacha_warmi')"
+              :class="vistaActual === 'inscripcion_chacha_warmi' ? 'bg-slate-50 text-secondary border-l-4 border-l-primary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'inscripcion_chacha_warmi' ? 'text-primary' : 'text-slate-400'">diversity_3</span>
+              <span class="text-sm font-bold">Inscripción Chacha-Warmi</span>
             </button>
 
             <button
@@ -498,10 +509,15 @@
                />
             </div>
 
-            <!-- Vista: CRUD Participantes Externos (Delegado/Admin) -->
+            <!-- Vista: CRUD Participantes Externos (Admin) -->
             <DelegadoParticipantesView
               v-else-if="vistaActual === 'participantes_concurso'"
               key="participantes_concurso"
+            />
+
+            <DelegadoInscripcionChachaView
+              v-else-if="vistaActual === 'inscripcion_chacha_warmi'"
+              :key="`chacha-${currentUser?.idUsuario}`"
             />
 
             <!-- Vista: CRUD Fraternidades (Admin/SuperUser) -->
@@ -744,6 +760,7 @@ import FraternidadesCRUDView from './FraternidadesCRUDView.vue'
 import UsuariosCRUDView from './UsuariosCRUDView.vue'
 import ListadoCompetidoresView from './ListadoCompetidoresView.vue'
 import DelegadoParticipantesView from './DelegadoParticipantesView.vue'
+import DelegadoInscripcionChachaView from './DelegadoInscripcionChachaView.vue'
 import OrganizacionCRUDView from './OrganizacionCRUDView.vue'
 import EnviarMensajeView from './EnviarMensajeView.vue'
 import AuditoriaReportesView from './AuditoriaReportesView.vue'
@@ -866,7 +883,7 @@ const can = (permission) => {
     admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria_reportes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'ver_monografias', 'revision_inscripciones_concurso', 'admin_fichas_tecnicas'],
     jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
-    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'ficha_tecnica', 'gestionar_participantes', 'inscripcion_fraternidad'],
+    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'ficha_tecnica', 'inscripcion_chacha_warmi', 'inscripcion_fraternidad'],
     veedor: ['estadisticas', 'reglamento', 'ver_monografias'],
     concursante: ['reglamento', 'mi_inscripcion_concurso'],
   }
@@ -886,7 +903,7 @@ const timer = computed(() => {
 onMounted(async () => {
   document.documentElement.classList.remove('dark')
   localStorage.theme = 'light'
-  vuetifyTheme.global.name.value = 'umsa'
+  vuetifyTheme.change('umsa')
 
   timerInterval = setInterval(() => {
     timerSegundos.value = authStore.remainingIdleSeconds
@@ -992,7 +1009,9 @@ const tituloVista = computed(() => {
     auditoria_reportes: 'Auditoría y Reportes',
     inscripcion_fraternidad: 'Formulario de Inscripción de Fraternidad',
     mi_inscripcion_concurso: 'Inscripción al Concurso',
-    revision_inscripciones_concurso: 'Inscripciones de Concursantes',
+    inscripcion_chacha_warmi: 'Inscripción Chacha-Warmi',
+    revision_inscripciones_concurso: 'Inscripciones a Concursos',
+    participantes_concurso: 'Participantes Concursos',
     reglamento: 'Reglamentos y Documentos Oficiales',
     solicitudes_inscripcion: 'Solicitudes de Preinscripción',
     asistencias: 'Directorio de Delegados',
@@ -1065,8 +1084,8 @@ const manejarFinalizacion = (resultados) => {
   setVista('estadisticas')
 }
 
-const handleLogout = () => {
-  authStore.logout()
+const handleLogout = async () => {
+  await authStore.logout()
   router.replace('/login')
 }
 </script>

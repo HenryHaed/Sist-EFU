@@ -62,7 +62,11 @@
             class="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
             :class="fase.accesible ? (tipoConcurso === 'EFU' ? 'bg-primary/5 text-primary hover:bg-primary hover:!text-white shadow-sm hover:shadow-primary/20' : 'bg-secondary/5 text-secondary hover:bg-secondary hover:!text-white shadow-sm hover:shadow-secondary/20') : 'bg-slate-100 text-slate-400'"
           >
-            {{ fase.accesible ? (tipoConcurso === 'EFU' ? 'Ingresar a Calificar' : 'Ver Participantes') : 'Acceso Restringido' }}
+            {{ fase.accesible
+              ? (tipoConcurso === 'EFU'
+                ? 'Ingresar a Calificar'
+                : (esChacha(fase) ? 'Ver fraternidades' : 'Ver Participantes'))
+              : 'Acceso Restringido' }}
             <span class="material-symbols-outlined text-[20px]">{{ fase.accesible ? 'arrow_forward' : 'block' }}</span>
           </button>
         </div>
@@ -77,6 +81,7 @@ import { ref, onMounted } from 'vue'
 import api from '../services/api'
 
 import { getImageUrl } from '../utils/url'
+import { esFaseChachaWarmi } from '../utils/chachaWarmi'
 
 
 const props = defineProps({
@@ -95,6 +100,8 @@ const emit = defineEmits(['fase-seleccionada'])
 const fases = ref([])
 const loading = ref(true)
 const error = ref('')
+
+const esChacha = (fase) => esFaseChachaWarmi(fase)
 
 const cargarFases = async () => {
   loading.value = true
