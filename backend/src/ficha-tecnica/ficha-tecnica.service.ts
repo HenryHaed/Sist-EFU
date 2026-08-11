@@ -403,14 +403,15 @@ export class FichaTecnicaService {
     }
 
     /**
-     * Expositores / representantes: flexible.
-     * - Al menos 1 persona completa por sección.
-     * - La 2.ª es opcional; si se empieza a llenar, debe quedar completa.
+     * Expositores / representantes: muy flexible.
+     * - La misma persona (CI/datos) puede repetirse en ambas secciones.
+     * - Filas vacías OK; si se empieza una fila, debe quedar completa.
+     * - Basta con al menos 1 persona completa en expositores O en representantes
+     *   (no se exige una por cada sección ni 2 por bloque).
      */
-    const checkPersonasFlexibles = (list: PersonaFicha[], titulo: string) => {
-      const rows = this.normalizarPersonas(list);
+    const revisarFilas = (list: PersonaFicha[], titulo: string) => {
       let completas = 0;
-      rows.forEach((p, i) => {
+      this.normalizarPersonas(list).forEach((p, i) => {
         if (this.personaVacia(p)) return;
         if (!this.personaCompleta(p)) {
           faltantes.push(
@@ -420,19 +421,23 @@ export class FichaTecnicaService {
         }
         completas += 1;
       });
-      if (completas < 1) {
-        faltantes.push(`${titulo}: designa al menos 1 persona (la segunda es opcional)`);
-      }
+      return completas;
     };
 
-    checkPersonasFlexibles(
+    const nExpositores = revisarFilas(
       this.normalizarPersonas(ficha.expositores),
       'Expositor defensa monografía',
     );
-    checkPersonasFlexibles(
+    const nRepresentantes = revisarFilas(
       this.normalizarPersonas(ficha.representantesTraje),
       'Representante traje típico',
     );
+
+    if (nExpositores + nRepresentantes < 1) {
+      faltantes.push(
+        'Designa al menos 1 persona como expositor o como representante de traje (pueden ser la misma persona en ambos roles)',
+      );
+    }
 
     if (faltantes.length) {
       throw new BadRequestException(`Completa: ${faltantes.join('; ')}`);

@@ -143,33 +143,31 @@
           <div>
             <h3 class="text-[10px] font-black uppercase tracking-widest text-secondary">Expositores para la defensa de monografía</h3>
             <p class="text-[11px] text-slate-500 font-medium mt-1">
-              Al menos <b>1 persona</b> completa. La segunda es opcional.
+              Opcional por fila. Basta <b>1 persona</b> en expositores <b>o</b> en representantes.
+              La misma persona puede repetirse en ambas secciones.
             </p>
           </div>
           <div v-for="(p, i) in form.expositores" :key="'ex-'+i" class="grid grid-cols-1 md:grid-cols-12 gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
             <p class="md:col-span-12 text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
               Persona {{ i + 1 }}
-              <span
-                class="px-2 py-0.5 rounded-full text-[8px] tracking-widest border"
-                :class="i === 0 ? 'bg-primary/5 text-primary border-primary/20' : 'bg-slate-100 text-slate-500 border-slate-200'"
-              >
-                {{ i === 0 ? 'Requerida' : 'Opcional' }}
+              <span class="px-2 py-0.5 rounded-full text-[8px] tracking-widest border bg-slate-100 text-slate-500 border-slate-200">
+                Opcional
               </span>
             </p>
             <div class="md:col-span-5">
-              <label class="lbl">Nombre(s) y Apellidos <span v-if="i === 0" class="text-secondary">*</span></label>
+              <label class="lbl">Nombre(s) y Apellidos</label>
               <input v-model="p.nombresApellidos" class="inp" @input="p.nombresApellidos = String(p.nombresApellidos||'').toUpperCase()" />
             </div>
             <div class="md:col-span-2">
-              <label class="lbl">C.I. <span v-if="i === 0" class="text-secondary">*</span></label>
+              <label class="lbl">C.I.</label>
               <input v-model="p.ci" class="inp" />
             </div>
             <div class="md:col-span-3">
-              <label class="lbl">Matrícula <span v-if="i === 0" class="text-secondary">*</span></label>
+              <label class="lbl">Matrícula</label>
               <input v-model="p.matricula" class="inp" />
             </div>
             <div class="md:col-span-2">
-              <label class="lbl">Celular <span v-if="i === 0" class="text-secondary">*</span></label>
+              <label class="lbl">Celular</label>
               <input v-model="p.celular" class="inp" />
             </div>
           </div>
@@ -179,33 +177,30 @@
           <div>
             <h3 class="text-[10px] font-black uppercase tracking-widest text-secondary">Representantes para la exposición de traje típico</h3>
             <p class="text-[11px] text-slate-500 font-medium mt-1">
-              Al menos <b>1 persona</b> completa. La segunda es opcional.
+              Opcional por fila. Puedes usar los mismos datos que en expositores si es la misma persona.
             </p>
           </div>
           <div v-for="(p, i) in form.representantesTraje" :key="'tr-'+i" class="grid grid-cols-1 md:grid-cols-12 gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
             <p class="md:col-span-12 text-[10px] font-black text-slate-400 uppercase flex items-center gap-2">
               Persona {{ i + 1 }}
-              <span
-                class="px-2 py-0.5 rounded-full text-[8px] tracking-widest border"
-                :class="i === 0 ? 'bg-primary/5 text-primary border-primary/20' : 'bg-slate-100 text-slate-500 border-slate-200'"
-              >
-                {{ i === 0 ? 'Requerida' : 'Opcional' }}
+              <span class="px-2 py-0.5 rounded-full text-[8px] tracking-widest border bg-slate-100 text-slate-500 border-slate-200">
+                Opcional
               </span>
             </p>
             <div class="md:col-span-5">
-              <label class="lbl">Nombre(s) y Apellidos <span v-if="i === 0" class="text-secondary">*</span></label>
+              <label class="lbl">Nombre(s) y Apellidos</label>
               <input v-model="p.nombresApellidos" class="inp" @input="p.nombresApellidos = String(p.nombresApellidos||'').toUpperCase()" />
             </div>
             <div class="md:col-span-2">
-              <label class="lbl">C.I. <span v-if="i === 0" class="text-secondary">*</span></label>
+              <label class="lbl">C.I.</label>
               <input v-model="p.ci" class="inp" />
             </div>
             <div class="md:col-span-3">
-              <label class="lbl">Matrícula <span v-if="i === 0" class="text-secondary">*</span></label>
+              <label class="lbl">Matrícula</label>
               <input v-model="p.matricula" class="inp" />
             </div>
             <div class="md:col-span-2">
-              <label class="lbl">Celular <span v-if="i === 0" class="text-secondary">*</span></label>
+              <label class="lbl">Celular</label>
               <input v-model="p.celular" class="inp" />
             </div>
           </div>

@@ -114,6 +114,28 @@ function encontrarCargoPorCi(solicitud: SolicitudInscripcion, ci: string, comple
     return null;
 }
 
+/** Cargos distintos de Co-Gobierno donde aparece el CI en la solicitud. */
+function encontrarCargosNoCogobPorCi(
+    solicitud: SolicitudInscripcion,
+    ci: string,
+    complemento?: string | null,
+): string[] {
+    const idBuscado = ciIdentificador(ci, complemento);
+    const cargos: string[] = [];
+    for (const p of PERSONAS_DIRECTIVA) {
+        if (p.prefix === 'delCogob') continue;
+        const valor = ciIdentificador(
+            String((solicitud as any)[`${p.prefix}Ci`] || ''),
+            (solicitud as any)[`${p.prefix}CiComplemento`],
+        );
+        if (valor.replace(/^\|/, '') && valor === idBuscado) cargos.push(p.checklist);
+    }
+    return cargos;
+}
+
+/** Máx. fraternidades distintas (solicitudes) donde un CI puede figurar en cargos no Co-Gobierno. */
+const MAX_FRATERNIDADES_CARGO_NO_COGOB = 2;
+
 const MAP_DELEGADO_KEY_TO_ADMIN = buildMapDelegadoKeyToAdmin();
 
 function campoEditableEnReedicion(clave: string, checklist: Record<string, any>): boolean {
@@ -331,9 +353,11 @@ export class InscripcionesService {
             qb.andWhere('s.idSolicitud != :excludeId', { excludeId: excludeSolicitudId });
         }
 
+        // Solo coincidencias en cargos distintos de Co-Gobierno (el cogob no cuenta para el cupo).
         qb.andWhere(
             new Brackets((sub) => {
                 for (const p of PERSONAS_DIRECTIVA) {
+                    if (p.prefix === 'delCogob') continue;
                     sub.orWhere(
                         `TRIM(s.${p.prefix}Ci) = :ciNorm AND COALESCE(UPPER(REPLACE(TRIM(s.${p.prefix}CiComplemento), ' ', '')), '') = :compNorm`,
                         { ciNorm, compNorm },
@@ -342,25 +366,66 @@ export class InscripcionesService {
             }),
         );
 
-        const conflicto = await qb.getOne();
-        if (!conflicto) return { disponible: true };
+        const conflictos = await qb.getMany();
+        const usosNoCogob = conflictos
+            .map((sol) => {
+                const cargos = encontrarCargosNoCogobPorCi(sol, ciNorm, compNorm);
+                if (!cargos.length) return null;
+                return {
+                    idSolicitud: sol.idSolicitud,
+                    estado: sol.estado,
+                    nombreFraternidad:
+                        sol.fraternidadCreada?.nombre || sol.nombreFraternidad || 'Otra fraternidad',
+                    cargos,
+                    cargo: cargos[0],
+                };
+            })
+            .filter(Boolean) as Array<{
+            idSolicitud: number;
+            estado: EstadoSolicitud;
+            nombreFraternidad: string;
+            cargos: string[];
+            cargo: string;
+        }>;
 
-        const cargo = encontrarCargoPorCi(conflicto, ciNorm, compNorm);
-        const nombreFraternidad =
-            conflicto.fraternidadCreada?.nombre || conflicto.nombreFraternidad || 'Otra fraternidad';
+        const usados = usosNoCogob.length;
+
+        // Permitido en hasta 2 fraternidades (la actual + 1 más) en cargos no Co-Gobierno.
+        if (usados < MAX_FRATERNIDADES_CARGO_NO_COGOB) {
+            return {
+                disponible: true,
+                repeticionPermitida: usados === 1,
+                usosPreviosNoCogob: usados,
+                usosPrevios: usosNoCogob,
+                maxFraternidadesNoCogob: MAX_FRATERNIDADES_CARGO_NO_COGOB,
+            };
+        }
+
+        const primero = usosNoCogob[0];
+        const detalle = usosNoCogob
+            .map((u) => `"${u.nombreFraternidad}" (${u.cargos.join(', ')})`)
+            .join('; ');
 
         return {
             disponible: false,
-            nombreFraternidad,
-            cargo,
-            idSolicitud: conflicto.idSolicitud,
-            estado: conflicto.estado,
+            nombreFraternidad: primero.nombreFraternidad,
+            cargo: primero.cargo,
+            idSolicitud: primero.idSolicitud,
+            estado: primero.estado,
+            usosPreviosNoCogob: usados,
+            usosPrevios: usosNoCogob,
+            maxFraternidadesNoCogob: MAX_FRATERNIDADES_CARGO_NO_COGOB,
+            mensaje:
+                `El CI ${ciNorm}${compNorm ? ` ${compNorm}` : ''} ya figura en cargos de directiva (aparte de Co-Gobierno) en ${usados} fraternidades: ${detalle}. ` +
+                `Solo puede repetirse en 1 fraternidad adicional (máximo ${MAX_FRATERNIDADES_CARGO_NO_COGOB}).`,
         };
     }
 
     private async assertCisDirectivaUnicos(data: any, excludeSolicitudId?: number) {
         // Misma fraternidad: un CI puede ocupar varios cargos (p.ej. Co-Gobierno + Presidente).
-        // Otras fraternidades: solo Co-Gobierno puede repetirse; el resto de cargos no invade.
+        // Otras fraternidades:
+        //  - Co-Gobierno: libre (solo como Co-Gobierno).
+        //  - Resto de cargos: puede repetirse en 1 fraternidad más (máx. 2 en total).
         for (const p of PERSONAS_DIRECTIVA) {
             const ci = String(data[`${p.prefix}Ci`] || '').trim();
             if (!ci) continue;
@@ -370,9 +435,10 @@ export class InscripcionesService {
             });
             if (!resultado.disponible) {
                 throw new BadRequestException(
-                    `El CI ${ci}${complemento ? ` ${complemento}` : ''} (${p.checklist}) ya figura como ${resultado.cargo} en la fraternidad "${resultado.nombreFraternidad}". ` +
-                        'Los cargos de directiva (salvo Co-Gobierno) solo pueden figurar en una fraternidad. ' +
-                        'El Co-Gobierno sí puede repetirse en otras fraternidades solo como Co-Gobierno.',
+                    (resultado as any).mensaje ||
+                        `El CI ${ci}${complemento ? ` ${complemento}` : ''} (${p.checklist}) ya figura como ${(resultado as any).cargo} en la fraternidad "${(resultado as any).nombreFraternidad}". ` +
+                            'Los cargos de directiva (salvo Co-Gobierno) solo pueden repetirse en 1 fraternidad adicional. ' +
+                            'El Co-Gobierno sí puede repetirse en otras fraternidades solo como Co-Gobierno.',
                 );
             }
         }

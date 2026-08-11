@@ -1213,7 +1213,7 @@ const onCiChange = (ciField, cargoLabel) => {
   }
 
   // Misma fraternidad: CI puede repetirse en varios cargos.
-  // Otras fraternidades: solo Co-Gobierno puede repetirse (solo como Co-Gobierno).
+  // Otras fraternidades: Co-Gobierno libre; resto de cargos puede repetirse en 1 fraternidad más (máx. 2).
   ciValidacion.value = { ...ciValidacion.value, [ciField]: { estado: 'checking', mensaje: 'Verificando...' } }
   ciTimers[ciField] = setTimeout(async () => {
     try {
@@ -1229,13 +1229,20 @@ const onCiChange = (ciField, cargoLabel) => {
           ...ciValidacion.value,
           [ciField]: {
             estado: 'error',
-            mensaje: `Ya figura como ${data.cargo} en "${data.nombreFraternidad}".`,
+            mensaje: data.mensaje
+              || `Ya figura como ${data.cargo} en "${data.nombreFraternidad}" (límite: 2 fraternidades en cargos distintos de Co-Gobierno).`,
           },
         }
       } else {
-        const msg = data.excepcionCogobLibre || cargoPrefix === 'delCogob'
-          ? 'CI permitido: Co-Gobierno puede repetirse en otras fraternidades solo como Co-Gobierno.'
-          : 'CI disponible (puede repetirse en otro cargo de esta fraternidad).'
+        let msg = 'CI disponible (puede repetirse en otro cargo de esta fraternidad).'
+        if (data.excepcionCogobLibre || cargoPrefix === 'delCogob') {
+          msg = 'CI permitido: Co-Gobierno puede repetirse en otras fraternidades solo como Co-Gobierno.'
+        } else if (data.repeticionPermitida) {
+          const prev = (data.usosPrevios || [])[0]
+          msg = prev
+            ? `CI permitido como 2.ª fraternidad (ya figura como ${prev.cargo} en "${prev.nombreFraternidad}"). No podrá usarse en una 3.ª.`
+            : 'CI permitido como 2.ª fraternidad (máximo 2 en cargos distintos de Co-Gobierno).'
+        }
         ciValidacion.value = {
           ...ciValidacion.value,
           [ciField]: { estado: 'ok', mensaje: msg },
