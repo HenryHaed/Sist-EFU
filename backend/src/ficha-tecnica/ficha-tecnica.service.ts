@@ -359,6 +359,30 @@ export class FichaTecnicaService {
     }
   }
 
+  private personaVacia(p: PersonaFicha): boolean {
+    return (
+      !String(p?.nombresApellidos || '').trim() &&
+      !String(p?.ci || '').trim() &&
+      !String(p?.matricula || '').trim() &&
+      !String(p?.celular || '').trim()
+    );
+  }
+
+  private personaCompleta(p: PersonaFicha): boolean {
+    return !!(
+      String(p?.nombresApellidos || '').trim() &&
+      String(p?.ci || '').trim() &&
+      String(p?.matricula || '').trim() &&
+      String(p?.celular || '').trim()
+    );
+  }
+
+  /** Filas con datos útiles para PDF (omite vacías). */
+  private personasParaPdf(arr: any): PersonaFicha[] {
+    const list = this.normalizarPersonas(arr).filter((p) => !this.personaVacia(p));
+    return list.length ? list : [EMPTY_PERSONA()];
+  }
+
   private validarCompleta(ficha: FichaTecnicaMonografia) {
     const faltantes: string[] = [];
     const req = [
@@ -377,15 +401,39 @@ export class FichaTecnicaService {
     for (const [key, label] of req) {
       if (!String((ficha as any)[key] || '').trim()) faltantes.push(label);
     }
-    const checkPersonas = (list: PersonaFicha[], titulo: string) => {
-      list.forEach((p, i) => {
-        if (!p.nombresApellidos || !p.ci || !p.matricula || !p.celular) {
-          faltantes.push(`${titulo} #${i + 1} (nombre, CI, matrícula y celular)`);
+
+    /**
+     * Expositores / representantes: flexible.
+     * - Al menos 1 persona completa por sección.
+     * - La 2.ª es opcional; si se empieza a llenar, debe quedar completa.
+     */
+    const checkPersonasFlexibles = (list: PersonaFicha[], titulo: string) => {
+      const rows = this.normalizarPersonas(list);
+      let completas = 0;
+      rows.forEach((p, i) => {
+        if (this.personaVacia(p)) return;
+        if (!this.personaCompleta(p)) {
+          faltantes.push(
+            `${titulo} #${i + 1}: completa nombre, CI, matrícula y celular, o deja la fila vacía`,
+          );
+          return;
         }
+        completas += 1;
       });
+      if (completas < 1) {
+        faltantes.push(`${titulo}: designa al menos 1 persona (la segunda es opcional)`);
+      }
     };
-    checkPersonas(this.normalizarPersonas(ficha.expositores), 'Expositor defensa monografía');
-    checkPersonas(this.normalizarPersonas(ficha.representantesTraje), 'Representante traje típico');
+
+    checkPersonasFlexibles(
+      this.normalizarPersonas(ficha.expositores),
+      'Expositor defensa monografía',
+    );
+    checkPersonasFlexibles(
+      this.normalizarPersonas(ficha.representantesTraje),
+      'Representante traje típico',
+    );
+
     if (faltantes.length) {
       throw new BadRequestException(`Completa: ${faltantes.join('; ')}`);
     }
@@ -700,7 +748,7 @@ export class FichaTecnicaService {
           });
           y += headerH;
 
-          const rows = this.normalizarPersonas(personas);
+          const rows = this.personasParaPdf(personas);
           rows.forEach((p, idx) => {
             const rowH = 22;
             doc.rect(margin, y, contentWidth, rowH).strokeColor('#334155').lineWidth(0.5).stroke();
