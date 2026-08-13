@@ -6,6 +6,7 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
+import { FichaTecnicaMonografia } from '../entities/FichaTecnicaMonografia';
 import { CreateFraternidadDto, UpdateFraternidadDto } from './dto/fraternidad.dto';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
@@ -22,6 +23,8 @@ export class FraternidadesService {
     private readonly usuarioRepo: Repository<Usuario>,
     @InjectRepository(SolicitudInscripcion)
     private readonly solicitudRepo: Repository<SolicitudInscripcion>,
+    @InjectRepository(FichaTecnicaMonografia)
+    private readonly fichaRepo: Repository<FichaTecnicaMonografia>,
   ) {}
 
   async getGestionActiva() {
@@ -149,15 +152,55 @@ export class FraternidadesService {
   async update(id: number, updateDto: UpdateFraternidadDto) {
     const fraternidad = await this.findOne(id);
     const { idFacultad, idCarrera, idInstitucionExterna, idCategoria, ...data } = updateDto;
+    const nombreAnterior = fraternidad.nombre;
 
     const updateData: any = { ...data };
+    if (updateData.nombre !== undefined) {
+      updateData.nombre = String(updateData.nombre || '')
+        .trim()
+        .toUpperCase();
+    }
     if (idFacultad !== undefined) updateData.facultad = idFacultad ? { idFacultad } : null;
     if (idCarrera !== undefined) updateData.carrera = idCarrera ? { idCarrera } : null;
-    if (idInstitucionExterna !== undefined) updateData.institucionExterna = idInstitucionExterna ? { idInstitucion: idInstitucionExterna } : null;
+    if (idInstitucionExterna !== undefined) {
+      updateData.institucionExterna = idInstitucionExterna
+        ? { idInstitucion: idInstitucionExterna }
+        : null;
+    }
     if (idCategoria !== undefined) updateData.categoria = { idCategoria };
 
     Object.assign(fraternidad, updateData);
-    return this.fraternidadRepo.save(fraternidad);
+    const saved = await this.fraternidadRepo.save(fraternidad);
+
+    // Propagar nombre a solicitud aprobada y ficha técnica (copias desnormalizadas)
+    if (
+      updateData.nombre !== undefined &&
+      String(updateData.nombre) !== String(nombreAnterior || '')
+    ) {
+      await this.sincronizarNombreRelacionados(id, updateData.nombre);
+    }
+
+    return saved;
+  }
+
+  /** Actualiza nombre_fraternidad en solicitud y ficha técnica vinculadas. */
+  private async sincronizarNombreRelacionados(idFraternidad: number, nombre: string) {
+    const nombreNorm = String(nombre || '').trim();
+    if (!nombreNorm) return;
+
+    await this.solicitudRepo
+      .createQueryBuilder()
+      .update(SolicitudInscripcion)
+      .set({ nombreFraternidad: nombreNorm })
+      .where('id_fraternidad_creada = :id', { id: idFraternidad })
+      .execute();
+
+    await this.fichaRepo
+      .createQueryBuilder()
+      .update(FichaTecnicaMonografia)
+      .set({ nombreFraternidad: nombreNorm })
+      .where('id_fraternidad = :id', { id: idFraternidad })
+      .execute();
   }
 
   async remove(id: number) {

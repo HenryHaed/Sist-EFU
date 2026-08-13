@@ -15,6 +15,35 @@
       <span class="material-symbols-outlined animate-spin text-4xl">progress_activity</span>
     </div>
 
+    <div
+      v-else-if="bloqueado"
+      class="bg-white rounded-3xl border border-amber-200 shadow-sm p-6 sm:p-10 text-center flex flex-col items-center"
+    >
+      <div class="size-20 sm:size-24 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mb-5">
+        <span class="material-symbols-outlined text-4xl sm:text-5xl">hourglass_top</span>
+      </div>
+      <h3 class="text-xl sm:text-2xl font-black text-slate-800 uppercase italic mb-3">
+        Ficha técnica no disponible
+      </h3>
+      <p class="max-w-xl text-slate-600 font-medium text-sm sm:text-base leading-relaxed mb-4">
+        {{ bloqueado.mensaje }}
+      </p>
+      <p
+        v-if="bloqueado.estadoSolicitud"
+        class="mb-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border"
+        :class="badgeEstadoClass(bloqueado.estadoSolicitud)"
+      >
+        Estado actual: {{ bloqueado.estadoSolicitud }}
+      </p>
+      <button
+        type="button"
+        @click="irAInscripcion"
+        class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
+      >
+        Ir a mi solicitud de inscripción
+      </button>
+    </div>
+
     <template v-else-if="form">
       <div class="mb-5 flex flex-wrap items-center gap-3">
         <span
@@ -32,11 +61,11 @@
         <p class="text-sm text-emerald-900 font-medium">
           Tu ficha ya está generada. Puedes descargarla o corregirla (se eliminará el PDF actual).
         </p>
-        <div class="flex flex-wrap gap-2">
-          <button type="button" @click="descargar" class="px-4 py-2 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest">
+        <div class="flex flex-col xs:flex-row flex-wrap gap-2 w-full sm:w-auto">
+          <button type="button" @click="descargar" class="w-full sm:w-auto px-4 py-2.5 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest">
             Descargar PDF
           </button>
-          <button type="button" @click="corregir" :disabled="working" class="px-4 py-2 bg-secondary text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50">
+          <button type="button" @click="corregir" :disabled="working" class="w-full sm:w-auto px-4 py-2.5 bg-secondary text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50">
             Corregir mi ficha técnica
           </button>
         </div>
@@ -221,14 +250,31 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
 import api from '../services/api'
 
+const router = useRouter()
 const loading = ref(true)
 const working = ref(false)
 const form = ref(null)
+const bloqueado = ref(null)
 
 const editable = computed(() => form.value?.estado === 'BORRADOR')
+
+const badgeEstadoClass = (estado) => {
+  const map = {
+    OBSERVADO: 'bg-amber-50 text-amber-800 border-amber-200',
+    PENDIENTE: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+    RECHAZADO: 'bg-red-50 text-red-800 border-red-200',
+    BORRADOR: 'bg-slate-50 text-slate-600 border-slate-200',
+  }
+  return map[estado] || 'bg-slate-50 text-slate-600 border-slate-200'
+}
+
+const irAInscripcion = () => {
+  router.push({ query: { ...router.currentRoute.value.query, v: 'inscripcion_fraternidad' } })
+}
 
 const formatFecha = (d) => {
   if (!d) return ''
@@ -253,11 +299,25 @@ const ensurePersonas = (data) => {
 
 const cargar = async () => {
   loading.value = true
+  bloqueado.value = null
+  form.value = null
   try {
     const { data } = await api.get('/ficha-tecnica/mi')
+    if (data?.accesoPermitido === false) {
+      bloqueado.value = {
+        mensaje: data.mensaje,
+        estadoSolicitud: data.estadoSolicitud || null,
+      }
+      return
+    }
     form.value = ensurePersonas(data)
   } catch (e) {
-    Swal.fire('Error', e.response?.data?.message || 'No se pudo cargar la ficha', 'error')
+    const msg = e.response?.data?.message || 'No se pudo cargar la ficha'
+    if (String(msg).toLowerCase().includes('aún no fue aprobada') || String(msg).toLowerCase().includes('aun no fue aprobada')) {
+      bloqueado.value = { mensaje: msg, estadoSolicitud: null }
+    } else {
+      Swal.fire('Error', msg, 'error')
+    }
   } finally {
     loading.value = false
   }

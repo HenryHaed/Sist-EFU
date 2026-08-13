@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not, IsNull } from 'typeorm';
+import { Response } from 'express';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { Asistencia } from '../entities/Asistencia';
 import { Incidencia } from '../entities/Incidencia';
@@ -11,6 +12,7 @@ import { EventoControl } from '../entities/EventoControl';
 import { Usuario } from '../entities/Usuario';
 import { MailService } from '../mail/mail.service';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 import { CrearEventoDto } from './dto/crear-evento.dto';
 
 /** 10% de la nota máxima de disciplina (30 pts) */
@@ -221,6 +223,143 @@ export class AsistenciasService {
     });
 
     return Array.from(fraternidadesMap.values()).filter(e => e.titular || e.suplente);
+  }
+
+  /**
+   * PDF: directorio de fraternidades con delegado titular y suplente + celulares.
+   */
+  async generarReporteDirectorioDelegadosPdf(res: Response) {
+    const gestion = await this.getGestionActiva();
+    const listado = await this.getDelegados();
+    listado.sort((a, b) =>
+      String(a.nombreFraternidad || '').localeCompare(String(b.nombreFraternidad || ''), 'es'),
+    );
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({
+      margin: 36,
+      size: 'A4',
+      layout: 'landscape',
+      autoFirstPage: true,
+    });
+
+    const anio = (gestion as any)?.anio || new Date().getFullYear();
+    const nombreArchivo = `Directorio_Delegados_EFU_${anio}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+    doc.pipe(res);
+
+    const pageWidth = 841.89;
+    const margin = 36;
+    const contentWidth = pageWidth - margin * 2;
+
+    const { contentStartY } = drawPdfInstitutionalHeader(
+      doc,
+      'DIRECTORIO DE DELEGADOS POR FRATERNIDAD',
+      `Gestión ${anio} · Titular y suplente con celular de contacto`,
+      { pageWidth, margin, compact: true },
+    );
+
+    let y = contentStartY + 4;
+    doc
+      .fontSize(8)
+      .fillColor('#64748b')
+      .font('Helvetica')
+      .text(
+        `Total fraternidades: ${listado.length}  ·  Generado: ${new Date().toLocaleString('es-BO')}`,
+        margin,
+        y,
+        { width: contentWidth },
+      );
+    y += 16;
+
+    const cols = [
+      { key: 'n', label: 'N°', w: 28 },
+      { key: 'frat', label: 'Fraternidad', w: 175 },
+      { key: 'cat', label: 'Categoría', w: 70 },
+      { key: 'titNombre', label: 'Delegado titular', w: 155 },
+      { key: 'titCel', label: 'Celular titular', w: 78 },
+      { key: 'supNombre', label: 'Delegado suplente', w: 155 },
+      { key: 'supCel', label: 'Celular suplente', w: contentWidth - 28 - 175 - 70 - 155 - 78 - 155 },
+    ];
+
+    const rowH = 22;
+    const headerH = 20;
+
+    const drawHeader = (startY: number) => {
+      doc.save();
+      doc.rect(margin, startY, contentWidth, headerH).fill('#003399');
+      let x = margin;
+      doc.fontSize(7).fillColor('#ffffff').font('Helvetica-Bold');
+      cols.forEach((c) => {
+        doc.text(c.label, x + 3, startY + 6, { width: c.w - 6 });
+        x += c.w;
+      });
+      doc.restore();
+      return startY + headerH;
+    };
+
+    y = drawHeader(y);
+
+    if (!listado.length) {
+      doc
+        .fontSize(10)
+        .fillColor('#64748b')
+        .font('Helvetica-Oblique')
+        .text('No hay fraternidades con delegados registrados en la gestión activa.', margin, y + 20);
+      doc.end();
+      return;
+    }
+
+    listado.forEach((f, idx) => {
+      if (y + rowH > 560) {
+        doc.addPage({ size: 'A4', layout: 'landscape', margin: 36 });
+        y = 40;
+        doc
+          .fontSize(9)
+          .fillColor('#003399')
+          .font('Helvetica-Bold')
+          .text(`Directorio de Delegados — Gestión ${anio} (continuación)`, margin, y);
+        y += 18;
+        y = drawHeader(y);
+      }
+
+      const bg = idx % 2 === 0 ? '#f8fafc' : '#ffffff';
+      doc.save();
+      doc.rect(margin, y, contentWidth, rowH).fill(bg);
+      doc.restore();
+
+      const vals = [
+        String(idx + 1),
+        String(f.nombreFraternidad || '—'),
+        String(f.categoria || '—'),
+        String(f.titular?.nombre || '—'),
+        String(f.titular?.celular || '—'),
+        String(f.suplente?.nombre || '—'),
+        String(f.suplente?.celular || '—'),
+      ];
+
+      let x = margin;
+      vals.forEach((v, i) => {
+        doc
+          .fontSize(i === 1 || i === 3 || i === 5 ? 7.5 : 7)
+          .fillColor('#0f172a')
+          .font(i === 1 ? 'Helvetica-Bold' : 'Helvetica')
+          .text(v, x + 3, y + 6, { width: cols[i].w - 6, ellipsis: true, lineBreak: false });
+        x += cols[i].w;
+      });
+
+      doc
+        .moveTo(margin, y + rowH)
+        .lineTo(margin + contentWidth, y + rowH)
+        .strokeColor('#e2e8f0')
+        .lineWidth(0.5)
+        .stroke();
+
+      y += rowH;
+    });
+
+    doc.end();
   }
 
   async registrarAsistencia(data: {

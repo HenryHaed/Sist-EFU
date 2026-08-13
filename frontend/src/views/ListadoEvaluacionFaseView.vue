@@ -30,6 +30,24 @@
         <span class="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
       </div>
 
+      <div v-else class="space-y-4">
+        <div class="relative max-w-lg">
+          <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+          <input
+            v-model="busqueda"
+            type="search"
+            placeholder="Buscar fraternidad o categoría..."
+            class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
+          />
+        </div>
+
+        <div v-if="fraternidadesFiltradas.length === 0" class="bg-white rounded-3xl border border-slate-200 py-16 text-center text-slate-400">
+          <span class="material-symbols-outlined text-5xl mb-3">search_off</span>
+          <p class="text-sm font-medium">
+            {{ busqueda.trim() ? `Ninguna fraternidad coincide con “${busqueda}”.` : 'No hay fraternidades habilitadas en esta fase.' }}
+          </p>
+        </div>
+
       <div v-else class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
         
         <!-- Vista Desktop (Tabla) -->
@@ -45,7 +63,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="item in fraternidades" :key="item.idFraternidad" class="hover:bg-slate-50 transition-colors">
+              <tr v-for="item in fraternidadesFiltradas" :key="item.idFraternidad" class="hover:bg-slate-50 transition-colors">
                 <td class="px-6 py-4">
                   <p class="font-bold text-primary">{{ item.nombre }}</p>
                   <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
@@ -165,7 +183,7 @@
 
         <!-- Vista Mobile (Tarjetas) -->
         <div class="md:hidden p-4 space-y-4">
-          <div v-for="item in fraternidades" :key="item.idFraternidad + '_mobile'" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-4 relative overflow-hidden">
+          <div v-for="item in fraternidadesFiltradas" :key="item.idFraternidad + '_mobile'" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-4 relative overflow-hidden">
             <!-- Indicador lateral estado -->
             <div class="absolute left-0 top-0 bottom-0 w-1.5"
                  :class="{
@@ -247,6 +265,7 @@
           </div>
         </div>
 
+      </div>
       </div>
     </div>
 
@@ -360,7 +379,20 @@ const emit = defineEmits(['volver', 'evaluar-fraternidad'])
 
 const fase = ref(null)
 const fraternidades = ref([])
+const busqueda = ref('')
 const loading = ref(true)
+
+const fraternidadesFiltradas = computed(() => {
+  const q = busqueda.value.trim().toLowerCase()
+  if (!q) return fraternidades.value
+  return fraternidades.value.filter((f) => {
+    const haystack = [f.nombre, f.categoria]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(q)
+  })
+})
 
 // Temporizador Regresivo Global
 const tiempoRestante = ref(0)

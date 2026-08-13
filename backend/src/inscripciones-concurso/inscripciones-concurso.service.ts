@@ -293,7 +293,7 @@ export class InscripcionesConcursoService {
     }
 
     return {
-      nombreFraternidad: sol?.nombreFraternidad || frat.nombre || '',
+      nombreFraternidad: frat.nombre || sol?.nombreFraternidad || '',
       categoria: sol?.categoria?.nombre || frat.categoria?.nombre || '',
       instanciaRepresentacion: instancia || '',
       facultadNombre,

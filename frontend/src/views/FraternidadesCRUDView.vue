@@ -12,13 +12,24 @@
         </p>
       </div>
 
-      <button
-        @click="abrirModalCrear"
-        class="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
-      >
-        <span class="material-symbols-outlined">add_circle</span>
-        Nueva Fraternidad
-      </button>
+      <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+        <div class="relative w-full sm:w-72">
+          <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+          <input
+            v-model="busqueda"
+            type="search"
+            placeholder="Buscar fraternidad..."
+            class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
+          />
+        </div>
+        <button
+          @click="abrirModalCrear"
+          class="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+        >
+          <span class="material-symbols-outlined">add_circle</span>
+          Nueva Fraternidad
+        </button>
+      </div>
     </div>
 
     <!-- Table Card -->
@@ -33,7 +44,13 @@
         <p class="text-lg">No hay fraternidades registradas.</p>
       </div>
 
-      <div v-else class="hidden md:block overflow-x-auto">
+      <div v-else-if="fraternidadesOrdenadas.length === 0" class="p-16 flex flex-col items-center justify-center gap-3 text-slate-400">
+        <span class="material-symbols-outlined text-5xl">search_off</span>
+        <p class="text-sm font-medium">Ninguna fraternidad coincide con “{{ busqueda }}”.</p>
+      </div>
+
+      <template v-else>
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left">
           <thead>
             <tr class="bg-slate-50/50 border-b border-slate-100">
@@ -223,6 +240,7 @@
 
         </div>
       </div>
+      </template>
     </div>
 
     <!-- Modal Form -->
@@ -330,6 +348,7 @@ const router = useRouter()
 
 const fraternidades = ref([])
 const loading = ref(true)
+const busqueda = ref('')
 const modalAbierto = ref(false)
 const editando = ref(false)
 const sortField = ref('nombre')
@@ -412,7 +431,28 @@ const sortIcon = (field) => {
 }
 
 const fraternidadesOrdenadas = computed(() => {
-  const list = [...fraternidades.value]
+  const q = busqueda.value.trim().toLowerCase()
+  let list = [...fraternidades.value]
+
+  if (q) {
+    list = list.filter((f) => {
+      const haystack = [
+        f.nombre,
+        f.nivelRepresentacion,
+        f.categoria?.nombre,
+        f.facultad?.sigla,
+        f.facultad?.nombre,
+        f.carrera?.nombre,
+        f.institucionExterna?.sigla,
+        f.institucionExterna?.nombre,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    })
+  }
+
   const dir = sortDir.value === 'asc' ? 1 : -1
 
   const compareText = (a, b) => {
@@ -555,7 +595,7 @@ const guardar = async () => {
   const payload = {
     nombre: form.value.nombre,
     nivelRepresentacion: form.value.nivelRepresentacion,
-    categoria: { idCategoria: form.value.idCategoria },
+    idCategoria: form.value.idCategoria,
     idFacultad: form.value.idFacultad,
     idCarrera: form.value.idCarrera,
     idInstitucionExterna: form.value.idInstitucionExterna,

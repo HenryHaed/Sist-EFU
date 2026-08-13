@@ -555,7 +555,7 @@ export class ReportesService implements OnModuleInit {
 
     for (const s of solicitudes) {
       pushCostos(s.costosParticipacion, {
-        nombreFraternidad: s.nombreFraternidad || s.fraternidadCreada?.nombre || '—',
+        nombreFraternidad: s.fraternidadCreada?.nombre || s.nombreFraternidad || '—',
         tipoDanza: s.tipoDanza?.nombre || '—',
         categoria: s.categoria?.nombre || '—',
         facultad: s.facultad?.nombre || '—',

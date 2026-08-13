@@ -8,6 +8,15 @@
         </p>
       </div>
       <div class="flex flex-col sm:flex-row gap-3">
+        <div class="relative min-w-[200px] sm:min-w-[240px]">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+          <input
+            v-model="busqueda"
+            type="search"
+            :placeholder="ambito === 'EFU' ? 'Buscar fraternidad...' : 'Buscar participante o fraternidad...'"
+            class="form-input !py-2.5 !text-sm !pl-10 w-full"
+          />
+        </div>
         <select v-model="idGestion" class="form-input !py-2.5 !text-sm min-w-[160px]" @change="cargar">
           <option v-for="g in gestiones" :key="g.idGestion" :value="g.idGestion">
             Gestión {{ g.anio }}{{ g.activa ? ' (activa)' : '' }}
@@ -59,7 +68,11 @@
     <div v-else-if="ambito === 'EFU'" class="space-y-3">
       <div v-if="!itemsEfu.length" class="py-16 text-center text-slate-400">
         <span class="material-symbols-outlined text-5xl mb-3">inbox</span>
-        <p class="text-sm font-medium">No hay calificaciones EFU registradas en esta gestión.</p>
+        <p class="text-sm font-medium">
+          {{ busqueda.trim()
+            ? `Ninguna fraternidad coincide con “${busqueda}”.`
+            : 'No hay calificaciones EFU registradas en esta gestión.' }}
+        </p>
       </div>
 
       <article
@@ -139,7 +152,11 @@
     <div v-else class="space-y-6">
       <div v-if="!concursos.length" class="py-16 text-center text-slate-400">
         <span class="material-symbols-outlined text-5xl mb-3">emoji_events</span>
-        <p class="text-sm font-medium">No hay calificaciones de concursos en esta gestión.</p>
+        <p class="text-sm font-medium">
+          {{ busqueda.trim()
+            ? `Ningún resultado para “${busqueda}”.`
+            : 'No hay calificaciones de concursos en esta gestión.' }}
+        </p>
       </div>
 
       <section v-for="concurso in concursos" :key="concurso.idFase" class="space-y-3">
@@ -219,11 +236,42 @@ const error = ref('')
 const gestiones = ref([])
 const idGestion = ref(null)
 const ambito = ref('EFU')
+const busqueda = ref('')
 const data = ref(null)
 const expandido = reactive({})
 
-const itemsEfu = computed(() => data.value?.items || [])
-const concursos = computed(() => data.value?.concursos || [])
+const qNorm = computed(() => busqueda.value.trim().toLowerCase())
+
+const itemsEfu = computed(() => {
+  const items = data.value?.items || []
+  const q = qNorm.value
+  if (!q) return items
+  return items.filter((item) => {
+    const haystack = [item.nombre, item.categoria]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(q)
+  })
+})
+
+const concursos = computed(() => {
+  const list = data.value?.concursos || []
+  const q = qNorm.value
+  if (!q) return list
+  return list
+    .map((c) => ({
+      ...c,
+      participantes: (c.participantes || []).filter((p) => {
+        const haystack = [p.nombre, p.fraternidad, p.tipo, c.nombreConcurso]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(q)
+      }),
+    }))
+    .filter((c) => c.participantes.length > 0)
+})
 
 const fmt = (n) => Number(n || 0).toFixed(2)
 

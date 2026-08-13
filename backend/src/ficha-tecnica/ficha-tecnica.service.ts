@@ -201,7 +201,7 @@ export class FichaTecnicaService {
     const titular = sol ? nombreCompletoSolicitud(sol as any, 'delTitular') : '';
 
     return {
-      nombreFraternidad: sol?.nombreFraternidad || frat.nombre || '',
+      nombreFraternidad: frat.nombre || sol?.nombreFraternidad || '',
       categoria: sol?.categoria?.nombre || frat.categoria?.nombre || '',
       instanciaRepresentacion: instancia || '',
       facultadNombre,
@@ -264,10 +264,67 @@ export class FichaTecnicaService {
     return usuario;
   }
 
+  private static readonly MENSAJE_FICHA_NO_APROBADA =
+    'Su fraternidad aún no fue aprobada. Corrija las observaciones pendientes o espere a que la Comisión de Culturas revise su solicitud para generar su ficha técnica.';
+
+  private async findUltimaSolicitudDelegado(idUsuario: number) {
+    return this.solicitudRepo.findOne({
+      where: { delegado: { idUsuario } },
+      order: { createdAt: 'DESC' },
+      relations: ['fraternidadCreada'],
+    });
+  }
+
+  private respuestaFichaBloqueada(estadoSolicitud: string | null = null) {
+    return {
+      accesoPermitido: false,
+      estadoSolicitud,
+      mensaje: FichaTecnicaService.MENSAJE_FICHA_NO_APROBADA,
+    };
+  }
+
+  /** Solo inscripción APROBADA con fraternidad oficial puede usar ficha técnica. */
+  private async assertAccesoFichaAprobada(idUsuario: number) {
+    const usuario = await this.usuarioRepo.findOne({
+      where: { idUsuario },
+      relations: ['rol', 'fraternidad'],
+    });
+    if (!usuario || usuario.rol?.nombre !== 'delegado') {
+      throw new ForbiddenException('Solo el delegado puede gestionar su ficha técnica.');
+    }
+    const ultima = await this.findUltimaSolicitudDelegado(idUsuario);
+    if (!usuario.fraternidad) {
+      throw new BadRequestException(FichaTecnicaService.MENSAJE_FICHA_NO_APROBADA);
+    }
+    const sol = await this.findSolicitudHerencia(usuario.fraternidad.idFraternidad);
+    if (!sol || sol.estado !== EstadoSolicitud.APROBADO) {
+      throw new BadRequestException(FichaTecnicaService.MENSAJE_FICHA_NO_APROBADA);
+    }
+    return { usuario, sol, ultima };
+  }
+
   async getMiFicha(idUsuario: number) {
+    const usuarioLite = await this.usuarioRepo.findOne({
+      where: { idUsuario },
+      relations: ['rol', 'fraternidad'],
+    });
+    if (!usuarioLite || usuarioLite.rol?.nombre !== 'delegado') {
+      throw new ForbiddenException('Solo el delegado puede gestionar su ficha técnica.');
+    }
+
+    const ultimaSol = await this.findUltimaSolicitudDelegado(idUsuario);
+    if (!usuarioLite.fraternidad) {
+      return this.respuestaFichaBloqueada(ultimaSol?.estado || null);
+    }
+
+    const solCheck = await this.findSolicitudHerencia(usuarioLite.fraternidad.idFraternidad);
+    if (!solCheck || solCheck.estado !== EstadoSolicitud.APROBADO) {
+      return this.respuestaFichaBloqueada(solCheck?.estado || ultimaSol?.estado || null);
+    }
+
     const usuario = await this.getDelegadoFraternidad(idUsuario);
     const frat = usuario.fraternidad;
-    const sol = await this.findSolicitudHerencia(frat.idFraternidad);
+    const sol = solCheck;
     const herencia = this.herenciaDesdeSolicitud(frat, sol);
 
     let ficha = await this.fichaRepo.findOne({
@@ -310,10 +367,11 @@ export class FichaTecnicaService {
       await this.fichaRepo.save(ficha);
     }
 
-    return this.toResponse(ficha, herencia);
+    return { accesoPermitido: true, ...this.toResponse(ficha, herencia) };
   }
 
   async guardarMiFicha(idUsuario: number, body: any) {
+    await this.assertAccesoFichaAprobada(idUsuario);
     const usuario = await this.getDelegadoFraternidad(idUsuario);
     let ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: usuario.fraternidad.idFraternidad } },
@@ -445,6 +503,7 @@ export class FichaTecnicaService {
   }
 
   async generarMiPdf(idUsuario: number, res: Response) {
+    await this.assertAccesoFichaAprobada(idUsuario);
     const usuario = await this.getDelegadoFraternidad(idUsuario);
     const ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: usuario.fraternidad.idFraternidad } },
@@ -487,6 +546,7 @@ export class FichaTecnicaService {
   }
 
   async corregirMiFicha(idUsuario: number) {
+    await this.assertAccesoFichaAprobada(idUsuario);
     const usuario = await this.getDelegadoFraternidad(idUsuario);
     const ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: usuario.fraternidad.idFraternidad } },
@@ -557,6 +617,7 @@ export class FichaTecnicaService {
   }
 
   async descargarMiPdf(idUsuario: number, res: Response) {
+    await this.assertAccesoFichaAprobada(idUsuario);
     const usuario = await this.getDelegadoFraternidad(idUsuario);
     const ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: usuario.fraternidad.idFraternidad } },

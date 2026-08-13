@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { AsistenciasService } from './asistencias.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -27,6 +28,12 @@ export class AsistenciasController {
   @Roles('superusuario', 'admin', 'controladorhcu')
   getDelegados() {
     return this.asistenciasService.getDelegados();
+  }
+
+  @Get('delegados/reporte-pdf')
+  @Roles('superusuario', 'admin', 'controladorhcu')
+  reporteDirectorioPdf(@Res() res: Response) {
+    return this.asistenciasService.generarReporteDirectorioDelegadosPdf(res);
   }
 
   @Get('eventos')

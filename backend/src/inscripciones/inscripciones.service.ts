@@ -16,6 +16,7 @@ import { MailService } from '../mail/mail.service';
 import { Evaluacion } from '../entities/Evaluacion';
 import { Incidencia } from '../entities/Incidencia';
 import { Asistencia } from '../entities/Asistencia';
+import { FichaTecnicaMonografia } from '../entities/FichaTecnicaMonografia';
 import { recalcularExcedentesPorTipoDanza } from '../common/cupo-fraternidades';
 
 const PERSONAS_DIRECTIVA = [
@@ -186,6 +187,8 @@ export class InscripcionesService {
         private readonly incidenciaRepo: Repository<Incidencia>,
         @InjectRepository(Asistencia)
         private readonly asistenciaRepo: Repository<Asistencia>,
+        @InjectRepository(FichaTecnicaMonografia)
+        private readonly fichaRepo: Repository<FichaTecnicaMonografia>,
         private readonly dataSource: DataSource,
         private readonly mailService: MailService,
     ) {}
@@ -1107,6 +1110,39 @@ export class InscripcionesService {
         await this.assertCisDirectivaUnicos(sol, sol.idSolicitud);
         this.normalizarSolicitudInscripcion(sol);
         await this.solicitudRepo.save(sol);
+
+        // Si ya hay fraternidad oficial, propagar nombre (y datos clave) a fraternidad + ficha
+        if (sol.fraternidadCreada?.idFraternidad && data.nombreFraternidad !== undefined) {
+            const nombreNorm = String(sol.nombreFraternidad || '').trim();
+            if (nombreNorm) {
+                const frat = await this.fraternidadRepo.findOne({
+                    where: { idFraternidad: sol.fraternidadCreada.idFraternidad },
+                });
+                if (frat) {
+                    frat.nombre = this.aMayusculas(nombreNorm) as string;
+                    if (data.instanciaRepresentacion !== undefined) {
+                        frat.nivelRepresentacion = sol.instanciaRepresentacion || frat.nivelRepresentacion;
+                    }
+                    if (data.idCategoria !== undefined && sol.categoria) {
+                        frat.categoria = sol.categoria as any;
+                    }
+                    if (data.idFacultad !== undefined) frat.facultad = sol.facultad as any;
+                    if (data.idCarrera !== undefined) frat.carrera = sol.carrera as any;
+                    if (data.idTipoDanza !== undefined && sol.tipoDanza) {
+                        frat.tipoDanza = sol.tipoDanza as any;
+                    }
+                    await this.fraternidadRepo.save(frat);
+
+                    await this.fichaRepo
+                        .createQueryBuilder()
+                        .update(FichaTecnicaMonografia)
+                        .set({ nombreFraternidad: frat.nombre })
+                        .where('id_fraternidad = :id', { id: frat.idFraternidad })
+                        .execute();
+                }
+            }
+        }
+
         return this.getSolicitudById(id);
     }
 

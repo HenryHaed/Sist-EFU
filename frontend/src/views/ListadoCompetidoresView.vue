@@ -42,10 +42,24 @@
         <span class="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
       </div>
 
+      <template v-else>
+        <div
+          v-if="!(esChacha && vista === 'pareja')"
+          class="relative max-w-lg mb-6"
+        >
+          <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+          <input
+            v-model="busqueda"
+            type="search"
+            :placeholder="esChacha && vista === 'fraternidades' ? 'Buscar fraternidad...' : 'Buscar participante o fraternidad...'"
+            class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
+          />
+        </div>
+
       <!-- CHACHA: fraternidades -->
-      <div v-else-if="esChacha && vista === 'fraternidades'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-if="esChacha && vista === 'fraternidades'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <button
-          v-for="grupo in fraternidadesGrupos"
+          v-for="grupo in fraternidadesGruposFiltrados"
           :key="grupo.idFraternidad ?? 'sin'"
           type="button"
           class="text-left bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all p-6 group"
@@ -75,10 +89,12 @@
           </div>
         </button>
 
-        <div v-if="fraternidadesGrupos.length === 0" class="col-span-full py-20 text-center">
+        <div v-if="fraternidadesGruposFiltrados.length === 0" class="col-span-full py-20 text-center">
           <span class="material-symbols-outlined text-6xl text-slate-200 mb-4">groups</span>
           <p class="text-slate-400 font-bold uppercase tracking-widest max-w-md mx-auto">
-            No hay fraternidades con Chacha-Warmi aprobado para calificar.
+            {{ busqueda.trim()
+              ? `Ninguna fraternidad coincide con “${busqueda}”.`
+              : 'No hay fraternidades con Chacha-Warmi aprobado para calificar.' }}
           </p>
         </div>
       </div>
@@ -86,7 +102,7 @@
       <!-- CHACHA: pareja / listado plano de otros -->
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div
-          v-for="p in participantesVista"
+          v-for="p in participantesVistaFiltrados"
           :key="p.idParticipante"
           class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg transition-all group flex flex-col"
         >
@@ -155,13 +171,16 @@
           </div>
         </div>
 
-        <div v-if="participantesVista.length === 0" class="col-span-full py-20 text-center">
+        <div v-if="participantesVistaFiltrados.length === 0" class="col-span-full py-20 text-center">
           <span class="material-symbols-outlined text-6xl text-slate-200 mb-4">person_off</span>
           <p class="text-slate-400 font-bold uppercase tracking-widest">
-            {{ esChacha ? 'Esta fraternidad no tiene pareja registrada.' : 'No hay participantes registrados para este concurso.' }}
+            {{ busqueda.trim()
+              ? `Ningún resultado para “${busqueda}”.`
+              : (esChacha ? 'Esta fraternidad no tiene pareja registrada.' : 'No hay participantes registrados para este concurso.') }}
           </p>
         </div>
       </div>
+      </template>
     </div>
   </div>
 </template>
@@ -179,6 +198,7 @@ const emit = defineEmits(['volver', 'evaluar-participante'])
 
 const participantes = ref([])
 const loading = ref(true)
+const busqueda = ref('')
 const vista = ref('lista') // 'lista' | 'fraternidades' | 'pareja'
 const fraternidadActiva = ref(null)
 const plantillaDesdeApi = ref(null)
@@ -224,6 +244,26 @@ const participantesVista = computed(() => {
     })
   }
   return participantes.value
+})
+
+const fraternidadesGruposFiltrados = computed(() => {
+  const q = busqueda.value.trim().toLowerCase()
+  if (!q) return fraternidadesGrupos.value
+  return fraternidadesGrupos.value.filter((g) =>
+    String(g.nombre || '').toLowerCase().includes(q),
+  )
+})
+
+const participantesVistaFiltrados = computed(() => {
+  const q = busqueda.value.trim().toLowerCase()
+  if (!q || (esChacha.value && vista.value === 'pareja')) return participantesVista.value
+  return participantesVista.value.filter((p) => {
+    const haystack = [p.nombre, p.fraternidad, p.tipo]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(q)
+  })
 })
 
 const resumenTipos = (lista) => {

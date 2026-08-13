@@ -1,40 +1,40 @@
 <template>
   <div class="dashboard-page max-w-5xl">
     <!-- Header -->
-    <div class="mb-8 sm:mb-10 text-left">
+    <div class="mb-6 sm:mb-10 text-left">
       <div class="flex items-center gap-3 mb-2">
         <span class="h-6 sm:h-8 w-2 bg-secondary rounded-full shrink-0"></span>
         <h2 class="dashboard-page-title italic uppercase text-primary">Inscripción Oficial</h2>
       </div>
-      <p class="text-slate-500 font-medium">Completa los 33 puntos requeridos para el registro de tu fraternidad en la gestión {{ siteInfo.anio }}.</p>
+      <p class="text-slate-500 font-medium text-sm sm:text-base">Completa los 33 puntos requeridos para el registro de tu fraternidad en la gestión {{ siteInfo.anio }}.</p>
     </div>
 
     <!-- Stepper Navigation -->
-    <div class="mb-8 sm:mb-12 overflow-x-auto pb-2 -mx-1 px-1">
-      <div class="flex items-center justify-between relative min-w-[520px] sm:min-w-0 max-w-3xl mx-auto">
+    <div class="mb-6 sm:mb-12 overflow-x-auto pb-2 -mx-1 px-1">
+      <div class="flex items-center justify-between relative min-w-[420px] sm:min-w-0 max-w-3xl mx-auto px-1">
       <div class="absolute top-1/2 left-0 w-full h-[2px] bg-slate-100 -translate-y-1/2 z-0"></div>
       <div 
         v-for="(step, i) in steps" :key="i"
-        class="relative z-10 flex flex-col items-center gap-3"
+        class="relative z-10 flex flex-col items-center gap-2 sm:gap-3"
       >
         <div 
-          class="size-12 rounded-full flex items-center justify-center font-black transition-all duration-500 border-4"
+          class="size-9 sm:size-12 rounded-full flex items-center justify-center font-black transition-all duration-500 border-4 text-sm sm:text-base"
           :class="[
             currentStep > i + 1 ? 'bg-green-500 border-green-100 text-white' : 
             currentStep === i + 1 ? 'bg-primary border-blue-100 text-white shadow-lg shadow-primary/30 scale-110' : 
             'bg-white border-slate-50 text-slate-300'
           ]"
         >
-          <span v-if="currentStep > i + 1" class="material-symbols-outlined">check</span>
+          <span v-if="currentStep > i + 1" class="material-symbols-outlined text-lg sm:text-xl">check</span>
           <span v-else>{{ i + 1 }}</span>
         </div>
-        <span class="text-[9px] font-black uppercase tracking-widest text-center max-w-[4.5rem] leading-tight" :class="currentStep === i + 1 ? 'text-primary' : 'text-slate-400'">{{ step.label }}</span>
+        <span class="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-center max-w-[3.5rem] sm:max-w-[4.5rem] leading-tight" :class="currentStep === i + 1 ? 'text-primary' : 'text-slate-400'">{{ step.label }}</span>
       </div>
       </div>
     </div>
 
     <!-- FORM CONTAINER -->
-    <div class="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden min-h-[500px]">
+    <div class="bg-white rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden min-h-[400px] sm:min-h-[500px]">
       
       <!-- LOADING STATE -->
       <div v-if="loadingForm" class="py-32 flex flex-col items-center justify-center">
@@ -43,110 +43,110 @@
       </div>
 
       <!-- SOLICITUD YA ENVIADA O APROBADA -->
-      <div v-else-if="solicitudExistente && !solicitudEditable" class="py-24 px-8 text-center flex flex-col items-center">
+      <div v-else-if="solicitudExistente && !solicitudEditable" class="py-16 sm:py-24 px-4 sm:px-8 text-center flex flex-col items-center">
         <!-- RECHAZADO: anulada, sin derecho a corregir -->
         <template v-if="solicitudExistente.estado === 'RECHAZADO'">
-          <div class="size-24 bg-red-50 text-secondary rounded-full flex items-center justify-center mb-6">
-            <span class="material-symbols-outlined text-5xl">block</span>
+          <div class="size-20 sm:size-24 bg-red-50 text-secondary rounded-full flex items-center justify-center mb-6">
+            <span class="material-symbols-outlined text-4xl sm:text-5xl">block</span>
           </div>
-          <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Inscripción anulada</h3>
-          <p class="max-w-md text-slate-500 font-medium mb-4">
+          <h3 class="text-xl sm:text-2xl font-black text-slate-800 uppercase italic mb-2">Inscripción anulada</h3>
+          <p class="max-w-md text-slate-500 font-medium mb-4 text-sm sm:text-base">
             La Comisión ha rechazado y anulado tu solicitud de inscripción para la gestión {{ siteInfo.anio }}.
             <strong class="text-secondary">No tienes derecho a corregir ni reenviar</strong> esta inscripción.
           </p>
-          <div v-if="solicitudExistente.observaciones" class="bg-red-50 border border-red-100 p-4 rounded-xl mb-8 max-w-md text-left">
+          <div v-if="solicitudExistente.observaciones" class="bg-red-50 border border-red-100 p-4 rounded-xl mb-8 max-w-md text-left w-full">
             <p class="text-[10px] font-black uppercase text-red-600 mb-1">Motivo del rechazo (La Comisión):</p>
             <p class="text-xs text-red-800 font-medium">{{ solicitudExistente.observaciones }}</p>
           </div>
-          <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
+          <button @click="$router.push('/dashboard')" class="w-full sm:w-auto px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
             Ir a Mi Panel
           </button>
         </template>
 
         <!-- PENDIENTE: en revisión -->
         <template v-else-if="solicitudExistente.estado === 'PENDIENTE'">
-          <div class="size-24 bg-indigo-50 text-primary rounded-full flex items-center justify-center mb-6">
-            <span class="material-symbols-outlined text-5xl">mark_email_read</span>
+          <div class="size-20 sm:size-24 bg-indigo-50 text-primary rounded-full flex items-center justify-center mb-6">
+            <span class="material-symbols-outlined text-4xl sm:text-5xl">mark_email_read</span>
           </div>
-          <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Solicitud en Revisión</h3>
-          <p class="max-w-md text-slate-500 font-medium mb-4">
+          <h3 class="text-xl sm:text-2xl font-black text-slate-800 uppercase italic mb-2">Solicitud en Revisión</h3>
+          <p class="max-w-md text-slate-500 font-medium mb-4 text-sm sm:text-base">
             Ya has enviado una solicitud de inscripción para la gestión {{ siteInfo.anio }}.
             Tu registro se encuentra actualmente en estado:
-            <span class="px-3 py-1 bg-primary/10 text-primary rounded-full font-black text-[10px] uppercase ml-2">
+            <span class="inline-flex mt-2 sm:mt-0 px-3 py-1 bg-primary/10 text-primary rounded-full font-black text-[10px] uppercase sm:ml-2">
               PENDIENTE
             </span>
           </p>
           <p class="max-w-sm text-slate-400 text-xs italic mb-8">
             Por favor, espera a que <strong>La Comisión</strong> revise tu documentación. Serás notificado una vez se tome una decisión.
           </p>
-          <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-primary text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+          <button @click="$router.push('/dashboard')" class="w-full sm:w-auto px-8 py-3 bg-primary text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all">
             Ir a Mi Panel
           </button>
         </template>
 
         <!-- APROBADO PERO AUN SIN FRATERNIDAD CREADA (fallback manual) -->
         <template v-else-if="solicitudExistente.estado === 'APROBADO' && !solicitudExistente.fraternidadCreada">
-          <div class="size-24 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-            <span class="material-symbols-outlined text-5xl">task_alt</span>
+          <div class="size-20 sm:size-24 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+            <span class="material-symbols-outlined text-4xl sm:text-5xl">task_alt</span>
           </div>
-          <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">¡Preinscripción Aprobada!</h3>
-          <p class="text-slate-500 font-medium mb-6">
+          <h3 class="text-xl sm:text-2xl font-black text-slate-800 uppercase italic mb-2">¡Preinscripción Aprobada!</h3>
+          <p class="text-slate-500 font-medium mb-6 text-sm sm:text-base">
             Tu solicitud para la fraternidad <b class="text-primary">{{ solicitudExistente.nombreFraternidad }}</b> ha sido revisada y aceptada por <strong>La Comisión</strong>.
           </p>
           <p class="text-slate-400 text-sm italic max-w-md mx-auto mb-8">
             El registro oficial de tu fraternidad está pendiente de completarse en el sistema. Contacta a La Comisión si este estado persiste.
           </p>
-          <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
+          <button @click="$router.push('/dashboard')" class="w-full sm:w-auto px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
             Ir a mi Panel
           </button>
         </template>
 
         <!-- APROBADO Y YA INSCRITO OFICIALMENTE -->
         <template v-else-if="solicitudExistente.estado === 'APROBADO' && solicitudExistente.fraternidadCreada">
-          <div class="size-24 bg-blue-50 text-primary rounded-full flex items-center justify-center mb-6 mx-auto">
-            <span class="material-symbols-outlined text-5xl">verified_user</span>
+          <div class="size-20 sm:size-24 bg-blue-50 text-primary rounded-full flex items-center justify-center mb-6 mx-auto">
+            <span class="material-symbols-outlined text-4xl sm:text-5xl">verified_user</span>
           </div>
-          <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">¡Inscripción Oficial Exitosa!</h3>
-          <p class="text-slate-500 font-medium mb-6">
+          <h3 class="text-xl sm:text-2xl font-black text-slate-800 uppercase italic mb-2">¡Inscripción Oficial Exitosa!</h3>
+          <p class="text-slate-500 font-medium mb-6 text-sm sm:text-base">
             Tu preinscripción fue aceptada e inscrita con éxito. Tus datos registrados son los siguientes:
           </p>
           
-          <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200 text-left mb-8 space-y-4 max-w-xl mx-auto w-full shadow-inner">
+          <div class="bg-slate-50 rounded-2xl p-4 sm:p-6 border border-slate-200 text-left mb-8 space-y-4 max-w-xl mx-auto w-full shadow-inner">
             <p class="text-[10px] font-black uppercase text-slate-400 tracking-wider border-b border-slate-200 pb-2">Identificación Oficial de la Fraternidad:</p>
-            <div class="grid grid-cols-2 gap-4 text-sm">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Nombre</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.nombre }}</span></div>
               <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Categoría</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.categoria?.nombre || 'General' }}</span></div>
               <div><span class="font-bold text-slate-400 block text-[10px] uppercase">Instancia</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.nivelRepresentacion }}</span></div>
               <div v-if="solicitudExistente.fraternidadCreada.facultad"><span class="font-bold text-slate-400 block text-[10px] uppercase">Facultad</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.facultad.nombre }}</span></div>
-              <div v-if="solicitudExistente.fraternidadCreada.carrera"><span class="font-bold text-slate-400 block text-[10px] uppercase">Carrera</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.carrera.nombre }}</span></div>
+              <div v-if="solicitudExistente.fraternidadCreada.carrera" class="sm:col-span-2"><span class="font-bold text-slate-400 block text-[10px] uppercase">Carrera</span> <span class="font-medium text-slate-800">{{ solicitudExistente.fraternidadCreada.carrera.nombre }}</span></div>
             </div>
           </div>
 
-          <button @click="$router.push('/dashboard')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
+          <button @click="$router.push('/dashboard')" class="w-full sm:w-auto px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest">
             Ir a mi Panel
           </button>
         </template>
       </div>
 
       <!-- NO ACTIVE CATEGORIES / EXPIRED STATE -->
-      <div v-else-if="activeCategories.length === 0 && !solicitudEditable" class="py-24 px-8 text-center flex flex-col items-center">
-        <div class="size-24 bg-red-50 text-secondary rounded-full flex items-center justify-center mb-6">
-          <span class="material-symbols-outlined text-5xl">event_busy</span>
+      <div v-else-if="activeCategories.length === 0 && !solicitudEditable" class="py-16 sm:py-24 px-4 sm:px-8 text-center flex flex-col items-center">
+        <div class="size-20 sm:size-24 bg-red-50 text-secondary rounded-full flex items-center justify-center mb-6">
+          <span class="material-symbols-outlined text-4xl sm:text-5xl">event_busy</span>
         </div>
-        <h3 class="text-2xl font-black text-slate-800 uppercase italic mb-2">Periodo de Inscripción Cerrado</h3>
-        <p class="max-w-md text-slate-500 font-medium mb-8">
+        <h3 class="text-xl sm:text-2xl font-black text-slate-800 uppercase italic mb-2">Periodo de Inscripción Cerrado</h3>
+        <p class="max-w-md text-slate-500 font-medium mb-8 text-sm sm:text-base">
           Actualmente no existen categorías con periodos de inscripción habilitados. 
           Por favor, consulta el cronograma oficial o contacta con <strong>La Comisión</strong>.
         </p>
-        <button @click="$router.push('/')" class="px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all">
+        <button @click="$router.push('/')" class="w-full sm:w-auto px-8 py-3 bg-slate-800 text-white rounded-xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all">
           Volver al Inicio
         </button>
       </div>
 
-      <form v-else @submit.prevent="handleSubmit" novalidate class="form-inscripcion p-8 md:p-12">
+      <form v-else @submit.prevent="handleSubmit" novalidate class="form-inscripcion p-4 sm:p-8 md:p-12">
         <div ref="wizardAnchor" class="scroll-mt-4" aria-hidden="true"></div>
 
-        <div v-if="solicitudExistente?.estado === 'OBSERVADO'" class="mb-8 p-6 rounded-3xl border border-amber-300 bg-amber-50">
+        <div v-if="solicitudExistente?.estado === 'OBSERVADO'" class="mb-6 sm:mb-8 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-amber-300 bg-amber-50">
           <p class="text-[10px] font-black uppercase tracking-[0.2em] text-amber-800 mb-2">Solicitud observada por La Comisión</p>
           <p class="text-sm text-slate-800 font-semibold leading-relaxed">
             La Comisión observó tu solicitud. Corrige únicamente los datos señalados a continuación.
@@ -163,13 +163,13 @@
               <p v-if="item.comentario" class="text-xs text-red-700 font-medium mt-1">{{ item.comentario }}</p>
             </div>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5 text-[11px] font-semibold">
-            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-100/80 border border-emerald-300 text-emerald-900">
-              <span class="size-3 rounded bg-emerald-400 shrink-0"></span>
+          <div class="grid grid-cols-1 gap-2 sm:gap-3 mt-5 text-[11px] font-semibold">
+            <div class="flex items-start sm:items-center gap-2 px-3 py-2 rounded-xl bg-emerald-100/80 border border-emerald-300 text-emerald-900">
+              <span class="size-3 rounded bg-emerald-400 shrink-0 mt-0.5 sm:mt-0"></span>
               Datos aprobados por La Comisión (bloqueados)
             </div>
-            <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-100/80 border border-red-300 text-red-900">
-              <span class="size-3 rounded bg-red-400 shrink-0"></span>
+            <div class="flex items-start sm:items-center gap-2 px-3 py-2 rounded-xl bg-red-100/80 border border-red-300 text-red-900">
+              <span class="size-3 rounded bg-red-400 shrink-0 mt-0.5 sm:mt-0"></span>
               Datos marcados para corregir
             </div>
           </div>
@@ -256,34 +256,30 @@
                   <p class="text-xs font-medium text-slate-600">
                     ¿Tiene una estructura de costos única o variable según bailarín de la fraternidad?
                   </p>
-                  <label class="inline-flex items-center justify-center gap-3 cursor-pointer select-none">
-                    <span
-                      class="text-[10px] font-black uppercase tracking-widest transition-colors"
-                      :class="!form.costosParticipacion.multiple ? 'text-primary' : 'text-slate-400'"
-                    >
-                      Costo único
-                    </span>
+                  <div class="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
                     <button
                       type="button"
-                      role="switch"
-                      :aria-checked="form.costosParticipacion.multiple"
-                      class="relative w-11 h-6 rounded-full transition-colors shrink-0"
-                      :class="form.costosParticipacion.multiple ? 'bg-primary' : 'bg-slate-300'"
+                      class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors"
+                      :class="!form.costosParticipacion.multiple
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-slate-500 border-slate-200'"
                       :disabled="!puedeEditarCampo('costosParticipacion')"
-                      @click="toggleCostosMultiples"
+                      @click="setCostosMultiples(false)"
                     >
-                      <span
-                        class="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform"
-                        :class="form.costosParticipacion.multiple ? 'translate-x-5' : ''"
-                      ></span>
+                      Costo único
                     </button>
-                    <span
-                      class="text-[10px] font-black uppercase tracking-widest transition-colors"
-                      :class="form.costosParticipacion.multiple ? 'text-primary' : 'text-slate-400'"
+                    <button
+                      type="button"
+                      class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors"
+                      :class="form.costosParticipacion.multiple
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-slate-500 border-slate-200'"
+                      :disabled="!puedeEditarCampo('costosParticipacion')"
+                      @click="setCostosMultiples(true)"
                     >
-                      Costo variado (detallar)
-                    </span>
-                  </label>
+                      Costo variado
+                    </button>
+                  </div>
                 </div>
 
                 <div v-if="!form.costosParticipacion.multiple" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -357,7 +353,7 @@
                   </div>
                   <button
                     type="button"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5"
+                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5"
                     :disabled="!puedeEditarCampo('costosParticipacion')"
                     @click="agregarCostoItem"
                   >
@@ -847,9 +843,9 @@
           </div>
 
           <!-- REGLAMENTO WARNING -->
-          <div class="mt-12 p-6 bg-red-50 border border-red-100 rounded-3xl flex items-start gap-4">
-            <span class="material-symbols-outlined text-secondary">warning</span>
-            <div>
+          <div class="mt-8 sm:mt-12 p-4 sm:p-6 bg-red-50 border border-red-100 rounded-2xl sm:rounded-3xl flex items-start gap-3 sm:gap-4">
+            <span class="material-symbols-outlined text-secondary shrink-0">warning</span>
+            <div class="min-w-0">
               <p class="text-xs font-black uppercase text-secondary mb-1">Declaración Jurada</p>
               <p class="text-[11px] text-red-800 font-medium leading-relaxed">
                 Al enviar este formulario, declaro bajo juramento que toda la información y documentos proporcionados son fidedignos y corresponden a la directiva legalmente constituida. Cualquier falsedad anulará la inscripción.
@@ -859,21 +855,21 @@
         </div>
 
         <!-- NAVIGATION BUTTONS -->
-        <div class="mt-16 flex items-center justify-between pt-8 border-t border-slate-100">
+        <div class="mt-10 sm:mt-16 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-6 sm:pt-8 border-t border-slate-100">
            <button 
             v-if="currentStep > 1"
             type="button" @click="prevStep"
-            class="px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all flex items-center gap-2"
+            class="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 bg-slate-50 sm:bg-transparent border border-slate-200 sm:border-0 rounded-2xl transition-all flex items-center justify-center gap-2 order-2 sm:order-1"
            >
              <span class="material-symbols-outlined text-base">arrow_back_ios</span>
              Anterior
            </button>
-           <div v-else></div>
+           <div v-else class="hidden sm:block"></div>
 
            <button 
             v-if="currentStep < 4"
             type="button" @click="nextStep"
-            class="px-10 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+            class="w-full sm:w-auto px-6 sm:px-10 py-3.5 sm:py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 order-1 sm:order-2"
            >
              Siguiente
              <span class="material-symbols-outlined text-base">arrow_forward_ios</span>
@@ -882,7 +878,7 @@
            <button 
             v-else
             type="submit" :disabled="submitting"
-            class="w-full sm:w-auto px-8 sm:px-12 py-4 sm:py-5 bg-primary text-white rounded-2xl text-sm font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            class="w-full sm:w-auto px-6 sm:px-12 py-4 sm:py-5 bg-primary text-white rounded-2xl text-xs sm:text-sm font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 order-1 sm:order-2"
            >
              <span v-if="submitting" class="material-symbols-outlined animate-spin">progress_activity</span>
              <span v-else class="material-symbols-outlined">send</span>
@@ -1065,8 +1061,12 @@ const costosValidos = () => {
 }
 
 const toggleCostosMultiples = () => {
+  setCostosMultiples(!form.value.costosParticipacion.multiple)
+}
+
+const setCostosMultiples = (multiple) => {
   if (!puedeEditarCampo('costosParticipacion')) return
-  const multiple = !form.value.costosParticipacion.multiple
+  if (form.value.costosParticipacion.multiple === multiple) return
   if (multiple) {
     const monto = form.value.costosParticipacion.items?.[0]?.monto
     form.value.costosParticipacion = {

@@ -15,6 +15,7 @@ import { Usuario } from '../entities/Usuario';
 import { Evaluacion } from '../entities/Evaluacion';
 import { Incidencia } from '../entities/Incidencia';
 import { Asistencia } from '../entities/Asistencia';
+import { FichaTecnicaMonografia } from '../entities/FichaTecnicaMonografia';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
@@ -33,6 +34,7 @@ import { MailModule } from '../mail/mail.module';
       Evaluacion,
       Incidencia,
       Asistencia,
+      FichaTecnicaMonografia,
     ]),
     MailModule,
   ],

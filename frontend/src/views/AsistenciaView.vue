@@ -14,6 +14,17 @@
       <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
         <button
           type="button"
+          @click="descargarReportePdf"
+          :disabled="loading || descargandoPdf || !fraternidades.length"
+          class="w-full sm:w-auto px-5 py-3 bg-primary hover:brightness-110 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          <span class="material-symbols-outlined text-lg" :class="descargandoPdf ? 'animate-spin' : ''">
+            {{ descargandoPdf ? 'progress_activity' : 'picture_as_pdf' }}
+          </span>
+          {{ descargandoPdf ? 'Generando…' : 'Reporte PDF' }}
+        </button>
+        <button
+          type="button"
           @click="abrirModalEvento"
           class="w-full sm:w-auto px-5 py-3 bg-secondary hover:bg-amber-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-secondary/20 transition-all flex items-center justify-center gap-2"
         >
@@ -338,6 +349,7 @@ const asistenciaForm = reactive({})
 const mensaje = ref(null)
 const modalEvento = ref(false)
 const creandoEvento = ref(false)
+const descargandoPdf = ref(false)
 const formEvento = reactive({
   nombre: '',
   fecha: '',
@@ -429,6 +441,32 @@ const fetchData = async () => {
     console.error('Error fetching delegados:', err)
   } finally {
     loading.value = false
+  }
+}
+
+const descargarReportePdf = async () => {
+  if (descargandoPdf.value || !fraternidades.value.length) return
+  descargandoPdf.value = true
+  try {
+    const { data } = await api.get('/asistencias/delegados/reporte-pdf', {
+      responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Directorio_Delegados_EFU.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+    mensaje.value = { tipo: 'ok', texto: 'Reporte PDF descargado.' }
+    setTimeout(() => { mensaje.value = null }, 2500)
+  } catch (err) {
+    console.error('Error al generar reporte:', err)
+    mensaje.value = { tipo: 'error', texto: 'No se pudo generar el reporte PDF.' }
+    setTimeout(() => { mensaje.value = null }, 3500)
+  } finally {
+    descargandoPdf.value = false
   }
 }
 
