@@ -4,6 +4,7 @@ import { Repository, Brackets, ILike } from 'typeorm';
 import { SolicitudInscripcion, EstadoSolicitud, CostosParticipacion, InstanciaRepresentacion } from '../entities/SolicitudInscripcion';
 import { Gestion } from '../entities/Gestion';
 import { CronogramaInscripcion } from '../entities/CronogramaInscripcion';
+import { CronogramaActividad } from '../entities/CronogramaActividad';
 import { Usuario } from '../entities/Usuario';
 import { Categoria } from '../entities/Categoria';
 import { Facultad } from '../entities/Facultad';
@@ -18,6 +19,10 @@ import { Incidencia } from '../entities/Incidencia';
 import { Asistencia } from '../entities/Asistencia';
 import { FichaTecnicaMonografia } from '../entities/FichaTecnicaMonografia';
 import { recalcularExcedentesPorTipoDanza } from '../common/cupo-fraternidades';
+import {
+    esTipoCronogramaActividad,
+    estadoVentanaCronograma,
+} from '../common/cronograma-actividad';
 
 const PERSONAS_DIRECTIVA = [
     { prefix: 'presi', checklist: 'Presidente', hasCelular: true, required: true },
@@ -167,6 +172,8 @@ export class InscripcionesService {
         private readonly gestionRepo: Repository<Gestion>,
         @InjectRepository(CronogramaInscripcion)
         private readonly cronogramaRepo: Repository<CronogramaInscripcion>,
+        @InjectRepository(CronogramaActividad)
+        private readonly cronogramaActividadRepo: Repository<CronogramaActividad>,
         @InjectRepository(Categoria)
         private readonly categoriaRepo: Repository<Categoria>,
         @InjectRepository(Facultad)
@@ -1176,6 +1183,59 @@ export class InscripcionesService {
         }
 
         return await this.cronogramaRepo.save(cronograma);
+    }
+
+    async getCronogramasActividad(idGestion: number) {
+        const filas = await this.cronogramaActividadRepo.find({
+            where: { gestion: { idGestion } },
+        });
+        return ['MONOGRAFIA', 'FICHA_TECNICA'].map((tipo) => {
+            const row = filas.find((f) => String(f.tipo).toUpperCase() === tipo);
+            const estado = estadoVentanaCronograma(tipo, row?.fechaInicio, row?.fechaFin);
+            return {
+                tipo,
+                idCronogramaActividad: row?.idCronogramaActividad || null,
+                fechaInicio: row?.fechaInicio || null,
+                fechaFin: row?.fechaFin || null,
+                ...estado,
+            };
+        });
+    }
+
+    async upsertCronogramaActividad(data: {
+        idGestion: number;
+        tipo: string;
+        fechaInicio: Date;
+        fechaFin: Date;
+    }) {
+        const tipo = String(data.tipo || '').toUpperCase();
+        if (!esTipoCronogramaActividad(tipo)) {
+            throw new BadRequestException('Tipo de cronograma inválido.');
+        }
+        if (!data.fechaInicio || !data.fechaFin) {
+            throw new BadRequestException('Debes definir apertura y cierre.');
+        }
+        const inicio = new Date(data.fechaInicio);
+        const fin = new Date(data.fechaFin);
+        if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime()) || fin <= inicio) {
+            throw new BadRequestException('El cierre debe ser posterior a la apertura.');
+        }
+
+        let row = await this.cronogramaActividadRepo.findOne({
+            where: { gestion: { idGestion: data.idGestion }, tipo },
+        });
+        if (row) {
+            row.fechaInicio = inicio;
+            row.fechaFin = fin;
+        } else {
+            row = this.cronogramaActividadRepo.create({
+                gestion: { idGestion: data.idGestion } as any,
+                tipo,
+                fechaInicio: inicio,
+                fechaFin: fin,
+            });
+        }
+        return this.cronogramaActividadRepo.save(row);
     }
 
     // ── Inscripción Oficial Transaccional (Llamado por Administrador) ──────────────────────────────────

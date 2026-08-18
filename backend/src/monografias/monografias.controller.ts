@@ -34,6 +34,13 @@ export class MonografiasController {
     return this.monografiasService.getMiMonografia(req.user);
   }
 
+  @Get('cronograma')
+  @Roles('delegado')
+  @ApiOperation({ summary: 'Estado del cronograma de subida de monografías' })
+  getCronograma(@Request() req: any) {
+    return this.monografiasService.getEstadoCronogramaMonografia(req.user?.fraternidad?.idFraternidad);
+  }
+
   @Get('listado-fraternidades')
   @Roles('superusuario', 'admin', 'veedor')
   @ApiOperation({

@@ -177,6 +177,18 @@ export class InscripcionesController {
     return this.inscripcionesService.upsertCronograma(data);
   }
 
+  @Get('cronogramas-actividad/:idGestion')
+  @Roles('superusuario', 'admin', 'delegado')
+  async getCronogramasActividad(@Param('idGestion', ParseIntPipe) idGestion: number) {
+    return this.inscripcionesService.getCronogramasActividad(idGestion);
+  }
+
+  @Post('cronogramas-actividad')
+  @Roles('superusuario', 'admin')
+  async upsertCronogramaActividad(@Body() data: any) {
+    return this.inscripcionesService.upsertCronogramaActividad(data);
+  }
+
   // ── Inscripción Oficial (Fraternidad) ────────────────────────────────────
 
   @Post('inscribir-desde-solicitud/:idSolicitud')

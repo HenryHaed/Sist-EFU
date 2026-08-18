@@ -19,6 +19,8 @@ import { Usuario } from '../entities/Usuario';
 import { Gestion } from '../entities/Gestion';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { CronogramaActividad } from '../entities/CronogramaActividad';
+import { estadoVentanaCronograma, EstadoVentanaCronograma } from '../common/cronograma-actividad';
 import {
   resolveLogoPath,
   PDF_UMSA_BLUE,
@@ -52,6 +54,8 @@ export class FichaTecnicaService {
     private readonly gestionRepo: Repository<Gestion>,
     @InjectRepository(SolicitudInscripcion)
     private readonly solicitudRepo: Repository<SolicitudInscripcion>,
+    @InjectRepository(CronogramaActividad)
+    private readonly cronogramaActividadRepo: Repository<CronogramaActividad>,
   ) {}
 
   private ensureUploadDir(): string {
@@ -303,6 +307,26 @@ export class FichaTecnicaService {
     return { usuario, sol, ultima };
   }
 
+  private async estadoCronogramaFicha(idGestion?: number | null): Promise<EstadoVentanaCronograma> {
+    let gid = idGestion || null;
+    if (!gid) {
+      const gestion = await findGestionActivaOrLatest(this.gestionRepo);
+      gid = gestion?.idGestion ?? null;
+    }
+    if (!gid) return estadoVentanaCronograma('FICHA_TECNICA', null, null);
+    const row = await this.cronogramaActividadRepo.findOne({
+      where: { gestion: { idGestion: gid }, tipo: 'FICHA_TECNICA' },
+    });
+    return estadoVentanaCronograma('FICHA_TECNICA', row?.fechaInicio, row?.fechaFin);
+  }
+
+  private async assertCronogramaFichaAbierto(idGestion?: number | null) {
+    const estado = await this.estadoCronogramaFicha(idGestion);
+    if (!estado.abierto) {
+      throw new BadRequestException(estado.mensaje || 'No está en el cronograma respectivo.');
+    }
+  }
+
   async getMiFicha(idUsuario: number) {
     const usuarioLite = await this.usuarioRepo.findOne({
       where: { idUsuario },
@@ -326,6 +350,9 @@ export class FichaTecnicaService {
     const frat = usuario.fraternidad;
     const sol = solCheck;
     const herencia = this.herenciaDesdeSolicitud(frat, sol);
+    const idGestion =
+      frat.gestion?.idGestion || (await findGestionActivaOrLatest(this.gestionRepo))?.idGestion;
+    const cronograma = await this.estadoCronogramaFicha(idGestion);
 
     let ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: frat.idFraternidad } },
@@ -333,6 +360,15 @@ export class FichaTecnicaService {
     });
 
     if (!ficha) {
+      if (!cronograma.abierto) {
+        return {
+          accesoPermitido: false,
+          motivo: 'CRONOGRAMA',
+          estadoSolicitud: sol.estado,
+          mensaje: cronograma.mensaje,
+          cronograma,
+        };
+      }
       const gestion =
         frat.gestion || (await findGestionActivaOrLatest(this.gestionRepo));
       if (!gestion) throw new BadRequestException('No hay gestión activa.');
@@ -367,12 +403,13 @@ export class FichaTecnicaService {
       await this.fichaRepo.save(ficha);
     }
 
-    return { accesoPermitido: true, ...this.toResponse(ficha, herencia) };
+    return { accesoPermitido: true, cronograma, ...this.toResponse(ficha, herencia) };
   }
 
   async guardarMiFicha(idUsuario: number, body: any) {
     await this.assertAccesoFichaAprobada(idUsuario);
     const usuario = await this.getDelegadoFraternidad(idUsuario);
+    await this.assertCronogramaFichaAbierto(usuario.fraternidad?.gestion?.idGestion);
     let ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: usuario.fraternidad.idFraternidad } },
       relations: ['fraternidad', 'actualizadoPor', 'gestion'],
@@ -505,6 +542,7 @@ export class FichaTecnicaService {
   async generarMiPdf(idUsuario: number, res: Response) {
     await this.assertAccesoFichaAprobada(idUsuario);
     const usuario = await this.getDelegadoFraternidad(idUsuario);
+    await this.assertCronogramaFichaAbierto(usuario.fraternidad?.gestion?.idGestion);
     const ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: usuario.fraternidad.idFraternidad } },
       relations: ['fraternidad', 'gestion', 'actualizadoPor'],
@@ -548,6 +586,7 @@ export class FichaTecnicaService {
   async corregirMiFicha(idUsuario: number) {
     await this.assertAccesoFichaAprobada(idUsuario);
     const usuario = await this.getDelegadoFraternidad(idUsuario);
+    await this.assertCronogramaFichaAbierto(usuario.fraternidad?.gestion?.idGestion);
     const ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: usuario.fraternidad.idFraternidad } },
       relations: ['fraternidad', 'actualizadoPor'],

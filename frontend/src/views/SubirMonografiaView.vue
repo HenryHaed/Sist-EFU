@@ -23,6 +23,29 @@
       </p>
     </div>
 
+    <div
+      v-else-if="cronograma && !cronograma.abierto"
+      class="bg-white rounded-3xl border border-amber-200 shadow-sm p-6 sm:p-10 text-center flex flex-col items-center"
+    >
+      <div class="size-20 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mb-5">
+        <span class="material-symbols-outlined text-4xl">event_busy</span>
+      </div>
+      <h3 class="text-xl font-black text-slate-800 uppercase italic mb-3">No está en el cronograma respectivo</h3>
+      <p class="max-w-xl text-slate-600 font-medium text-sm leading-relaxed">
+        {{ cronograma.mensaje || 'No está en el cronograma respectivo para la subida de monografías.' }}
+      </p>
+      <div v-if="monografia" class="mt-6 w-full max-w-lg text-left">
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Documento ya cargado</p>
+        <button
+          type="button"
+          @click="abrirVisor"
+          class="w-full px-4 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest"
+        >
+          Ver monografía actual
+        </button>
+      </div>
+    </div>
+
     <template v-else>
       <div class="bg-white rounded-2xl border border-slate-100 shadow-xl overflow-hidden mb-6">
         <div class="bg-slate-900 px-6 py-4 flex items-center gap-3">
@@ -126,6 +149,7 @@ const monografia = ref(null)
 const archivoSeleccionado = ref(null)
 const dragOver = ref(false)
 const visorAbierto = ref(false)
+const cronograma = ref(null)
 
 const fraternidad = computed(() => authStore.user?.fraternidad || null)
 
@@ -143,8 +167,12 @@ const formatFecha = (fecha) => {
 const cargarMonografia = async () => {
   loading.value = true
   try {
-    const res = await api.get('/monografias/mi-fraternidad')
+    const [res, resCrono] = await Promise.all([
+      api.get('/monografias/mi-fraternidad'),
+      api.get('/monografias/cronograma').catch(() => ({ data: null })),
+    ])
     monografia.value = res.data || null
+    cronograma.value = resCrono.data || null
   } catch (error) {
     if (error.response?.status !== 400) {
       notify.error('Error', error.response?.data?.message || 'No se pudo cargar la monografía.')

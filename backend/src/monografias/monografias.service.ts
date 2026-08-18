@@ -13,6 +13,8 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { Usuario } from '../entities/Usuario';
 import { Gestion } from '../entities/Gestion';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { CronogramaActividad } from '../entities/CronogramaActividad';
+import { estadoVentanaCronograma } from '../common/cronograma-actividad';
 
 @Injectable()
 export class MonografiasService {
@@ -25,6 +27,8 @@ export class MonografiasService {
     private readonly usuarioRepo: Repository<Usuario>,
     @InjectRepository(Gestion)
     private readonly gestionRepo: Repository<Gestion>,
+    @InjectRepository(CronogramaActividad)
+    private readonly cronogramaActividadRepo: Repository<CronogramaActividad>,
   ) {}
 
   private ensureUploadDir(): string {
@@ -74,6 +78,36 @@ export class MonografiasService {
       relations: ['fraternidad', 'subidoPor'],
     });
     return monografia ? this.toResponse(monografia) : null;
+  }
+
+  private async resolverGestionIdFraternidad(idFraternidad: number): Promise<number | null> {
+    const frat = await this.fraternidadRepo.findOne({
+      where: { idFraternidad },
+      relations: ['gestion'],
+    });
+    if (frat?.gestion?.idGestion) return frat.gestion.idGestion;
+    const gestion = await findGestionActivaOrLatest(this.gestionRepo);
+    return gestion?.idGestion ?? null;
+  }
+
+  async getEstadoCronogramaMonografia(idFraternidad?: number | null) {
+    const idGestion = idFraternidad
+      ? await this.resolverGestionIdFraternidad(idFraternidad)
+      : (await findGestionActivaOrLatest(this.gestionRepo))?.idGestion;
+    if (!idGestion) {
+      return estadoVentanaCronograma('MONOGRAFIA', null, null);
+    }
+    const row = await this.cronogramaActividadRepo.findOne({
+      where: { gestion: { idGestion }, tipo: 'MONOGRAFIA' },
+    });
+    return estadoVentanaCronograma('MONOGRAFIA', row?.fechaInicio, row?.fechaFin);
+  }
+
+  private async assertCronogramaMonografiaAbierto(idFraternidad: number) {
+    const estado = await this.getEstadoCronogramaMonografia(idFraternidad);
+    if (!estado.abierto) {
+      throw new BadRequestException(estado.mensaje || 'No está en el cronograma respectivo.');
+    }
   }
 
   /**
@@ -164,6 +198,8 @@ export class MonografiasService {
     if (!fraternidad) {
       throw new NotFoundException('Fraternidad no encontrada.');
     }
+
+    await this.assertCronogramaMonografiaAbierto(idFraternidad);
 
     this.ensureUploadDir();
 

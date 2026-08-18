@@ -1044,6 +1044,7 @@ export class EvaluacionesService {
       await qr.query(`UPDATE solicitudes_inscripcion SET id_fraternidad_creada = NULL WHERE id_gestion = $1`, [id]);
       await qr.query(`DELETE FROM solicitudes_inscripcion WHERE id_gestion = $1`, [id]);
       await qr.query(`DELETE FROM cronograma_inscripciones WHERE id_gestion = $1`, [id]);
+      await qr.query(`DELETE FROM cronogramas_actividad WHERE id_gestion = $1`, [id]);
 
       // 8. Fraternidades, infracciones, categorías, documentos
       await qr.query(`DELETE FROM fraternidades WHERE id_gestion = $1`, [id]);

@@ -23,19 +23,20 @@
         <span class="material-symbols-outlined text-4xl sm:text-5xl">hourglass_top</span>
       </div>
       <h3 class="text-xl sm:text-2xl font-black text-slate-800 uppercase italic mb-3">
-        Ficha técnica no disponible
+        {{ bloqueado.motivo === 'CRONOGRAMA' ? 'No está en el cronograma respectivo' : 'Ficha técnica no disponible' }}
       </h3>
       <p class="max-w-xl text-slate-600 font-medium text-sm sm:text-base leading-relaxed mb-4">
         {{ bloqueado.mensaje }}
       </p>
       <p
-        v-if="bloqueado.estadoSolicitud"
+        v-if="bloqueado.estadoSolicitud && bloqueado.motivo !== 'CRONOGRAMA'"
         class="mb-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border"
         :class="badgeEstadoClass(bloqueado.estadoSolicitud)"
       >
         Estado actual: {{ bloqueado.estadoSolicitud }}
       </p>
       <button
+        v-if="bloqueado.motivo !== 'CRONOGRAMA'"
         type="button"
         @click="irAInscripcion"
         class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20"
@@ -57,6 +58,16 @@
         </span>
       </div>
 
+      <div
+        v-if="form.cronograma && !form.cronograma.abierto"
+        class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4"
+      >
+        <p class="text-sm font-black uppercase italic text-amber-900 mb-1">No está en el cronograma respectivo</p>
+        <p class="text-sm text-amber-800 font-medium leading-relaxed">
+          {{ form.cronograma.mensaje }}
+        </p>
+      </div>
+
       <div v-if="form.estado === 'GENERADA'" class="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p class="text-sm text-emerald-900 font-medium">
           Tu ficha ya está generada. Puedes descargarla o corregirla (se eliminará el PDF actual).
@@ -65,7 +76,7 @@
           <button type="button" @click="descargar" class="w-full sm:w-auto px-4 py-2.5 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest">
             Descargar PDF
           </button>
-          <button type="button" @click="corregir" :disabled="working" class="w-full sm:w-auto px-4 py-2.5 bg-secondary text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50">
+          <button type="button" @click="corregir" :disabled="working || !dentroCronograma" class="w-full sm:w-auto px-4 py-2.5 bg-secondary text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50">
             Corregir mi ficha técnica
           </button>
         </div>
@@ -260,7 +271,8 @@ const working = ref(false)
 const form = ref(null)
 const bloqueado = ref(null)
 
-const editable = computed(() => form.value?.estado === 'BORRADOR')
+const editable = computed(() => form.value?.estado === 'BORRADOR' && dentroCronograma.value)
+const dentroCronograma = computed(() => form.value?.cronograma?.abierto !== false)
 
 const badgeEstadoClass = (estado) => {
   const map = {
@@ -307,6 +319,7 @@ const cargar = async () => {
       bloqueado.value = {
         mensaje: data.mensaje,
         estadoSolicitud: data.estadoSolicitud || null,
+        motivo: data.motivo || null,
       }
       return
     }

@@ -244,6 +244,22 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       )
   `);
 
+  await runPatch(dataSource, 'tabla cronogramas_actividad', `
+    CREATE TABLE IF NOT EXISTS cronogramas_actividad (
+      id_cronograma_actividad SERIAL PRIMARY KEY,
+      id_gestion INTEGER NOT NULL REFERENCES gestiones(id_gestion) ON DELETE CASCADE,
+      tipo VARCHAR(40) NOT NULL,
+      fecha_inicio TIMESTAMP NOT NULL,
+      fecha_fin TIMESTAMP NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+  await runPatch(dataSource, 'uq cronogramas_actividad gestion tipo', `
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_cronograma_actividad_gestion_tipo
+    ON cronogramas_actividad (id_gestion, tipo)
+  `);
+
   try {
     await ensureSystemRoles(dataSource);
   } catch (err) {

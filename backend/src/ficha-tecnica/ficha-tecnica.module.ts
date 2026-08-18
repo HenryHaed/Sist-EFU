@@ -5,6 +5,7 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { Usuario } from '../entities/Usuario';
 import { Gestion } from '../entities/Gestion';
 import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
+import { CronogramaActividad } from '../entities/CronogramaActividad';
 import { FichaTecnicaService } from './ficha-tecnica.service';
 import { FichaTecnicaController } from './ficha-tecnica.controller';
 
@@ -16,6 +17,7 @@ import { FichaTecnicaController } from './ficha-tecnica.controller';
       Usuario,
       Gestion,
       SolicitudInscripcion,
+      CronogramaActividad,
     ]),
   ],
   controllers: [FichaTecnicaController],

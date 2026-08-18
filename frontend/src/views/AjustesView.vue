@@ -587,10 +587,64 @@
             <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-start gap-3">
               <span class="material-symbols-outlined text-primary shrink-0">info</span>
               <p class="text-xs text-blue-900 font-medium leading-relaxed">
-                Establece las fechas de apertura y cierre de inscripciones para cada categoría.
-                Los delegados solo podrán enviar solicitudes dentro del periodo definido para su categoría.
+                Define las fechas de inscripción por categoría, y también los periodos para que los delegados
+                suban monografías y generen fichas técnicas. Fuera de esas fechas el sistema bloquea la acción
+                con el mensaje de cronograma.
               </p>
             </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              <div
+                v-for="act in actividadesCronograma"
+                :key="act.tipo"
+                class="rounded-2xl border-2 p-5"
+                :class="act.tipo === 'MONOGRAFIA' ? 'border-indigo-100 bg-indigo-50/40' : 'border-rose-100 bg-rose-50/40'"
+              >
+                <div class="flex items-start gap-3 mb-4">
+                  <span
+                    class="size-10 rounded-xl flex items-center justify-center text-white shrink-0"
+                    :class="act.tipo === 'MONOGRAFIA' ? 'bg-indigo-600' : 'bg-rose-600'"
+                  >
+                    <span class="material-symbols-outlined">{{ act.icono }}</span>
+                  </span>
+                  <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">{{ act.etiqueta }}</p>
+                    <p class="text-sm font-black text-slate-800 uppercase tracking-tight">{{ act.titulo }}</p>
+                    <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">{{ act.ayuda }}</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 px-1">Apertura</label>
+                    <input
+                      type="datetime-local"
+                      v-model="cronoActividadForms[act.tipo].fechaInicio"
+                      class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-sm text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 px-1">Cierre</label>
+                    <input
+                      type="datetime-local"
+                      v-model="cronoActividadForms[act.tipo].fechaFin"
+                      class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-sm text-slate-700"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  @click="guardarCronogramaActividad(act.tipo)"
+                  :disabled="savingCronoActividad === act.tipo"
+                  class="mt-4 w-full px-4 py-2.5 bg-primary hover:bg-blue-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  <span v-if="savingCronoActividad === act.tipo" class="material-symbols-outlined animate-spin text-xs">sync</span>
+                  <span v-else class="material-symbols-outlined text-xs">save</span>
+                  {{ savingCronoActividad === act.tipo ? 'Guardando' : 'Guardar este cronograma' }}
+                </button>
+              </div>
+            </div>
+
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 px-1">Inscripciones por categoría</p>
 
             <div v-if="loadingCronos" class="py-12 text-center text-slate-400">
               <span class="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
@@ -1033,8 +1087,29 @@ watch(activeTab, (val) => {
 // ── Cronogramas ───────────────────────────────────────────────────────────
 const categorias = ref([])
 const cronoForms = ref({})
+const cronoActividadForms = ref({
+  MONOGRAFIA: { fechaInicio: '', fechaFin: '' },
+  FICHA_TECNICA: { fechaInicio: '', fechaFin: '' },
+})
+const actividadesCronograma = [
+  {
+    tipo: 'MONOGRAFIA',
+    titulo: 'Subida de monografías',
+    etiqueta: 'Delegados',
+    icono: 'menu_book',
+    ayuda: 'Fuera de estas fechas el delegado no podrá subir ni reemplazar el PDF de monografía.',
+  },
+  {
+    tipo: 'FICHA_TECNICA',
+    titulo: 'Fichas técnicas',
+    etiqueta: 'Delegados',
+    icono: 'description',
+    ayuda: 'Fuera de estas fechas no podrán guardar, generar ni corregir la ficha técnica.',
+  },
+]
 const loadingCronos = ref(false)
 const savingCrono = ref(null)
+const savingCronoActividad = ref(null)
 const savingAllCronos = ref(false)
 
 const formatDatetimeLocal = (dateStr) => {
@@ -1080,6 +1155,18 @@ const cargarDatosCronogramas = async () => {
         cronoForms.value[idCat].fechaFin = formatDatetimeLocal(c.fechaFin)
       }
     })
+
+    cronoActividadForms.value = {
+      MONOGRAFIA: { fechaInicio: '', fechaFin: '' },
+      FICHA_TECNICA: { fechaInicio: '', fechaFin: '' },
+    }
+    const { data: cronosAct } = await api.get(`/inscripciones/cronogramas-actividad/${gestion.value.idGestion}`)
+    ;(cronosAct || []).forEach((c) => {
+      if (cronoActividadForms.value[c.tipo]) {
+        cronoActividadForms.value[c.tipo].fechaInicio = formatDatetimeLocal(c.fechaInicio)
+        cronoActividadForms.value[c.tipo].fechaFin = formatDatetimeLocal(c.fechaFin)
+      }
+    })
   } catch (e) {
     console.error('Error cargando datos cronograma:', e)
     Swal.fire('Error', 'No se pudo cargar el cronograma de inscripciones.', 'error')
@@ -1098,6 +1185,26 @@ const validarFechasCronograma = (form) => {
     return false
   }
   return true
+}
+
+const guardarCronogramaActividad = async (tipo) => {
+  const form = cronoActividadForms.value[tipo]
+  if (!validarFechasCronograma(form)) return
+
+  savingCronoActividad.value = tipo
+  try {
+    await api.post('/inscripciones/cronogramas-actividad', {
+      idGestion: gestion.value.idGestion,
+      tipo,
+      fechaInicio: form.fechaInicio,
+      fechaFin: form.fechaFin,
+    })
+    Swal.fire({ icon: 'success', title: 'Cronograma guardado', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
+  } catch (e) {
+    Swal.fire('Error', e.response?.data?.message || 'No se pudo guardar el cronograma.', 'error')
+  } finally {
+    savingCronoActividad.value = null
+  }
 }
 
 const guardarCronograma = async (idCategoria) => {
@@ -1126,18 +1233,34 @@ const guardarTodosCronogramas = async () => {
     const form = cronoForms.value[cat.idCategoria]
     return form?.fechaInicio && form?.fechaFin
   })
+  const actividadesPendientes = actividadesCronograma.filter((act) => {
+    const form = cronoActividadForms.value[act.tipo]
+    return form?.fechaInicio && form?.fechaFin
+  })
 
-  if (pendientes.length === 0) {
-    Swal.fire({ icon: 'info', title: 'Sin fechas', text: 'Completa al menos una categoría antes de guardar.', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
+  if (pendientes.length === 0 && actividadesPendientes.length === 0) {
+    Swal.fire({ icon: 'info', title: 'Sin fechas', text: 'Completa al menos un cronograma antes de guardar.', toast: true, position: 'top-end', timer: 2500, showConfirmButton: false })
     return
   }
 
+  for (const act of actividadesPendientes) {
+    if (!validarFechasCronograma(cronoActividadForms.value[act.tipo])) return
+  }
   for (const cat of pendientes) {
     if (!validarFechasCronograma(cronoForms.value[cat.idCategoria])) return
   }
 
   savingAllCronos.value = true
   try {
+    for (const act of actividadesPendientes) {
+      const form = cronoActividadForms.value[act.tipo]
+      await api.post('/inscripciones/cronogramas-actividad', {
+        idGestion: gestion.value.idGestion,
+        tipo: act.tipo,
+        fechaInicio: form.fechaInicio,
+        fechaFin: form.fechaFin,
+      })
+    }
     for (const cat of pendientes) {
       const form = cronoForms.value[cat.idCategoria]
       await api.post('/inscripciones/cronogramas', {

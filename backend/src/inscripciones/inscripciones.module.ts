@@ -5,6 +5,7 @@ import { InscripcionesService } from './inscripciones.service';
 import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
 import { Gestion } from '../entities/Gestion';
 import { CronogramaInscripcion } from '../entities/CronogramaInscripcion';
+import { CronogramaActividad } from '../entities/CronogramaActividad';
 import { Categoria } from '../entities/Categoria';
 import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
@@ -24,6 +25,7 @@ import { MailModule } from '../mail/mail.module';
       SolicitudInscripcion,
       Gestion,
       CronogramaInscripcion,
+      CronogramaActividad,
       Categoria,
       Facultad,
       Carrera,

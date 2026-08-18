@@ -154,6 +154,7 @@ async function limpiarBaseDeDatos(dataSource: DataSource) {
     'jurados',
     'solicitudes_inscripcion',
     'cronograma_inscripciones',
+    'cronogramas_actividad',
     'usuarios',
     'fraternidades',
     'categorias',
