@@ -20,6 +20,13 @@ import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { ensureCategoriasDefault } from '../common/categorias-default';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 import { recalcularExcedentesGestion } from '../common/cupo-fraternidades';
+import {
+  actaDesdeEvaluacion,
+  calcularScoresEfu,
+  FORMULA_EFU_PROMEDIO,
+  nombreJuradoDesdeUsuario,
+  round2,
+} from './efu-scoring';
 
 @Injectable()
 export class EvaluacionesService {
@@ -293,6 +300,7 @@ export class EvaluacionesService {
         idIncidencia: inc.idIncidencia,
         nombre: inc.infraccion?.nombre,
         valor: Number(inc.infraccion?.valorImpacto || 0),
+        tipoImpacto: inc.infraccion?.tipoImpacto || 'RESTA_PUNTOS',
         fecha: inc.fechaHora
       });
     });
@@ -315,7 +323,8 @@ export class EvaluacionesService {
           idEvaluacion: ev?.idEvaluacion || null, 
           estadoEvaluacion: ev?.estado || 'PENDIENTE', 
           puntajeActual: score,
-          penalizaciones: penalties
+          penalizaciones: penalties,
+          suspendida: penalties.some((p) => p.tipoImpacto === 'SUSPENSION'),
         };
       })
     };
@@ -400,7 +409,7 @@ export class EvaluacionesService {
         { estado: 'COMPLETADO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } },
         { estado: 'EN_PROGRESO', fase: { gestion: { idGestion: gestion.idGestion }, tipoConcurso: 'EFU' } }
       ],
-      relations: ['fraternidad']
+      relations: ['fraternidad', 'jurado'],
     });
 
     const incidencias = await this.incidenciaRepo.find({
@@ -411,25 +420,24 @@ export class EvaluacionesService {
     const evaluadasIds = new Set(evsEfu.map(e => e.fraternidad?.idFraternidad).filter(id => !!id));
     const progreso = frats.length > 0 ? Math.round((evaluadasIds.size / frats.length) * 100) : 0;
 
-    const ranking = new Map<number, { nombre: string, tipo: string, sum: number, count: number, impactos: number }>();
+    const ranking = new Map<number, { nombre: string, tipo: string, promedio: number, impactos: number }>();
     
     // Inicializar con todas las fraternidades habilitadas
     frats.forEach(f => {
       ranking.set(f.idFraternidad, { 
         nombre: f.nombre, 
         tipo: f.categoria?.nombre || 'General', 
-        sum: 0, 
-        count: 0,
+        promedio: 0,
         impactos: 0
       });
     });
 
-    // Sumar evaluaciones de jurados
-    evsEfu.forEach(e => {
-        if (!e.fraternidad) return;
-        const pts = Number(e.puntajeTotal) || 0;
-        const ex = ranking.get(e.fraternidad.idFraternidad);
-        if (ex) { ex.sum += pts; ex.count++; }
+    const scoresEfu = calcularScoresEfu(
+      evsEfu.map((e) => actaDesdeEvaluacion(e)).filter((a): a is NonNullable<typeof a> => !!a),
+    );
+    scoresEfu.forEach((score, idFrat) => {
+      const ex = ranking.get(idFrat);
+      if (ex) ex.promedio = score.promedioFinal;
     });
 
     // Aplicar impactos de sanciones/puntos extra (HCU)
@@ -442,12 +450,11 @@ export class EvaluacionesService {
     });
 
     const rankingSorted = Array.from(ranking.values()).map(r => {
-        const promedio = r.count > 0 ? r.sum / r.count : 0;
-        const puntajeFinal = Math.max(0, promedio + r.impactos);
+        const puntajeFinal = Math.max(0, r.promedio + r.impactos);
         return {
             nombre: r.nombre, 
             tipo: r.tipo, 
-            puntaje: Number(puntajeFinal.toFixed(2))
+            puntaje: round2(puntajeFinal)
         };
     }).sort((a, b) => b.puntaje - a.puntaje);
 
@@ -522,8 +529,8 @@ export class EvaluacionesService {
 
   /**
    * Auditoría de calificaciones: desglose por fraternidad (EFU) o concurso (EXTERNO).
-   * El total/promedio usa la misma lógica que el panel de estadísticas:
-   * promedio de las N notas de N jurados (+ sanciones en EFU).
+   * EFU: Promedio Final = suma(NotaFraternidad de cada jurado) / N jurados.
+   * NotaFraternidad = suma de las fases que ese jurado sí calificó (sin reescalar).
    */
   async getAuditoriaCalificaciones(ambito: 'EFU' | 'EXTERNO' = 'EFU', idGestion?: number) {
     const gestion = idGestion
@@ -531,11 +538,7 @@ export class EvaluacionesService {
       : await this.getGestionActiva();
     if (!gestion) throw new NotFoundException('No hay gestión activa');
 
-    const nombreJurado = (j?: Jurado | null) => {
-      const u = j?.usuario;
-      if (!u) return 'Jurado sin usuario';
-      return [u.nombres, u.primerApellido, u.segundoApellido].filter(Boolean).join(' ').trim() || `Jurado #${j.idJurado}`;
-    };
+    const nombreJurado = (j?: Jurado | null) => nombreJuradoDesdeUsuario(j);
 
     if (ambito === 'EXTERNO') {
       const evsExt = await this.evaluacionRepo.find({
@@ -650,82 +653,69 @@ export class EvaluacionesService {
       relations: ['fraternidad', 'infraccion'],
     });
 
-    type FratAgg = {
-      idFraternidad: number;
-      nombre: string;
-      categoria: string;
-      sum: number;
-      count: number;
-      impactos: number;
-      calificaciones: any[];
-    };
+    const impactos = new Map<number, number>();
+    const sancionesPorFrat = new Map<number, { nombre: string; valor: number; tipoImpacto: string }[]>();
+    incidencias.forEach((i) => {
+      if (!i.fraternidad || !i.infraccion) return;
+      const id = i.fraternidad.idFraternidad;
+      impactos.set(id, (impactos.get(id) || 0) + (Number(i.infraccion.valorImpacto) || 0));
+      if (!sancionesPorFrat.has(id)) sancionesPorFrat.set(id, []);
+      sancionesPorFrat.get(id).push({
+        nombre: i.infraccion.nombre,
+        valor: Number(i.infraccion.valorImpacto) || 0,
+        tipoImpacto: i.infraccion.tipoImpacto || 'RESTA_PUNTOS',
+      });
+    });
 
-    const map = new Map<number, FratAgg>();
+    const scores = calcularScoresEfu(
+      evsEfu.map((e) => actaDesdeEvaluacion(e)).filter((a): a is NonNullable<typeof a> => !!a),
+    );
+
+    type ItemMeta = { idFraternidad: number; nombre: string; categoria: string };
+    const metas = new Map<number, ItemMeta>();
     frats.forEach((f) => {
-      map.set(f.idFraternidad, {
+      metas.set(f.idFraternidad, {
         idFraternidad: f.idFraternidad,
         nombre: f.nombre,
         categoria: f.categoria?.nombre || 'General',
-        sum: 0,
-        count: 0,
-        impactos: 0,
-        calificaciones: [],
       });
     });
-
     evsEfu.forEach((e) => {
-      if (!e.fraternidad) return;
-      const id = e.fraternidad.idFraternidad;
-      let ex = map.get(id);
-      if (!ex) {
-        ex = {
-          idFraternidad: id,
-          nombre: e.fraternidad.nombre,
-          categoria: 'General',
-          sum: 0,
-          count: 0,
-          impactos: 0,
-          calificaciones: [],
-        };
-        map.set(id, ex);
-      }
-      const pts = Number(e.puntajeTotal) || 0;
-      ex.sum += pts;
-      ex.count++;
-      ex.calificaciones.push({
-        idEvaluacion: e.idEvaluacion,
-        idJurado: e.jurado?.idJurado ?? null,
-        juradoNombre: nombreJurado(e.jurado),
-        idFase: e.fase?.idFase ?? null,
-        faseNombre: e.fase?.nombre || '—',
-        puntajeTotal: Number(pts.toFixed(2)),
-        estado: e.estado,
-        fechaCierre: e.fechaCierre || e.updatedAt || null,
-        criteriosEvaluados: e.criteriosEvaluados || null,
+      const id = e.fraternidad?.idFraternidad;
+      if (!id || metas.has(id)) return;
+      metas.set(id, {
+        idFraternidad: id,
+        nombre: e.fraternidad.nombre,
+        categoria: 'General',
       });
     });
 
-    incidencias.forEach((i) => {
-      if (!i.fraternidad || !i.infraccion) return;
-      const ex = map.get(i.fraternidad.idFraternidad);
-      if (ex) ex.impactos += Number(i.infraccion.valorImpacto) || 0;
-    });
-
-    const items = Array.from(map.values())
-      .map((r) => {
-        const promedioJurado = r.count > 0 ? Number((r.sum / r.count).toFixed(2)) : 0;
-        const puntajeFinal = Math.max(0, Number((promedioJurado + r.impactos).toFixed(2)));
+    const items = Array.from(metas.values())
+      .map((meta) => {
+        const score = scores.get(meta.idFraternidad);
+        const promedioFinal = score?.promedioFinal ?? 0;
+        const impactoSanciones = round2(impactos.get(meta.idFraternidad) || 0);
+        const sanciones = sancionesPorFrat.get(meta.idFraternidad) || [];
+        const puntajeFinal = Math.max(0, round2(promedioFinal + impactoSanciones));
+        const jurados = (score?.jurados || []).map((j) => ({
+          idJurado: j.idJurado,
+          juradoNombre: j.juradoNombre,
+          notaFraternidad: j.notaFraternidad,
+          fasesCalificadas: j.fasesCalificadas,
+          fases: j.fases,
+        }));
         return {
-          idFraternidad: r.idFraternidad,
-          nombre: r.nombre,
-          categoria: r.categoria,
-          cantidadJurados: r.count,
-          promedioJurado,
-          impactoSanciones: Number(r.impactos.toFixed(2)),
+          idFraternidad: meta.idFraternidad,
+          nombre: meta.nombre,
+          categoria: meta.categoria,
+          cantidadJurados: score?.cantidadJurados ?? 0,
+          promedioFinal,
+          promedioJurado: promedioFinal,
+          impactoSanciones,
+          sanciones,
+          suspendida: sanciones.some((s) => s.tipoImpacto === 'SUSPENSION'),
           puntajeFinal,
-          calificaciones: r.calificaciones.sort(
-            (a, b) => Number(b.puntajeTotal) - Number(a.puntajeTotal),
-          ),
+          jurados,
         };
       })
       .sort((a, b) => b.puntajeFinal - a.puntajeFinal);
@@ -733,7 +723,7 @@ export class EvaluacionesService {
     return {
       gestion: { idGestion: gestion.idGestion, anio: gestion.anio },
       ambito: 'EFU',
-      formula: 'promedio jurados = suma(notas) / N; final = max(0, promedio + sanciones)',
+      formula: `${FORMULA_EFU_PROMEDIO}; final = max(0, Promedio Final + sanciones)`,
       items,
     };
   }
@@ -1244,8 +1234,6 @@ export class EvaluacionesService {
         valorImpacto = 0;
         nombreInfraccion = 'Sanción: Agresividad (Suspensión 1 Año)';
         tipoImpacto = 'SUSPENSION';
-        fraternidad.habilitadoEfu = false;
-        await this.fraternidadRepo.save(fraternidad);
         break;
       case 'SANCION_BANDA':
         valorImpacto = -30;
@@ -1255,8 +1243,6 @@ export class EvaluacionesService {
         valorImpacto = 0;
         nombreInfraccion = 'Sanción: Personal ajeno a la UMSA (Suspensión 1 Año)';
         tipoImpacto = 'SUSPENSION';
-        fraternidad.habilitadoEfu = false;
-        await this.fraternidadRepo.save(fraternidad);
         break;
     }
 
@@ -1284,17 +1270,8 @@ export class EvaluacionesService {
   }
 
   async removerPenalizacion(idIncidencia: number) {
-    const inc = await this.incidenciaRepo.findOne({ 
-      where: { idIncidencia }, 
-      relations: ['infraccion', 'fraternidad'] 
-    });
+    const inc = await this.incidenciaRepo.findOne({ where: { idIncidencia } });
     if (!inc) throw new NotFoundException('Penalización no encontrada');
-
-    if (inc.infraccion?.tipoImpacto === 'SUSPENSION') {
-      const frat = inc.fraternidad;
-      frat.habilitadoEfu = true;
-      await this.fraternidadRepo.save(frat);
-    }
 
     return this.incidenciaRepo.delete(idIncidencia);
   }
@@ -1319,7 +1296,7 @@ export class EvaluacionesService {
 
     const evsEfu = await this.evaluacionRepo.find({
       where: { estado: 'COMPLETADO', fase: { gestion: { idGestion }, tipoConcurso: 'EFU' } },
-      relations: ['fraternidad']
+      relations: ['fraternidad', 'jurado']
     });
 
     const incidencias = await this.incidenciaRepo.find({
@@ -1336,25 +1313,35 @@ export class EvaluacionesService {
         categoria: f.categoria?.nombre || 'General',
         representacion,
         promedioJurado: 0,
-        sumJurado: 0,
-        countJurado: 0,
+        promedioFinal: 0,
+        cantidadJurados: 0,
         impactoSanciones: 0,
+        sanciones: [] as { nombre: string; valor: number; tipoImpacto: string }[],
+        suspendida: false,
         puntajeFinal: 0,
         fechaHoraCalificacion: null
       });
     });
 
+    const scoresHist = calcularScoresEfu(
+      evsEfu.map((e) => actaDesdeEvaluacion(e)).filter((a): a is NonNullable<typeof a> => !!a),
+    );
+    scoresHist.forEach((score, idFrat) => {
+      const ex = rankingMap.get(idFrat);
+      if (ex) {
+        ex.promedioJurado = score.promedioFinal;
+        ex.promedioFinal = score.promedioFinal;
+        ex.cantidadJurados = score.cantidadJurados;
+      }
+    });
+
     evsEfu.forEach(e => {
       if (!e.fraternidad) return;
       const ex = rankingMap.get(e.fraternidad.idFraternidad);
-      if (ex) {
-        ex.sumJurado += Number(e.puntajeTotal);
-        ex.countJurado++;
-        if (e.fechaCierre) {
-          const date = new Date(e.fechaCierre);
-          if (!ex.fechaHoraCalificacion || date > new Date(ex.fechaHoraCalificacion)) {
-            ex.fechaHoraCalificacion = e.fechaCierre;
-          }
+      if (ex && e.fechaCierre) {
+        const date = new Date(e.fechaCierre);
+        if (!ex.fechaHoraCalificacion || date > new Date(ex.fechaHoraCalificacion)) {
+          ex.fechaHoraCalificacion = e.fechaCierre;
         }
       }
     });
@@ -1363,13 +1350,23 @@ export class EvaluacionesService {
       if (!i.fraternidad || !i.infraccion) return;
       const ex = rankingMap.get(i.fraternidad.idFraternidad);
       if (ex) {
-        ex.impactoSanciones += Number(i.infraccion.valorImpacto) || 0;
+        const valor = Number(i.infraccion.valorImpacto) || 0;
+        const tipoImpacto = i.infraccion.tipoImpacto || 'RESTA_PUNTOS';
+        ex.impactoSanciones += valor;
+        ex.sanciones.push({
+          nombre: i.infraccion.nombre,
+          valor,
+          tipoImpacto,
+        });
+        if (tipoImpacto === 'SUSPENSION') ex.suspendida = true;
       }
     });
 
     const rankingEfu = Array.from(rankingMap.values()).map(r => {
-      r.promedioJurado = r.countJurado > 0 ? Number((r.sumJurado / r.countJurado).toFixed(2)) : 0;
-      r.puntajeFinal = Math.max(0, Number((r.promedioJurado + r.impactoSanciones).toFixed(2)));
+      r.impactoSanciones = round2(r.impactoSanciones || 0);
+      r.puntajeFinal = Math.max(0, round2((r.promedioFinal || r.promedioJurado || 0) + r.impactoSanciones));
+      r.promedioJurado = round2(r.promedioJurado || 0);
+      r.promedioFinal = round2(r.promedioFinal || r.promedioJurado || 0);
       return r;
     }).sort((a, b) => b.puntajeFinal - a.puntajeFinal)
       .map((r, index) => ({ ...r, puesto: index + 1 }));
@@ -1448,6 +1445,7 @@ export class EvaluacionesService {
         activa: gestion.activa,
         fechaGeneracion: new Date()
       },
+      formula: `${FORMULA_EFU_PROMEDIO}; final = max(0, Promedio Final + sanciones)`,
       rankingEfu,
       concursosExternos
     };
@@ -1494,6 +1492,11 @@ export class EvaluacionesService {
 
     let currentY = contentStartY;
 
+    if (reporte.formula) {
+      doc.fontSize(7).fillColor('#64748b').font('Helvetica').text(reporte.formula, 50, currentY, { width: 495 });
+      currentY += 14;
+    }
+
     // Tabla Ranking EFU
     doc.fontSize(12).fillColor('#003399').font('Helvetica-Bold').text('RANKING OFICIAL - ENTRADA FOLKLÓRICA', 50, currentY);
     currentY += 18;
@@ -1519,7 +1522,7 @@ export class EvaluacionesService {
       doc.text('Fraternidad', curX, y + 5, { width: colWidths.frat }); curX += colWidths.frat;
       doc.text('Cat.', curX, y + 5, { width: colWidths.cat }); curX += colWidths.cat;
       doc.text('Pertenencia', curX, y + 5, { width: colWidths.pert }); curX += colWidths.pert;
-      doc.text('Jur.', curX, y + 5, { width: colWidths.prom, align: 'center' }); curX += colWidths.prom;
+      doc.text('Prom.', curX, y + 5, { width: colWidths.prom, align: 'center' }); curX += colWidths.prom;
       doc.text('Sanc.', curX, y + 5, { width: colWidths.sanc, align: 'center' }); curX += colWidths.sanc;
       doc.text('Fin.', curX, y + 5, { width: colWidths.final, align: 'center' }); curX += colWidths.final;
       doc.text('Fecha/Hora', curX, y + 5, { width: colWidths.fecha });
@@ -1559,11 +1562,11 @@ export class EvaluacionesService {
       doc.text(r.categoria, curX, currentY + 4, { width: colWidths.cat, height: 12, ellipsis: true }); curX += colWidths.cat;
       // Pertenencia
       doc.text(r.representacion, curX, currentY + 4, { width: colWidths.pert, height: 12, ellipsis: true }); curX += colWidths.pert;
-      // Promedio jurado
-      doc.text(`${r.promedioJurado}`, curX, currentY + 4, { width: colWidths.prom, align: 'center' }); curX += colWidths.prom;
+      // Promedio Final
+      doc.text(`${r.promedioFinal ?? r.promedioJurado}`, curX, currentY + 4, { width: colWidths.prom, align: 'center' }); curX += colWidths.prom;
       // Sanciones
-      doc.fillColor(r.impactoSanciones < 0 ? '#c8102e' : '#0f172a');
-      doc.text(`${r.impactoSanciones}`, curX, currentY + 4, { width: colWidths.sanc, align: 'center' }); curX += colWidths.sanc;
+      doc.fillColor(r.suspendida || r.impactoSanciones < 0 ? '#c8102e' : '#0f172a');
+      doc.text(r.suspendida && !(r.impactoSanciones < 0) ? 'SUSP.' : `${r.impactoSanciones}`, curX, currentY + 4, { width: colWidths.sanc, align: 'center' }); curX += colWidths.sanc;
       doc.fillColor('#0f172a');
       // Puntaje final
       doc.font('Helvetica-Bold').text(`${r.puntajeFinal}`, curX, currentY + 4, { width: colWidths.final, align: 'center' }); curX += colWidths.final;

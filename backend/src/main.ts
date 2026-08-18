@@ -5,52 +5,60 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { join } from 'path';
+import { ensureSystemRoles } from './common/system-roles';
+
+async function runPatch(dataSource: DataSource, name: string, sql: string) {
+  try {
+    await dataSource.query(sql);
+  } catch (err) {
+    console.warn(`[SCHEMA] Patch "${name}" omitido:`, (err as Error)?.message || err);
+  }
+}
 
 async function ensureSchemaPatches(dataSource: DataSource) {
-  // Producción con TYPEORM_SYNCHRONIZE=false: columnas nuevas sin migración formal
-  await dataSource.query(`
+  // Producción con TYPEORM_SYNCHRONIZE=false: cada patch es independiente
+  // (un fallo no debe impedir crear roles ni el resto de columnas).
+  await runPatch(dataSource, 'gestiones.landing_fraternidades', `
     ALTER TABLE gestiones
     ADD COLUMN IF NOT EXISTS landing_fraternidades jsonb NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'gestiones.mostrar_historico', `
     ALTER TABLE gestiones
     ADD COLUMN IF NOT EXISTS mostrar_historico boolean NOT NULL DEFAULT false
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'gestiones.edicion', `
     ALTER TABLE gestiones
     ADD COLUMN IF NOT EXISTS edicion varchar(20) NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'eventos_control.es_publico', `
     ALTER TABLE eventos_control
     ADD COLUMN IF NOT EXISTS es_publico boolean NOT NULL DEFAULT false
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'eventos_control.descripcion', `
     ALTER TABLE eventos_control
     ADD COLUMN IF NOT EXISTS descripcion text NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'solicitudes.costos_participacion', `
     ALTER TABLE solicitudes_inscripcion
     ADD COLUMN IF NOT EXISTS costos_participacion jsonb NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'fraternidades.costos_participacion', `
     ALTER TABLE fraternidades
     ADD COLUMN IF NOT EXISTS costos_participacion jsonb NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'gestiones.limite_fraternidades_por_danza', `
     ALTER TABLE gestiones
     ADD COLUMN IF NOT EXISTS limite_fraternidades_por_danza integer NOT NULL DEFAULT 6
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'fraternidades.es_excedente', `
     ALTER TABLE fraternidades
     ADD COLUMN IF NOT EXISTS es_excedente boolean NOT NULL DEFAULT false
   `);
-  // Permitir borradores sin categoría aún elegida
-  await dataSource.query(`
+  await runPatch(dataSource, 'solicitudes.id_categoria nullable', `
     ALTER TABLE solicitudes_inscripcion
     ALTER COLUMN id_categoria DROP NOT NULL
   `);
-  // Postgres: agregar BORRADOR al enum de forma idempotente
-  await dataSource.query(`
+  await runPatch(dataSource, 'enum BORRADOR', `
     DO $$ BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM pg_enum e
@@ -61,50 +69,26 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       END IF;
     END $$;
   `);
-  // Rol veedor (solo lectura) — idempotente en bases ya existentes
-  await dataSource.query(`
-    INSERT INTO roles (nombre, descripcion, created_at, updated_at)
-    SELECT
-      'veedor',
-      'Veedor de solo lectura: estadísticas, reglamento y monografías de fraternidades.',
-      NOW(),
-      NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM roles WHERE nombre = 'veedor')
-  `);
 
-  // Documentos de gestión: visibilidad pública (landing)
-  await dataSource.query(`
+  await runPatch(dataSource, 'documentos_gestion.es_publico', `
     ALTER TABLE documentos_gestion
     ADD COLUMN IF NOT EXISTS es_publico boolean NOT NULL DEFAULT false
   `);
 
-  // Rol concursante — idempotente (NO re-ejecutar seed en producción)
-  await dataSource.query(`
-    INSERT INTO roles (nombre, descripcion, created_at, updated_at)
-    SELECT
-      'concursante',
-      'Concursante de concurso externo: completa inscripción y sube documentos de su fase asignada.',
-      NOW(),
-      NOW()
-    WHERE NOT EXISTS (SELECT 1 FROM roles WHERE nombre = 'concursante')
-  `);
-
-  // Fase EXTERNO: plantilla y requisitos de inscripción
-  await dataSource.query(`
+  await runPatch(dataSource, 'fases.plantilla_requisitos', `
     ALTER TABLE fases
     ADD COLUMN IF NOT EXISTS plantilla_requisitos varchar(50) NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'fases.requisitos_inscripcion', `
     ALTER TABLE fases
     ADD COLUMN IF NOT EXISTS requisitos_inscripcion jsonb NULL
   `);
 
-  // Usuario concursante → un concurso (fase EXTERNO)
-  await dataSource.query(`
+  await runPatch(dataSource, 'usuarios.id_fase_concurso', `
     ALTER TABLE usuarios
     ADD COLUMN IF NOT EXISTS id_fase_concurso integer NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'fk_usuarios_fase_concurso', `
     DO $$ BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.table_constraints
@@ -119,8 +103,7 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     END $$;
   `);
 
-  // Inscripciones de concursantes a concursos externos
-  await dataSource.query(`
+  await runPatch(dataSource, 'tabla inscripciones_concurso', `
     CREATE TABLE IF NOT EXISTS inscripciones_concurso (
       id_inscripcion SERIAL PRIMARY KEY,
       id_usuario INTEGER NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
@@ -135,7 +118,7 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       CONSTRAINT uq_inscripcion_usuario_fase UNIQUE (id_usuario, id_fase)
     )
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'tabla inscripcion_concurso_archivos', `
     CREATE TABLE IF NOT EXISTS inscripcion_concurso_archivos (
       id_archivo SERIAL PRIMARY KEY,
       id_inscripcion INTEGER NOT NULL REFERENCES inscripciones_concurso(id_inscripcion) ON DELETE CASCADE,
@@ -147,23 +130,22 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'idx inscripciones_concurso_fase', `
     CREATE INDEX IF NOT EXISTS idx_inscripciones_concurso_fase ON inscripciones_concurso(id_fase)
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'idx inscripciones_concurso_usuario', `
     CREATE INDEX IF NOT EXISTS idx_inscripciones_concurso_usuario ON inscripciones_concurso(id_usuario)
   `);
 
-  // Chacha-Warmi por fraternidad (delegado): fraternidad + pareja
-  await dataSource.query(`
+  await runPatch(dataSource, 'inscripciones_concurso.id_fraternidad', `
     ALTER TABLE inscripciones_concurso
     ADD COLUMN IF NOT EXISTS id_fraternidad integer NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'inscripciones_concurso.id_participante_pareja', `
     ALTER TABLE inscripciones_concurso
     ADD COLUMN IF NOT EXISTS id_participante_pareja integer NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'fk_insc_concurso_fraternidad', `
     DO $$ BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.table_constraints
@@ -177,7 +159,7 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       END IF;
     END $$;
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'fk_insc_concurso_participante_pareja', `
     DO $$ BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.table_constraints
@@ -191,22 +173,21 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       END IF;
     END $$;
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'uq_insc_concurso_fraternidad_fase', `
     CREATE UNIQUE INDEX IF NOT EXISTS uq_insc_concurso_fraternidad_fase
     ON inscripciones_concurso (id_fraternidad, id_fase)
     WHERE id_fraternidad IS NOT NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'idx inscripciones_concurso_fraternidad', `
     CREATE INDEX IF NOT EXISTS idx_inscripciones_concurso_fraternidad
     ON inscripciones_concurso(id_fraternidad)
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'inscripciones_concurso.revision_checklist', `
     ALTER TABLE inscripciones_concurso
     ADD COLUMN IF NOT EXISTS revision_checklist jsonb NULL DEFAULT '{}'::jsonb
   `);
 
-  // Ficha técnica monografía (delegado llena / admin lista) — sin borrar datos
-  await dataSource.query(`
+  await runPatch(dataSource, 'tabla fichas_tecnicas_monografia', `
     CREATE TABLE IF NOT EXISTS fichas_tecnicas_monografia (
       id_ficha SERIAL PRIMARY KEY,
       id_fraternidad INTEGER NOT NULL UNIQUE REFERENCES fraternidades(id_fraternidad) ON DELETE CASCADE,
@@ -233,20 +214,41 @@ async function ensureSchemaPatches(dataSource: DataSource) {
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'idx fichas_tecnicas_gestion', `
     CREATE INDEX IF NOT EXISTS idx_fichas_tecnicas_gestion ON fichas_tecnicas_monografia(id_gestion)
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'idx fichas_tecnicas_estado', `
     CREATE INDEX IF NOT EXISTS idx_fichas_tecnicas_estado ON fichas_tecnicas_monografia(estado)
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'fichas.nombre_firmante', `
     ALTER TABLE fichas_tecnicas_monografia
     ADD COLUMN IF NOT EXISTS nombre_firmante varchar(255) NULL
   `);
-  await dataSource.query(`
+  await runPatch(dataSource, 'fichas.instancia_representacion', `
     ALTER TABLE fichas_tecnicas_monografia
     ADD COLUMN IF NOT EXISTS instancia_representacion varchar(50) NULL
   `);
+
+  // Una sanción grave no debe apagar habilitado_efu (eso oculta la fraternidad
+  // de calificación, ranking y gestión). Restaura las que se deshabilitaron así.
+  await runPatch(dataSource, 'restaurar habilitado_efu tras sancion SUSPENSION', `
+    UPDATE fraternidades f
+    SET habilitado_efu = true
+    WHERE f.habilitado_efu = false
+      AND EXISTS (
+        SELECT 1
+        FROM incidencias i
+        INNER JOIN infracciones inf ON inf.id_infraccion = i.id_infraccion
+        WHERE i.id_fraternidad = f.id_fraternidad
+          AND inf.tipo_impacto = 'SUSPENSION'
+      )
+  `);
+
+  try {
+    await ensureSystemRoles(dataSource);
+  } catch (err) {
+    console.warn('[SCHEMA] No se pudieron asegurar roles del sistema:', (err as Error)?.message || err);
+  }
 }
 
 async function bootstrap() {
@@ -263,10 +265,16 @@ async function bootstrap() {
   const swaggerEnabled =
     configService.get<string>('SWAGGER_ENABLED', swaggerDefault) === 'true';
 
+  const dataSource = app.get(DataSource);
   try {
-    await ensureSchemaPatches(app.get(DataSource));
+    await ensureSchemaPatches(dataSource);
   } catch (err) {
     console.warn('[SERVER] No se pudo aplicar patch de esquema:', (err as Error)?.message || err);
+  }
+  try {
+    await ensureSystemRoles(dataSource);
+  } catch (err) {
+    console.warn('[SERVER] No se pudieron asegurar roles del sistema:', (err as Error)?.message || err);
   }
 
   // Prefijo global para todas las rutas: /api/v1

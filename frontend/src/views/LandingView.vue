@@ -758,18 +758,32 @@
                         <th class="px-4 py-3 text-center">Puesto</th>
                         <th class="px-4 py-3">Fraternidad</th>
                         <th class="px-4 py-3">Categoría</th>
-                        <th class="px-4 py-3 text-center">Jurado</th>
+                        <th class="px-4 py-3 text-center">Prom. Final</th>
                         <th class="px-4 py-3 text-center text-red-500">Sanción</th>
                         <th class="px-4 py-3 text-center text-primary">Final</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50 text-sm">
-                      <tr v-for="r in reporteActual.rankingEfu" :key="r.idFraternidad" class="hover:bg-slate-50/50 transition-colors">
+                      <tr
+                        v-for="r in reporteActual.rankingEfu"
+                        :key="r.idFraternidad"
+                        class="transition-colors"
+                        :class="r.suspendida || r.impactoSanciones < 0 ? 'bg-red-50' : 'hover:bg-slate-50/50'"
+                      >
                         <td class="px-4 py-3 text-center font-black" :class="r.puesto <= 3 ? 'text-secondary' : 'text-slate-400'">{{ r.puesto }}</td>
-                        <td class="px-4 py-3 font-bold text-slate-800 uppercase text-xs">{{ r.nombre }}<br><span class="text-[9px] text-slate-400 font-medium normal-case">{{ r.representacion }}</span></td>
+                        <td class="px-4 py-3 font-bold uppercase text-xs" :class="r.suspendida ? 'text-red-800' : 'text-slate-800'">
+                          {{ r.nombre }}
+                          <span
+                            v-if="r.suspendida"
+                            class="ml-2 inline-flex align-middle px-1.5 py-0.5 rounded bg-red-700 text-white text-[8px] font-black tracking-widest"
+                          >SUSPENDIDA</span>
+                          <br><span class="text-[9px] text-slate-400 font-medium normal-case">{{ r.representacion }}</span>
+                        </td>
                         <td class="px-4 py-3 text-xs text-slate-600 font-medium">{{ r.categoria }}</td>
-                        <td class="px-4 py-3 text-center text-slate-500 font-bold">{{ r.promedioJurado }}</td>
-                        <td class="px-4 py-3 text-center text-red-500 font-bold">{{ r.impactoSanciones }}</td>
+                        <td class="px-4 py-3 text-center text-slate-500 font-bold">{{ r.promedioFinal ?? r.promedioJurado }}</td>
+                        <td class="px-4 py-3 text-center font-black" :class="r.suspendida || r.impactoSanciones < 0 ? 'text-red-700' : 'text-red-500'">
+                          {{ r.suspendida && !(r.impactoSanciones < 0) ? 'SUSP.' : r.impactoSanciones }}
+                        </td>
                         <td class="px-4 py-3 text-center text-primary font-black text-base">{{ r.puntajeFinal }}</td>
                       </tr>
                       <tr v-if="!reporteActual.rankingEfu.length">

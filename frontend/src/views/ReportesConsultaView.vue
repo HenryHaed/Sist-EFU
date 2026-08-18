@@ -1,7 +1,7 @@
 <template>
   <div class="w-full">
     <!-- Tipo de reporte -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       <button
         v-for="tipo in tiposReporte"
         :key="tipo.id"
@@ -128,6 +128,25 @@
           <p class="text-[11px] text-slate-500 mt-2">{{ alcanceDescripcion }}</p>
         </div>
 
+        <div v-if="muestraFiltroIncidencia" class="sm:col-span-2 lg:col-span-3">
+          <label class="label-xs mb-2 block">Banderas y sanciones</label>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="tipo in tiposIncidencia"
+              :key="tipo.id"
+              type="button"
+              @click="filtros.tipoIncidencia = tipo.id"
+              class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all"
+              :class="filtros.tipoIncidencia === tipo.id
+                ? tipo.activo
+                : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40'"
+            >
+              {{ tipo.label }}
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2">{{ incidenciaDescripcion }}</p>
+        </div>
+
         <div>
           <label class="label-xs">Ordenar por</label>
           <select v-model="filtros.ordenarPor" class="form-input !py-2 !text-sm">
@@ -179,6 +198,10 @@
           {{ resultado.total }} registro(s) encontrado(s)
         </p>
         <p class="text-[11px] text-slate-500">Página {{ resultado.page }} · {{ resultado.limit }} por página</p>
+        <p v-if="resultado.formula" class="w-full text-[11px] text-slate-500 font-medium">
+          <span class="font-black uppercase tracking-widest text-slate-400 mr-1">Fórmula</span>
+          {{ resultado.formula }}
+        </p>
       </div>
 
       <div class="overflow-x-auto">
@@ -200,6 +223,7 @@
               v-for="(row, idx) in resultado.data"
               :key="idx"
               class="border-b border-slate-50 hover:bg-slate-50/50"
+              :class="row.suspendida || (row.tipoIncidencia && String(row.tipoIncidencia).startsWith('SANCION')) ? 'bg-red-50/70 hover:bg-red-50' : ''"
             >
               <td v-for="col in columnas" :key="col.key" class="px-4 py-3 text-sm text-slate-700">
                 <span
@@ -222,6 +246,21 @@
                 >
                   {{ row.estadoLabel || row.estadoInscripcion || '—' }}
                 </span>
+                <span
+                  v-else-if="col.key === 'tipoLabel'"
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                  :class="incidenciaBadgeClass(row.tipoIncidencia)"
+                >
+                  {{ row.tipoLabel || '—' }}
+                </span>
+                <span
+                  v-else-if="col.key === 'valorImpacto' && row.tipoImpacto === 'SUSPENSION'"
+                  class="font-black text-red-700"
+                >SUSP.</span>
+                <span
+                  v-else-if="col.key === 'impactoSanciones' && row.suspendida && !(Number(row.impactoSanciones) < 0)"
+                  class="font-black text-red-700"
+                >SUSP.</span>
                 <template v-else>{{ formatCell(row, col.key) }}</template>
               </td>
             </tr>
@@ -266,7 +305,8 @@ const esValorFiltroActivo = (val) => val !== null && val !== '' && val !== TODOS
 const tiposReporte = [
   { id: 'fraternidades', label: 'Fraternidades', icon: 'groups', desc: 'Listado con tipo de danza, categoría e instancia.' },
   { id: 'directiva', label: 'Directiva', icon: 'badge', desc: 'Integrantes por cargo de cada fraternidad.' },
-  { id: 'calificaciones', label: 'Calificaciones', icon: 'leaderboard', desc: 'Puesto y puntaje final por gestión.' },
+  { id: 'calificaciones', label: 'Calificaciones', icon: 'leaderboard', desc: 'Promedio Final (suma de NotaFraternidad / N jurados) y puntaje final.' },
+  { id: 'disciplina', label: 'Disciplina', icon: 'gavel', desc: 'Todos los casos: banderas amarillas/rojas y sanciones por tipo.' },
 ]
 
 const alcancesListado = [
@@ -276,9 +316,22 @@ const alcancesListado = [
   { id: 'todos', label: 'Todos los casos', desc: 'Inscritas + pendientes + observadas en un solo listado.' },
 ]
 
+const tiposIncidencia = [
+  { id: 'todos', label: 'Todos los casos', activo: 'bg-primary text-white border-primary' },
+  { id: 'BANDERAS', label: 'Solo banderas', activo: 'bg-amber-500 text-white border-amber-500' },
+  { id: 'AMARILLA', label: 'Bandera amarilla', activo: 'bg-yellow-400 text-slate-900 border-yellow-400' },
+  { id: 'ROJA', label: 'Bandera roja', activo: 'bg-red-600 text-white border-red-600' },
+  { id: 'SANCIONES_GRAVES', label: 'Sanciones graves', activo: 'bg-red-800 text-white border-red-800' },
+  { id: 'SANCION_ALCOHOL', label: 'Alcohol', activo: 'bg-red-700 text-white border-red-700' },
+  { id: 'SANCION_AGRESION', label: 'Agresividad', activo: 'bg-red-700 text-white border-red-700' },
+  { id: 'SANCION_BANDA', label: 'Exceso de bandas', activo: 'bg-red-700 text-white border-red-700' },
+  { id: 'SANCION_AJENO', label: 'Personal ajeno', activo: 'bg-red-700 text-white border-red-700' },
+]
+
 const filtros = ref({
   tipoReporte: 'fraternidades',
   alcanceListado: 'inscritas',
+  tipoIncidencia: 'todos',
   idGestion: null,
   idTipoDanza: null,
   idFacultad: null,
@@ -294,6 +347,17 @@ const filtros = ref({
 
 const alcanceDescripcion = computed(() => {
   return alcancesListado.find((a) => a.id === filtros.value.alcanceListado)?.desc || ''
+})
+
+const muestraFiltroIncidencia = computed(() =>
+  filtros.value.tipoReporte === 'disciplina' || filtros.value.tipoReporte === 'calificaciones',
+)
+
+const incidenciaDescripcion = computed(() => {
+  if (filtros.value.tipoReporte === 'disciplina') {
+    return 'Cada fila es un caso (una bandera o una sanción). Use los filtros para ver N casos del mismo tipo.'
+  }
+  return 'Opcional: deja solo fraternidades que tengan ese tipo de bandera o sanción.'
 })
 
 const opciones = ref({
@@ -364,9 +428,19 @@ const columnasPorTipo = {
     { key: 'nombreFraternidad', label: 'Fraternidad' },
     { key: 'tipoDanza', label: 'Danza' },
     { key: 'categoria', label: 'Categoría' },
-    { key: 'promedioJurado', label: 'Prom. jurado' },
+    { key: 'promedioFinal', label: 'Promedio Final' },
     { key: 'impactoSanciones', label: 'Sanciones' },
+    { key: 'detalleSanciones', label: 'Detalle' },
     { key: 'puntajeFinal', label: 'Puntaje final' },
+  ],
+  disciplina: [
+    { key: 'nombreFraternidad', label: 'Fraternidad' },
+    { key: 'tipoLabel', label: 'Tipo' },
+    { key: 'detalle', label: 'Detalle' },
+    { key: 'valorImpacto', label: 'Impacto' },
+    { key: 'fechaHora', label: 'Fecha' },
+    { key: 'categoria', label: 'Categoría' },
+    { key: 'gestionAnio', label: 'Gestión' },
   ],
 }
 
@@ -382,6 +456,9 @@ const opcionesOrden = computed(() => {
   if (filtros.value.tipoReporte === 'calificaciones') {
     base.push({ value: 'puntajeFinal', label: 'Puntaje final' }, { value: 'puesto', label: 'Puesto' })
   }
+  if (filtros.value.tipoReporte === 'disciplina') {
+    base.push({ value: 'fechaHora', label: 'Fecha' }, { value: 'tipoLabel', label: 'Tipo de incidencia' }, { value: 'valorImpacto', label: 'Impacto' })
+  }
   return base
 })
 
@@ -393,8 +470,8 @@ const totalPaginas = computed(() => {
 const formatCell = (row, key) => {
   const val = row[key]
   if (val === null || val === undefined || val === '') return '—'
-  if (key === 'promedioJurado' || key === 'puntajeFinal') return Number(val).toFixed(2)
-  if (key === 'fechaHoraCalificacion' && val) {
+  if (key === 'promedioJurado' || key === 'promedioFinal' || key === 'puntajeFinal') return Number(val).toFixed(2)
+  if ((key === 'fechaHoraCalificacion' || key === 'fechaHora') && val) {
     return new Date(val).toLocaleString('es-BO')
   }
   if ((key === 'cupo' || key === 'esExcedente') && row.estadoInscripcion && row.estadoInscripcion !== 'INSCRITA') {
@@ -410,6 +487,13 @@ const estadoBadgeClass = (estado) => {
   return 'bg-slate-50 text-slate-600 border-slate-200'
 }
 
+const incidenciaBadgeClass = (tipo) => {
+  if (tipo === 'AMARILLA') return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+  if (tipo === 'ROJA') return 'bg-red-100 text-red-800 border-red-300'
+  if (tipo && String(tipo).startsWith('SANCION')) return 'bg-red-700 text-white border-red-800'
+  return 'bg-slate-50 text-slate-600 border-slate-200'
+}
+
 const seleccionarAlcance = (id) => {
   filtros.value.alcanceListado = id
   resultado.value = null
@@ -421,12 +505,18 @@ const seleccionarTipo = (id) => {
   if (id === 'calificaciones') {
     filtros.value.ordenarPor = 'puesto'
     filtros.value.orden = 'ASC'
+  } else if (id === 'disciplina') {
+    filtros.value.ordenarPor = 'fechaHora'
+    filtros.value.orden = 'DESC'
   } else {
     filtros.value.ordenarPor = 'nombreFraternidad'
     filtros.value.orden = 'ASC'
   }
   if (id !== 'fraternidades') {
     filtros.value.alcanceListado = 'inscritas'
+  }
+  if (id !== 'disciplina' && id !== 'calificaciones') {
+    filtros.value.tipoIncidencia = 'todos'
   }
   resultado.value = null
   error.value = ''
@@ -447,6 +537,9 @@ const buildPayload = (page) => {
   }
   if (p.tipoReporte !== 'fraternidades') {
     delete p.alcanceListado
+  }
+  if (p.tipoReporte !== 'disciplina' && p.tipoReporte !== 'calificaciones') {
+    delete p.tipoIncidencia
   }
   Object.keys(p).forEach((k) => {
     if (p[k] === null || p[k] === '' || p[k] === TODOS) delete p[k]

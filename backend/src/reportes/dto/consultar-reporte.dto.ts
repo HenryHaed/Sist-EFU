@@ -12,7 +12,21 @@ export enum TipoReporte {
   FRATERNIDADES = 'fraternidades',
   DIRECTIVA = 'directiva',
   CALIFICACIONES = 'calificaciones',
+  DISCIPLINA = 'disciplina',
   COSTOS = 'costos',
+}
+
+/** Filtro de banderas / sanciones (una fila por caso) */
+export enum TipoIncidenciaReporte {
+  TODOS = 'todos',
+  AMARILLA = 'AMARILLA',
+  ROJA = 'ROJA',
+  SANCION_ALCOHOL = 'SANCION_ALCOHOL',
+  SANCION_AGRESION = 'SANCION_AGRESION',
+  SANCION_BANDA = 'SANCION_BANDA',
+  SANCION_AJENO = 'SANCION_AJENO',
+  BANDERAS = 'BANDERAS',
+  SANCIONES_GRAVES = 'SANCIONES_GRAVES',
 }
 
 /** Alcance del listado de fraternidades / preinscripciones */
@@ -92,4 +106,8 @@ export class ConsultarReporteDto {
 
   @IsOptional()
   soloHabilitadas?: boolean;
+
+  @IsOptional()
+  @IsEnum(TipoIncidenciaReporte)
+  tipoIncidencia?: TipoIncidenciaReporte;
 }

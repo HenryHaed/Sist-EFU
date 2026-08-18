@@ -9,6 +9,7 @@ import { Facultad } from '../entities/Facultad';
 import { Carrera } from '../entities/Carrera';
 import { Categoria } from '../entities/Categoria';
 import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
+import { Incidencia } from '../entities/Incidencia';
 import { EvaluacionesModule } from '../evaluaciones/evaluaciones.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { EvaluacionesModule } from '../evaluaciones/evaluaciones.module';
       Carrera,
       Categoria,
       SolicitudInscripcion,
+      Incidencia,
     ]),
     EvaluacionesModule,
   ],

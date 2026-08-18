@@ -9,6 +9,7 @@ import { Carrera } from './entities/Carrera';
 import { TipoDanza } from './entities/TipoDanza';
 import { ensureOrganizacionUmsaDefault } from './common/organizacion-umsa-default';
 import { ensureTiposDanzaDefault } from './common/tipos-danza-default';
+import { SYSTEM_ROLES } from './common/system-roles';
 
 const UPLOAD_SUBDIRS = [
   'Doc_Gestion',
@@ -215,14 +216,7 @@ async function limpiarBaseDeDatos(dataSource: DataSource) {
 async function sembrarProduccion(dataSource: DataSource) {
   console.log('[SEED] Insertando roles del sistema...');
   const roleRepo = dataSource.getRepository(Role);
-  const roles = await roleRepo.save([
-    { nombre: 'superusuario', descripcion: 'Dueño del sistema. Acceso total.' },
-    { nombre: 'admin', descripcion: 'Administrador general del evento y gestión de usuarios.' },
-    { nombre: 'controladorhcu', descripcion: 'Control de asistencia y disciplina.' },
-    { nombre: 'delegado', descripcion: 'Delegado de fraternidad.' },
-    { nombre: 'jurado', descripcion: 'Jurado calificador del evento.' },
-    { nombre: 'veedor', descripcion: 'Veedor de solo lectura: estadísticas, reglamento y monografías de fraternidades.' },
-  ]);
+  const roles = await roleRepo.save([...SYSTEM_ROLES]);
 
   const rolSuper = roles.find((r) => r.nombre === 'superusuario');
   if (!rolSuper) throw new Error('No se pudo crear el rol superusuario.');

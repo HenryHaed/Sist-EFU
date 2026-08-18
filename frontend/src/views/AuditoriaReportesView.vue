@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-page max-w-6xl w-full">
+  <div class="dashboard-page max-w-7xl w-full">
     <div class="mb-6 sm:mb-8">
       <div class="flex items-center gap-3 mb-2">
         <span class="h-6 sm:h-8 w-2 bg-secondary rounded-full shrink-0"></span>

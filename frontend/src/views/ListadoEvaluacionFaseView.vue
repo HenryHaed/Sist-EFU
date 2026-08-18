@@ -63,24 +63,32 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="item in fraternidadesFiltradas" :key="item.idFraternidad" class="hover:bg-slate-50 transition-colors">
+              <tr
+                v-for="item in fraternidadesFiltradas"
+                :key="item.idFraternidad"
+                class="transition-colors"
+                :class="tieneSancionGrave(item) ? 'bg-red-50/80 hover:bg-red-50' : 'hover:bg-slate-50'"
+              >
                 <td class="px-6 py-4">
-                  <p class="font-bold text-primary">{{ item.nombre }}</p>
+                  <p class="font-bold" :class="tieneSancionGrave(item) ? 'text-red-800' : 'text-primary'">{{ item.nombre }}</p>
                   <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
                   
                   <!-- LISTADO DE PENALIZACIONES (Solo en Disciplina) -->
-                  <div v-if="item.penalizaciones && item.penalizaciones.length > 0" class="mt-2 flex flex-wrap gap-1">
+                  <div v-if="item.penalizaciones && item.penalizaciones.length > 0" class="mt-2 flex flex-wrap gap-1.5">
                     <div v-for="p in item.penalizaciones" :key="p.idIncidencia" 
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-50 border border-red-100 text-[9px] font-bold text-red-700"
+                      class="inline-flex items-center gap-1.5 rounded-lg font-black uppercase tracking-wide"
+                      :class="esSancionGrave(p)
+                        ? 'bg-red-700 text-white border border-red-900 px-2.5 py-1 text-[10px] shadow-sm shadow-red-200'
+                        : 'bg-red-50 border border-red-200 text-[10px] text-red-800 px-2 py-1'"
                     >
-                      <span class="material-symbols-outlined text-[10px]">warning</span>
-                      {{ p.nombre }}
+                      <span class="material-symbols-outlined text-[14px]">{{ esSancionGrave(p) ? 'gavel' : 'warning' }}</span>
+                      {{ etiquetaPenalizacion(p) }}
                       <button v-if="authStore.userRole === 'admin' || authStore.userRole === 'superusuario'"
                         @click="removerPenalizacion(item, p.idIncidencia)"
-                        class="ml-1 hover:text-red-900"
+                        class="ml-0.5 hover:text-white/80"
                         title="Remover (Solo Admin)"
                       >
-                        <span class="material-symbols-outlined text-[12px]">close</span>
+                        <span class="material-symbols-outlined text-[14px]">close</span>
                       </button>
                     </div>
                   </div>
@@ -169,7 +177,7 @@
                     <button 
                       @click="abrirSanciones(item)"
                       title="Sanciones Graves"
-                      class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-slate-900 text-white hover:bg-black shadow-sm transition-all"
+                      class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 shadow-sm shadow-red-200 transition-all"
                     >
                       <span class="material-symbols-outlined text-[18px]">gavel</span>
                       <span class="text-[10px] font-black uppercase tracking-widest">Sanciones</span>
@@ -183,10 +191,17 @@
 
         <!-- Vista Mobile (Tarjetas) -->
         <div class="md:hidden p-4 space-y-4">
-          <div v-for="item in fraternidadesFiltradas" :key="item.idFraternidad + '_mobile'" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-4 relative overflow-hidden">
+          <div
+            v-for="item in fraternidadesFiltradas"
+            :key="item.idFraternidad + '_mobile'"
+            class="rounded-2xl p-4 shadow-sm flex flex-col gap-4 relative overflow-hidden"
+            :class="tieneSancionGrave(item)
+              ? 'bg-red-50 border-2 border-red-600'
+              : 'bg-slate-50 border border-slate-200'"
+          >
             <!-- Indicador lateral estado -->
             <div class="absolute left-0 top-0 bottom-0 w-1.5"
-                 :class="{
+                 :class="tieneSancionGrave(item) ? 'bg-red-700' : {
                    'bg-slate-300': item.estadoEvaluacion === 'PENDIENTE',
                    'bg-amber-500': item.estadoEvaluacion === 'EN_PROGRESO',
                    'bg-emerald-500': item.estadoEvaluacion === 'COMPLETADO'
@@ -195,11 +210,11 @@
 
             <div class="flex justify-between items-start pl-2">
               <div>
-                <p class="font-black text-primary text-base">{{ item.nombre }}</p>
+                <p class="font-black text-base" :class="tieneSancionGrave(item) ? 'text-red-800' : 'text-primary'">{{ item.nombre }}</p>
                 <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
               </div>
               <div class="text-right">
-                <p class="text-xl font-black text-primary">{{ item.puntajeActual || 0 }}</p>
+                <p class="text-xl font-black" :class="tieneSancionGrave(item) ? 'text-red-700' : 'text-primary'">{{ item.puntajeActual || 0 }}</p>
                 <p class="text-[10px] text-slate-400 font-bold uppercase">pts</p>
               </div>
             </div>
@@ -217,6 +232,17 @@
                 </span>
                 {{ item.estadoEvaluacion.replace('_', ' ') }}
               </div>
+              <div
+                v-for="p in (item.penalizaciones || [])"
+                :key="p.idIncidencia + '_m'"
+                class="inline-flex items-center gap-1 rounded-lg font-black uppercase"
+                :class="esSancionGrave(p)
+                  ? 'bg-red-700 text-white px-2.5 py-1 text-[10px]'
+                  : 'bg-red-100 text-red-800 border border-red-200 px-2 py-1 text-[10px]'"
+              >
+                <span class="material-symbols-outlined text-[14px]">{{ esSancionGrave(p) ? 'gavel' : 'warning' }}</span>
+                {{ etiquetaPenalizacion(p) }}
+              </div>
             </div>
             
             <!-- ACCIONES DISCIPLINA MOBILE -->
@@ -227,7 +253,7 @@
               <button @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
                 <span class="material-symbols-outlined text-[18px]">flag</span>
               </button>
-              <button @click="abrirSanciones(item)" class="flex-[2] py-2 rounded-xl bg-slate-900 text-white flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-sm">
+              <button @click="abrirSanciones(item)" class="flex-[2] py-2 rounded-xl bg-red-700 text-white flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-sm shadow-red-200">
                 <span class="material-symbols-outlined text-[18px]">gavel</span>
                 Sanciones
               </button>
@@ -279,40 +305,43 @@
 
     <!-- MODAL DE SANCIONES GRAVES -->
     <v-dialog v-model="modalSanciones" max-width="600" max-height="90dvh" scrollable persistent>
-      <v-card class="rounded-2xl overflow-hidden border-4 border-slate-900 flex flex-col max-h-[90dvh]">
-        <div class="bg-slate-900 p-6 text-white text-center relative shrink-0">
+      <v-card class="rounded-2xl overflow-hidden border-4 border-red-800 flex flex-col max-h-[90dvh]">
+        <div class="bg-red-800 p-6 text-white text-center relative shrink-0">
           <button @click="modalSanciones = false" class="absolute right-4 top-4 size-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
             <span class="material-symbols-outlined text-xl text-white">close</span>
           </button>
-          <div class="size-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/20">
-            <span class="material-symbols-outlined text-4xl text-red-500">warning</span>
+          <div class="size-16 bg-white/15 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-white/30">
+            <span class="material-symbols-outlined text-4xl text-white">gavel</span>
           </div>
-          <h3 class="text-2xl font-black italic uppercase tracking-tighter">Sanciones de Disciplina</h3>
-          <p class="text-white/60 text-xs font-bold mt-1">{{ fraternidadParaSancion?.nombre }}</p>
+          <h3 class="text-2xl font-black italic uppercase tracking-tighter">Sanciones graves</h3>
+          <p class="text-white/80 text-xs font-bold mt-1 uppercase tracking-widest">{{ fraternidadParaSancion?.nombre }}</p>
         </div>
 
-        <v-card-text class="pa-6 sm:pa-8 bg-white overflow-y-auto flex-1 min-h-0 custom-scrollbar">
-          <p class="text-slate-500 text-sm mb-6">Seleccione una sanción grave según el reglamento de disciplina. <b>Estas acciones son irreversibles</b> y afectan directamente la participación de la fraternidad.</p>
+        <v-card-text class="pa-6 sm:pa-8 bg-red-50 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+          <p class="text-red-900 text-sm mb-6 font-medium leading-relaxed">
+            Seleccione una sanción grave según el reglamento de disciplina.
+            <b class="uppercase">Estas acciones son irreversibles</b> y afectan de forma severa la participación de la fraternidad.
+          </p>
           
           <div class="grid gap-3">
             <button v-for="s in sancionesReglamento" :key="s.id"
               @click="preconfirmarSancion(s)"
-              class="w-full p-4 rounded-xl border border-slate-200 hover:border-red-500 hover:bg-red-50 text-left transition-all flex items-center gap-4 group"
+              class="w-full p-4 rounded-xl border-2 border-red-200 bg-white hover:border-red-700 hover:bg-red-100 text-left transition-all flex items-center gap-4 group"
             >
-              <div class="size-10 rounded-lg bg-slate-100 group-hover:bg-red-100 flex items-center justify-center text-slate-400 group-hover:text-red-600 shrink-0">
+              <div class="size-11 rounded-lg bg-red-100 group-hover:bg-red-700 flex items-center justify-center text-red-700 group-hover:text-white shrink-0">
                 <span class="material-symbols-outlined">{{ s.icono }}</span>
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-black text-slate-800">{{ s.titulo }}</p>
-                <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{{ s.penalidad }}</p>
+                <p class="text-sm font-black text-red-950">{{ s.titulo }}</p>
+                <p class="text-[10px] text-red-700 uppercase tracking-widest font-black mt-0.5">{{ s.penalidad }}</p>
               </div>
-              <span class="material-symbols-outlined text-slate-300 group-hover:text-red-400 shrink-0">chevron_right</span>
+              <span class="material-symbols-outlined text-red-300 group-hover:text-red-700 shrink-0">chevron_right</span>
             </button>
           </div>
         </v-card-text>
 
-        <v-card-actions class="pa-4 sm:pa-6 bg-slate-50 border-t border-slate-100 shrink-0">
-          <v-btn block height="48" variant="tonal" color="slate" class="rounded-xl font-bold" @click="modalSanciones = false">Cancelar</v-btn>
+        <v-card-actions class="pa-4 sm:pa-6 bg-white border-t border-red-100 shrink-0">
+          <v-btn block height="48" variant="tonal" color="error" class="rounded-xl font-bold" @click="modalSanciones = false">Cancelar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -325,9 +354,10 @@
           <p class="text-white/80 text-xs font-bold mt-2">ESTA ACCIÓN NO SE PUEDE DESHACER</p>
         </div>
         
-        <v-card-text class="pa-8 text-center bg-white">
-          <p class="text-slate-800 font-bold mb-2">{{ sancionSeleccionada?.titulo }}</p>
-          <p class="text-slate-500 text-sm mb-6">{{ sancionSeleccionada?.descripcion }}</p>
+        <v-card-text class="pa-8 text-center bg-red-50">
+          <p class="text-red-950 font-black text-lg mb-2">{{ sancionSeleccionada?.titulo }}</p>
+          <p class="text-red-800 text-sm mb-2 font-bold uppercase tracking-widest">{{ sancionSeleccionada?.penalidad }}</p>
+          <p class="text-red-700/80 text-sm mb-6">{{ sancionSeleccionada?.descripcion }}</p>
 
           <div v-if="contador > 0" class="size-16 rounded-full border-4 border-slate-100 flex items-center justify-center mx-auto mb-4">
              <span class="text-2xl font-black text-primary">{{ contador }}</span>
@@ -418,6 +448,15 @@ const sancionesReglamento = [
   { id: 'SANCION_BANDA', titulo: 'Exceso de Bandas/Músicos', penalidad: 'Puntaje 0 en Disciplina', icono: 'music_off', descripcion: 'Más de 2 bandas de 80 músicos cada una o exceso de personal musical permitido.', tipo: 'SANCION_BANDA' },
   { id: 'SANCION_AJENO', titulo: 'Personal ajeno a la UMSA', penalidad: 'Suspensión de 1 año', icono: 'group_remove', descripcion: 'Se detectó personal externo no perteneciente a la universidad dentro de las filas.', tipo: 'SANCION_AJENO' }
 ]
+
+const esSancionGrave = (p) => p?.tipoImpacto === 'SUSPENSION' || Number(p?.valor) <= -10
+const tieneSancionGrave = (item) => (item?.penalizaciones || []).some(esSancionGrave)
+const etiquetaPenalizacion = (p) => {
+  if (!p) return ''
+  if (p.tipoImpacto === 'SUSPENSION') return p.nombre
+  if (Number(p.valor)) return `${p.nombre} (${p.valor})`
+  return p.nombre
+}
 
 const cargarFaseData = async () => {
   loading.value = true

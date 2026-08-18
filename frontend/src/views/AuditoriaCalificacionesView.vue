@@ -1,53 +1,58 @@
 <template>
   <div class="w-full space-y-6">
-    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+    <div class="flex flex-col gap-4">
       <div>
         <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Desglose de notas</p>
         <p class="text-sm text-slate-600 font-medium max-w-2xl">
-          Quién calificó, con qué nota y el total oficial (promedio de jurados), igual que en el panel de estadísticas.
+          Promedio Final = suma de la NotaFraternidad de cada jurado, dividido entre los jurados que calificaron.
+          El detalle por fase se ve al expandir cada jurado.
         </p>
       </div>
-      <div class="flex flex-col sm:flex-row gap-3">
-        <div class="relative min-w-[200px] sm:min-w-[240px]">
-          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-          <input
-            v-model="busqueda"
-            type="search"
-            :placeholder="ambito === 'EFU' ? 'Buscar fraternidad...' : 'Buscar participante o fraternidad...'"
-            class="form-input !py-2.5 !text-sm !pl-10 w-full"
-          />
+      <div class="flex flex-col xl:flex-row xl:items-center gap-3">
+        <div class="flex flex-col sm:flex-row gap-3 flex-1 min-w-0">
+          <div class="relative flex-1 min-w-[200px]">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+            <input
+              v-model="busqueda"
+              type="search"
+              :placeholder="ambito === 'EFU' ? 'Buscar fraternidad o jurado...' : 'Buscar participante o fraternidad...'"
+              class="form-input !py-2.5 !text-sm !pl-10 w-full"
+            />
+          </div>
+          <select v-model="idGestion" class="form-input !py-2.5 !text-sm sm:w-[180px] shrink-0" @change="cargar">
+            <option v-for="g in gestiones" :key="g.idGestion" :value="g.idGestion">
+              Gestión {{ g.anio }}{{ g.activa ? ' (activa)' : '' }}
+            </option>
+          </select>
         </div>
-        <select v-model="idGestion" class="form-input !py-2.5 !text-sm min-w-[160px]" @change="cargar">
-          <option v-for="g in gestiones" :key="g.idGestion" :value="g.idGestion">
-            Gestión {{ g.anio }}{{ g.activa ? ' (activa)' : '' }}
-          </option>
-        </select>
-        <div class="inline-flex rounded-xl border border-slate-200 overflow-hidden bg-white">
+        <div class="flex flex-wrap items-center gap-3 shrink-0">
+          <div class="inline-flex rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <button
+              type="button"
+              @click="ambito = 'EFU'; cargar()"
+              class="px-5 py-2.5 text-xs font-black uppercase tracking-wide whitespace-nowrap min-w-[9.5rem] transition-colors"
+              :class="ambito === 'EFU' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'"
+            >
+              Fraternidades
+            </button>
+            <button
+              type="button"
+              @click="ambito = 'EXTERNO'; cargar()"
+              class="px-5 py-2.5 text-xs font-black uppercase tracking-wide whitespace-nowrap min-w-[7.5rem] transition-colors border-l border-slate-200"
+              :class="ambito === 'EXTERNO' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'"
+            >
+              Concursos
+            </button>
+          </div>
           <button
             type="button"
-            @click="ambito = 'EFU'; cargar()"
-            class="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors"
-            :class="ambito === 'EFU' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'"
+            @click="cargar"
+            class="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-black uppercase tracking-wide text-slate-600 hover:border-primary hover:text-primary flex items-center gap-2 whitespace-nowrap"
           >
-            Fraternidades
-          </button>
-          <button
-            type="button"
-            @click="ambito = 'EXTERNO'; cargar()"
-            class="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors border-l border-slate-200"
-            :class="ambito === 'EXTERNO' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'"
-          >
-            Concursos
+            <span class="material-symbols-outlined text-base" :class="{ 'animate-spin': loading }">sync</span>
+            Actualizar
           </button>
         </div>
-        <button
-          type="button"
-          @click="cargar"
-          class="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-600 hover:border-primary hover:text-primary flex items-center gap-2"
-        >
-          <span class="material-symbols-outlined text-base" :class="{ 'animate-spin': loading }">sync</span>
-          Actualizar
-        </button>
       </div>
     </div>
 
@@ -78,28 +83,43 @@
       <article
         v-for="item in itemsEfu"
         :key="item.idFraternidad"
-        class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm"
+        class="rounded-2xl overflow-hidden shadow-sm"
+        :class="item.suspendida || item.impactoSanciones < 0
+          ? 'bg-white border-2 border-red-500'
+          : 'bg-white border border-slate-200'"
       >
         <button
           type="button"
-          class="w-full flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 text-left hover:bg-slate-50/80 transition-colors"
+          class="w-full flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 text-left transition-colors"
+          :class="item.suspendida || item.impactoSanciones < 0 ? 'hover:bg-red-50/70' : 'hover:bg-slate-50/80'"
           @click="toggleExpand(`f-${item.idFraternidad}`)"
         >
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-black uppercase italic text-slate-800 truncate">{{ item.nombre }}</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="text-sm font-black uppercase italic truncate" :class="item.suspendida ? 'text-red-800' : 'text-slate-800'">{{ item.nombre }}</p>
+              <span
+                v-if="item.suspendida"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-700 text-white text-[9px] font-black uppercase tracking-widest"
+              >
+                <span class="material-symbols-outlined text-[12px]">gavel</span>
+                Suspendida
+              </span>
+            </div>
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-              {{ item.categoria }} · {{ item.cantidadJurados }} nota(s) de jurado(s)
+              {{ item.categoria }} · {{ item.cantidadJurados }} jurado(s)
             </p>
           </div>
           <div class="flex items-center gap-4 sm:gap-6 shrink-0">
             <div class="text-right">
-              <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Promedio</p>
-              <p class="text-sm font-black text-slate-700">{{ fmt(item.promedioJurado) }}</p>
+              <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Promedio Final</p>
+              <p class="text-sm font-black text-slate-700">{{ fmt(item.promedioFinal ?? item.promedioJurado) }}</p>
             </div>
-            <div class="text-right">
-              <p class="text-[9px] font-black uppercase text-red-400 tracking-widest">Sanción</p>
-              <p class="text-sm font-black" :class="item.impactoSanciones < 0 ? 'text-red-600' : 'text-slate-500'">
-                {{ fmt(item.impactoSanciones) }}
+            <div class="text-right min-w-[5.5rem] rounded-xl px-2.5 py-1.5"
+              :class="item.suspendida || item.impactoSanciones < 0 ? 'bg-red-700 text-white' : 'bg-slate-50'"
+            >
+              <p class="text-[9px] font-black uppercase tracking-widest" :class="item.suspendida || item.impactoSanciones < 0 ? 'text-white/80' : 'text-red-400'">Sanción</p>
+              <p class="text-sm font-black">
+                {{ item.suspendida && !(item.impactoSanciones < 0) ? 'SUSP.' : fmt(item.impactoSanciones) }}
               </p>
             </div>
             <div class="text-right min-w-[4rem]">
@@ -112,37 +132,89 @@
           </div>
         </button>
 
-        <div v-if="expandido[`f-${item.idFraternidad}`]" class="border-t border-slate-100 bg-slate-50/50 px-4 sm:px-5 py-4">
-          <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Calificaciones por jurado</p>
-          <div v-if="!item.calificaciones?.length" class="text-xs text-slate-400 font-medium py-2">Sin evaluaciones aún.</div>
-          <div v-else class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-            <table class="w-full text-left text-sm min-w-[560px]">
-              <thead>
-                <tr class="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                  <th class="px-3 py-2.5">Jurado</th>
-                  <th class="px-3 py-2.5">Fase</th>
-                  <th class="px-3 py-2.5 text-center">Estado</th>
-                  <th class="px-3 py-2.5 text-center">Nota</th>
-                  <th class="px-3 py-2.5">Fecha</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-50">
-                <tr v-for="c in item.calificaciones" :key="c.idEvaluacion" class="hover:bg-slate-50/80">
-                  <td class="px-3 py-2.5 font-bold text-slate-800 text-xs">{{ c.juradoNombre }}</td>
-                  <td class="px-3 py-2.5 text-xs text-slate-600 font-medium">{{ c.faseNombre }}</td>
-                  <td class="px-3 py-2.5 text-center">
-                    <span
-                      class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full"
-                      :class="c.estado === 'COMPLETADO' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
-                    >
-                      {{ c.estado }}
-                    </span>
-                  </td>
-                  <td class="px-3 py-2.5 text-center font-black text-primary">{{ fmt(c.puntajeTotal) }}</td>
-                  <td class="px-3 py-2.5 text-[11px] text-slate-500">{{ fmtFecha(c.fechaCierre) }}</td>
-                </tr>
-              </tbody>
-            </table>
+        <div v-if="expandido[`f-${item.idFraternidad}`]" class="border-t border-slate-100 bg-slate-50/50 px-4 sm:px-5 py-4 space-y-3">
+          <div v-if="item.sanciones?.length" class="rounded-xl border-2 border-red-200 bg-red-50 px-3 py-3">
+            <p class="text-[10px] font-black uppercase tracking-widest text-red-700 mb-2 flex items-center gap-1">
+              <span class="material-symbols-outlined text-[14px]">gavel</span>
+              Sanciones registradas
+            </p>
+            <ul class="space-y-1">
+              <li
+                v-for="(s, idx) in item.sanciones"
+                :key="`${item.idFraternidad}-s-${idx}`"
+                class="text-xs font-bold text-red-900"
+              >
+                {{ s.nombre }}
+                <span v-if="s.tipoImpacto === 'SUSPENSION'" class="ml-1 uppercase text-[9px] tracking-widest">· suspensión</span>
+                <span v-else-if="s.valor"> ({{ Number(s.valor) > 0 ? '+' : '' }}{{ s.valor }})</span>
+              </li>
+            </ul>
+          </div>
+          <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">NotaFraternidad por jurado (sobre 100)</p>
+          <div v-if="!item.jurados?.length" class="text-xs text-slate-400 font-medium py-2">Sin evaluaciones aún.</div>
+          <div
+            v-for="j in item.jurados"
+            :key="`${item.idFraternidad}-${j.idJurado ?? j.juradoNombre}`"
+            class="rounded-xl border border-slate-200 bg-white overflow-hidden"
+          >
+            <button
+              type="button"
+              class="w-full flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 text-left hover:bg-slate-50/80 transition-colors"
+              @click.stop="toggleExpand(`j-${item.idFraternidad}-${j.idJurado ?? j.juradoNombre}`)"
+            >
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-black uppercase italic text-slate-800 truncate">{{ j.juradoNombre }}</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                  {{ j.fasesCalificadas }} fase(s) calificada(s)
+                </p>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <div class="text-right">
+                  <p class="text-[8px] font-black uppercase text-slate-400 tracking-widest">NotaFraternidad</p>
+                  <p class="text-base font-black text-primary italic">{{ fmt(j.notaFraternidad) }}</p>
+                </div>
+                <span class="material-symbols-outlined text-slate-400 text-lg">
+                  {{ expandido[`j-${item.idFraternidad}-${j.idJurado ?? j.juradoNombre}`] ? 'expand_less' : 'expand_more' }}
+                </span>
+              </div>
+            </button>
+            <div
+              v-if="expandido[`j-${item.idFraternidad}-${j.idJurado ?? j.juradoNombre}`]"
+              class="border-t border-slate-100 px-3 sm:px-4 py-3 bg-slate-50/60"
+            >
+              <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Detalle por fase</p>
+              <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                <table class="w-full text-left text-sm min-w-[420px]">
+                  <thead>
+                    <tr class="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                      <th class="px-3 py-2">Fase</th>
+                      <th class="px-3 py-2 text-center">Peso</th>
+                      <th class="px-3 py-2 text-center">Estado</th>
+                      <th class="px-3 py-2 text-center">Nota</th>
+                      <th class="px-3 py-2">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-50">
+                    <tr v-for="fase in j.fases" :key="fase.idEvaluacion || `${fase.idFase}-${fase.faseNombre}`">
+                      <td class="px-3 py-2 text-xs font-medium text-slate-700">{{ fase.faseNombre }}</td>
+                      <td class="px-3 py-2 text-center text-[11px] text-slate-500">
+                        {{ fase.pesoPorcentaje != null ? fmt(fase.pesoPorcentaje) : '—' }}
+                      </td>
+                      <td class="px-3 py-2 text-center">
+                        <span
+                          class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full"
+                          :class="fase.estado === 'COMPLETADO' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+                        >
+                          {{ fase.estado || '—' }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2 text-center font-black text-primary">{{ fmt(fase.puntajeTotal) }}</td>
+                      <td class="px-3 py-2 text-[11px] text-slate-500">{{ fmtFecha(fase.fechaCierre) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </article>
@@ -247,7 +319,8 @@ const itemsEfu = computed(() => {
   const q = qNorm.value
   if (!q) return items
   return items.filter((item) => {
-    const haystack = [item.nombre, item.categoria]
+    const jurados = (item.jurados || []).map((j) => j.juradoNombre).join(' ')
+    const haystack = [item.nombre, item.categoria, jurados]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()

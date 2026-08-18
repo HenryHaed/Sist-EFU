@@ -16,7 +16,14 @@ import { Categoria } from '../entities/Categoria';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { ensureTiposDanzaDefault } from '../common/tipos-danza-default';
 import { buildMiembrosDirectiva } from '../common/personas-directiva';
-import { ConsultarReporteDto, TipoReporte, AlcanceListadoFraternidades } from './dto/consultar-reporte.dto';
+import {
+  ConsultarReporteDto,
+  TipoReporte,
+  AlcanceListadoFraternidades,
+  TipoIncidenciaReporte,
+} from './dto/consultar-reporte.dto';
+import { Incidencia } from '../entities/Incidencia';
+import { FORMULA_EFU_PROMEDIO } from '../evaluaciones/efu-scoring';
 import { EvaluacionesService } from '../evaluaciones/evaluaciones.service';
 import { drawPdfInstitutionalHeader, PDF_UMSA_BLUE, PDF_UMSA_RED } from '../common/pdf-layout';
 import { InstanciaRepresentacion } from '../entities/SolicitudInscripcion';
@@ -38,6 +45,8 @@ export class ReportesService implements OnModuleInit {
     private readonly categoriaRepo: Repository<Categoria>,
     @InjectRepository(SolicitudInscripcion)
     private readonly solicitudRepo: Repository<SolicitudInscripcion>,
+    @InjectRepository(Incidencia)
+    private readonly incidenciaRepo: Repository<Incidencia>,
     private readonly evaluacionesService: EvaluacionesService,
   ) {}
 
@@ -82,6 +91,43 @@ export class ReportesService implements OnModuleInit {
   }
 
   private readonly INSTANCIAS_CENTRALES = ['UMSA', 'FEDSIDUMSA', 'STUMSA'];
+
+  private clasificarInfraccion(inf?: {
+    nombre?: string;
+    tipoImpacto?: string;
+    valorImpacto?: number;
+  } | null): string {
+    const n = (inf?.nombre || '').toLowerCase();
+    const tipo = (inf?.tipoImpacto || '').toUpperCase();
+    if (n.includes('amarilla')) return 'AMARILLA';
+    if (n.includes('roja')) return 'ROJA';
+    if (n.includes('alcohol')) return 'SANCION_ALCOHOL';
+    if (n.includes('agresiv')) return 'SANCION_AGRESION';
+    if (n.includes('banda') || n.includes('músico') || n.includes('musico')) return 'SANCION_BANDA';
+    if (n.includes('ajeno')) return 'SANCION_AJENO';
+    if (tipo === 'SUSPENSION') return 'SANCION_AGRESION';
+    return 'OTRA';
+  }
+
+  private etiquetaIncidencia(clave: string, nombreOriginal?: string): string {
+    const labels: Record<string, string> = {
+      AMARILLA: 'Bandera Amarilla',
+      ROJA: 'Bandera Roja',
+      SANCION_ALCOHOL: 'Sanción: Alcohol',
+      SANCION_AGRESION: 'Sanción: Agresividad (suspensión 1 año)',
+      SANCION_BANDA: 'Sanción: Exceso de bandas',
+      SANCION_AJENO: 'Sanción: Personal ajeno a la UMSA',
+      OTRA: nombreOriginal || 'Incidencia',
+    };
+    return labels[clave] || nombreOriginal || clave;
+  }
+
+  private coincideTipoIncidencia(clave: string, filtro?: TipoIncidenciaReporte): boolean {
+    if (!filtro || filtro === TipoIncidenciaReporte.TODOS) return true;
+    if (filtro === TipoIncidenciaReporte.BANDERAS) return clave === 'AMARILLA' || clave === 'ROJA';
+    if (filtro === TipoIncidenciaReporte.SANCIONES_GRAVES) return clave.startsWith('SANCION_');
+    return clave === filtro;
+  }
 
   private buildFraternidadQuery(dto: ConsultarReporteDto): SelectQueryBuilder<Fraternidad> {
     const qb = this.fraternidadRepo
@@ -364,6 +410,10 @@ export class ReportesService implements OnModuleInit {
       return this.consultarListadoFraternidades(dto, page, limit, skip);
     }
 
+    if (dto.tipoReporte === TipoReporte.DISCIPLINA) {
+      return this.consultarDisciplina(dto, page, limit, skip);
+    }
+
     const fraternidades = await this.buildFraternidadQuery(dto).getMany();
 
     if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
@@ -405,13 +455,26 @@ export class ReportesService implements OnModuleInit {
     const idsFiltrados = new Set(fraternidades.map((f) => f.idFraternidad));
     const ranking = reporte.rankingEfu
       .filter((r) => idsFiltrados.has(r.idFraternidad))
+      .filter((r) => {
+        if (!dto.tipoIncidencia || dto.tipoIncidencia === TipoIncidenciaReporte.TODOS) return true;
+        const claves = (r.sanciones || []).map((s: any) => this.clasificarInfraccion(s));
+        return claves.some((c) => this.coincideTipoIncidencia(c, dto.tipoIncidencia));
+      })
       .map((r) => {
         const frat = fraternidades.find((f) => f.idFraternidad === r.idFraternidad);
+        const detalleSanciones = (r.sanciones || [])
+          .map((s: any) => s.nombre)
+          .filter(Boolean)
+          .join(' · ');
         return {
           ...this.mapFraternidadRow(frat!),
           puesto: r.puesto,
           promedioJurado: r.promedioJurado,
+          promedioFinal: r.promedioFinal ?? r.promedioJurado,
+          cantidadJurados: r.cantidadJurados ?? 0,
           impactoSanciones: r.impactoSanciones,
+          detalleSanciones: detalleSanciones || '—',
+          suspendida: !!r.suspendida,
           puntajeFinal: r.puntajeFinal,
           fechaHoraCalificacion: r.fechaHoraCalificacion,
         };
@@ -434,7 +497,121 @@ export class ReportesService implements OnModuleInit {
       limit,
       filtros: dto,
       gestion: reporte.gestion,
+      formula: FORMULA_EFU_PROMEDIO,
       data: ranking.slice(skip, skip + limit),
+    };
+  }
+
+  /**
+   * Una fila por incidencia (bandera o sanción) para listar todos los casos.
+   */
+  private async consultarDisciplina(
+    dto: ConsultarReporteDto,
+    page: number,
+    limit: number,
+    skip: number,
+  ) {
+    const qb = this.incidenciaRepo
+      .createQueryBuilder('i')
+      .leftJoinAndSelect('i.fraternidad', 'f')
+      .leftJoinAndSelect('f.tipoDanza', 'tipoDanza')
+      .leftJoinAndSelect('f.categoria', 'categoria')
+      .leftJoinAndSelect('f.facultad', 'facultad')
+      .leftJoinAndSelect('f.carrera', 'carrera')
+      .leftJoinAndSelect('f.institucionExterna', 'institucionExterna')
+      .leftJoinAndSelect('f.gestion', 'gestionFrat')
+      .leftJoinAndSelect('i.infraccion', 'infraccion')
+      .leftJoinAndSelect('i.gestion', 'gestion')
+      .orderBy('i.fecha_hora', 'DESC');
+
+    if (dto.idGestion) {
+      qb.andWhere('gestion.id_gestion = :idGestion', { idGestion: dto.idGestion });
+    }
+    if (dto.idTipoDanza) {
+      qb.andWhere('tipoDanza.id_tipo_danza = :idTipoDanza', { idTipoDanza: dto.idTipoDanza });
+    }
+    if (dto.idFacultad) {
+      qb.andWhere('facultad.id_facultad = :idFacultad', { idFacultad: dto.idFacultad });
+    }
+    if (dto.idCarrera) {
+      qb.andWhere('carrera.id_carrera = :idCarrera', { idCarrera: dto.idCarrera });
+    }
+    if (dto.idCategoria) {
+      qb.andWhere('categoria.id_categoria = :idCategoria', { idCategoria: dto.idCategoria });
+    }
+    if (dto.instanciaRepresentacion) {
+      qb.andWhere('f.nivel_representacion = :instancia', {
+        instancia: dto.instanciaRepresentacion,
+      });
+    }
+    if (dto.busqueda?.trim()) {
+      qb.andWhere(
+        '(LOWER(f.nombre) LIKE LOWER(:q) OR LOWER(infraccion.nombre) LIKE LOWER(:q))',
+        { q: `%${dto.busqueda.trim()}%` },
+      );
+    }
+
+    const incidencias = await qb.getMany();
+    let rows = incidencias
+      .filter((inc) => inc.fraternidad && inc.infraccion)
+      .map((inc) => {
+        const clave = this.clasificarInfraccion(inc.infraccion);
+        const frat = inc.fraternidad;
+        return {
+          idIncidencia: inc.idIncidencia,
+          idFraternidad: frat.idFraternidad,
+          nombreFraternidad: frat.nombre,
+          tipoDanza: frat.tipoDanza?.nombre || '—',
+          categoria: frat.categoria?.nombre || '—',
+          instancia: frat.nivelRepresentacion || '—',
+          pertenencia:
+            frat.facultad?.nombre ||
+            frat.carrera?.nombre ||
+            frat.institucionExterna?.nombre ||
+            frat.nivelRepresentacion ||
+            '—',
+          gestionAnio: inc.gestion?.anio || frat.gestion?.anio || null,
+          tipoIncidencia: clave,
+          tipoLabel: this.etiquetaIncidencia(clave, inc.infraccion.nombre),
+          detalle: inc.infraccion.nombre,
+          valorImpacto: Number(inc.infraccion.valorImpacto) || 0,
+          tipoImpacto: inc.infraccion.tipoImpacto || 'RESTA_PUNTOS',
+          observacion: inc.observacion || '—',
+          fechaHora: inc.fechaHora,
+        };
+      })
+      .filter((row) => this.coincideTipoIncidencia(row.tipoIncidencia, dto.tipoIncidencia));
+
+    const orden = dto.orden === 'ASC' ? 1 : -1;
+    const key = dto.ordenarPor || 'fechaHora';
+    rows.sort((a, b) => {
+      if (key === 'fechaHora') {
+        return (new Date(a.fechaHora).getTime() - new Date(b.fechaHora).getTime()) * orden;
+      }
+      if (key === 'valorImpacto') {
+        return (a.valorImpacto - b.valorImpacto) * orden;
+      }
+      const av = String((a as any)[key] ?? a.nombreFraternidad ?? '').toLowerCase();
+      const bv = String((b as any)[key] ?? b.nombreFraternidad ?? '').toLowerCase();
+      return av.localeCompare(bv, 'es') * orden;
+    });
+
+    let gestion: { anio?: number } | null = null;
+    if (dto.idGestion) {
+      const g = await this.gestionRepo.findOne({ where: { idGestion: dto.idGestion } });
+      if (g) gestion = { anio: g.anio };
+    }
+
+    const total = rows.length;
+    return {
+      tipoReporte: dto.tipoReporte,
+      tipoIncidencia: dto.tipoIncidencia || TipoIncidenciaReporte.TODOS,
+      total,
+      page,
+      limit,
+      filtros: dto,
+      gestion,
+      data: rows.slice(skip, skip + limit),
     };
   }
 
@@ -696,6 +873,7 @@ export class ReportesService implements OnModuleInit {
       fraternidades: 'REPORTE DE FRATERNIDADES',
       directiva: 'REPORTE DE DIRECTIVA',
       calificaciones: 'REPORTE DE CALIFICACIONES',
+      disciplina: 'REPORTE DE DISCIPLINA Y SANCIONES',
       costos: 'INFORME DE COSTOS DE PARTICIPACIÓN',
     };
 
@@ -713,10 +891,26 @@ export class ReportesService implements OnModuleInit {
     );
     doc.pipe(res);
 
+    const incidenciaLabel: Record<string, string> = {
+      todos: 'Todos los casos',
+      AMARILLA: 'Bandera Amarilla',
+      ROJA: 'Bandera Roja',
+      SANCION_ALCOHOL: 'Sanción: Alcohol',
+      SANCION_AGRESION: 'Sanción: Agresividad',
+      SANCION_BANDA: 'Sanción: Bandas',
+      SANCION_AJENO: 'Sanción: Personal ajeno',
+      BANDERAS: 'Banderas (amarilla y roja)',
+      SANCIONES_GRAVES: 'Sanciones graves',
+    };
+
     const subtitleParts = [
       (resultado as any).gestion?.anio ? `Gestión ${(resultado as any).gestion.anio}` : null,
       dto.tipoReporte === TipoReporte.FRATERNIDADES && dto.alcanceListado
         ? `Alcance: ${alcanceLabel[dto.alcanceListado] || dto.alcanceListado}`
+        : null,
+      (dto.tipoReporte === TipoReporte.DISCIPLINA || dto.tipoReporte === TipoReporte.CALIFICACIONES) &&
+      dto.tipoIncidencia
+        ? `Filtro: ${incidenciaLabel[dto.tipoIncidencia] || dto.tipoIncidencia}`
         : null,
     ].filter(Boolean);
     const subtitle = subtitleParts.length ? subtitleParts.join(' · ') : undefined;
@@ -743,7 +937,17 @@ export class ReportesService implements OnModuleInit {
         y,
         { width: contentW },
       );
-    y += 14;
+    y += 12;
+    if (dto.tipoReporte === TipoReporte.CALIFICACIONES) {
+      doc
+        .fontSize(7)
+        .fillColor('#334155')
+        .font('Helvetica-Oblique')
+        .text(FORMULA_EFU_PROMEDIO + '; final = max(0, Promedio Final + sanciones)', margin, y, {
+          width: contentW,
+        });
+      y += 12;
+    }
 
     const fontSize = 6.5;
     const headerFontSize = 7;
@@ -894,6 +1098,19 @@ export class ReportesService implements OnModuleInit {
         row.celular || '—',
       ]);
       renderTable(headers, widths, dataRows);
+    } else if (dto.tipoReporte === TipoReporte.DISCIPLINA) {
+      const headers = ['N°', 'Fraternidad', 'Tipo', 'Detalle', 'Impacto', 'Fecha', 'Gestión'];
+      const widths = [28, 140, 120, 160, 50, 90, 45];
+      const dataRows = rows.map((row, i) => [
+        String(i + 1),
+        row.nombreFraternidad || '—',
+        row.tipoLabel || '—',
+        row.detalle || '—',
+        row.tipoImpacto === 'SUSPENSION' ? 'SUSP.' : String(row.valorImpacto ?? '—'),
+        row.fechaHora ? new Date(row.fechaHora).toLocaleString('es-BO') : '—',
+        String(row.gestionAnio || '—'),
+      ]);
+      renderTable(headers, widths, dataRows);
     } else if (dto.tipoReporte === TipoReporte.COSTOS) {
       const resumen = (resultado as any).resumen;
       if (resumen) {
@@ -982,11 +1199,11 @@ export class ReportesService implements OnModuleInit {
         'Tipo de danza',
         'Categoría',
         'Pertenencia',
-        'Jurado',
+        'Prom. Final',
         'Sanciones',
         'Final',
       ];
-      const widths = [28, 36, 140, 100, 70, 150, 45, 50, 45];
+      const widths = [28, 36, 130, 95, 65, 130, 55, 70, 45];
       const dataRows = rows.map((row, i) => [
         String(i + 1),
         String(row.puesto ?? '—'),
@@ -994,8 +1211,10 @@ export class ReportesService implements OnModuleInit {
         row.tipoDanza || '—',
         row.categoria || '—',
         row.pertenencia || '—',
-        String(row.promedioJurado ?? '—'),
-        String(row.impactoSanciones ?? '—'),
+        String(row.promedioFinal ?? row.promedioJurado ?? '—'),
+        row.suspendida
+          ? `SUSP. ${row.detalleSanciones && row.detalleSanciones !== '—' ? row.detalleSanciones : ''}`.trim()
+          : String(row.impactoSanciones ?? '—'),
         String(row.puntajeFinal ?? '—'),
       ]);
       renderTable(headers, widths, dataRows);

@@ -592,6 +592,11 @@ const usuarios = ref([])
 const roles = ref([])
 const todasFases = ref([])
 const todasFraternidades = ref([])
+
+const idRolDe = (rol) => Number(rol?.idRol ?? rol?.id_rol)
+const nombreRolDe = (rol) => String(rol?.nombre || '').trim().toLowerCase()
+const rolDeFiltro = () =>
+  roles.value.find((r) => nombreRolDe(r) === String(props.rolFiltro || '').trim().toLowerCase())
 const fraternidadBusqueda = ref('')
 const fraternidadSugerencias = ref([])
 const cargandoFraternidades = ref(false)
@@ -797,8 +802,17 @@ const abrirModal = async (modoEdicion, usuario = null) => {
     asegurarFraternidadSeleccionada(usuario.fraternidad)
   } else {
     ciOriginalAlAbrir.value = ''
-    const rolDefault = roles.value.find(r => r.nombre === props.rolFiltro)
-    if (!rolDefault?.idRol) {
+    let rolDefault = rolDeFiltro()
+    if (!idRolDe(rolDefault)) {
+      try {
+        const { data } = await api.get('/usuarios/roles')
+        roles.value = Array.isArray(data) ? data : []
+        rolDefault = rolDeFiltro()
+      } catch (err) {
+        console.error('Error recargando roles:', err)
+      }
+    }
+    if (!idRolDe(rolDefault)) {
       Swal.fire({
         title: 'Rol no disponible',
         text: `No se encontró el rol «${props.rolFiltro}» en el sistema. Recarga la página; si persiste, verifica que el rol exista en la base de datos.`,
@@ -810,7 +824,7 @@ const abrirModal = async (modoEdicion, usuario = null) => {
     form.value = {
       idUsuario: null,
       ci: '', nombres: '', primerApellido: '', segundoApellido: '', correo: '',
-      password: '', idRol: rolDefault.idRol,
+      password: '', idRol: idRolDe(rolDefault),
       fasesEfuIds: [], fasesExternasIds: [], fraternidadesIds: [],
       idFraternidad: null,
       idFaseConcurso: null,
@@ -835,8 +849,7 @@ const guardarUsuario = async () => {
     // Resolver idRol: el filtro de vista / roles cargados (evita enviar '' → 500 en Postgres)
     let idRolResuelto = Number(form.value.idRol)
     if (!Number.isFinite(idRolResuelto) || idRolResuelto <= 0) {
-      const rolDefault = roles.value.find(r => r.nombre === props.rolFiltro)
-      idRolResuelto = Number(rolDefault?.idRol)
+      idRolResuelto = idRolDe(rolDeFiltro())
     }
     if (!Number.isFinite(idRolResuelto) || idRolResuelto <= 0) {
       errorFormulario.value = `No se pudo determinar el rol «${props.rolFiltro}». Recarga la página e intenta de nuevo.`
@@ -848,6 +861,7 @@ const guardarUsuario = async () => {
     const payload = {
       ...form.value,
       idRol: idRolResuelto,
+      nombreRol: props.rolFiltro,
       fasesEfuIds: form.value.fasesEfuIds,
       fasesExternasIds: form.value.fasesExternasIds,
       fraternidadesIds: form.value.fraternidadesIds

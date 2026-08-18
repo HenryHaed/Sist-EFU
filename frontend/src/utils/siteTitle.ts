@@ -1,6 +1,19 @@
 import { defaultLogo } from '../assets/defaultImages'
 
 const DEFAULT_SITE_TITLE = 'Evaluación Entrada Universitaria UMSA'
+const DEFAULT_SITE_DESCRIPTION =
+  'Sitio oficial de la Entrada Folklórica Universitaria de la UMSA: fraternidades, recorrido, eventos, comunicados y resultados de la evaluación folklórica.'
+
+function setMeta(attr: 'name' | 'property', key: string, content: string) {
+  const selector = `meta[${attr}="${key}"]`
+  let tag = document.querySelector<HTMLMetaElement>(selector)
+  if (!tag) {
+    tag = document.createElement('meta')
+    tag.setAttribute(attr, key)
+    document.head.appendChild(tag)
+  }
+  tag.setAttribute('content', content)
+}
 
 function setFavicon(href: string) {
   let link = document.querySelector<HTMLLinkElement>("link[rel='icon']")
@@ -28,8 +41,19 @@ export function applySiteFavicon(url?: string | null) {
 
 /** Actualiza el título de la pestaña del navegador (nombreSitio desde Ajustes). */
 export function applySiteTitle(nombreSitio?: string | null) {
-  const titulo = nombreSitio?.trim()
-  document.title = titulo || DEFAULT_SITE_TITLE
+  const titulo = nombreSitio?.trim() || DEFAULT_SITE_TITLE
+  document.title = titulo
+  setMeta('property', 'og:title', titulo)
+  setMeta('name', 'twitter:title', titulo)
+  applySiteDescription()
 }
 
-export { DEFAULT_SITE_TITLE }
+/** Mantiene la descripción que Google y redes usan en el snippet. */
+export function applySiteDescription(descripcion?: string | null) {
+  const texto = descripcion?.trim() || DEFAULT_SITE_DESCRIPTION
+  setMeta('name', 'description', texto)
+  setMeta('property', 'og:description', texto)
+  setMeta('name', 'twitter:description', texto)
+}
+
+export { DEFAULT_SITE_TITLE, DEFAULT_SITE_DESCRIPTION }

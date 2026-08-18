@@ -11,6 +11,7 @@ import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
 import { normalizeEmail } from '../common/password-policy';
 import { MailService } from '../mail/mail.service';
 import { validarCiUsuario } from '../common/ci-usuario.validation';
+import { ensureSystemRoles } from '../common/system-roles';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -42,7 +43,39 @@ export class UsuariosService {
   }
 
   async findRoles() {
+    try {
+      await ensureSystemRoles(this.dataSource);
+    } catch (err) {
+      this.logger.warn(`No se pudieron asegurar roles del sistema: ${(err as Error)?.message || err}`);
+    }
     return this.roleRepo.find({ order: { idRol: 'ASC' } });
+  }
+
+  private async resolverRol(idRol: unknown, nombreRol?: string) {
+    try {
+      await ensureSystemRoles(this.dataSource);
+    } catch (err) {
+      this.logger.warn(`No se pudieron asegurar roles del sistema: ${(err as Error)?.message || err}`);
+    }
+
+    const id = Number(idRol);
+    if (Number.isFinite(id) && id > 0) {
+      const byId = await this.roleRepo.findOne({ where: { idRol: id } });
+      if (byId) return byId;
+    }
+
+    const nombre = String(nombreRol || '').trim().toLowerCase();
+    if (nombre) {
+      const todos = await this.roleRepo.find();
+      const byName = todos.find((r) => String(r.nombre || '').trim().toLowerCase() === nombre);
+      if (byName) return byName;
+    }
+
+    throw new BadRequestException(
+      nombre
+        ? `El rol «${nombre}» no existe en la base de datos.`
+        : 'Debes seleccionar un rol válido.',
+    );
   }
 
   async findOne(id: number) {
@@ -194,11 +227,9 @@ export class UsuariosService {
     idFraternidad?: number;
     idFaseConcurso?: number;
   }) {
-    const { idRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, idFaseConcurso, ...data } = createDto as any;
+    const { idRol, nombreRol, password, tipoJurado, fasesEfuIds, fasesExternasIds, fasesIds, fraternidadesIds, idFraternidad, nuevaFraternidad, idFaseConcurso, ...data } = createDto as any;
 
-    const idRolNum = this.parseIdRolRequerido(idRol);
-    const role = await this.roleRepo.findOne({ where: { idRol: idRolNum } });
-    if (!role) throw new BadRequestException('Rol no válido');
+    const role = await this.resolverRol(idRol, nombreRol);
 
     const correoNorm = this.prepareCorreo(data.correo);
     if (!correoNorm) {
