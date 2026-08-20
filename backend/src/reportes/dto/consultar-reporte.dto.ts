@@ -110,4 +110,11 @@ export class ConsultarReporteDto {
   @IsOptional()
   @IsEnum(TipoIncidenciaReporte)
   tipoIncidencia?: TipoIncidenciaReporte;
+
+  /**
+   * Columnas opcionales del reporte de fraternidades.
+   * Si no se envían, el PDF/tabla no incluyen Cupo, Estado ni Gestión.
+   */
+  @IsOptional()
+  columnasOpcionales?: Array<'cupo' | 'estado' | 'gestion'>;
 }

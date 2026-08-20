@@ -128,6 +128,31 @@
           <p class="text-[11px] text-slate-500 mt-2">{{ alcanceDescripcion }}</p>
         </div>
 
+        <!-- Columnas opcionales fraternidades -->
+        <div v-if="filtros.tipoReporte === 'fraternidades'" class="sm:col-span-2 lg:col-span-3">
+          <label class="label-xs mb-2 block">Columnas opcionales en el reporte</label>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="col in columnasOpcionalesDisponibles"
+              :key="col.id"
+              type="button"
+              @click="toggleColumnaOpcional(col.id)"
+              class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all flex items-center gap-1.5"
+              :class="columnasOpcionalesActivas.includes(col.id)
+                ? 'bg-secondary text-white border-secondary'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-secondary/40'"
+            >
+              <span class="material-symbols-outlined text-sm">
+                {{ columnasOpcionalesActivas.includes(col.id) ? 'check_box' : 'check_box_outline_blank' }}
+              </span>
+              {{ col.label }}
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2">
+            Por defecto el reporte no incluye Cupo, Estado ni Gestión. Activa solo las que necesites.
+          </p>
+        </div>
+
         <div v-if="muestraFiltroIncidencia" class="sm:col-span-2 lg:col-span-3">
           <label class="label-xs mb-2 block">Banderas y sanciones</label>
           <div class="flex flex-wrap gap-2">
@@ -345,6 +370,21 @@ const filtros = ref({
   limit: 50,
 })
 
+/** Columnas opcionales del reporte de fraternidades (off por defecto). */
+const columnasOpcionalesActivas = ref([])
+const columnasOpcionalesDisponibles = [
+  { id: 'cupo', label: 'Cupo', key: 'cupo' },
+  { id: 'estado', label: 'Estado', key: 'estadoLabel' },
+  { id: 'gestion', label: 'Gestión', key: 'gestionAnio' },
+]
+
+const toggleColumnaOpcional = (id) => {
+  const set = new Set(columnasOpcionalesActivas.value)
+  if (set.has(id)) set.delete(id)
+  else set.add(id)
+  columnasOpcionalesActivas.value = [...set]
+}
+
 const alcanceDescripcion = computed(() => {
   return alcancesListado.find((a) => a.id === filtros.value.alcanceListado)?.desc || ''
 })
@@ -408,12 +448,9 @@ const columnasPorTipo = {
   fraternidades: [
     { key: 'nombreFraternidad', label: 'Fraternidad' },
     { key: 'tipoDanza', label: 'Tipo de danza' },
-    { key: 'estadoLabel', label: 'Estado' },
-    { key: 'cupo', label: 'Cupo' },
     { key: 'categoria', label: 'Categoría' },
     { key: 'instancia', label: 'Instancia' },
     { key: 'pertenencia', label: 'Pertenencia' },
-    { key: 'gestionAnio', label: 'Gestión' },
   ],
   directiva: [
     { key: 'nombreFraternidad', label: 'Fraternidad' },
@@ -444,7 +481,14 @@ const columnasPorTipo = {
   ],
 }
 
-const columnas = computed(() => columnasPorTipo[filtros.value.tipoReporte] || columnasPorTipo.fraternidades)
+const columnas = computed(() => {
+  const base = columnasPorTipo[filtros.value.tipoReporte] || columnasPorTipo.fraternidades
+  if (filtros.value.tipoReporte !== 'fraternidades') return base
+  const extras = columnasOpcionalesDisponibles
+    .filter((c) => columnasOpcionalesActivas.value.includes(c.id))
+    .map((c) => ({ key: c.key, label: c.label }))
+  return [...base, ...extras]
+})
 
 const opcionesOrden = computed(() => {
   const base = [
@@ -514,6 +558,7 @@ const seleccionarTipo = (id) => {
   }
   if (id !== 'fraternidades') {
     filtros.value.alcanceListado = 'inscritas'
+    columnasOpcionalesActivas.value = []
   }
   if (id !== 'disciplina' && id !== 'calificaciones') {
     filtros.value.tipoIncidencia = 'todos'
@@ -537,6 +582,8 @@ const buildPayload = (page) => {
   }
   if (p.tipoReporte !== 'fraternidades') {
     delete p.alcanceListado
+  } else if (columnasOpcionalesActivas.value.length) {
+    p.columnasOpcionales = [...columnasOpcionalesActivas.value]
   }
   if (p.tipoReporte !== 'disciplina' && p.tipoReporte !== 'calificaciones') {
     delete p.tipoIncidencia

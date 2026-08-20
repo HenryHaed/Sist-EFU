@@ -861,13 +861,16 @@ export class ReportesService implements OnModuleInit {
       size: 'A4',
       layout: 'landscape',
       autoFirstPage: true,
+      bufferPages: true,
     });
 
     const pageW = 841.89;
     const pageH = 595.28;
     const margin = 36;
     const contentW = pageW - margin * 2;
-    const bottomLimit = pageH - 40;
+    /** Reserva fija para el pie de página (evita que PDFKit cree hojas en blanco). */
+    const footerReserve = 32;
+    const bottomLimit = pageH - margin - footerReserve;
 
     const titulos: Record<string, string> = {
       fraternidades: 'REPORTE DE FRATERNIDADES',
@@ -915,8 +918,6 @@ export class ReportesService implements OnModuleInit {
     ].filter(Boolean);
     const subtitle = subtitleParts.length ? subtitleParts.join(' · ') : undefined;
 
-    let pageNum = 1;
-
     const drawDocHeader = () =>
       drawPdfInstitutionalHeader(doc, titulos[dto.tipoReporte] || 'REPORTE EFU', subtitle, {
         pageWidth: pageW,
@@ -935,7 +936,7 @@ export class ReportesService implements OnModuleInit {
         `Generado: ${new Date().toLocaleString('es-BO')}  |  Total registros: ${resultado.total}  |  Formato: horizontal`,
         margin,
         y,
-        { width: contentW },
+        { width: contentW, lineBreak: false },
       );
     y += 12;
     if (dto.tipoReporte === TipoReporte.CALIFICACIONES) {
@@ -961,7 +962,7 @@ export class ReportesService implements OnModuleInit {
         });
         maxH = Math.max(maxH, Math.ceil(h) + 6);
       });
-      return Math.min(maxH, 80);
+      return Math.min(maxH, 48);
     };
 
     const drawCellBorders = (
@@ -998,6 +999,7 @@ export class ReportesService implements OnModuleInit {
           width: widths[i] - 4,
           height: rowH - 4,
           align: i === 0 ? 'center' : 'left',
+          ellipsis: true,
         });
         x += widths[i];
       });
@@ -1020,7 +1022,9 @@ export class ReportesService implements OnModuleInit {
       cells.forEach((cell, i) => {
         doc.text(String(cell ?? '—'), x + 2, startY + 3, {
           width: widths[i] - 4,
+          height: rowH - 4,
           align: i === 0 ? 'center' : 'left',
+          ellipsis: true,
         });
         x += widths[i];
       });
@@ -1030,16 +1034,7 @@ export class ReportesService implements OnModuleInit {
 
     const ensureSpace = (needed: number, headers: string[], widths: number[]) => {
       if (y + needed <= bottomLimit) return;
-      doc
-        .fontSize(6)
-        .fillColor('#94a3b8')
-        .font('Helvetica')
-        .text(`Página ${pageNum}`, margin, pageH - 28, {
-          width: contentW,
-          align: 'center',
-        });
       doc.addPage({ size: 'A4', layout: 'landscape', margin });
-      pageNum += 1;
       ({ contentStartY } = drawDocHeader());
       y = contentStartY + 4;
       doc
@@ -1048,13 +1043,14 @@ export class ReportesService implements OnModuleInit {
         .font('Helvetica-Oblique')
         .text(`Continuación — ${titulos[dto.tipoReporte] || 'REPORTE'}`, margin, y, {
           width: contentW,
+          lineBreak: false,
         });
       y += 12;
       y += drawTableHeader(headers, widths, y);
     };
 
     const renderTable = (headers: string[], widths: number[], tableRows: string[][]) => {
-      const sum = widths.reduce((a, b) => a + b, 0);
+      const sum = widths.reduce((a, b) => a + b, 0) || 1;
       const scaled = widths.map((w) => (w / sum) * contentW);
 
       y += drawTableHeader(headers, scaled, y);
@@ -1066,24 +1062,72 @@ export class ReportesService implements OnModuleInit {
     };
 
     const rows = (resultado.data as any[]) || [];
+    const extras = new Set(
+      (Array.isArray(dto.columnasOpcionales) ? dto.columnasOpcionales : [])
+        .map((c) => String(c || '').toLowerCase().trim())
+        .filter(Boolean),
+    );
 
     if (dto.tipoReporte === TipoReporte.FRATERNIDADES) {
-      const headers = ['N°', 'Fraternidad', 'Tipo de danza', 'Categoría', 'Pertenencia', 'Gestión', 'Cupo', 'Estado'];
-      const widths = [28, 150, 110, 70, 160, 45, 55, 70];
-      const dataRows = rows.map((row, i) => [
-        String(i + 1),
-        row.nombreFraternidad || '—',
-        row.tipoDanza || '—',
-        row.categoria || '—',
-        row.pertenencia || '—',
-        String(row.gestionAnio || '—'),
-        row.estadoInscripcion === 'INSCRITA'
-          ? row.esExcedente
-            ? 'EXCEDENTE'
-            : 'Cupo OK'
-          : '—',
-        row.estadoLabel || row.estadoInscripcion || '—',
-      ]);
+      const colDefs: Array<{ key: string; header: string; width: number; cell: (row: any, i: number) => string }> = [
+        { key: 'n', header: 'N°', width: 28, cell: (_r, i) => String(i + 1) },
+        {
+          key: 'nombreFraternidad',
+          header: 'Fraternidad',
+          width: 170,
+          cell: (row) => row.nombreFraternidad || '—',
+        },
+        {
+          key: 'tipoDanza',
+          header: 'Tipo de danza',
+          width: 120,
+          cell: (row) => row.tipoDanza || '—',
+        },
+        {
+          key: 'categoria',
+          header: 'Categoría',
+          width: 80,
+          cell: (row) => row.categoria || '—',
+        },
+        {
+          key: 'pertenencia',
+          header: 'Pertenencia',
+          width: 180,
+          cell: (row) => row.pertenencia || '—',
+        },
+      ];
+      if (extras.has('gestion')) {
+        colDefs.push({
+          key: 'gestion',
+          header: 'Gestión',
+          width: 48,
+          cell: (row) => String(row.gestionAnio || '—'),
+        });
+      }
+      if (extras.has('cupo')) {
+        colDefs.push({
+          key: 'cupo',
+          header: 'Cupo',
+          width: 58,
+          cell: (row) =>
+            row.estadoInscripcion === 'INSCRITA'
+              ? row.esExcedente
+                ? 'EXCEDENTE'
+                : 'Cupo OK'
+              : '—',
+        });
+      }
+      if (extras.has('estado')) {
+        colDefs.push({
+          key: 'estado',
+          header: 'Estado',
+          width: 72,
+          cell: (row) => row.estadoLabel || row.estadoInscripcion || '—',
+        });
+      }
+      const headers = colDefs.map((c) => c.header);
+      const widths = colDefs.map((c) => c.width);
+      const dataRows = rows.map((row, i) => colDefs.map((c) => c.cell(row, i)));
       renderTable(headers, widths, dataRows);
     } else if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
       const headers = ['N°', 'Fraternidad', 'Tipo de danza', 'Cargo', 'Nombre completo', 'CI', 'Celular'];
@@ -1220,14 +1264,20 @@ export class ReportesService implements OnModuleInit {
       renderTable(headers, widths, dataRows);
     }
 
-    doc
-      .fontSize(6)
-      .fillColor('#94a3b8')
-      .font('Helvetica')
-      .text(`Página ${pageNum}`, margin, pageH - 28, {
-        width: contentW,
-        align: 'center',
-      });
+    // Numeración al final sobre páginas reales (sin hojas fantasma).
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
+      doc
+        .fontSize(7)
+        .fillColor('#94a3b8')
+        .font('Helvetica')
+        .text(`Página ${i + 1} de ${range.count}`, margin, pageH - margin - 12, {
+          width: contentW,
+          align: 'center',
+          lineBreak: false,
+        });
+    }
 
     doc.end();
   }

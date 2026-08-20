@@ -84,16 +84,25 @@ export class InscripcionesConcursoController {
 
   // ── Delegado Chacha-Warmi ────────────────────────────────────────────────
 
+  private idUsuarioDe(req: { user?: { idUsuario?: number; id?: number; sub?: number } }) {
+    const raw = req.user?.idUsuario ?? req.user?.id ?? req.user?.sub;
+    const id = Number(raw);
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new BadRequestException('Sesión de usuario inválida.');
+    }
+    return id;
+  }
+
   @Get('mi-chacha')
   @Roles('delegado')
   getMiChacha(@Request() req) {
-    return this.service.getMiChacha(req.user.idUsuario);
+    return this.service.getMiChacha(this.idUsuarioDe(req));
   }
 
   @Put('mi-chacha/datos')
   @Roles('delegado')
   guardarDatosChacha(@Request() req, @Body() body: any) {
-    return this.service.guardarDatosChacha(req.user.idUsuario, body?.datos || body);
+    return this.service.guardarDatosChacha(this.idUsuarioDe(req), body?.datos || body);
   }
 
   @Post('mi-chacha/archivos')
@@ -105,19 +114,19 @@ export class InscripcionesConcursoController {
     @Body('claveDocumento') claveDocumento: string,
   ) {
     if (!claveDocumento) throw new BadRequestException('claveDocumento es requerido');
-    return this.service.subirArchivoChacha(req.user.idUsuario, claveDocumento, file);
+    return this.service.subirArchivoChacha(this.idUsuarioDe(req), claveDocumento, file);
   }
 
   @Delete('mi-chacha/archivos/:id')
   @Roles('delegado')
   eliminarArchivoChacha(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.service.eliminarArchivoChacha(req.user.idUsuario, id);
+    return this.service.eliminarArchivoChacha(this.idUsuarioDe(req), id);
   }
 
   @Post('mi-chacha/enviar')
   @Roles('delegado')
   enviarChacha(@Request() req) {
-    return this.service.enviarChacha(req.user.idUsuario);
+    return this.service.enviarChacha(this.idUsuarioDe(req));
   }
 
   // ── Admin ────────────────────────────────────────────────────────────────

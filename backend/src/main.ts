@@ -72,11 +72,20 @@ async function ensureSchemaPatches(dataSource: DataSource) {
   `);
   await runPatch(dataSource, 'enum BORRADOR', `
     DO $$ BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_enum e
-        JOIN pg_type t ON e.enumtypid = t.oid
-        WHERE t.typname = 'estado_solicitud' AND e.enumlabel = 'BORRADOR'
-      ) THEN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'solicitudes_inscripcion_estado_enum')
+         AND NOT EXISTS (
+           SELECT 1 FROM pg_enum e
+           JOIN pg_type t ON e.enumtypid = t.oid
+           WHERE t.typname = 'solicitudes_inscripcion_estado_enum' AND e.enumlabel = 'BORRADOR'
+         ) THEN
+        ALTER TYPE solicitudes_inscripcion_estado_enum ADD VALUE 'BORRADOR';
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'estado_solicitud')
+         AND NOT EXISTS (
+           SELECT 1 FROM pg_enum e
+           JOIN pg_type t ON e.enumtypid = t.oid
+           WHERE t.typname = 'estado_solicitud' AND e.enumlabel = 'BORRADOR'
+         ) THEN
         ALTER TYPE estado_solicitud ADD VALUE 'BORRADOR';
       END IF;
     END $$;

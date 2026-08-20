@@ -392,9 +392,20 @@ export class EvaluacionesService {
     const gestion = await this.getGestionActiva();
     if (!gestion) throw new NotFoundException('No hay gestión activa');
 
-    const totalFraternidades = await this.fraternidadRepo.count({
-      where: { gestion: { idGestion: gestion.idGestion } },
-    });
+    // Fraternidades oficialmente aprobadas en la gestión activa
+    // (tienen solicitud APROBADO que las creó).
+    const totalFraternidadesRaw = await this.fraternidadRepo
+      .createQueryBuilder('f')
+      .innerJoin(
+        'solicitudes_inscripcion',
+        's',
+        's.id_fraternidad_creada = f.id_fraternidad AND s.estado = :aprobado',
+        { aprobado: 'APROBADO' },
+      )
+      .where('f.id_gestion = :gid', { gid: gestion.idGestion })
+      .select('COUNT(DISTINCT f.id_fraternidad)', 'cnt')
+      .getRawOne();
+    const totalFraternidades = Number(totalFraternidadesRaw?.cnt || 0);
 
     const frats = await this.fraternidadRepo.find({
       where: {
@@ -518,7 +529,12 @@ export class EvaluacionesService {
 
     return {
       basico: [
-        { label: 'Total Fraternidades', valor: frats.length, badge: 'Habilitadas', progreso: 100 },
+        {
+          label: 'Fraternidades Aprobadas',
+          valor: totalFraternidades,
+          badge: 'Gestión activa',
+          progreso: 100,
+        },
         { label: 'Evaluadas', valor: evaluadasIds.size, badge: `${progreso}% Avance`, progreso },
         { clave: 'rankingTop', label: 'Ranking Top', valor: rankingSorted.length > 0 ? rankingSorted[0].nombre : '—', badge: 'Líder Actual', progreso: 100 }
       ],

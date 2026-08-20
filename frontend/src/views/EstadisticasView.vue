@@ -250,7 +250,7 @@
             <div class="w-px h-16 bg-white/10"></div>
             <div class="text-center group-hover:scale-110 transition-transform delay-75">
               <p class="text-5xl font-black text-white tracking-tighter mb-1">{{ totalFraternidades }}</p>
-              <p class="text-[10px] uppercase font-black opacity-40 tracking-widest">Fraternidades</p>
+              <p class="text-[10px] uppercase font-black opacity-40 tracking-widest">Aprobadas</p>
             </div>
           </div>
         </div>
@@ -496,7 +496,7 @@ const cargarEstadisticas = async () => {
             ? data.gestion.rankingConcursosOcultos
             : [],
         }
-        totalFraternidades.value = data.totalFraternidades || 0
+        totalFraternidades.value = Number(data.totalFraternidades ?? 0)
     } catch (error) {
         console.error('Error al cargar métricas:', error)
     } finally {

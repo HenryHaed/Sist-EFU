@@ -60,7 +60,10 @@ export class InscripcionesConcursoService {
     return usuario;
   }
 
-  private requisitosDeFase(fase: Fase) {
+  private requisitosDeFase(fase?: Fase | null) {
+    if (!fase) {
+      return requisitosDesdePlantilla('chacha_warmi');
+    }
     let req = fase.requisitosInscripcion
       ? normalizarRequisitos(fase.requisitosInscripcion)
       : requisitosDesdePlantilla(fase.plantillaRequisitos || 'generico');
@@ -103,8 +106,61 @@ export class InscripcionesConcursoService {
   }
 
   private toResponse(insc: InscripcionConcurso, extra: Record<string, any> = {}) {
+    const usuario = insc.usuario
+      ? {
+          idUsuario: insc.usuario.idUsuario,
+          nombres: insc.usuario.nombres,
+          primerApellido: insc.usuario.primerApellido,
+          segundoApellido: insc.usuario.segundoApellido,
+          ci: insc.usuario.ci,
+          correo: insc.usuario.correo,
+        }
+      : null;
+
     return {
-      ...insc,
+      idInscripcion: insc.idInscripcion,
+      estado: insc.estado,
+      datos: insc.datos || {},
+      observacionAdmin: insc.observacionAdmin,
+      revisionChecklist: insc.revisionChecklist || {},
+      createdAt: insc.createdAt,
+      updatedAt: insc.updatedAt,
+      fase: insc.fase
+        ? {
+            idFase: insc.fase.idFase,
+            nombre: insc.fase.nombre,
+            tipoConcurso: insc.fase.tipoConcurso,
+            plantillaRequisitos: insc.fase.plantillaRequisitos,
+          }
+        : null,
+      archivos: (insc.archivos || []).map((a) => ({
+        idArchivo: a.idArchivo,
+        claveDocumento: a.claveDocumento,
+        nombreOriginal: a.nombreOriginal,
+        mime: a.mime,
+        url: a.url,
+        orden: a.orden,
+        createdAt: a.createdAt,
+      })),
+      gestion: insc.gestion
+        ? { idGestion: insc.gestion.idGestion, anio: (insc.gestion as any).anio }
+        : null,
+      fraternidad: this.fraternidadResumen(insc.fraternidad),
+      participante: insc.participante
+        ? {
+            idParticipante: insc.participante.idParticipante,
+            nombre: insc.participante.nombre,
+            tipo: insc.participante.tipo,
+          }
+        : null,
+      participantePareja: insc.participantePareja
+        ? {
+            idParticipante: insc.participantePareja.idParticipante,
+            nombre: insc.participantePareja.nombre,
+            tipo: insc.participantePareja.tipo,
+          }
+        : null,
+      usuario,
       requisitos: this.requisitosDeFase(insc.fase),
       ...extra,
     };
@@ -161,7 +217,9 @@ export class InscripcionesConcursoService {
       });
     }
 
-    return this.toResponse(insc, { fraternidad: usuario.fraternidad || insc.fraternidad || null });
+    return this.toResponse(insc, {
+      fraternidad: this.fraternidadResumen(usuario.fraternidad || insc.fraternidad),
+    });
   }
 
   async guardarDatos(idUsuario: number, datos: Record<string, any>) {
@@ -210,8 +268,12 @@ export class InscripcionesConcursoService {
   // ── Delegado Chacha-Warmi ────────────────────────────────────────────────
 
   private async getDelegadoConFraternidad(idUsuario: number) {
+    const id = Number(idUsuario);
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new BadRequestException('Usuario delegado inválido.');
+    }
     const usuario = await this.usuarioRepo.findOne({
-      where: { idUsuario },
+      where: { idUsuario: id },
       relations: [
         'rol',
         'fraternidad',
@@ -223,7 +285,8 @@ export class InscripcionesConcursoService {
         'fraternidad.tipoDanza',
       ],
     });
-    if (!usuario || usuario.rol?.nombre !== 'delegado') {
+    const rolNombre = String(usuario?.rol?.nombre || '').trim().toLowerCase();
+    if (!usuario || rolNombre !== 'delegado') {
       throw new ForbiddenException('Solo el delegado puede gestionar la inscripción Chacha-Warmi.');
     }
     if (!usuario.fraternidad) {
@@ -232,6 +295,75 @@ export class InscripcionesConcursoService {
       );
     }
     return usuario;
+  }
+
+  private fraternidadResumen(frat: Fraternidad | null | undefined) {
+    if (!frat) return null;
+    return {
+      idFraternidad: frat.idFraternidad,
+      nombre: frat.nombre,
+      habilitadoEfu: frat.habilitadoEfu,
+    };
+  }
+
+  private async cargarInscripcionChacha(idInscripcion: number) {
+    return this.inscRepo.findOne({
+      where: { idInscripcion },
+      relations: [
+        'fase',
+        'archivos',
+        'gestion',
+        'fraternidad',
+        'participante',
+        'participantePareja',
+        'usuario',
+      ],
+    });
+  }
+
+  /** Busca inscripción Chacha por fraternidad o, en su defecto, por el delegado + fase. */
+  private async findInscripcionChacha(opts: {
+    idFraternidad: number;
+    idFase: number;
+    idUsuario: number;
+  }) {
+    const relations = [
+      'fase',
+      'archivos',
+      'gestion',
+      'fraternidad',
+      'participante',
+      'participantePareja',
+      'usuario',
+    ] as const;
+
+    let insc = await this.inscRepo.findOne({
+      where: {
+        fraternidad: { idFraternidad: opts.idFraternidad },
+        fase: { idFase: opts.idFase },
+      },
+      relations: [...relations],
+    });
+    if (insc) return insc;
+
+    insc = await this.inscRepo.findOne({
+      where: {
+        usuario: { idUsuario: opts.idUsuario },
+        fase: { idFase: opts.idFase },
+      },
+      relations: [...relations],
+    });
+    return insc;
+  }
+
+  private esConflictoUnico(err: unknown): boolean {
+    const e = err as { code?: string; driverError?: { code?: string }; message?: string };
+    const code = e?.code || e?.driverError?.code;
+    const msg = String(e?.message || '');
+    return (
+      code === '23505' ||
+      /duplicate key|unique constraint|llave duplicada/i.test(msg)
+    );
   }
 
   /** Solicitud oficial APROBADA que creó la fraternidad del delegado. */
@@ -415,59 +547,77 @@ export class InscripcionesConcursoService {
       };
     }
 
-    let insc = await this.inscRepo.findOne({
-      where: {
-        fraternidad: { idFraternidad: frat.idFraternidad },
-        fase: { idFase: fase.idFase },
-      },
-      relations: [
-        'fase',
-        'archivos',
-        'gestion',
-        'fraternidad',
-        'participante',
-        'participantePareja',
-        'usuario',
-      ],
+    let insc = await this.findInscripcionChacha({
+      idFraternidad: frat.idFraternidad,
+      idFase: fase.idFase,
+      idUsuario: usuario.idUsuario,
     });
 
     const datosConHerencia = this.aplicarHerenciaEnDatos(insc?.datos, herencia);
 
     if (!insc) {
-      insc = await this.inscRepo.save(
-        this.inscRepo.create({
-          usuario,
-          fase,
-          gestion: { idGestion: (gestion as any).idGestion } as any,
-          fraternidad: frat,
-          estado: EstadoInscripcionConcurso.BORRADOR,
-          datos: datosConHerencia,
-        }),
+      try {
+        const created = await this.inscRepo.save(
+          this.inscRepo.create({
+            // Solo PKs: evitar cascadas/conflictos al persistir el grafo del usuario cargado.
+            usuario: { idUsuario: usuario.idUsuario } as Usuario,
+            fase: { idFase: fase.idFase } as Fase,
+            gestion: { idGestion: (gestion as any).idGestion } as Gestion,
+            fraternidad: { idFraternidad: frat.idFraternidad } as Fraternidad,
+            estado: EstadoInscripcionConcurso.BORRADOR,
+            datos: datosConHerencia,
+          }),
+        );
+        insc = await this.cargarInscripcionChacha(created.idInscripcion);
+      } catch (err) {
+        // Doble carga del GET (p. ej. remount Vue) puede chocar con UNIQUE(usuario,fase).
+        if (!this.esConflictoUnico(err)) throw err;
+        insc = await this.findInscripcionChacha({
+          idFraternidad: frat.idFraternidad,
+          idFase: fase.idFase,
+          idUsuario: usuario.idUsuario,
+        });
+      }
+    }
+
+    if (!insc) {
+      throw new BadRequestException(
+        'No se pudo crear ni recuperar la inscripción Chacha-Warmi. Intenta de nuevo.',
       );
-      insc = await this.inscRepo.findOne({
-        where: { idInscripcion: insc.idInscripcion },
-        relations: [
-          'fase',
-          'archivos',
-          'gestion',
-          'fraternidad',
-          'participante',
-          'participantePareja',
-        ],
-      });
-    } else if (
+    }
+
+    // Si existía por usuario+fase sin fraternidad (o con otra), alinear a la fraternidad del delegado.
+    if (!insc.fraternidad || insc.fraternidad.idFraternidad !== frat.idFraternidad) {
+      try {
+        insc.fraternidad = { idFraternidad: frat.idFraternidad } as Fraternidad;
+        await this.inscRepo.save(insc);
+        insc = (await this.cargarInscripcionChacha(insc.idInscripcion)) || insc;
+      } catch (err) {
+        if (!this.esConflictoUnico(err)) throw err;
+        // Ya hay inscripción de esta fraternidad en la fase: usar esa.
+        const porFrat = await this.findInscripcionChacha({
+          idFraternidad: frat.idFraternidad,
+          idFase: fase.idFase,
+          idUsuario: usuario.idUsuario,
+        });
+        if (porFrat) insc = porFrat;
+      }
+    }
+
+    if (
       insc.datos?.facultadCarrera !== herencia.facultadCarrera ||
       insc.datos?.facultadCarreraPareja !== herencia.facultadCarrera ||
       insc.datos?.instanciaRepresentacion !== herencia.instanciaRepresentacion
     ) {
       insc.datos = datosConHerencia;
       await this.inscRepo.save(insc);
+      insc = (await this.cargarInscripcionChacha(insc.idInscripcion)) || insc;
     }
 
     return this.toResponse(insc, {
       sinFase: false,
       fraternidadNoAprobada: false,
-      fraternidad: frat,
+      fraternidad: this.fraternidadResumen(frat),
       herencia,
       camposHeredados: ['facultadCarrera', 'facultadCarreraPareja', 'instanciaRepresentacion'],
     });

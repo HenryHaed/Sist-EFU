@@ -455,13 +455,20 @@ const aplicarRespuesta = (data) => {
   formDatos.value = { ...(data.datos || {}) }
 }
 
+const mensajeApi = (e, fallback) => {
+  const msg = e?.response?.data?.message
+  if (Array.isArray(msg)) return msg.join('. ')
+  if (typeof msg === 'string' && msg.trim()) return msg
+  return fallback
+}
+
 const cargar = async () => {
   loading.value = true
   try {
     const { data } = await api.get('/inscripciones-concurso/mi-chacha')
     aplicarRespuesta(data)
   } catch (e) {
-    Swal.fire('Error', e.response?.data?.message || 'No se pudo cargar la inscripción Chacha-Warmi', 'error')
+    Swal.fire('Error', mensajeApi(e, 'No se pudo cargar la inscripción Chacha-Warmi'), 'error')
   } finally {
     loading.value = false
   }
