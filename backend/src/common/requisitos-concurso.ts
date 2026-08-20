@@ -31,11 +31,11 @@ export const CATALOGO_CAMPOS: CampoRequisito[] = [
   { clave: 'celular', etiqueta: 'Número de celular', tipo: 'tel', obligatorio: true },
   { clave: 'correo', etiqueta: 'Correo electrónico', tipo: 'email', obligatorio: true },
   { clave: 'descripcionConceptual', etiqueta: 'Breve descripción conceptual de cada fotografía', tipo: 'textarea', obligatorio: false },
-  { clave: 'nombreCompletoPareja', etiqueta: 'Nombre completo (segundo postulante)', tipo: 'text', obligatorio: false },
-  { clave: 'ciPareja', etiqueta: 'CI del segundo postulante', tipo: 'text', obligatorio: false },
-  { clave: 'facultadCarreraPareja', etiqueta: 'Facultad y Carrera (segundo postulante)', tipo: 'text', obligatorio: false },
-  { clave: 'celularPareja', etiqueta: 'Celular (segundo postulante)', tipo: 'tel', obligatorio: false },
-  { clave: 'correoPareja', etiqueta: 'Correo (segundo postulante)', tipo: 'email', obligatorio: false },
+  { clave: 'nombreCompletoPareja', etiqueta: 'Nombre completo (Warmi)', tipo: 'text', obligatorio: false },
+  { clave: 'ciPareja', etiqueta: 'CI del Warmi', tipo: 'text', obligatorio: false },
+  { clave: 'facultadCarreraPareja', etiqueta: 'Facultad y Carrera (Warmi)', tipo: 'text', obligatorio: false },
+  { clave: 'celularPareja', etiqueta: 'Celular (Warmi)', tipo: 'tel', obligatorio: false },
+  { clave: 'correoPareja', etiqueta: 'Correo (Warmi)', tipo: 'email', obligatorio: false },
 ];
 
 /** Catálogo completo de documentos disponibles (checkboxes en UI). */
@@ -44,8 +44,12 @@ export const CATALOGO_DOCUMENTOS: DocumentoRequisito[] = [
   { clave: 'matricula_pdf', etiqueta: 'Documento que acredite pertenencia a la UMSA — matrícula o boleta (PDF)', mime: ['application/pdf'], obligatorio: true, maxArchivos: 1, maxMb: 10 },
   { clave: 'fotos_jpeg', etiqueta: 'Respaldo digital con fotografías (JPEG)', mime: ['image/jpeg', 'image/jpg'], obligatorio: false, maxArchivos: 20, maxMb: 15 },
   { clave: 'carta_inscripcion_pdf', etiqueta: 'Carta de inscripción (PDF)', mime: ['application/pdf'], obligatorio: false, maxArchivos: 1, maxMb: 10 },
-  { clave: 'ci_ambos_pdf', etiqueta: 'Fotocopia CI de ambos postulantes (PDF)', mime: ['application/pdf'], obligatorio: false, maxArchivos: 2, maxMb: 10 },
-  { clave: 'pertenencia_umsa_pdf', etiqueta: 'Documento de pertenencia UMSA (según corresponda) (PDF)', mime: ['application/pdf'], obligatorio: false, maxArchivos: 2, maxMb: 10 },
+  { clave: 'ci_ambos_pdf', etiqueta: 'Fotocopia CI de ambos postulantes (PDF) — legado', mime: ['application/pdf'], obligatorio: false, maxArchivos: 2, maxMb: 10 },
+  { clave: 'pertenencia_umsa_pdf', etiqueta: 'Documento de pertenencia UMSA (según corresponda) (PDF) — legado', mime: ['application/pdf'], obligatorio: false, maxArchivos: 2, maxMb: 10 },
+  { clave: 'ci_chacha_pdf', etiqueta: 'CI del Chacha (PDF)', mime: ['application/pdf'], obligatorio: true, maxArchivos: 1, maxMb: 10 },
+  { clave: 'matricula_chacha_pdf', etiqueta: 'Matrícula o boleta del Chacha (PDF)', mime: ['application/pdf'], obligatorio: true, maxArchivos: 1, maxMb: 10 },
+  { clave: 'ci_warmi_pdf', etiqueta: 'CI del Warmi (PDF)', mime: ['application/pdf'], obligatorio: true, maxArchivos: 1, maxMb: 10 },
+  { clave: 'matricula_warmi_pdf', etiqueta: 'Matrícula o boleta del Warmi (PDF)', mime: ['application/pdf'], obligatorio: true, maxArchivos: 1, maxMb: 10 },
   { clave: 'foto_postal_jpeg', etiqueta: 'Fotografía tamaño postal 10×15 cm cuerpo entero con traje (JPEG)', mime: ['image/jpeg', 'image/jpg'], obligatorio: false, maxArchivos: 1, maxMb: 15 },
   { clave: 'pista_mp3', etiqueta: 'Pista musical MP3 (máx. 40 segundos)', mime: ['audio/mpeg', 'audio/mp3'], obligatorio: false, maxArchivos: 1, maxMb: 10 },
 ];
@@ -93,12 +97,21 @@ export const PLANTILLAS_REQUISITOS: Record<PlantillaRequisitos, RequisitosInscri
       'celularPareja',
       'correoPareja',
     ],
-    ['ci_ambos_pdf', 'pertenencia_umsa_pdf', 'foto_postal_jpeg', 'pista_mp3'],
+    [
+      'ci_chacha_pdf',
+      'matricula_chacha_pdf',
+      'ci_warmi_pdf',
+      'matricula_warmi_pdf',
+      'foto_postal_jpeg',
+      'pista_mp3',
+    ],
     [
       'nombreCompletoPareja',
       'ciPareja',
-      'ci_ambos_pdf',
-      'pertenencia_umsa_pdf',
+      'ci_chacha_pdf',
+      'matricula_chacha_pdf',
+      'ci_warmi_pdf',
+      'matricula_warmi_pdf',
       'foto_postal_jpeg',
       'pista_mp3',
     ],
@@ -119,7 +132,8 @@ export const PLANTILLAS_META: { id: PlantillaRequisitos; etiqueta: string; descr
   {
     id: 'chacha_warmi',
     etiqueta: 'Chacha Warmi (por delegado)',
-    descripcion: 'Inscripción por el delegado de la fraternidad: pareja, CI ambos, foto postal, MP3',
+    descripcion:
+      'Inscripción por delegado: CI y matrícula/boleta de Chacha y Warmi (PDF), foto postal y MP3',
   },
   {
     id: 'generico',
@@ -135,9 +149,72 @@ export function esPlantillaChachaWarmi(plantilla?: string | null): boolean {
   return String(plantilla || '').toLowerCase() === 'chacha_warmi';
 }
 
+/** Detecta fase Chacha-Warmi por plantilla o por nombre (compatibilidad). */
+export function esFaseChachaWarmi(fase?: { plantillaRequisitos?: string | null; nombre?: string | null } | null): boolean {
+  if (!fase) return false;
+  if (esPlantillaChachaWarmi(fase.plantillaRequisitos)) return true;
+  const nombre = String(fase.nombre || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '');
+  return (
+    nombre.includes('chachawarmi') ||
+    (nombre.includes('chacha') && nombre.includes('warmi'))
+  );
+}
+
 export function esPlantillaParaConcursante(plantilla?: string | null): boolean {
   const p = String(plantilla || '').toLowerCase() as PlantillaRequisitos;
   return PLANTILLAS_CONCURSANTE.includes(p);
+}
+
+const DOCS_CHACHA_LEGACY = new Set([
+  'ci_ambos_pdf',
+  'pertenencia_umsa_pdf',
+  'ci_pdf',
+  'matricula_pdf',
+]);
+
+const DOCS_CHACHA_NUEVOS = [
+  'ci_chacha_pdf',
+  'matricula_chacha_pdf',
+  'ci_warmi_pdf',
+  'matricula_warmi_pdf',
+] as const;
+
+/**
+ * Si la fase aún tiene documentos antiguos (CI ambos / pertenencia conjunta),
+ * los reemplaza por CI y matrícula separados de Chacha y Warmi.
+ */
+export function asegurarDocumentosChachaWarmi(req: RequisitosInscripcion): RequisitosInscripcion {
+  const plantilla = requisitosDesdePlantilla('chacha_warmi');
+  const claves = new Set((req.documentos || []).map((d) => d.clave));
+  const yaActualizado = DOCS_CHACHA_NUEVOS.every((c) => claves.has(c));
+  if (yaActualizado) {
+    return {
+      campos: req.campos?.length ? req.campos : plantilla.campos,
+      documentos: req.documentos,
+    };
+  }
+
+  const keep = (req.documentos || []).filter(
+    (d) => !DOCS_CHACHA_LEGACY.has(d.clave) && !(DOCS_CHACHA_NUEVOS as readonly string[]).includes(d.clave),
+  );
+  const byClave = new Map<string, DocumentoRequisito>();
+  for (const d of plantilla.documentos) {
+    if ((DOCS_CHACHA_NUEVOS as readonly string[]).includes(d.clave) || d.clave === 'foto_postal_jpeg' || d.clave === 'pista_mp3') {
+      byClave.set(d.clave, { ...d });
+    }
+  }
+  for (const d of keep) {
+    byClave.set(d.clave, d);
+  }
+
+  return {
+    campos: req.campos?.length ? req.campos : plantilla.campos,
+    documentos: Array.from(byClave.values()),
+  };
 }
 
 export function normalizarRequisitos(raw: any): RequisitosInscripcion {

@@ -43,8 +43,12 @@
             <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">event</span>
             <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Eventos</p>
           </a>
-          <a @click.prevent="scrollTo('estadisticas')" href="#estadisticas"
-            class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer">
+          <a
+            v-if="mostrarRankingLanding"
+            @click.prevent="scrollTo('estadisticas')"
+            href="#estadisticas"
+            class="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors group cursor-pointer"
+          >
             <span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">leaderboard</span>
             <p class="text-sm font-medium tracking-wide uppercase text-slate-600 group-hover:text-primary transition-colors">Estadísticas</p>
           </a>
@@ -96,7 +100,11 @@
         <span class="material-symbols-outlined text-[22px]">event</span>
         <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Eventos</span>
       </button>
-      <button @click="scrollTo('estadisticas')" class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors">
+      <button
+        v-if="mostrarRankingLanding"
+        @click="scrollTo('estadisticas')"
+        class="flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 text-slate-400 hover:text-primary transition-colors"
+      >
         <span class="material-symbols-outlined text-[22px]">leaderboard</span>
         <span class="text-[7px] font-black uppercase tracking-wide truncate w-full text-center">Ranking</span>
       </button>
@@ -263,6 +271,7 @@
             <div class="h-1.5 w-24 md:w-32 bg-primary mt-4"></div>
           </div>
           <button 
+            v-if="mostrarRankingLanding"
             @click="mostrarRanking = true"
             class="text-primary font-black flex items-center gap-2 hover:text-secondary transition-all tracking-[0.2em] uppercase text-[10px] md:text-xs"
           >
@@ -559,53 +568,125 @@
           <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
         </div>
 
-        <div v-else class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-          <article
-            v-for="doc in documentosPublicos"
-            :key="doc.idDocumento"
-            class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-lg shadow-slate-100/60 p-6 sm:p-8 reveal reveal-left flex flex-col justify-between"
-          >
-            <div>
-              <div class="flex items-center justify-between gap-4 mb-4">
-                <span class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
-                  <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
-                  {{ etiquetaTipoDoc(doc.tipo) }}
-                </span>
-                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                  PDF Oficial
-                </span>
+        <div v-else class="max-w-5xl mx-auto">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+            <article
+              v-for="doc in comunicadosRecientes"
+              :key="doc.idDocumento"
+              class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-lg shadow-slate-100/60 p-6 sm:p-8 reveal reveal-left flex flex-col justify-between"
+            >
+              <div>
+                <div class="flex items-center justify-between gap-4 mb-4">
+                  <span class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                    <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+                    {{ etiquetaTipoDoc(doc.tipo) }}
+                  </span>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                    {{ fechaComunicado(doc) || 'PDF Oficial' }}
+                  </span>
+                </div>
+                <h3 class="text-xl md:text-2xl font-black text-slate-900 italic uppercase tracking-tight mb-3">
+                  {{ doc.titulo }}
+                </h3>
+                <p v-if="doc.descripcion" class="text-slate-500 font-medium text-sm leading-relaxed mb-6">
+                  {{ doc.descripcion }}
+                </p>
               </div>
-              <h3 class="text-xl md:text-2xl font-black text-slate-900 italic uppercase tracking-tight mb-3">
-                {{ doc.titulo }}
-              </h3>
-              <p v-if="doc.descripcion" class="text-slate-500 font-medium text-sm leading-relaxed mb-6">
-                {{ doc.descripcion }}
-              </p>
-            </div>
-            <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
-              <button
-                @click="abrirPdfEnModal(doc.urlPdf, doc.titulo)"
-                class="flex-1 bg-primary hover:bg-blue-900 text-white py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all"
-              >
-                <span class="material-symbols-outlined text-base">visibility</span>
-                Ver Documento
-              </button>
-              <a
-                :href="getImageUrl(doc.urlPdf)"
-                download
-                target="_blank"
-                class="bg-slate-100 hover:bg-slate-200 text-slate-700 p-3 rounded-xl transition-colors flex items-center justify-center"
-                title="Descargar PDF"
-              >
-                <span class="material-symbols-outlined text-base">download</span>
-              </a>
-            </div>
-          </article>
+              <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
+                <button
+                  @click="abrirPdfEnModal(doc.urlPdf, doc.titulo)"
+                  class="flex-1 bg-primary hover:bg-blue-900 text-white py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all"
+                >
+                  <span class="material-symbols-outlined text-base">visibility</span>
+                  Ver Documento
+                </button>
+                <a
+                  :href="getImageUrl(doc.urlPdf)"
+                  download
+                  target="_blank"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 p-3 rounded-xl transition-colors flex items-center justify-center"
+                  title="Descargar PDF"
+                >
+                  <span class="material-symbols-outlined text-base">download</span>
+                </a>
+              </div>
+            </article>
+          </div>
+
+          <div v-if="documentosPublicosOrdenados.length > 4" class="mt-10 md:mt-12 text-center reveal">
+            <button
+              type="button"
+              @click="mostrarTodosComunicados = true"
+              class="text-primary hover:text-secondary font-black text-sm md:text-base uppercase tracking-widest underline underline-offset-8 decoration-2 transition-colors"
+            >
+              Ver más comunicados
+            </button>
+          </div>
         </div>
+
+        <v-dialog v-model="mostrarTodosComunicados" max-width="720" transition="dialog-bottom-transition">
+          <v-card class="rounded-3xl overflow-hidden border-4 border-slate-900">
+            <v-card-title class="bg-slate-900 text-white d-flex align-center justify-space-between pa-6">
+              <div class="d-flex align-center gap-3 font-black italic uppercase tracking-tighter text-xl">
+                <span class="material-symbols-outlined text-secondary text-3xl">campaign</span>
+                Todos los comunicados
+              </div>
+              <v-btn icon="close" variant="text" color="white" @click="mostrarTodosComunicados = false"></v-btn>
+            </v-card-title>
+            <v-card-text class="pa-0 bg-white">
+              <div class="divide-y divide-slate-100 overflow-y-auto" style="max-height: 520px;">
+                <div
+                  v-for="doc in documentosPublicosOrdenados"
+                  :key="doc.idDocumento"
+                  class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 hover:bg-slate-50 transition-colors"
+                >
+                  <div class="min-w-0">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-emerald-700 mb-1">
+                      {{ etiquetaTipoDoc(doc.tipo) }}
+                      <span v-if="fechaComunicado(doc)" class="text-slate-400"> · {{ fechaComunicado(doc) }}</span>
+                    </p>
+                    <p class="font-black text-slate-900 uppercase tracking-tight leading-snug text-sm">{{ doc.titulo }}</p>
+                    <p v-if="doc.descripcion" class="text-slate-500 text-xs font-medium mt-1 line-clamp-2">{{ doc.descripcion }}</p>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      @click="abrirPdfEnModal(doc.urlPdf, doc.titulo)"
+                      class="bg-primary hover:bg-blue-900 text-white py-2.5 px-4 rounded-xl font-black text-[10px] uppercase tracking-wider flex items-center gap-1.5"
+                    >
+                      <span class="material-symbols-outlined text-base">visibility</span>
+                      Ver
+                    </button>
+                    <a
+                      :href="getImageUrl(doc.urlPdf)"
+                      download
+                      target="_blank"
+                      class="bg-slate-100 hover:bg-slate-200 text-slate-700 p-2.5 rounded-xl"
+                      title="Descargar PDF"
+                    >
+                      <span class="material-symbols-outlined text-base">download</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </v-card-text>
+            <v-card-actions class="bg-white pa-4">
+              <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                {{ documentosPublicosOrdenados.length }} comunicados
+              </p>
+              <v-spacer></v-spacer>
+              <v-btn color="slate-900" variant="flat" rounded="pill" class="font-black px-8" @click="mostrarTodosComunicados = false">Cerrar</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
       </section>
 
       <!-- ===== ESTADÍSTICAS ===== -->
-      <section class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-white" id="estadisticas">
+      <section
+        v-if="mostrarRankingLanding"
+        class="py-12 sm:py-16 md:py-24 px-5 sm:px-6 md:px-12 lg:px-24 bg-white"
+        id="estadisticas"
+      >
         <div class="text-center mb-12 md:mb-16 reveal">
           <h2 class="text-3xl md:text-5xl font-black text-slate-900 italic mb-4 uppercase tracking-tighter">RANKING <span class="text-secondary">FRATERNIDADES</span></h2>
           <p class="text-slate-400 font-bold tracking-widest uppercase text-[10px] md:text-xs">Puntuación en tiempo real</p>
@@ -851,7 +932,9 @@
               <li><a @click.prevent="scrollTo('fraternidades')" href="#fraternidades" class="hover:text-primary transition-colors cursor-pointer">Fraternidades</a></li>
               <li><a @click.prevent="scrollTo('ruta')" href="#ruta" class="hover:text-primary transition-colors cursor-pointer">Ruta Oficial</a></li>
               <li><a @click.prevent="scrollTo('eventos')" href="#eventos" class="hover:text-primary transition-colors cursor-pointer">Eventos</a></li>
-              <li><a @click.prevent="scrollTo('estadisticas')" href="#estadisticas" class="hover:text-primary transition-colors cursor-pointer">Estadísticas</a></li>
+              <li v-if="mostrarRankingLanding">
+                <a @click.prevent="scrollTo('estadisticas')" href="#estadisticas" class="hover:text-primary transition-colors cursor-pointer">Estadísticas</a>
+              </li>
               <li v-if="mostrarHistoricoLanding">
                 <a @click.prevent="scrollTo('historicos')" href="#historicos" class="hover:text-primary transition-colors cursor-pointer">Archivo Histórico</a>
               </li>
@@ -955,6 +1038,7 @@ const aniosTradicion = computed(() => {
 
 const heroBannerUrl = computed(() => siteInfo.value.urlBanner || defaultHeroBanner)
 const mostrarHistoricoLanding = computed(() => siteInfo.value?.mostrarHistorico === true)
+const mostrarRankingLanding = computed(() => siteInfo.value?.mostrarRanking !== false)
 
 const rankingPublico = ref([])
 const loadingRanking = ref(true)
@@ -1001,8 +1085,12 @@ const cargarDatos = async (opts = {}) => {
   } catch (err) {}
 
   try {
-    const { data } = await api.get('/evaluaciones/estadisticas')
-    rankingPublico.value = data.rankingEfu || []
+    if (siteInfo.value?.mostrarRanking === false) {
+      rankingPublico.value = []
+    } else {
+      const { data } = await api.get('/evaluaciones/estadisticas')
+      rankingPublico.value = data.rankingEfu || []
+    }
   } catch (err) {
     console.error('Error al cargar ranking:', err)
   } finally {
@@ -1017,7 +1105,26 @@ const cargarDatos = async (opts = {}) => {
 const documentosPublicos = ref([])
 const loadingDocumentos = ref(false)
 const mostrarAvisoNuevoDoc = ref(false)
+const mostrarTodosComunicados = ref(false)
 const nuevoDocumento = ref(null)
+
+const ordenarComunicadosRecientes = (lista) =>
+  [...lista].sort((a, b) => {
+    const fechaA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const fechaB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    if (fechaB !== fechaA) return fechaB - fechaA
+    return (b.idDocumento || 0) - (a.idDocumento || 0)
+  })
+
+const documentosPublicosOrdenados = computed(() => ordenarComunicadosRecientes(documentosPublicos.value))
+const comunicadosRecientes = computed(() => documentosPublicosOrdenados.value.slice(0, 4))
+
+const fechaComunicado = (doc) => {
+  if (!doc?.createdAt) return ''
+  const fecha = new Date(doc.createdAt)
+  if (Number.isNaN(fecha.getTime())) return ''
+  return fecha.toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 const cargarDocumentosPublicos = async (opts = {}) => {
   const silent = !!opts.silent
@@ -1025,7 +1132,7 @@ const cargarDocumentosPublicos = async (opts = {}) => {
   try {
     const { data } = await api.get('/evaluaciones/documentos-gestion?soloPublicos=true')
     const lista = Array.isArray(data) ? data : []
-    documentosPublicos.value = lista
+    documentosPublicos.value = ordenarComunicadosRecientes(lista)
 
     // Si hay documentos públicos, verifiquemos si el último es nuevo
     if (lista.length > 0) {

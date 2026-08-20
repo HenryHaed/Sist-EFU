@@ -26,6 +26,18 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     ALTER TABLE gestiones
     ADD COLUMN IF NOT EXISTS mostrar_historico boolean NOT NULL DEFAULT false
   `);
+  await runPatch(dataSource, 'gestiones.mostrar_ranking_estadisticas', `
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS mostrar_ranking_estadisticas boolean NOT NULL DEFAULT true
+  `);
+  await runPatch(dataSource, 'gestiones.mostrar_ranking_concursos_externos', `
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS mostrar_ranking_concursos_externos boolean NOT NULL DEFAULT true
+  `);
+  await runPatch(dataSource, 'gestiones.ranking_concursos_ocultos', `
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS ranking_concursos_ocultos jsonb NULL
+  `);
   await runPatch(dataSource, 'gestiones.edicion', `
     ALTER TABLE gestiones
     ADD COLUMN IF NOT EXISTS edicion varchar(20) NULL

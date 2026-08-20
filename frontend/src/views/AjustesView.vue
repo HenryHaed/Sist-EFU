@@ -144,31 +144,107 @@
           </div>
         </div>
 
-        <!-- Toggles -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex items-center justify-between">
-                <div>
-                   <p class="text-xs font-black text-slate-700 uppercase leading-none mb-1">Mostrar Ranking</p>
-                   <p class="text-[10px] text-slate-400 font-bold">Público en el landing</p>
-                </div>
-                <input type="checkbox" v-model="gestion.mostrarRanking" class="toggle-checkbox" />
-             </div>
+        <div class="space-y-4">
+          <div>
+            <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Visibilidad de rankings y archivo</h3>
+            <p class="text-[10px] text-slate-400 font-medium mt-1">
+              Cada interruptor oculta o muestra un bloque concreto. En móvil los interruptores quedan a la derecha, sin deformarse.
+            </p>
+          </div>
 
-             <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex items-center justify-between">
-                <div>
-                   <p class="text-xs font-black text-slate-700 uppercase leading-none mb-1">Mostrar Histórico</p>
-                   <p class="text-[10px] text-slate-400 font-bold">Archivo histórico en el landing</p>
-                </div>
-                <input type="checkbox" v-model="gestion.mostrarHistorico" class="toggle-checkbox" />
-             </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-xs font-black text-slate-800 uppercase leading-snug">Ranking en landing</p>
+                <p class="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
+                  Si se apaga, en la página de inicio no aparece la sección, el menú ni el modal de ranking.
+                </p>
+              </div>
+              <input type="checkbox" v-model="gestion.mostrarRanking" class="toggle-checkbox shrink-0 mt-0.5" />
+            </div>
 
-             <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-center justify-between">
-                <div>
-                   <p class="text-xs font-black text-blue-800 uppercase leading-none mb-1">Gestión Activa</p>
-                   <p class="text-[10px] text-blue-600 font-bold">Es la gestión vigente en el sistema</p>
-                </div>
-                <input type="checkbox" v-model="gestion.activa" class="toggle-checkbox primary" />
-             </div>
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-xs font-black text-slate-800 uppercase leading-snug">Archivo histórico</p>
+                <p class="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
+                  Muestra u oculta el histórico de gestiones en el landing.
+                </p>
+              </div>
+              <input type="checkbox" v-model="gestion.mostrarHistorico" class="toggle-checkbox shrink-0 mt-0.5" />
+            </div>
+
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-xs font-black text-slate-800 uppercase leading-snug">Ranking de notas (Estadísticas)</p>
+                <p class="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
+                  Gráfica, podio y tabla de puntajes de fraternidades en el panel de Estadísticas.
+                </p>
+              </div>
+              <input type="checkbox" v-model="gestion.mostrarRankingEstadisticas" class="toggle-checkbox shrink-0 mt-0.5" />
+            </div>
+
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-xs font-black text-slate-800 uppercase leading-snug">Ranking concursos externos</p>
+                <p class="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
+                  Top 3 de concursos externos en Estadísticas. Abajo eliges cuáles se publican.
+                </p>
+              </div>
+              <input type="checkbox" v-model="gestion.mostrarRankingConcursosExternos" class="toggle-checkbox shrink-0 mt-0.5" />
+            </div>
+          </div>
+
+          <div
+            class="bg-slate-50 p-4 sm:p-6 rounded-2xl border border-slate-200"
+            :class="{ 'opacity-70': !gestion.mostrarRankingConcursosExternos }"
+          >
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-4">
+              <div class="min-w-0">
+                <p class="text-xs font-black text-slate-800 uppercase">Concursos externos visibles</p>
+                <p class="text-[10px] text-slate-500 font-medium mt-1 leading-relaxed">
+                  Los concursos nuevos se muestran por defecto. Apaga el que no quieras publicar.
+                </p>
+              </div>
+              <span class="text-[9px] font-black uppercase tracking-widest text-slate-400 shrink-0">
+                {{ concursosExternosAjustes.length }} concurso(s)
+              </span>
+            </div>
+
+            <div v-if="loadingConcursosExternos" class="py-6 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              Cargando concursos...
+            </div>
+            <div v-else-if="!concursosExternosAjustes.length" class="py-6 text-center rounded-xl border border-dashed border-slate-200 bg-white">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Aún no hay concursos externos en esta gestión
+              </p>
+              <p class="text-[10px] text-slate-400 mt-1">Cuando se creen en Fases, aparecerán aquí para elegir si se muestran.</p>
+            </div>
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label
+                v-for="fase in concursosExternosAjustes"
+                :key="fase.idFase"
+                class="flex items-center justify-between gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3 cursor-pointer"
+              >
+                <span class="text-xs font-black text-slate-700 uppercase tracking-wide min-w-0 truncate">
+                  {{ fase.nombre }}
+                </span>
+                <input
+                  type="checkbox"
+                  class="toggle-checkbox shrink-0"
+                  :checked="concursoExternoVisible(fase.idFase)"
+                  @change="setConcursoExternoVisible(fase.idFase, $event.target.checked)"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="bg-blue-50 p-4 sm:p-5 rounded-2xl border border-blue-100 flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-xs font-black text-blue-800 uppercase leading-snug">Gestión activa</p>
+              <p class="text-[10px] text-blue-600 font-medium mt-1">Es la gestión vigente en el sistema.</p>
+            </div>
+            <input type="checkbox" v-model="gestion.activa" class="toggle-checkbox primary shrink-0 mt-0.5" />
+          </div>
         </div>
 
         <!-- Mapa del recorrido (Google My Maps / iframe) -->
@@ -828,6 +904,9 @@ const gestion = ref({
   modoMantenimiento: false,
   mostrarRanking: true,
   mostrarHistorico: false,
+  mostrarRankingEstadisticas: true,
+  mostrarRankingConcursosExternos: true,
+  rankingConcursosOcultos: [],
   permiteInscripcionPublica: false,
   limiteFraternidadesPorDanza: 6,
   landingFraternidades: DEFAULT_LANDING_FRATERNIDADES(),
@@ -858,6 +937,43 @@ const previews = ref({
   ...emptyLandingPreviews(),
 })
 
+const concursosExternosAjustes = ref([])
+const loadingConcursosExternos = ref(false)
+
+const cargarConcursosExternos = async (idGestion) => {
+  if (!idGestion) {
+    concursosExternosAjustes.value = []
+    return
+  }
+  loadingConcursosExternos.value = true
+  try {
+    const { data } = await api.get(`/evaluaciones/gestiones/${idGestion}/fases`)
+    concursosExternosAjustes.value = (data?.fases || []).filter((f) => f.tipoConcurso === 'EXTERNO')
+  } catch (err) {
+    console.error('Error al cargar concursos externos:', err)
+    concursosExternosAjustes.value = []
+  } finally {
+    loadingConcursosExternos.value = false
+  }
+}
+
+const concursoExternoVisible = (idFase) => {
+  const ocultos = Array.isArray(gestion.value.rankingConcursosOcultos)
+    ? gestion.value.rankingConcursosOcultos
+    : []
+  return !ocultos.includes(idFase)
+}
+
+const setConcursoExternoVisible = (idFase, visible) => {
+  const actual = Array.isArray(gestion.value.rankingConcursosOcultos)
+    ? [...gestion.value.rankingConcursosOcultos]
+    : []
+  const idx = actual.indexOf(idFase)
+  if (visible && idx >= 0) actual.splice(idx, 1)
+  if (!visible && idx < 0) actual.push(idFase)
+  gestion.value.rankingConcursosOcultos = actual
+}
+
 const loadGestion = async (idGestion = null) => {
   loading.value = true
   try {
@@ -868,9 +984,17 @@ const loadGestion = async (idGestion = null) => {
       data.urlBanner = getImageUrl(data.urlBanner)
       data.urlImagenLogin = getImageUrl(data.urlImagenLogin)
       data.landingFraternidades = normalizeLandingFraternidades(data.landingFraternidades)
+      data.mostrarRanking = data.mostrarRanking !== false
+      data.mostrarHistorico = data.mostrarHistorico === true
+      data.mostrarRankingEstadisticas = data.mostrarRankingEstadisticas !== false
+      data.mostrarRankingConcursosExternos = data.mostrarRankingConcursosExternos !== false
+      data.rankingConcursosOcultos = Array.isArray(data.rankingConcursosOcultos)
+        ? data.rankingConcursosOcultos.map((id) => Number(id)).filter((id) => Number.isFinite(id))
+        : []
       gestion.value = data
       selectedGestionId.value = data.idGestion
       applySiteTitle(data.nombreSitio)
+      await cargarConcursosExternos(data.idGestion)
     }
   } catch (err) {
     console.error('Error al cargar gestion:', err)
@@ -945,6 +1069,9 @@ const saveSettings = async () => {
         descripcion: card.descripcion || '',
         urlImagen: toStoredAssetPath(card.urlImagen),
       })),
+      rankingConcursosOcultos: Array.isArray(gestion.value.rankingConcursosOcultos)
+        ? gestion.value.rankingConcursosOcultos
+        : [],
     }
     formData.append('data', JSON.stringify(payload))
     
@@ -1301,6 +1428,8 @@ watch(() => props.gestionId, async (id) => {
   appearance: none;
   width: 44px;
   height: 24px;
+  min-width: 44px;
+  flex-shrink: 0;
   background: #cbd5e1;
   border-radius: 20px;
   position: relative;

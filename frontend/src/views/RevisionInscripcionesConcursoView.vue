@@ -437,6 +437,7 @@ import { ref, computed, onMounted } from 'vue'
 import Swal from 'sweetalert2'
 import api from '../services/api'
 import { getImageUrl } from '../utils/url'
+import { esFaseChachaWarmi } from '../utils/chachaWarmi'
 
 const loading = ref(true)
 const lista = ref([])
@@ -452,7 +453,7 @@ const panelScroll = ref(null)
 const actualizando = ref(false)
 const guardandoProgreso = ref(false)
 
-const esChacha = (item) => item?.fase?.plantillaRequisitos === 'chacha_warmi'
+const esChacha = (item) => esFaseChachaWarmi(item?.fase)
 
 const badgeEstado = (estado) => ({
   BORRADOR: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -771,7 +772,7 @@ const decidir = async (accion) => {
     const conf = await Swal.fire({
       title: '¿Aprobar inscripción?',
       text: esChacha(detalle.value)
-        ? 'Se crearán/actualizarán los participantes Chacha y Warmi.'
+        ? 'Se confirmará la pareja Chacha y Warmi en Concursantes y calificación.'
         : 'El concursante pasará al listado de participantes.',
       icon: 'question',
       showCancelButton: true,

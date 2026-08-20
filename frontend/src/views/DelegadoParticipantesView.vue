@@ -59,21 +59,35 @@
             <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic leading-none">{{ faseSeleccionada.nombre }}</h2>
             <p class="text-slate-500 font-medium text-sm mt-1">
               {{ esChachaActiva
-                ? 'Fraternidades con pareja Chacha-Warmi aprobada'
+                ? 'Fraternidades con pareja Chacha-Warmi inscrita'
                 : 'Listado de concursantes aprobados / inscritos' }}
             </p>
           </div>
         </div>
 
-        <button
-          v-if="!esChachaActiva"
-          type="button"
-          @click="abrirModalCrear"
-          class="px-6 py-3 bg-secondary text-white font-black rounded-2xl shadow-lg shadow-secondary/20 hover:brightness-110 transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest"
-        >
-          <span class="material-symbols-outlined text-[20px]">person_add</span>
-          Inscribir Participante
-        </button>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <button
+            v-if="esChachaActiva"
+            type="button"
+            @click="descargarAudiosZip"
+            :disabled="descargandoAudios"
+            class="px-5 py-3 bg-slate-900 text-white font-black rounded-2xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest disabled:opacity-50"
+          >
+            <span class="material-symbols-outlined text-[20px]" :class="{ 'animate-spin': descargandoAudios }">
+              {{ descargandoAudios ? 'progress_activity' : 'folder_zip' }}
+            </span>
+            Descargar audios ZIP
+          </button>
+          <button
+            v-if="!esChachaActiva"
+            type="button"
+            @click="abrirModalCrear"
+            class="px-6 py-3 bg-secondary text-white font-black rounded-2xl shadow-lg shadow-secondary/20 hover:brightness-110 transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest"
+          >
+            <span class="material-symbols-outlined text-[20px]">person_add</span>
+            Inscribir Participante
+          </button>
+        </div>
       </div>
 
       <div v-if="loadingParticipantes" class="flex justify-center py-20">
@@ -133,7 +147,7 @@
           >
             <span class="material-symbols-outlined text-5xl text-slate-200 mb-2">groups</span>
             <p class="text-slate-400 font-bold uppercase tracking-widest max-w-md mx-auto">
-              Aún no hay fraternidades con Chacha-Warmi aprobado. Aparecerán aquí al aprobar el expediente.
+              Aún no hay parejas. Aparecerán cuando el delegado envíe la inscripción Chacha-Warmi.
             </p>
           </div>
         </div>
@@ -518,6 +532,7 @@ const faseSeleccionada = ref(null)
 const participantes = ref([])
 const loadingParticipantes = ref(false)
 const modalFraternidad = ref(null)
+const descargandoAudios = ref(false)
 
 const fraternidades = ref([])
 const modalAbierto = ref(false)
@@ -685,6 +700,44 @@ const cargarParticipantes = async () => {
     Swal.fire('Error', msg, 'error')
   } finally {
     loadingParticipantes.value = false
+  }
+}
+
+const descargarAudiosZip = async () => {
+  if (!faseSeleccionada.value?.idFase) return
+  descargandoAudios.value = true
+  try {
+    const { data } = await api.get(
+      `/participantes/fase/${faseSeleccionada.value.idFase}/audios-zip`,
+      { responseType: 'blob' },
+    )
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/zip' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const safeName = String(faseSeleccionada.value.nombre || 'ChachaWarmi')
+      .replace(/[^\w\-]+/g, '_')
+      .slice(0, 40)
+    a.download = `Audios_${safeName}.zip`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    let msg = 'No se pudo descargar el ZIP de audios.'
+    const blob = error.response?.data
+    if (blob instanceof Blob) {
+      try {
+        const text = await blob.text()
+        const parsed = JSON.parse(text)
+        msg = parsed.message || msg
+      } catch { /* ignore */ }
+    } else if (error.response?.data?.message) {
+      msg = error.response.data.message
+    }
+    Swal.fire('Sin audios', msg, 'info')
+  } finally {
+    descargandoAudios.value = false
   }
 }
 

@@ -31,15 +31,15 @@ export function esRolSistema(nombre: string | null | undefined): boolean {
  */
 export async function ensureSystemRoles(dataSource: DataSource): Promise<void> {
   for (const rol of SYSTEM_ROLES) {
+    const existentes = await dataSource.query(
+      `SELECT 1 FROM roles WHERE LOWER(TRIM(nombre)) = LOWER(TRIM($1::text)) LIMIT 1`,
+      [rol.nombre],
+    );
+    if (Array.isArray(existentes) && existentes.length > 0) continue;
+
     await dataSource.query(
-      `
-      INSERT INTO roles (nombre, descripcion, created_at, updated_at)
-      SELECT $1, $2, NOW(), NOW()
-      WHERE NOT EXISTS (
-        SELECT 1 FROM roles
-        WHERE LOWER(TRIM(nombre)) = LOWER(TRIM($1::text))
-      )
-      `,
+      `INSERT INTO roles (nombre, descripcion, created_at, updated_at)
+       VALUES ($1::text, $2::text, NOW(), NOW())`,
       [rol.nombre, rol.descripcion],
     );
   }

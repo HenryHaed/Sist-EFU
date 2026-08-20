@@ -466,7 +466,7 @@ export class EvaluacionesService {
       relations: ['participante', 'participante.fraternidad', 'fase'],
     });
 
-    const concursosMap = new Map<number, { nombreConcurso: string; participantesMap: Map<number, any> }>();
+    const concursosMap = new Map<number, { idFase: number; nombreConcurso: string; participantesMap: Map<number, any> }>();
 
     evsExt.forEach((e) => {
       if (!e.participante || !e.fase) return;
@@ -474,6 +474,7 @@ export class EvaluacionesService {
       const idFase = e.fase.idFase;
       if (!concursosMap.has(idFase)) {
         concursosMap.set(idFase, {
+          idFase,
           nombreConcurso: e.fase.nombre,
           participantesMap: new Map<number, any>(),
         });
@@ -500,6 +501,7 @@ export class EvaluacionesService {
 
     const concursos = Array.from(concursosMap.values())
       .map((concurso) => ({
+        idFase: concurso.idFase,
         nombreConcurso: concurso.nombreConcurso,
         participantes: Array.from(concurso.participantesMap.values())
           .map((p) => ({
@@ -518,12 +520,21 @@ export class EvaluacionesService {
       basico: [
         { label: 'Total Fraternidades', valor: frats.length, badge: 'Habilitadas', progreso: 100 },
         { label: 'Evaluadas', valor: evaluadasIds.size, badge: `${progreso}% Avance`, progreso },
-        { label: 'Ranking Top', valor: rankingSorted.length > 0 ? rankingSorted[0].nombre : '—', badge: 'Líder Actual', progreso: 100 }
+        { clave: 'rankingTop', label: 'Ranking Top', valor: rankingSorted.length > 0 ? rankingSorted[0].nombre : '—', badge: 'Líder Actual', progreso: 100 }
       ],
       rankingEfu: rankingSorted,
       concursos,
       totalFraternidades,
-      gestion: { anio: gestion.anio, edicion: gestion.edicion }
+      gestion: {
+        anio: gestion.anio,
+        edicion: gestion.edicion,
+        mostrarRanking: gestion.mostrarRanking !== false,
+        mostrarRankingEstadisticas: gestion.mostrarRankingEstadisticas !== false,
+        mostrarRankingConcursosExternos: gestion.mostrarRankingConcursosExternos !== false,
+        rankingConcursosOcultos: Array.isArray(gestion.rankingConcursosOcultos)
+          ? gestion.rankingConcursosOcultos
+          : [],
+      }
     };
   }
 
@@ -944,7 +955,9 @@ export class EvaluacionesService {
     const allowed = [
       'anio', 'edicion', 'lema', 'activa', 'nombreSitio', 'tituloPrincipal', 'subtituloPrincipal',
       'urlBanner', 'urlLogo', 'urlImagenLogin', 'urlMapaUbicacion',
-      'modoMantenimiento', 'mostrarRanking', 'mostrarHistorico', 'permiteInscripcionPublica',
+      'modoMantenimiento', 'mostrarRanking', 'mostrarHistorico',
+      'mostrarRankingEstadisticas', 'mostrarRankingConcursosExternos', 'rankingConcursosOcultos',
+      'permiteInscripcionPublica',
       'limiteFraternidadesPorDanza',
       'landingFraternidades',
     ] as const;
@@ -973,6 +986,16 @@ export class EvaluacionesService {
         descripcion: String(item?.descripcion || '').trim().slice(0, 500),
         urlImagen: String(item?.urlImagen || '').trim().slice(0, 500),
       }));
+    }
+
+    if (payload.rankingConcursosOcultos !== undefined) {
+      const raw = payload.rankingConcursosOcultos;
+      const list = Array.isArray(raw) ? raw : [];
+      payload.rankingConcursosOcultos = [...new Set(
+        list
+          .map((id: any) => Number.parseInt(String(id), 10))
+          .filter((id: number) => Number.isFinite(id) && id > 0),
+      )];
     }
 
     await this.gestionRepo.update({ idGestion: id }, payload);

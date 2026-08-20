@@ -528,6 +528,7 @@ import { notify } from '../utils/notify'
 import Swal from 'sweetalert2'
 
 import { getImageUrl } from '../utils/url'
+import { esFaseChachaWarmi } from '../utils/chachaWarmi'
 
 
 const props = defineProps({
@@ -753,6 +754,14 @@ const abrirModal = (item = null) => {
     if (form.value.tipoConcurso === 'EXTERNO' && !form.value.clavesCampos.length && !form.value.clavesDocumentos.length) {
       aplicarPlantilla(form.value.plantillaRequisitos)
     }
+    // Migrar documentos legados de Chacha-Warmi (CI ambos) a CI/matrícula separados
+    if (
+      form.value.tipoConcurso === 'EXTERNO' &&
+      esFaseChachaWarmi({ nombre: form.value.nombre, plantillaRequisitos: form.value.plantillaRequisitos }) &&
+      !form.value.clavesDocumentos.includes('ci_chacha_pdf')
+    ) {
+      aplicarPlantilla('chacha_warmi')
+    }
   } else {
     editandoId.value = null
     form.value = {
@@ -781,6 +790,14 @@ const guardar = async () => {
   if (form.value.tipoConcurso === 'EXTERNO') {
     if (!form.value.clavesCampos?.length && !form.value.clavesDocumentos?.length) {
       return notify.error('Error', 'Selecciona al menos un campo o documento a solicitar en el concurso externo.')
+    }
+    // Si el nombre indica Chacha-Warmi y no eligieron plantilla, forzar la correcta (inscripción por delegado).
+    if (
+      esFaseChachaWarmi({ nombre: form.value.nombre, plantillaRequisitos: form.value.plantillaRequisitos }) &&
+      form.value.plantillaRequisitos !== 'chacha_warmi'
+    ) {
+      form.value.plantillaRequisitos = 'chacha_warmi'
+      if (!form.value.clavesCampos?.length) aplicarPlantilla('chacha_warmi')
     }
   }
   if (form.value.fechaInicio && form.value.fechaFin) {

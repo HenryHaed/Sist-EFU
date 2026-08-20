@@ -3,7 +3,7 @@
     <div class="mb-6">
       <h2 class="dashboard-page-title text-primary italic uppercase">Inscripción Chacha-Warmi</h2>
       <p class="text-slate-500 text-sm font-medium mt-1">
-        Completa los datos de la pareja y luego sube los documentos oficiales. El administrador revisará el expediente.
+        Completa los datos de la pareja y sube los documentos. Al enviar, la pareja queda registrada en Concursantes Chacha-Warmi para revisión y calificación.
       </p>
     </div>
 
@@ -564,7 +564,7 @@ const eliminarArchivo = async (idArchivo) => {
 const enviar = async () => {
   const conf = await Swal.fire({
     title: '¿Enviar inscripción Chacha-Warmi?',
-    text: 'Se enviará a revisión del administrador (pareja + documentos).',
+    text: 'Se enviará a revisión. La pareja Chacha y Warmi quedará visible en Concursantes y en calificación.',
     icon: 'question',
     showCancelButton: true,
     confirmButtonText: 'Sí, enviar',
@@ -577,7 +577,11 @@ const enviar = async () => {
     await api.put('/inscripciones-concurso/mi-chacha/datos', { datos: formDatos.value })
     const { data } = await api.post('/inscripciones-concurso/mi-chacha/enviar')
     aplicarRespuesta(data)
-    Swal.fire('Enviado', 'La inscripción está en revisión.', 'success')
+    Swal.fire(
+      'Enviado',
+      'Inscripción en revisión. La pareja ya figura en Participantes Concursos (Chacha-Warmi).',
+      'success',
+    )
   } catch (e) {
     Swal.fire('Error', e.response?.data?.message || 'No se pudo enviar', 'error')
   } finally {

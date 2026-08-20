@@ -27,7 +27,9 @@ import {
   normalizarRequisitos,
   requisitosDesdePlantilla,
   esPlantillaChachaWarmi,
+  esFaseChachaWarmi,
   esPlantillaParaConcursante,
+  asegurarDocumentosChachaWarmi,
 } from '../common/requisitos-concurso';
 
 @Injectable()
@@ -59,8 +61,13 @@ export class InscripcionesConcursoService {
   }
 
   private requisitosDeFase(fase: Fase) {
-    if (fase.requisitosInscripcion) return normalizarRequisitos(fase.requisitosInscripcion);
-    return requisitosDesdePlantilla(fase.plantillaRequisitos || 'generico');
+    let req = fase.requisitosInscripcion
+      ? normalizarRequisitos(fase.requisitosInscripcion)
+      : requisitosDesdePlantilla(fase.plantillaRequisitos || 'generico');
+    if (esFaseChachaWarmi(fase)) {
+      req = asegurarDocumentosChachaWarmi(req);
+    }
+    return req;
   }
 
   private assertEditable(estado: EstadoInscripcionConcurso) {
@@ -320,17 +327,30 @@ export class InscripcionesConcursoService {
     return next;
   }
 
+  /**
+   * Fase EXTERNO Chacha-Warmi de la gestión (plantilla o nombre).
+   * Solo fases activas: el admin debe activarla en Gestión de Fases para habilitar a delegados.
+   */
   private async findFaseChachaActiva(gestionId: number): Promise<Fase | null> {
-    return this.faseRepo
+    const fases = await this.faseRepo
       .createQueryBuilder('f')
       .leftJoinAndSelect('f.gestion', 'gestion')
       .where('gestion.id_gestion = :gid', { gid: gestionId })
       .andWhere('f.tipo_concurso = :tipo', { tipo: 'EXTERNO' })
-      .andWhere('LOWER(COALESCE(f.plantilla_requisitos, \'\')) = :plantilla', {
-        plantilla: 'chacha_warmi',
-      })
+      .andWhere('f.esta_activa = true')
       .orderBy('f.id_fase', 'DESC')
-      .getOne();
+      .getMany();
+
+    const match = fases.find((f) => esFaseChachaWarmi(f)) || null;
+    // Si el admin la creó por nombre pero sin plantilla, normalizamos para el resto del flujo.
+    if (match && !esPlantillaChachaWarmi(match.plantillaRequisitos)) {
+      match.plantillaRequisitos = 'chacha_warmi';
+      if (!match.requisitosInscripcion) {
+        match.requisitosInscripcion = requisitosDesdePlantilla('chacha_warmi');
+      }
+      await this.faseRepo.save(match);
+    }
+    return match;
   }
 
   async getMiChacha(idUsuario: number) {
@@ -374,8 +394,12 @@ export class InscripcionesConcursoService {
 
     const herencia = this.herenciaInstanciaFraternidad(frat, solicitudAprobada);
 
+    // Preferir gestión activa (donde el admin crea la fase Chacha-Warmi).
+    const gestionActiva = await findGestionActivaOrLatest(this.gestionRepo);
     const gestion =
-      frat.gestion || (await findGestionActivaOrLatest(this.gestionRepo));
+      gestionActiva ||
+      frat.gestion ||
+      null;
     if (!gestion) throw new BadRequestException('No hay gestión activa.');
 
     const fase = await this.findFaseChachaActiva((gestion as any).idGestion);
@@ -384,7 +408,7 @@ export class InscripcionesConcursoService {
         sinFase: true,
         fraternidadNoAprobada: false,
         mensaje:
-          'Aún no hay fase Chacha-Warmi en esta gestión. El administrador debe crearla en Gestión de Fases (plantilla Chacha Warmi).',
+          'Aún no hay fase Chacha-Warmi activa en esta gestión. El administrador debe crearla y activarla en Gestión de Fases (plantilla Chacha Warmi).',
         requisitos: null,
         insc: null,
         herencia,
@@ -517,11 +541,101 @@ export class InscripcionesConcursoService {
     }
     const insc = await this.inscRepo.findOne({
       where: { idInscripcion: (wrap as any).idInscripcion },
-      relations: ['fase', 'archivos'],
+      relations: [
+        'fase',
+        'fase.gestion',
+        'archivos',
+        'fraternidad',
+        'usuario',
+        'usuario.fraternidad',
+        'participante',
+        'participantePareja',
+        'gestion',
+      ],
     });
     this.validarYMarcarPendiente(insc);
+    // Al enviar, ya se registran Chacha + Warmi para Concursantes y calificación.
+    if (esFaseChachaWarmi(insc.fase)) {
+      await this.upsertParejaChachaWarmi(insc);
+    }
     await this.inscRepo.save(insc);
     return this.getMiChacha(idUsuario);
+  }
+
+  /**
+   * Crea o actualiza los dos participantes (Chacha + Warmi) ligados a la inscripción.
+   * Se usa al enviar (delegado) y al aprobar (admin) para que Concursantes / calificación se actualicen.
+   */
+  private async upsertParejaChachaWarmi(insc: InscripcionConcurso) {
+    const frat = insc.fraternidad || insc.usuario?.fraternidad || null;
+    const gestion = insc.fase?.gestion || insc.gestion;
+    if (!insc.fase) {
+      throw new BadRequestException('La inscripción no tiene fase asociada.');
+    }
+
+    const nombreChacha =
+      String(insc.datos?.nombreCompleto || '').trim() ||
+      (insc.usuario
+        ? `${insc.usuario.nombres || ''} ${insc.usuario.primerApellido || ''}`.trim()
+        : '') ||
+      'Chacha';
+    const nombreWarmi = String(insc.datos?.nombreCompletoPareja || '').trim();
+    if (!nombreWarmi) {
+      throw new BadRequestException(
+        'La inscripción Chacha-Warmi debe incluir el nombre del segundo postulante (Warmi).',
+      );
+    }
+
+    if (!esPlantillaChachaWarmi(insc.fase.plantillaRequisitos)) {
+      insc.fase.plantillaRequisitos = 'chacha_warmi';
+      await this.faseRepo.save(insc.fase);
+    }
+
+    let chacha = insc.participante;
+    if (!chacha) {
+      chacha = this.participanteRepo.create({
+        nombre: nombreChacha,
+        tipo: 'Chacha',
+        fase: insc.fase,
+        gestion,
+        perteneceFraternidad: !!frat,
+        fraternidad: frat,
+        esUmsa: true,
+      });
+    } else {
+      chacha.nombre = nombreChacha;
+      chacha.tipo = 'Chacha';
+      chacha.fraternidad = frat;
+      chacha.perteneceFraternidad = !!frat;
+      chacha.fase = insc.fase;
+      if (gestion) chacha.gestion = gestion;
+    }
+    chacha = await this.participanteRepo.save(chacha);
+
+    let warmi = insc.participantePareja;
+    if (!warmi) {
+      warmi = this.participanteRepo.create({
+        nombre: nombreWarmi,
+        tipo: 'Warmi',
+        fase: insc.fase,
+        gestion,
+        perteneceFraternidad: !!frat,
+        fraternidad: frat,
+        esUmsa: true,
+      });
+    } else {
+      warmi.nombre = nombreWarmi;
+      warmi.tipo = 'Warmi';
+      warmi.fraternidad = frat;
+      warmi.perteneceFraternidad = !!frat;
+      warmi.fase = insc.fase;
+      if (gestion) warmi.gestion = gestion;
+    }
+    warmi = await this.participanteRepo.save(warmi);
+
+    insc.participante = chacha;
+    insc.participantePareja = warmi;
+    return { chacha, warmi };
   }
 
   // ── Shared file / validate ───────────────────────────────────────────────
@@ -751,6 +865,8 @@ export class InscripcionesConcursoService {
       }
       insc.estado = EstadoInscripcionConcurso.RECHAZADO;
       insc.observacionAdmin = observacion.trim();
+      // Quitar de Concursantes / calificación si aún no hay evaluaciones cerradas.
+      await this.retirarParticipantesSiSinEvaluacion(insc);
       await this.inscRepo.save(insc);
       return this.getDetalleAdmin(idInscripcion);
     }
@@ -794,57 +910,8 @@ export class InscripcionesConcursoService {
     const frat = insc.fraternidad || insc.usuario?.fraternidad || null;
     const gestion = insc.fase.gestion || insc.gestion;
 
-    if (esPlantillaChachaWarmi(insc.fase.plantillaRequisitos)) {
-      const nombreChacha =
-        String(insc.datos?.nombreCompleto || '').trim() ||
-        `${insc.usuario.nombres} ${insc.usuario.primerApellido}`.trim();
-      const nombreWarmi = String(insc.datos?.nombreCompletoPareja || '').trim();
-      if (!nombreWarmi) {
-        throw new BadRequestException(
-          'La inscripción Chacha-Warmi debe incluir el nombre del segundo postulante (Warmi).',
-        );
-      }
-
-      let chacha = insc.participante;
-      if (!chacha) {
-        chacha = this.participanteRepo.create({
-          nombre: nombreChacha,
-          tipo: 'Chacha',
-          fase: insc.fase,
-          gestion,
-          perteneceFraternidad: !!frat,
-          fraternidad: frat,
-          esUmsa: true,
-        });
-      } else {
-        chacha.nombre = nombreChacha;
-        chacha.tipo = 'Chacha';
-        chacha.fraternidad = frat;
-        chacha.perteneceFraternidad = !!frat;
-      }
-      chacha = await this.participanteRepo.save(chacha);
-
-      let warmi = insc.participantePareja;
-      if (!warmi) {
-        warmi = this.participanteRepo.create({
-          nombre: nombreWarmi,
-          tipo: 'Warmi',
-          fase: insc.fase,
-          gestion,
-          perteneceFraternidad: !!frat,
-          fraternidad: frat,
-          esUmsa: true,
-        });
-      } else {
-        warmi.nombre = nombreWarmi;
-        warmi.tipo = 'Warmi';
-        warmi.fraternidad = frat;
-        warmi.perteneceFraternidad = !!frat;
-      }
-      warmi = await this.participanteRepo.save(warmi);
-
-      insc.participante = chacha;
-      insc.participantePareja = warmi;
+    if (esFaseChachaWarmi(insc.fase)) {
+      await this.upsertParejaChachaWarmi(insc);
     } else {
       const nombre =
         String(insc.datos?.nombreCompleto || '').trim() ||
@@ -881,6 +948,26 @@ export class InscripcionesConcursoService {
 
     await this.inscRepo.save(insc);
     return this.getDetalleAdmin(idInscripcion);
+  }
+
+  /** Al rechazar, desliga y elimina Chacha/Warmi si no hay evaluaciones. */
+  private async retirarParticipantesSiSinEvaluacion(insc: InscripcionConcurso) {
+    const ids = [
+      insc.participante?.idParticipante,
+      insc.participantePareja?.idParticipante,
+    ].filter((id): id is number => Number.isFinite(id) && id > 0);
+
+    insc.participante = null;
+    insc.participantePareja = null;
+    await this.inscRepo.save(insc);
+
+    for (const id of ids) {
+      try {
+        await this.participanteRepo.delete(id);
+      } catch {
+        // Si tiene evaluaciones u otra FK, se deja el registro desligado.
+      }
+    }
   }
 
   private borrarArchivoFisico(url: string) {

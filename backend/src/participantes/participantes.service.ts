@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Participante } from '../entities/Participante';
 import { Fase } from '../entities/Fase';
 import { Fraternidad } from '../entities/Fraternidad';
@@ -10,6 +12,8 @@ import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
 import { InscripcionConcurso } from '../entities/InscripcionConcurso';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { buildZipStore, sanitizeZipFilePart } from '../common/zip-store';
+import { esFaseChachaWarmi } from '../common/requisitos-concurso';
 
 @Injectable()
 export class ParticipantesService {
@@ -249,5 +253,62 @@ export class ParticipantesService {
     await this.assertDelegadoPuedeGestionar(p, user);
 
     return this.participanteRepo.remove(p);
+  }
+
+  /**
+   * ZIP con todas las pistas MP3 de inscripciones Chacha-Warmi de la fase.
+   * Nombre: Audio_[Fraternidad].mp3
+   */
+  async buildAudiosZipChacha(idFase: number): Promise<{ buffer: Buffer; filename: string; count: number }> {
+    const fase = await this.faseRepo.findOne({ where: { idFase } });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+    if (!esFaseChachaWarmi(fase)) {
+      throw new BadRequestException('Esta descarga solo aplica a fases Chacha-Warmi.');
+    }
+
+    const inscs = await this.inscConcursoRepo.find({
+      where: { fase: { idFase } },
+      relations: ['fraternidad', 'archivos', 'usuario', 'usuario.fraternidad'],
+    });
+
+    const usedNames = new Map<string, number>();
+    const entries: { name: string; data: Buffer }[] = [];
+
+    for (const insc of inscs) {
+      const audios = (insc.archivos || []).filter((a) => a.claveDocumento === 'pista_mp3');
+      if (!audios.length) continue;
+
+      const nombreFrat =
+        insc.fraternidad?.nombre ||
+        insc.usuario?.fraternidad?.nombre ||
+        `Inscripcion_${insc.idInscripcion}`;
+
+      for (const audio of audios) {
+        const filename = String(audio.url || '').split('/').pop();
+        if (!filename) continue;
+        const diskPath = path.join(process.cwd(), 'uploads', 'Doc_Inscripcion_Concurso', filename);
+        if (!fs.existsSync(diskPath)) continue;
+
+        let base = `Audio_${sanitizeZipFilePart(nombreFrat)}.mp3`;
+        const times = (usedNames.get(base) || 0) + 1;
+        usedNames.set(base, times);
+        if (times > 1) {
+          base = `Audio_${sanitizeZipFilePart(nombreFrat)}_${times}.mp3`;
+        }
+
+        entries.push({ name: base, data: fs.readFileSync(diskPath) });
+      }
+    }
+
+    if (!entries.length) {
+      throw new NotFoundException('No hay audios MP3 subidos en las inscripciones de esta fase.');
+    }
+
+    const faseSafe = sanitizeZipFilePart(fase.nombre || 'ChachaWarmi', 'ChachaWarmi');
+    return {
+      buffer: buildZipStore(entries),
+      filename: `Audios_${faseSafe}.zip`,
+      count: entries.length,
+    };
   }
 }

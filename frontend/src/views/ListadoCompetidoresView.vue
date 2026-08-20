@@ -176,7 +176,9 @@
           <p class="text-slate-400 font-bold uppercase tracking-widest">
             {{ busqueda.trim()
               ? `Ningún resultado para “${busqueda}”.`
-              : (esChacha ? 'Esta fraternidad no tiene pareja registrada.' : 'No hay participantes registrados para este concurso.') }}
+              : (esChacha
+                ? 'Esta fraternidad no tiene pareja registrada. Aparece cuando el delegado envía la inscripción Chacha-Warmi.'
+                : 'No hay participantes registrados para este concurso.') }}
           </p>
         </div>
       </div>

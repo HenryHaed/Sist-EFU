@@ -58,6 +58,18 @@ export class Gestion {
     @Column({ name: 'mostrar_historico', default: false })
     mostrarHistorico: boolean;
 
+    /** Ranking de notas EFU (gráfica, podio y tabla) en el panel de Estadísticas. */
+    @Column({ name: 'mostrar_ranking_estadisticas', default: true })
+    mostrarRankingEstadisticas: boolean;
+
+    /** Ranking de concursos externos en el panel de Estadísticas. */
+    @Column({ name: 'mostrar_ranking_concursos_externos', default: true })
+    mostrarRankingConcursosExternos: boolean;
+
+    /** IDs de fases EXTERNO cuyo ranking no debe publicarse. Los nuevos concursos se muestran salvo que estén aquí. */
+    @Column({ name: 'ranking_concursos_ocultos', type: 'jsonb', nullable: true })
+    rankingConcursosOcultos: number[] | null;
+
     @Column({ name: 'permite_inscripcion_publica', default: false })
     permiteInscripcionPublica: boolean;
 

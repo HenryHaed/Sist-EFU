@@ -38,8 +38,8 @@
 
     <div v-else class="space-y-8 animate-in fade-in duration-700">
       <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div v-for="stat in stats" :key="stat.label"
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" :class="{ 'xl:grid-cols-2': statsVisibles.length < 3 }">
+        <div v-for="stat in statsVisibles" :key="stat.clave || stat.label"
           class="bg-white p-6 rounded-2xl border border-slate-200 shadow-[2px_2px_0px_0px_rgba(226,232,240,1)] relative overflow-hidden group hover:translate-y-[-4px] transition-all duration-300">
           <div class="absolute -right-4 -top-4 size-24 rounded-full group-hover:scale-110 transition-transform opacity-10" :style="{ backgroundColor: stat.colorHex || '#003399' }"></div>
           
@@ -69,7 +69,7 @@
       </div>
 
       <!-- MAIN CHART SECTION -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div v-if="mostrarRankingNotas" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Vertical Bar Chart (ApexCharts) -->
         <div class="lg:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
           <div class="flex items-center justify-between mb-8">
@@ -156,7 +156,7 @@
         </div>
       </div>
 
-      <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+      <div v-if="mostrarRankingConcursos" class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
         <div class="flex items-center justify-between mb-8 gap-4 flex-wrap">
           <div>
             <h3 class="text-lg font-black text-primary uppercase italic tracking-tighter flex items-center gap-2">
@@ -175,7 +175,7 @@
         <div v-if="concursosTop3.length" class="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div
             v-for="concurso in concursosTop3"
-            :key="concurso.nombreConcurso"
+            :key="concurso.idFase || concurso.nombreConcurso"
             class="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50/40"
           >
             <div class="px-5 py-4 bg-white border-b border-slate-100">
@@ -275,7 +275,7 @@
         </v-card-title>
 
         <v-card-text class="pa-6 bg-slate-50">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div v-if="mostrarRankingNotas" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div class="bg-white rounded-2xl border border-slate-200 p-4">
               <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Fraternidades</p>
               <p class="text-2xl font-black text-primary">{{ rankingEfu.length }}</p>
@@ -290,7 +290,7 @@
             </div>
           </div>
 
-          <div v-if="rankingEfu.length" class="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-8">
+          <div v-if="mostrarRankingNotas && rankingEfu.length" class="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-8">
             <div class="px-5 py-4 border-b border-slate-100">
               <h4 class="text-[10px] font-black uppercase tracking-widest text-primary">Clasificación general EFU</h4>
             </div>
@@ -330,12 +330,12 @@
             </div>
           </div>
 
-          <div v-if="concursosTop3.length" class="space-y-4">
+          <div v-if="mostrarRankingConcursos && concursosTop3.length" class="space-y-4">
             <h4 class="text-[10px] font-black uppercase tracking-widest text-primary px-1">Concursos externos — Top 3</h4>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div
                 v-for="concurso in concursosTop3"
-                :key="`modal-${concurso.nombreConcurso}`"
+                :key="`modal-${concurso.idFase || concurso.nombreConcurso}`"
                 class="bg-white rounded-2xl border border-slate-200 overflow-hidden"
               >
                 <div class="px-5 py-3 border-b border-slate-100 bg-slate-50">
@@ -360,7 +360,7 @@
             </div>
           </div>
 
-          <div v-else-if="!rankingEfu.length" class="py-16 text-center text-slate-400">
+          <div v-else-if="mostrarRankingNotas && !rankingEfu.length" class="py-16 text-center text-slate-400">
             <span class="material-symbols-outlined text-5xl mb-3">emoji_events</span>
             <p class="text-[10px] font-black uppercase tracking-widest">Aún no hay datos de podio</p>
           </div>
@@ -389,10 +389,24 @@ const totalFraternidades = ref(0)
 const mostrarPodioCompleto = ref(false)
 const rankingBarras = computed(() => rankingEfu.value.slice(0, 7))
 const rankingEfuPreview = computed(() => rankingEfu.value.slice(0, 7))
-const concursosTop3 = computed(() => concursos.value || [])
+const mostrarRankingNotas = computed(() => gestionData.value?.mostrarRankingEstadisticas !== false)
+const mostrarRankingConcursos = computed(() => gestionData.value?.mostrarRankingConcursosExternos !== false)
+const concursosOcultosIds = computed(() => {
+  const raw = gestionData.value?.rankingConcursosOcultos
+  return new Set(Array.isArray(raw) ? raw.map((id) => Number(id)).filter((id) => Number.isFinite(id)) : [])
+})
+const concursosTop3 = computed(() => {
+  if (!mostrarRankingConcursos.value) return []
+  const ocultos = concursosOcultosIds.value
+  return (concursos.value || []).filter((c) => !ocultos.has(Number(c.idFase)))
+})
+const statsVisibles = computed(() => {
+  if (mostrarRankingNotas.value) return stats.value
+  return stats.value.filter((s) => s.clave !== 'rankingTop' && s.label !== 'Ranking Top')
+})
 
 const abrirPodioCompleto = () => {
-  if (!rankingEfu.value.length) return
+  if (!mostrarRankingNotas.value || !rankingEfu.value.length) return
   mostrarPodioCompleto.value = true
 }
 
@@ -474,7 +488,14 @@ const cargarEstadisticas = async () => {
         
         rankingEfu.value = data.rankingEfu || []
         concursos.value = data.concursos || []
-        gestionData.value = data.gestion || {}
+        gestionData.value = {
+          ...(data.gestion || {}),
+          mostrarRankingEstadisticas: data.gestion?.mostrarRankingEstadisticas !== false,
+          mostrarRankingConcursosExternos: data.gestion?.mostrarRankingConcursosExternos !== false,
+          rankingConcursosOcultos: Array.isArray(data.gestion?.rankingConcursosOcultos)
+            ? data.gestion.rankingConcursosOcultos
+            : [],
+        }
         totalFraternidades.value = data.totalFraternidades || 0
     } catch (error) {
         console.error('Error al cargar métricas:', error)
