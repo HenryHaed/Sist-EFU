@@ -27,7 +27,31 @@
       <p class="font-bold text-slate-600 text-sm max-w-md mx-auto">{{ mensajeSinFase }}</p>
     </div>
 
+    <div
+      v-else-if="inscripcionCerrada && !insc"
+      class="rounded-3xl border border-dashed border-amber-200 bg-amber-50 p-10 text-center space-y-3"
+    >
+      <span class="material-symbols-outlined text-5xl text-amber-400 mb-1">schedule</span>
+      <p class="font-bold text-amber-900 text-sm max-w-md mx-auto">{{ mensajeCerrada }}</p>
+      <p v-if="mensajePeriodo" class="text-xs font-medium text-amber-800/80 max-w-md mx-auto">{{ mensajePeriodo }}</p>
+    </div>
+
     <template v-else-if="insc">
+      <div
+        v-if="mensajePeriodo || (inscripcionCerrada && mensajeCerrada)"
+        class="mb-6 rounded-2xl border p-4 text-sm"
+        :class="inscripcionCerrada
+          ? 'border-amber-200 bg-amber-50 text-amber-900'
+          : 'border-blue-100 bg-blue-50 text-blue-900'"
+      >
+        <p class="font-black text-[10px] uppercase tracking-widest mb-1 flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[16px]">{{ inscripcionCerrada ? 'lock_clock' : 'event_available' }}</span>
+          Periodo de inscripción
+        </p>
+        <p class="font-medium">{{ inscripcionCerrada ? mensajeCerrada : mensajePeriodo }}</p>
+        <p v-if="inscripcionCerrada && mensajePeriodo" class="mt-1 text-xs opacity-80">{{ mensajePeriodo }}</p>
+      </div>
+
       <div class="mb-6 flex flex-wrap items-center gap-3">
         <span
           class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border"
@@ -370,6 +394,9 @@ const sinFase = ref(false)
 const mensajeSinFase = ref('')
 const fraternidadNoAprobada = ref(false)
 const mensajeBloqueo = ref('')
+const inscripcionCerrada = ref(false)
+const mensajeCerrada = ref('')
+const mensajePeriodo = ref('')
 const herencia = ref(null)
 const formDatos = ref({})
 const paso = ref(1)
@@ -381,7 +408,9 @@ const steps = [
 ]
 
 const requisitos = computed(() => insc.value?.requisitos || { campos: [], documentos: [] })
-const editable = computed(() => ['BORRADOR', 'OBSERVADO'].includes(insc.value?.estado))
+const editable = computed(() =>
+  ['BORRADOR', 'OBSERVADO'].includes(insc.value?.estado) && !inscripcionCerrada.value,
+)
 
 const esCampoPareja = (clave) => /pareja/i.test(String(clave || ''))
 const esCampoHeredado = (clave) =>
@@ -432,6 +461,14 @@ const iconoDoc = (doc) => {
 }
 
 const aplicarRespuesta = (data) => {
+  const crono = data?.cronogramaInscripcion || null
+  mensajePeriodo.value = crono?.mensajePeriodo || ''
+  inscripcionCerrada.value = !!data?.inscripcionCerrada || crono?.abierto === false
+  mensajeCerrada.value =
+    data?.mensaje ||
+    crono?.mensaje ||
+    'El periodo de inscripción Chacha-Warmi no está abierto.'
+
   if (data?.fraternidadNoAprobada) {
     fraternidadNoAprobada.value = true
     mensajeBloqueo.value = data.mensaje || 'Tu fraternidad aún no está aprobada.'
@@ -444,6 +481,13 @@ const aplicarRespuesta = (data) => {
     sinFase.value = true
     fraternidadNoAprobada.value = false
     mensajeSinFase.value = data.mensaje || 'No hay fase Chacha-Warmi.'
+    insc.value = null
+    herencia.value = data.herencia || null
+    return
+  }
+  if (data?.inscripcionCerrada && !data?.idInscripcion) {
+    sinFase.value = false
+    fraternidadNoAprobada.value = false
     insc.value = null
     herencia.value = data.herencia || null
     return

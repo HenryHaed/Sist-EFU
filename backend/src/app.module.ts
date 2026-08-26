@@ -35,6 +35,8 @@ import { join } from 'path';
       useFactory: (configService: ConfigService) => {
         const nodeEnv = configService.get<string>('NODE_ENV', 'development');
         const synchronizeDefault = nodeEnv === 'production' ? 'false' : 'true';
+        // Windows: brace globs like *{.ts,.js} often resolve to [] and entities never load.
+        const entitiesDir = join(__dirname, 'entities').replace(/\\/g, '/');
         return {
         type: 'postgres',
         host: configService.get<string>('DB_HOST', 'localhost'),
@@ -42,7 +44,8 @@ import { join } from 'path';
         username: configService.get<string>('DB_USER', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', 'root'),
         database: configService.get<string>('DB_NAME', 'efu_db'),
-        entities: [__dirname + '/entities/*{.ts,.js}'],
+        entities: [`${entitiesDir}/*.ts`, `${entitiesDir}/*.js`],
+        autoLoadEntities: true,
         synchronize: configService.get<string>('TYPEORM_SYNCHRONIZE', synchronizeDefault) === 'true',
       }},
     }),

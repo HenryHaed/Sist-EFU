@@ -82,7 +82,7 @@
             <th class="px-6 py-4">Fase</th>
             <th class="px-6 py-4">Tipo</th>
             <th class="px-6 py-4">Ponderación</th>
-            <th class="px-6 py-4">Vigencia</th>
+            <th class="px-6 py-4">Calificación / Inscripción</th>
             <th class="px-6 py-4">Estado</th>
             <th class="px-6 py-4">Jurados</th>
             <th class="px-6 py-4 text-right">Acciones</th>
@@ -117,9 +117,19 @@
               </span>
             </td>
             <td class="px-6 py-4 text-xs text-slate-600 font-medium">
-              <div class="flex flex-col gap-0.5">
-                <span><span class="text-[9px] font-black text-slate-400 uppercase">Desde</span> {{ fmtFecha(fase.fechaInicio) }}</span>
-                <span><span class="text-[9px] font-black text-slate-400 uppercase">Hasta</span> {{ fmtFecha(fase.fechaFin) }}</span>
+              <div class="flex flex-col gap-1.5">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-[9px] font-black text-slate-400 uppercase">Calificación</span>
+                  <span>Desde {{ fmtFecha(fase.fechaInicio) }}</span>
+                  <span>Hasta {{ fmtFecha(fase.fechaFin) }}</span>
+                </div>
+                <div v-if="fase.tipoConcurso === 'EXTERNO'" class="flex flex-col gap-0.5 pt-1 border-t border-slate-100">
+                  <span class="text-[9px] font-black text-secondary uppercase">Inscripción</span>
+                  <span v-if="fase.fechaInicioInscripcion && fase.fechaFinInscripcion">
+                    Desde {{ fmtFecha(fase.fechaInicioInscripcion) }} · Hasta {{ fmtFecha(fase.fechaFinInscripcion) }}
+                  </span>
+                  <span v-else class="text-slate-400 italic">Sin ventana definida (abierta)</span>
+                </div>
               </div>
             </td>
             <td class="px-6 py-4">
@@ -197,8 +207,18 @@
           </div>
 
           <div class="pl-2 flex flex-col gap-1 text-[10px] text-slate-600 bg-white p-2 rounded-lg border border-slate-100">
-            <div class="flex justify-between"><span class="font-black uppercase tracking-widest">Inicio:</span> <span>{{ fmtFecha(fase.fechaInicio) }}</span></div>
-            <div class="flex justify-between"><span class="font-black uppercase tracking-widest">Fin:</span> <span>{{ fmtFecha(fase.fechaFin) }}</span></div>
+            <div class="flex justify-between"><span class="font-black uppercase tracking-widest">Calif. inicio:</span> <span>{{ fmtFecha(fase.fechaInicio) }}</span></div>
+            <div class="flex justify-between"><span class="font-black uppercase tracking-widest">Calif. fin:</span> <span>{{ fmtFecha(fase.fechaFin) }}</span></div>
+            <template v-if="fase.tipoConcurso === 'EXTERNO'">
+              <div class="flex justify-between border-t border-slate-100 pt-1 mt-0.5">
+                <span class="font-black uppercase tracking-widest text-secondary">Insc. inicio:</span>
+                <span>{{ fase.fechaInicioInscripcion ? fmtFecha(fase.fechaInicioInscripcion) : '—' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="font-black uppercase tracking-widest text-secondary">Insc. fin:</span>
+                <span>{{ fase.fechaFinInscripcion ? fmtFecha(fase.fechaFinInscripcion) : '—' }}</span>
+              </div>
+            </template>
           </div>
 
           <div class="pl-2 flex items-center justify-between">
@@ -441,12 +461,37 @@
                 </div>
               </div>
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha y hora inicio</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Inicio calificación (jurados)</label>
                 <input v-model="form.fechaInicio" type="datetime-local" class="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
               </div>
               <div>
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fecha y hora fin</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fin calificación (jurados)</label>
                 <input v-model="form.fechaFin" type="datetime-local" class="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" />
+              </div>
+            </div>
+
+            <div
+              v-if="form.tipoConcurso === 'EXTERNO'"
+              class="rounded-2xl border border-secondary/20 bg-red-50/40 p-4 space-y-3"
+            >
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-secondary mb-1">Periodo de inscripción</p>
+                <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
+                  {{ esFaseChachaWarmi({ nombre: form.nombre, plantillaRequisitos: form.plantillaRequisitos })
+                    ? 'Define cuándo los delegados pueden inscribir a sus participantes Chacha-Warmi.'
+                    : 'Define cuándo los concursantes pueden completar su inscripción.' }}
+                  Si dejas ambas vacías, la inscripción permanece abierta.
+                </p>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Inicio inscripción</label>
+                  <input v-model="form.fechaInicioInscripcion" type="datetime-local" class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm" />
+                </div>
+                <div>
+                  <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fin inscripción</label>
+                  <input v-model="form.fechaFinInscripcion" type="datetime-local" class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm" />
+                </div>
               </div>
             </div>
 
@@ -575,6 +620,8 @@ const form = ref({
   pesoPorcentaje: 20,
   fechaInicio: '',
   fechaFin: '',
+  fechaInicioInscripcion: '',
+  fechaFinInscripcion: '',
   estaActiva: true,
   urlImagen: '',
   juradosIds: [],
@@ -744,6 +791,8 @@ const abrirModal = (item = null) => {
       pesoPorcentaje: Number(item.pesoPorcentaje),
       fechaInicio: toLocalISOString(item.fechaInicio),
       fechaFin: toLocalISOString(item.fechaFin),
+      fechaInicioInscripcion: toLocalISOString(item.fechaInicioInscripcion),
+      fechaFinInscripcion: toLocalISOString(item.fechaFinInscripcion),
       estaActiva: item.estaActiva,
       urlImagen: item.urlImagen || '',
       juradosIds: item.jurados?.map(j => j.idJurado) || [],
@@ -766,7 +815,8 @@ const abrirModal = (item = null) => {
     editandoId.value = null
     form.value = {
       nombre: '', tipoConcurso: 'EFU', pesoPorcentaje: 20,
-      fechaInicio: '', fechaFin: '', estaActiva: true, urlImagen: '', juradosIds: [],
+      fechaInicio: '', fechaFin: '', fechaInicioInscripcion: '', fechaFinInscripcion: '',
+      estaActiva: true, urlImagen: '', juradosIds: [],
       plantillaRequisitos: 'generico', clavesCampos: [], clavesDocumentos: [],
     }
   }
@@ -802,7 +852,17 @@ const guardar = async () => {
   }
   if (form.value.fechaInicio && form.value.fechaFin) {
     if (new Date(form.value.fechaFin) < new Date(form.value.fechaInicio)) {
-      return notify.error('Error Lógico', 'La fecha de fin debe ser estrictamente posterior o igual a la fecha de inicio.')
+      return notify.error('Error Lógico', 'La fecha fin de calificación debe ser posterior o igual a la de inicio.')
+    }
+  }
+  if (form.value.tipoConcurso === 'EXTERNO') {
+    const iniIns = form.value.fechaInicioInscripcion
+    const finIns = form.value.fechaFinInscripcion
+    if ((iniIns && !finIns) || (!iniIns && finIns)) {
+      return notify.error('Error', 'Indica inicio y fin de inscripción, o deja ambos vacíos.')
+    }
+    if (iniIns && finIns && new Date(finIns) < new Date(iniIns)) {
+      return notify.error('Error Lógico', 'La fecha fin de inscripción debe ser posterior o igual a la de inicio.')
     }
   }
 
@@ -815,6 +875,8 @@ const guardar = async () => {
       delete payloadInfo.plantillaRequisitos
       delete payloadInfo.clavesCampos
       delete payloadInfo.clavesDocumentos
+      delete payloadInfo.fechaInicioInscripcion
+      delete payloadInfo.fechaFinInscripcion
     }
     
     const formData = new FormData()

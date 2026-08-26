@@ -113,6 +113,8 @@ export class EvaluacionesService {
         pesoPorcentaje: f.pesoPorcentaje,
         fechaInicio: f.fechaInicio,
         fechaFin: f.fechaFin,
+        fechaInicioInscripcion: f.fechaInicioInscripcion || null,
+        fechaFinInscripcion: f.fechaFinInscripcion || null,
         estaActiva: f.estaActiva,
         urlImagen: f.urlImagen,
         plantillaRequisitos: f.plantillaRequisitos || null,
@@ -831,6 +833,10 @@ export class EvaluacionesService {
           esPrecalificacion: fase.esPrecalificacion,
           fechaInicio: fase.fechaInicio,
           fechaFin: fase.fechaFin,
+          fechaInicioInscripcion: fase.fechaInicioInscripcion,
+          fechaFinInscripcion: fase.fechaFinInscripcion,
+          plantillaRequisitos: fase.plantillaRequisitos,
+          requisitosInscripcion: fase.requisitosInscripcion,
           estaActiva: false,
           gestion: { idGestion: idDestino } as any,
         });
@@ -1116,12 +1122,45 @@ export class EvaluacionesService {
   }
 
   // --- CRUD HELPERS ---
+  private normalizarFechasFase(payload: any) {
+    const toDateOrNull = (v: unknown) => {
+      if (v === undefined) return undefined;
+      if (v === null || v === '') return null;
+      const d = new Date(String(v));
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+    if ('fechaInicio' in payload) payload.fechaInicio = toDateOrNull(payload.fechaInicio);
+    if ('fechaFin' in payload) payload.fechaFin = toDateOrNull(payload.fechaFin);
+    if ('fechaInicioInscripcion' in payload) {
+      payload.fechaInicioInscripcion = toDateOrNull(payload.fechaInicioInscripcion);
+    }
+    if ('fechaFinInscripcion' in payload) {
+      payload.fechaFinInscripcion = toDateOrNull(payload.fechaFinInscripcion);
+    }
+
+    const iniCal = payload.fechaInicio ?? undefined;
+    const finCal = payload.fechaFin ?? undefined;
+    if (iniCal && finCal && finCal < iniCal) {
+      throw new BadRequestException('La fecha fin de calificación debe ser posterior al inicio.');
+    }
+
+    const iniIns = payload.fechaInicioInscripcion ?? undefined;
+    const finIns = payload.fechaFinInscripcion ?? undefined;
+    if ((iniIns && !finIns) || (!iniIns && finIns)) {
+      throw new BadRequestException('Debes indicar inicio y fin de inscripción, o ninguno.');
+    }
+    if (iniIns && finIns && finIns < iniIns) {
+      throw new BadRequestException('La fecha fin de inscripción debe ser posterior al inicio.');
+    }
+  }
+
   async createFase(data: any) {
     const gestion = data.gestionId ? await this.gestionRepo.findOne({ where: { idGestion: data.gestionId } }) : await this.getGestionActiva();
     if (!gestion) throw new NotFoundException('No gestion');
 
     const { gestionId, juradosIds, clavesCampos, clavesDocumentos, ...rest } = data;
     const payload: any = { ...rest, gestion };
+    this.normalizarFechasFase(payload);
 
     if (payload.tipoConcurso === 'EXTERNO') {
       const { buildRequisitosFromSeleccion, normalizarRequisitos } = await import('../common/requisitos-concurso');
@@ -1144,6 +1183,8 @@ export class EvaluacionesService {
     } else {
       payload.plantillaRequisitos = null;
       payload.requisitosInscripcion = null;
+      payload.fechaInicioInscripcion = null;
+      payload.fechaFinInscripcion = null;
     }
 
     const f = await this.faseRepo.save(this.faseRepo.create(payload));
@@ -1161,6 +1202,7 @@ export class EvaluacionesService {
 
     const { gestionId, juradosIds, clavesCampos, clavesDocumentos, ...rest } = data;
     const payload: any = { ...rest };
+    this.normalizarFechasFase(payload);
 
     if ((payload.tipoConcurso || f.tipoConcurso) === 'EXTERNO') {
       const { buildRequisitosFromSeleccion, normalizarRequisitos } = await import('../common/requisitos-concurso');
@@ -1173,6 +1215,11 @@ export class EvaluacionesService {
           clavesDocumentos,
         );
       }
+    } else if (payload.tipoConcurso === 'EFU') {
+      payload.plantillaRequisitos = null;
+      payload.requisitosInscripcion = null;
+      payload.fechaInicioInscripcion = null;
+      payload.fechaFinInscripcion = null;
     }
 
     Object.assign(f, payload);

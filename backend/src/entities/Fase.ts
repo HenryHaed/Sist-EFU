@@ -35,6 +35,13 @@ export class Fase {
     @Column({ name: 'fecha_fin', type: 'timestamp', nullable: true })
     fechaFin: Date;
 
+    /** Periodo en que delegados (Chacha) o concursantes pueden inscribirse. */
+    @Column({ name: 'fecha_inicio_inscripcion', type: 'timestamp', nullable: true })
+    fechaInicioInscripcion: Date;
+
+    @Column({ name: 'fecha_fin_inscripcion', type: 'timestamp', nullable: true })
+    fechaFinInscripcion: Date;
+
     @Column({ name: 'esta_activa', type: 'boolean', default: false })
     estaActiva: boolean;
 

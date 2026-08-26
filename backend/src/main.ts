@@ -104,6 +104,14 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     ALTER TABLE fases
     ADD COLUMN IF NOT EXISTS requisitos_inscripcion jsonb NULL
   `);
+  await runPatch(dataSource, 'fases.fecha_inicio_inscripcion', `
+    ALTER TABLE fases
+    ADD COLUMN IF NOT EXISTS fecha_inicio_inscripcion timestamp NULL
+  `);
+  await runPatch(dataSource, 'fases.fecha_fin_inscripcion', `
+    ALTER TABLE fases
+    ADD COLUMN IF NOT EXISTS fecha_fin_inscripcion timestamp NULL
+  `);
 
   await runPatch(dataSource, 'usuarios.id_fase_concurso', `
     ALTER TABLE usuarios

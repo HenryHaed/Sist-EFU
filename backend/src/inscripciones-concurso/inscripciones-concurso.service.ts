@@ -31,6 +31,7 @@ import {
   esPlantillaParaConcursante,
   asegurarDocumentosChachaWarmi,
 } from '../common/requisitos-concurso';
+import { estadoVentanaInscripcionFase } from '../common/cronograma-actividad';
 
 @Injectable()
 export class InscripcionesConcursoService {
@@ -84,6 +85,36 @@ export class InscripcionesConcursoService {
         'Solo puedes editar la inscripción en estado BORRADOR u OBSERVADO.',
       );
     }
+  }
+
+  private ventanaInscripcionDeFase(fase?: Fase | null) {
+    return estadoVentanaInscripcionFase(
+      fase?.fechaInicioInscripcion,
+      fase?.fechaFinInscripcion,
+    );
+  }
+
+  private assertInscripcionAbierta(fase?: Fase | null) {
+    const ventana = this.ventanaInscripcionDeFase(fase);
+    if (!ventana.abierto) {
+      throw new BadRequestException(
+        ventana.mensaje ||
+          'No está en el cronograma respectivo para la inscripción al concurso.',
+      );
+    }
+    return ventana;
+  }
+
+  private cronogramaInscripcionPayload(fase?: Fase | null) {
+    const ventana = this.ventanaInscripcionDeFase(fase);
+    return {
+      definido: ventana.definido,
+      abierto: ventana.abierto,
+      fechaInicio: ventana.fechaInicio,
+      fechaFin: ventana.fechaFin,
+      mensaje: ventana.mensaje,
+      mensajePeriodo: ventana.mensajePeriodo,
+    };
   }
 
   private validarMime(docReq: { etiqueta: string; mime?: string[] }, file: Express.Multer.File) {
@@ -187,24 +218,46 @@ export class InscripcionesConcursoService {
       );
     }
 
+    const fase = usuario.faseConcurso;
+    const cronogramaInscripcion = this.cronogramaInscripcionPayload(fase);
+
     let insc = await this.inscRepo.findOne({
       where: {
         usuario: { idUsuario },
-        fase: { idFase: usuario.faseConcurso.idFase },
+        fase: { idFase: fase.idFase },
       },
       relations: ['fase', 'archivos', 'gestion', 'participante', 'fraternidad'],
     });
 
     if (!insc) {
+      if (!cronogramaInscripcion.abierto) {
+        return {
+          sinInscripcion: true,
+          inscripcionCerrada: true,
+          cronogramaInscripcion,
+          mensaje:
+            cronogramaInscripcion.mensaje ||
+            'El periodo de inscripción al concurso no está abierto.',
+          fase: {
+            idFase: fase.idFase,
+            nombre: fase.nombre,
+            tipoConcurso: fase.tipoConcurso,
+            plantillaRequisitos: fase.plantillaRequisitos,
+          },
+          requisitos: this.requisitosDeFase(fase),
+          fraternidad: this.fraternidadResumen(usuario.fraternidad),
+        };
+      }
+
       const gestion =
-        usuario.faseConcurso.gestion ||
+        fase.gestion ||
         (await findGestionActivaOrLatest(this.gestionRepo));
       if (!gestion) throw new BadRequestException('No hay gestión activa.');
 
       insc = await this.inscRepo.save(
         this.inscRepo.create({
           usuario,
-          fase: usuario.faseConcurso,
+          fase,
           gestion: { idGestion: (gestion as any).idGestion } as any,
           estado: EstadoInscripcionConcurso.BORRADOR,
           datos: {},
@@ -219,6 +272,8 @@ export class InscripcionesConcursoService {
 
     return this.toResponse(insc, {
       fraternidad: this.fraternidadResumen(usuario.fraternidad || insc.fraternidad),
+      cronogramaInscripcion,
+      inscripcionCerrada: !cronogramaInscripcion.abierto,
     });
   }
 
@@ -231,11 +286,24 @@ export class InscripcionesConcursoService {
 
   private async getMiInscripcionEditable(idUsuario: number) {
     const wrap = await this.getMiInscripcion(idUsuario);
+    if ((wrap as any).inscripcionCerrada || (wrap as any).sinInscripcion) {
+      throw new BadRequestException(
+        (wrap as any).mensaje ||
+          (wrap as any).cronogramaInscripcion?.mensaje ||
+          'El periodo de inscripción al concurso no está abierto.',
+      );
+    }
+    const idInscripcion = Number((wrap as any).idInscripcion);
+    if (!Number.isFinite(idInscripcion) || idInscripcion <= 0) {
+      throw new BadRequestException('No hay inscripción editable disponible.');
+    }
     const insc = await this.inscRepo.findOne({
-      where: { idInscripcion: wrap.idInscripcion },
+      where: { idInscripcion },
       relations: ['fase', 'archivos', 'usuario'],
     });
+    if (!insc) throw new NotFoundException('Inscripción no encontrada.');
     this.assertEditable(insc.estado);
+    this.assertInscripcionAbierta(insc.fase);
     return insc;
   }
 
@@ -256,10 +324,23 @@ export class InscripcionesConcursoService {
 
   async enviar(idUsuario: number) {
     const wrap = await this.getMiInscripcion(idUsuario);
+    if ((wrap as any).inscripcionCerrada || (wrap as any).sinInscripcion) {
+      throw new BadRequestException(
+        (wrap as any).mensaje ||
+          (wrap as any).cronogramaInscripcion?.mensaje ||
+          'El periodo de inscripción al concurso no está abierto.',
+      );
+    }
+    const idInscripcion = Number((wrap as any).idInscripcion);
+    if (!Number.isFinite(idInscripcion) || idInscripcion <= 0) {
+      throw new BadRequestException('No hay inscripción disponible para enviar.');
+    }
     const insc = await this.inscRepo.findOne({
-      where: { idInscripcion: wrap.idInscripcion },
+      where: { idInscripcion },
       relations: ['fase', 'archivos'],
     });
+    if (!insc) throw new NotFoundException('Inscripción no encontrada.');
+    this.assertInscripcionAbierta(insc.fase);
     this.validarYMarcarPendiente(insc);
     await this.inscRepo.save(insc);
     return this.getMiInscripcion(idUsuario);
@@ -547,6 +628,8 @@ export class InscripcionesConcursoService {
       };
     }
 
+    const cronogramaInscripcion = this.cronogramaInscripcionPayload(fase);
+
     let insc = await this.findInscripcionChacha({
       idFraternidad: frat.idFraternidad,
       idFase: fase.idFase,
@@ -556,6 +639,28 @@ export class InscripcionesConcursoService {
     const datosConHerencia = this.aplicarHerenciaEnDatos(insc?.datos, herencia);
 
     if (!insc) {
+      if (!cronogramaInscripcion.abierto) {
+        return {
+          sinFase: false,
+          fraternidadNoAprobada: false,
+          inscripcionCerrada: true,
+          cronogramaInscripcion,
+          mensaje:
+            cronogramaInscripcion.mensaje ||
+            'El periodo de inscripción Chacha-Warmi no está abierto.',
+          requisitos: this.requisitosDeFase(fase),
+          insc: null,
+          herencia,
+          fraternidad: this.fraternidadResumen(frat),
+          fase: {
+            idFase: fase.idFase,
+            nombre: fase.nombre,
+            tipoConcurso: fase.tipoConcurso,
+            plantillaRequisitos: fase.plantillaRequisitos,
+          },
+        };
+      }
+
       try {
         const created = await this.inscRepo.save(
           this.inscRepo.create({
@@ -620,6 +725,8 @@ export class InscripcionesConcursoService {
       fraternidad: this.fraternidadResumen(frat),
       herencia,
       camposHeredados: ['facultadCarrera', 'facultadCarreraPareja', 'instanciaRepresentacion'],
+      cronogramaInscripcion,
+      inscripcionCerrada: !cronogramaInscripcion.abierto,
     });
   }
 
@@ -636,11 +743,19 @@ export class InscripcionesConcursoService {
         (wrap as any).mensaje || 'No hay fase Chacha-Warmi disponible.',
       );
     }
+    if ((wrap as any).inscripcionCerrada) {
+      throw new BadRequestException(
+        (wrap as any).mensaje ||
+          (wrap as any).cronogramaInscripcion?.mensaje ||
+          'El periodo de inscripción Chacha-Warmi no está abierto.',
+      );
+    }
     const insc = await this.inscRepo.findOne({
       where: { idInscripcion: (wrap as any).idInscripcion },
       relations: ['fase', 'archivos', 'usuario', 'fraternidad'],
     });
     this.assertEditable(insc.estado);
+    this.assertInscripcionAbierta(insc.fase);
     return insc;
   }
 
@@ -689,6 +804,13 @@ export class InscripcionesConcursoService {
         (wrap as any).mensaje || 'No hay fase Chacha-Warmi disponible.',
       );
     }
+    if ((wrap as any).inscripcionCerrada) {
+      throw new BadRequestException(
+        (wrap as any).mensaje ||
+          (wrap as any).cronogramaInscripcion?.mensaje ||
+          'El periodo de inscripción Chacha-Warmi no está abierto.',
+      );
+    }
     const insc = await this.inscRepo.findOne({
       where: { idInscripcion: (wrap as any).idInscripcion },
       relations: [
@@ -703,6 +825,7 @@ export class InscripcionesConcursoService {
         'gestion',
       ],
     });
+    this.assertInscripcionAbierta(insc.fase);
     this.validarYMarcarPendiente(insc);
     // Al enviar, ya se registran Chacha + Warmi para Concursantes y calificación.
     if (esFaseChachaWarmi(insc.fase)) {
