@@ -11,15 +11,26 @@
         </div>
       </div>
       
-      <!-- Contador Global -->
-      <div 
-        class="flex items-center gap-3 px-4 py-2 border rounded-xl"
-        :class="urgenciaStatus.bgClass"
-      >
-        <span class="material-symbols-outlined animate-pulse" :class="urgenciaStatus.textClass">schedule</span>
-        <div>
-          <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo Restante de Fase</p>
-          <p class="text-sm font-black" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
+      <!-- Contador + panel admin -->
+      <div class="flex flex-col xs:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+        <button
+          v-if="esAdmin"
+          type="button"
+          @click="abrirPanelAdmin()"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 font-black text-[10px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+        >
+          <span class="material-symbols-outlined text-[18px]">monitoring</span>
+          Calificaciones admin
+        </button>
+        <div 
+          class="flex items-center gap-3 px-4 py-2.5 border rounded-xl w-full sm:w-auto"
+          :class="urgenciaStatus.bgClass"
+        >
+          <span class="material-symbols-outlined animate-pulse" :class="urgenciaStatus.textClass">schedule</span>
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo Restante de Fase</p>
+            <p class="text-sm font-black" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -141,6 +152,17 @@
                       <span class="material-symbols-outlined text-[20px]">download</span>
                     </a>
                   </template>
+
+                  <!-- Botón resumen admin -->
+                  <button
+                    v-if="esAdmin"
+                    type="button"
+                    @click="abrirPanelAdmin(item.idFraternidad)"
+                    title="Ver calificaciones de todos los jurados y admins"
+                    class="inline-flex size-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors"
+                  >
+                    <span class="material-symbols-outlined text-[20px]">monitoring</span>
+                  </button>
 
                   <!-- Botón Principal de Calificar -->
                   <button 
@@ -271,6 +293,16 @@
                   <span class="material-symbols-outlined text-[16px]">visibility</span>
                 </button>
               </template>
+
+              <button
+                v-if="esAdmin"
+                type="button"
+                @click="abrirPanelAdmin(item.idFraternidad)"
+                class="flex-1 inline-flex items-center justify-center gap-1 py-2.5 rounded-xl bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200"
+                title="Ver calificaciones"
+              >
+                <span class="material-symbols-outlined text-[16px]">monitoring</span>
+              </button>
               
               <!-- Evaluar Mobile -->
               <button 
@@ -301,6 +333,17 @@
       :url="pdfUrlActual" 
       :titulo="pdfTituloActual"
       @cerrar="visorPdfAbierto = false" 
+    />
+
+    <ModalResumenCalificacionesAdmin
+      v-if="modalResumenAdmin"
+      :key="modalAdminKey"
+      v-model="modalResumenAdmin"
+      :id-fase="props.faseSeleccionada.idFase"
+      :nombre-fase="fase?.nombre || props.faseSeleccionada?.nombre"
+      tipo-concurso="EFU"
+      :initial-id-fraternidad="resumenAdminIdFraternidad"
+      @actas-cerradas="cargarFaseData"
     />
 
     <!-- MODAL DE SANCIONES GRAVES -->
@@ -394,10 +437,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Swal from 'sweetalert2'
 import api from '../services/api'
 import PdfViewerModal from '../components/PdfViewerModal.vue'
+import ModalResumenCalificacionesAdmin from '../components/ModalResumenCalificacionesAdmin.vue'
 import { getImageUrl } from '../utils/url'
 import { useAuthStore } from '../store/auth'
 
 const authStore = useAuthStore()
+const esAdmin = computed(() => ['admin', 'superusuario'].includes(authStore.userRole))
 const props = defineProps({
   faseSeleccionada: {
     type: Object,
@@ -432,6 +477,17 @@ let timerInterval = null
 const visorPdfAbierto = ref(false)
 const pdfUrlActual = ref('')
 const pdfTituloActual = ref('')
+
+// Resumen calificaciones (admin)
+const modalResumenAdmin = ref(false)
+const modalAdminKey = ref(0)
+const resumenAdminIdFraternidad = ref(null)
+
+const abrirPanelAdmin = (idFraternidad = null) => {
+  resumenAdminIdFraternidad.value = idFraternidad
+  modalAdminKey.value += 1
+  modalResumenAdmin.value = true
+}
 
 // Disciplina / Sanciones
 const modalSanciones = ref(false)

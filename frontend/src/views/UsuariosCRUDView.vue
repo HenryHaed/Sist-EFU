@@ -254,7 +254,7 @@
     </div>
 
     <!-- Modal Save User -->
-    <v-dialog v-model="modalOpen" max-width="860" max-height="90dvh" scrollable persistent>
+    <v-dialog v-model="modalOpen" :max-width="esRolJurado ? 960 : 860" max-height="90dvh" scrollable persistent>
       <v-card class="rounded-xl overflow-hidden border border-slate-200 flex flex-col max-h-[90dvh]">
         <v-card-title class="bg-slate-50 border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between shrink-0">
           <h3 class="font-black text-slate-900 text-base sm:text-lg pr-2">{{ editando ? (esRolJurado ? 'Editar Jurado' : 'Editar Usuario') : (esRolJurado ? 'Nuevo Jurado' : 'Nuevo Usuario') }}</h3>
@@ -328,6 +328,9 @@
                 </label>
                 <input v-model="form.password" type="password" placeholder="••••••••"
                   class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:border-primary outline-none transition-all" />
+                <p class="text-[9px] text-slate-400 mt-1">
+                  Mín. 8 caracteres, mayúscula, minúscula y número. El usuario deberá usarla en el próximo inicio de sesión.
+                </p>
               </div>
 
               <!-- ════ PANEL JURADO ════ -->
@@ -402,23 +405,141 @@
                 </div>
 
                 <!-- Fraternidades habilitadas (SOLO SI tiene fases EFU) -->
-                <div v-if="form.fasesEfuIds.length > 0">
-                  <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-                    Restricción de Fraternidades
-                    <span class="text-slate-300 normal-case font-normal">(Vacío = acceso a todas)</span>
-                  </label>
-                  <div class="bg-slate-50 border-2 border-slate-100 rounded-xl p-3 max-h-40 overflow-y-auto space-y-1">
-                    <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-200">
-                      <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fraternidades</p>
-                      <button type="button" @click="form.fraternidadesIds = []"
-                        class="text-[9px] text-primary font-bold hover:underline">Limpiar</button>
+                <div v-if="form.fasesEfuIds.length > 0" class="border border-primary/20 rounded-2xl overflow-hidden bg-white shadow-sm">
+                  <div class="bg-primary/5 px-4 py-3 border-b border-primary/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <p class="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]">groups</span>
+                        Fraternidades a calificar
+                      </p>
+                      <p class="text-[10px] text-slate-500 mt-0.5">
+                        Sin selección = el jurado puede calificar <strong>todas</strong> las fraternidades habilitadas.
+                      </p>
                     </div>
-                    <label v-for="frat in todasFraternidades" :key="frat.idFraternidad"
-                      class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white transition-all">
-                      <input type="checkbox" :value="frat.idFraternidad" v-model="form.fraternidadesIds"
-                        class="size-4 accent-primary rounded" />
-                      <p class="text-sm font-bold text-slate-700">{{ frat.nombre }}</p>
-                    </label>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-white border border-primary/20 text-primary">
+                        {{ form.fraternidadesIds.length }} / {{ todasFraternidades.length }} asignadas
+                      </span>
+                      <button
+                        type="button"
+                        @click="form.fraternidadesIds = []"
+                        class="text-[10px] font-bold text-slate-500 hover:text-primary transition-colors"
+                      >
+                        Limpiar todo
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="fraternidadesJuradoSeleccionadas.length" class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                    <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Seleccionadas</p>
+                    <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar">
+                      <button
+                        v-for="frat in fraternidadesJuradoSeleccionadas"
+                        :key="'chip-' + frat.idFraternidad"
+                        type="button"
+                        @click="quitarFraternidadJurado(frat.idFraternidad)"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold hover:bg-primary/15 transition-colors max-w-full"
+                        :title="'Quitar ' + frat.nombre"
+                      >
+                        <span class="truncate">{{ frat.nombre }}</span>
+                        <span class="material-symbols-outlined text-[14px] shrink-0">close</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="p-4 space-y-3 border-b border-slate-100">
+                    <div class="relative">
+                      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
+                      <input
+                        v-model="busquedaFraternidadesJurado"
+                        type="search"
+                        placeholder="Buscar por nombre, categoría, facultad o carrera…"
+                        class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-primary focus:bg-white transition-all"
+                      />
+                    </div>
+
+                    <div v-if="categoriasFraternidadesJurado.length > 1" class="flex gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar">
+                      <button
+                        type="button"
+                        @click="categoriaFiltroJurado = ''"
+                        class="shrink-0 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors"
+                        :class="!categoriaFiltroJurado ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                      >
+                        Todas
+                      </button>
+                      <button
+                        v-for="cat in categoriasFraternidadesJurado"
+                        :key="cat"
+                        type="button"
+                        @click="categoriaFiltroJurado = cat"
+                        class="shrink-0 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors"
+                        :class="categoriaFiltroJurado === cat ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                      >
+                        {{ cat }}
+                      </button>
+                    </div>
+
+                    <div class="flex flex-col xs:flex-row gap-2">
+                      <button
+                        type="button"
+                        @click="seleccionarFraternidadesVisibles"
+                        :disabled="!fraternidadesJuradoFiltradas.length"
+                        class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                      >
+                        Seleccionar visibles ({{ fraternidadesJuradoFiltradas.length }})
+                      </button>
+                      <button
+                        type="button"
+                        @click="deseleccionarFraternidadesVisibles"
+                        :disabled="!fraternidadesJuradoFiltradas.length"
+                        class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                      >
+                        Quitar visibles
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="max-h-56 sm:max-h-72 overflow-y-auto custom-scrollbar p-3 bg-slate-50/50">
+                    <div v-if="!todasFraternidades.length" class="py-10 text-center text-xs text-slate-400 italic">
+                      No hay fraternidades habilitadas en la gestión activa.
+                    </div>
+                    <div v-else-if="!fraternidadesJuradoFiltradas.length" class="py-10 text-center">
+                      <span class="material-symbols-outlined text-4xl text-slate-300 mb-2">search_off</span>
+                      <p class="text-xs font-bold text-slate-500">Sin resultados para la búsqueda o categoría.</p>
+                    </div>
+                    <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        v-for="frat in fraternidadesJuradoFiltradas"
+                        :key="frat.idFraternidad"
+                        type="button"
+                        @click="toggleFraternidadJurado(frat.idFraternidad)"
+                        class="text-left rounded-xl border px-3 py-2.5 flex items-start gap-3 transition-all"
+                        :class="form.fraternidadesIds.includes(frat.idFraternidad)
+                          ? 'bg-primary/5 border-primary/40 shadow-sm ring-1 ring-primary/20'
+                          : 'bg-white border-slate-200 hover:border-primary/30 hover:shadow-sm'"
+                      >
+                        <span
+                          class="size-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors"
+                          :class="form.fraternidadesIds.includes(frat.idFraternidad)
+                            ? 'bg-primary border-primary text-white'
+                            : 'border-slate-300 bg-white'"
+                        >
+                          <span
+                            v-if="form.fraternidadesIds.includes(frat.idFraternidad)"
+                            class="material-symbols-outlined text-[14px]"
+                          >check</span>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <p class="text-sm font-bold text-slate-800 leading-tight truncate">{{ frat.nombre }}</p>
+                          <p v-if="frat.categoria?.nombre" class="text-[10px] font-black uppercase tracking-widest text-primary/70 mt-0.5 truncate">
+                            {{ frat.categoria.nombre }}
+                          </p>
+                          <p v-if="etiquetaFraternidadJurado(frat)" class="text-[10px] text-slate-500 mt-0.5 truncate">
+                            {{ etiquetaFraternidadJurado(frat) }}
+                          </p>
+                        </div>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -575,6 +696,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import api from '../services/api'
 import Swal from 'sweetalert2'
 import { validarCiUsuario, normalizarCiUsuario } from '../utils/ciUsuario'
+import { getPasswordPolicyErrors } from '../utils/passwordPolicy'
 
 const props = defineProps({
   rolFiltro: { type: String, required: true }
@@ -600,6 +722,8 @@ const rolDeFiltro = () =>
 const fraternidadBusqueda = ref('')
 const fraternidadSugerencias = ref([])
 const cargandoFraternidades = ref(false)
+const busquedaFraternidadesJurado = ref('')
+const categoriaFiltroJurado = ref('')
 let fraternidadBusquedaTimeout = null
 const loading = ref(true)
 const saving = ref(false)
@@ -651,6 +775,73 @@ const fasesConcursante = computed(() =>
     (f) => String(f.plantillaRequisitos || '').toLowerCase() !== 'chacha_warmi',
   ),
 )
+
+const fraternidadesJuradoFiltradas = computed(() => {
+  const q = normalizarBusqueda(busquedaFraternidadesJurado.value)
+  const cat = categoriaFiltroJurado.value
+  return todasFraternidades.value.filter((f) => {
+    const nombreCat = f.categoria?.nombre || 'Sin categoría'
+    if (cat && nombreCat !== cat) return false
+    if (!q) return true
+    const haystack = [
+      f.nombre,
+      nombreCat,
+      f.facultad?.nombre,
+      f.carrera?.nombre,
+      f.nivelRepresentacion,
+      f.institucionExterna?.nombre,
+    ].filter(Boolean).join(' ')
+    return normalizarBusqueda(haystack).includes(q)
+  })
+})
+
+const categoriasFraternidadesJurado = computed(() => {
+  const set = new Set()
+  for (const f of todasFraternidades.value) {
+    set.add(f.categoria?.nombre || 'Sin categoría')
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
+})
+
+const fraternidadesJuradoSeleccionadas = computed(() =>
+  todasFraternidades.value.filter((f) => form.value.fraternidadesIds.includes(f.idFraternidad)),
+)
+
+const etiquetaFraternidadJurado = (frat) => {
+  const nivel = (frat.nivelRepresentacion || '').trim()
+  if (nivel === 'Carrera') {
+    const partes = [frat.facultad?.nombre, frat.carrera?.nombre].filter(Boolean)
+    return partes.length ? partes.join(' · ') : ''
+  }
+  if (nivel === 'Facultad') return frat.facultad?.nombre || ''
+  if (nivel === 'Institución Externa') return frat.institucionExterna?.nombre || ''
+  return frat.facultad?.nombre || frat.carrera?.nombre || ''
+}
+
+const toggleFraternidadJurado = (id) => {
+  const idx = form.value.fraternidadesIds.indexOf(id)
+  if (idx >= 0) form.value.fraternidadesIds.splice(idx, 1)
+  else form.value.fraternidadesIds.push(id)
+}
+
+const quitarFraternidadJurado = (id) => {
+  form.value.fraternidadesIds = form.value.fraternidadesIds.filter((x) => x !== id)
+}
+
+const seleccionarFraternidadesVisibles = () => {
+  const ids = fraternidadesJuradoFiltradas.value.map((f) => f.idFraternidad)
+  form.value.fraternidadesIds = Array.from(new Set([...form.value.fraternidadesIds, ...ids]))
+}
+
+const deseleccionarFraternidadesVisibles = () => {
+  const visible = new Set(fraternidadesJuradoFiltradas.value.map((f) => f.idFraternidad))
+  form.value.fraternidadesIds = form.value.fraternidadesIds.filter((id) => !visible.has(id))
+}
+
+const resetFiltrosFraternidadesJurado = () => {
+  busquedaFraternidadesJurado.value = ''
+  categoriaFiltroJurado.value = ''
+}
 
 const usuariosDelRol = computed(() =>
   usuarios.value.filter((u) => u.rol?.nombre === props.rolFiltro),
@@ -757,14 +948,17 @@ const cargarDatos = async () => {
       }
     }
 
-    // Enriquecer usuarios jurado con su perfil
+    // Enriquecer usuarios jurado con su perfil (en paralelo)
     if (props.rolFiltro === 'jurado') {
-      for (const u of usuarios.value.filter(u => u.rol?.nombre === 'jurado')) {
+      const listaJurados = usuarios.value.filter((u) => u.rol?.nombre === 'jurado')
+      await Promise.all(listaJurados.map(async (u) => {
         try {
           const { data } = await api.get(`/usuarios/${u.idUsuario}/perfil-jurado`)
           u._perfil = data
-        } catch { u._perfil = null }
-      }
+        } catch {
+          u._perfil = null
+        }
+      }))
     }
   } catch (error) {
     console.error('Error cargando datos de usuarios', error)
@@ -799,6 +993,7 @@ const abrirModal = async (modoEdicion, usuario = null) => {
     }
     fraternidadBusqueda.value = usuario.fraternidad?.nombre || ''
     fraternidadSugerencias.value = []
+    resetFiltrosFraternidadesJurado()
     asegurarFraternidadSeleccionada(usuario.fraternidad)
   } else {
     ciOriginalAlAbrir.value = ''
@@ -831,6 +1026,7 @@ const abrirModal = async (modoEdicion, usuario = null) => {
     }
     fraternidadBusqueda.value = ''
     fraternidadSugerencias.value = []
+    resetFiltrosFraternidadesJurado()
   }
   modalOpen.value = true
 }
@@ -839,6 +1035,7 @@ const cerrarModal = () => {
   modalOpen.value = false
   fraternidadBusqueda.value = ''
   fraternidadSugerencias.value = []
+  resetFiltrosFraternidadesJurado()
 }
 
 // ── Guardar ───────────────────────────────────────────────────────────────
@@ -892,6 +1089,13 @@ const guardarUsuario = async () => {
       payload.password = payload.ci
     } else if (!payload.password) {
       delete payload.password
+    } else {
+      const erroresPass = getPasswordPolicyErrors(payload.password, form.value.ci)
+      if (erroresPass.length) {
+        errorFormulario.value = `Contraseña inválida: ${erroresPass.join('. ')}.`
+        saving.value = false
+        return
+      }
     }
 
     if (esRolDelegado.value) {
@@ -924,35 +1128,58 @@ const guardarUsuario = async () => {
 
     if (editando.value) {
       const { data } = await api.put(`/usuarios/${form.value.idUsuario}`, payload)
+      const esJurado = esRolJurado.value
       const n = data?.notificacionCorreo
-      let detalle = 'Usuario actualizado exitosamente.'
+
+      cerrarModal()
+      saving.value = false
+
+      let detalle = esJurado
+        ? 'Fases y fraternidades del jurado actualizadas correctamente.'
+        : 'Usuario actualizado exitosamente.'
       if (n?.enviado && n.tipo === 'bienvenida') {
-        detalle = `Usuario actualizado. Se envió correo de cuenta nueva a <strong>${n.correo}</strong> (como alta de usuario).`
+        detalle = esJurado
+          ? `Jurado actualizado. Se envió correo de cuenta nueva a <strong>${n.correo}</strong>.`
+          : `Usuario actualizado. Se envió correo de cuenta nueva a <strong>${n.correo}</strong> (como alta de usuario).`
       } else if (n?.enviado && n.tipo === 'actualizacion') {
-        detalle = `Usuario actualizado. Se notificó el cambio a <strong>${n.correo}</strong>.`
+        detalle = esJurado
+          ? `Jurado actualizado. Se notificó el cambio a <strong>${n.correo}</strong>.`
+          : `Usuario actualizado. Se notificó el cambio a <strong>${n.correo}</strong>.`
       } else if (n && n.enviado === false && n.correo) {
-        detalle = `Usuario actualizado, pero no se pudo enviar el correo a ${n.correo}.`
+        detalle = esJurado
+          ? `Jurado actualizado, pero no se pudo enviar el correo a ${n.correo}.`
+          : `Usuario actualizado, pero no se pudo enviar el correo a ${n.correo}.`
       } else if (!form.value.correo?.trim()) {
-        detalle = 'Usuario actualizado. Sin correo registrado: no se envió notificación.'
+        detalle = esJurado
+          ? 'Jurado actualizado. Sin correo registrado: no se envió notificación.'
+          : 'Usuario actualizado. Sin correo registrado: no se envió notificación.'
       }
+
+      void cargarDatos()
+
       await Swal.fire({
-        title: 'Actualizado',
+        title: esJurado ? 'Jurado actualizado' : 'Actualizado',
         html: detalle,
         icon: n?.enviado === false && n?.correo ? 'warning' : 'success',
         confirmButtonColor: '#003399',
+        timer: esJurado ? 2800 : undefined,
+        showConfirmButton: !esJurado,
       })
-    } else {
-      await api.post('/usuarios', payload)
-      Swal.fire({
-        title: 'Creado',
-        text: 'Usuario creado exitosamente. Se enviará un correo al usuario con sus datos de acceso al sistema.',
-        icon: 'success',
-        confirmButtonColor: '#003399',
-      })
+      return
     }
 
+    await api.post('/usuarios', payload)
     cerrarModal()
-    await cargarDatos()
+    saving.value = false
+    void cargarDatos()
+    await Swal.fire({
+      title: esRolJurado.value ? 'Jurado creado' : 'Creado',
+      text: esRolJurado.value
+        ? 'Jurado creado exitosamente. Se enviará un correo con sus datos de acceso si tiene correo registrado.'
+        : 'Usuario creado exitosamente. Se enviará un correo al usuario con sus datos de acceso al sistema.',
+      icon: 'success',
+      confirmButtonColor: '#003399',
+    })
   } catch (error) {
     errorFormulario.value = error.response?.data?.message || 'Error al guardar el usuario.'
   } finally {

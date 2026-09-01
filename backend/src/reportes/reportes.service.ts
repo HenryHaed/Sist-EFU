@@ -245,7 +245,7 @@ export class ReportesService implements OnModuleInit {
     return {
       idFraternidad: s.fraternidadCreada?.idFraternidad || null,
       idSolicitud: s.idSolicitud,
-      nombreFraternidad: s.nombreFraternidad,
+      nombreFraternidad: s.fraternidadCreada?.nombre || s.nombreFraternidad,
       tipoDanza: s.tipoDanza?.nombre || '—',
       idTipoDanza: s.tipoDanza?.idTipoDanza || null,
       categoria: s.categoria?.nombre || '—',

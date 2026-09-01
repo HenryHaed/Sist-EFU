@@ -252,31 +252,70 @@
     </div>
 
     <!-- MODAL ASIGNACIÓN JURADOS -->
-    <v-dialog v-model="modalJuradosOpen" max-width="520px">
-      <v-card class="rounded-2xl">
-        <v-card-title class="bg-slate-800 text-white pa-6">
-          <h3 class="text-lg font-black italic uppercase tracking-tighter">Asignar Jurados</h3>
+    <v-dialog v-model="modalJuradosOpen" max-width="720" scrollable>
+      <v-card class="rounded-2xl overflow-hidden">
+        <v-card-title class="bg-slate-800 text-white pa-4 sm:pa-6 shrink-0">
+          <h3 class="text-base sm:text-lg font-black italic uppercase tracking-tighter">Asignar Jurados</h3>
           <p class="text-slate-300 text-xs font-medium mt-0.5">{{ faseParaJurados?.nombre }}</p>
-        </v-card-title>
-        <v-card-text class="pa-6">
-          <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">
-            {{ esFaseDisciplina(faseParaJurados) ? controladoresList.length : juradosParaFase.length }} 
-            {{ esFaseDisciplina(faseParaJurados) ? 'Controlador(es)' : 'Jurado(s)' }} 
-            disponibles para {{ esFaseDisciplina(faseParaJurados) ? 'esta tarea' : 'este tipo de fase' }}
+          <p class="text-[10px] text-slate-400 font-medium mt-1">
+            {{ esFaseDisciplina(faseParaJurados) ? 'Controladores HCU' : faseParaJurados?.tipoConcurso }} ·
+            {{ juradosSeleccionados.length }} seleccionado(s)
           </p>
-          <div class="space-y-2 max-h-72 overflow-y-auto">
+        </v-card-title>
+        <v-card-text class="pa-4 sm:pa-6">
+          <div class="relative mb-3">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
+            <input
+              v-model="busquedaAsignacionJurados"
+              type="search"
+              :placeholder="esFaseDisciplina(faseParaJurados) ? 'Buscar controlador por nombre o CI…' : 'Buscar jurado por nombre o CI…'"
+              class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-primary"
+            />
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2 mb-4">
+            <button
+              type="button"
+              @click="seleccionarJuradosVisibles"
+              class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+            >
+              Seleccionar visibles
+            </button>
+            <button
+              type="button"
+              @click="limpiarSeleccionJurados"
+              class="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors"
+            >
+              Limpiar selección
+            </button>
+          </div>
+
+          <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+            {{ esFaseDisciplina(faseParaJurados) ? controladoresFiltrados.length : juradosParaFaseFiltrados.length }}
+            {{ esFaseDisciplina(faseParaJurados) ? 'controlador(es)' : 'jurado(s)' }}
+            disponibles
+          </p>
+
+          <div class="space-y-2 max-h-72 sm:max-h-80 overflow-y-auto custom-scrollbar">
             <!-- LISTADO PARA DISCIPLINA (CONTROLADORES) -->
             <template v-if="esFaseDisciplina(faseParaJurados)">
-              <label v-for="c in controladoresList" :key="c.idUsuario"
-                class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-primary/30 hover:bg-primary/5 cursor-pointer transition-all">
-                <input type="checkbox" :value="c.idUsuario" v-model="usuariosSeleccionados" class="size-4 accent-primary rounded" />
+              <label v-for="c in controladoresFiltrados" :key="c.idUsuario"
+                class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all"
+                :class="usuariosSeleccionados.includes(c.idUsuario)
+                  ? 'border-emerald-300 bg-emerald-50/60'
+                  : 'border-slate-100 hover:border-primary/30 hover:bg-primary/5'"
+              >
+                <input type="checkbox" :value="c.idUsuario" v-model="usuariosSeleccionados" class="size-4 accent-primary rounded mt-1 shrink-0" />
                 <div class="size-8 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
                   <span class="material-symbols-outlined text-[16px] text-emerald-600">shield_person</span>
                 </div>
-                <div class="flex-1">
-                  <p class="text-sm font-bold text-slate-800">{{ c.nombre }}</p>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-bold text-slate-800 truncate">{{ c.nombre }}</p>
                   <p class="text-[9px] uppercase font-black tracking-widest text-emerald-600">
                     Controlador HCU · CI: {{ c.ci }}
+                  </p>
+                  <p v-if="c.fasesHabilitadas?.length" class="text-[9px] text-slate-500 mt-1 truncate">
+                    {{ c.fasesHabilitadas.length }} fase(s) en perfil
                   </p>
                 </div>
               </label>
@@ -284,35 +323,44 @@
 
             <!-- LISTADO PARA OTRAS FASES (JURADOS) -->
             <template v-else>
-              <label v-for="j in juradosParaFase" :key="j.idJurado"
-                class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-primary/30 hover:bg-primary/5 cursor-pointer transition-all">
-                <input type="checkbox" :value="j.idJurado" v-model="juradosSeleccionados" class="size-4 accent-primary rounded" />
+              <label v-for="j in juradosParaFaseFiltrados" :key="j.idJurado"
+                class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all"
+                :class="juradosSeleccionados.includes(j.idJurado)
+                  ? 'border-primary/40 bg-primary/5'
+                  : 'border-slate-100 hover:border-primary/30 hover:bg-primary/5'"
+              >
+                <input type="checkbox" :value="j.idJurado" v-model="juradosSeleccionados" class="size-4 accent-primary rounded mt-1 shrink-0" />
                 <div class="size-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <span class="material-symbols-outlined text-[16px] text-primary">person</span>
                 </div>
-                <div class="flex-1">
-                  <p class="text-sm font-bold text-slate-800">{{ j.nombre }}</p>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-bold text-slate-800 truncate">{{ j.nombre }}</p>
                   <p class="text-[9px] uppercase font-black tracking-widest"
                     :class="j.tipoJurado === 'EFU' ? 'text-blue-500' : j.tipoJurado === 'EXTERNO' ? 'text-amber-500' : 'text-emerald-500'">
                     {{ j.tipoJurado }} · CI: {{ j.ci }}
                   </p>
+                  <p class="text-[9px] text-slate-500 mt-1 leading-snug">
+                    <span v-if="j.fasesHabilitadas?.length">{{ resumenFasesJurado(j) }}</span>
+                    <span v-if="j.cantidadFraternidades > 0"> · {{ j.cantidadFraternidades }} fraternidad(es) restringidas</span>
+                    <span v-else-if="j.tipoJurado !== 'EXTERNO'"> · Todas las fraternidades</span>
+                  </p>
                 </div>
               </label>
             </template>
-            
-            <p v-if="(!esFaseDisciplina(faseParaJurados) && juradosParaFase.length === 0) || (esFaseDisciplina(faseParaJurados) && controladoresList.length === 0)" 
-              class="text-center text-slate-400 italic text-sm py-6">
-              No hay personal registrado para este tipo de fase.
+
+            <p v-if="(!esFaseDisciplina(faseParaJurados) && juradosParaFaseFiltrados.length === 0) || (esFaseDisciplina(faseParaJurados) && controladoresFiltrados.length === 0)"
+              class="text-center text-slate-400 italic text-sm py-8">
+              {{ busquedaAsignacionJurados.trim() ? 'Sin resultados para la búsqueda.' : 'No hay personal registrado para este tipo de fase.' }}
             </p>
           </div>
         </v-card-text>
-        <v-card-actions class="pa-4 border-t border-slate-100 bg-slate-50">
-          <v-spacer></v-spacer>
-          <button @click="modalJuradosOpen = false" class="px-4 py-2 text-slate-500 font-bold text-sm hover:text-slate-800 transition-colors">Cancelar</button>
+        <v-card-actions class="pa-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-2">
+          <button @click="modalJuradosOpen = false" class="w-full sm:w-auto px-4 py-2.5 text-slate-500 font-bold text-sm hover:text-slate-800 transition-colors">Cancelar</button>
+          <v-spacer class="hidden sm:block" />
           <button @click="guardarAsignacionJurados" :disabled="savingJurados"
-            class="px-6 py-2 bg-primary text-white rounded-xl font-black text-sm shadow-lg shadow-primary/20 hover:bg-blue-900 transition-all flex items-center gap-2">
+            class="w-full sm:w-auto px-6 py-2.5 bg-primary text-white rounded-xl font-black text-sm shadow-lg shadow-primary/20 hover:bg-blue-900 transition-all flex items-center justify-center gap-2 disabled:opacity-60">
             <span v-if="savingJurados" class="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
-            {{ savingJurados ? 'Guardando...' : 'Confirmar Asignación' }}
+            {{ savingJurados ? 'Guardando…' : 'Confirmar asignación' }}
           </button>
         </v-card-actions>
       </v-card>
@@ -595,6 +643,7 @@ const faseParaJurados = ref(null)
 const juradosSeleccionados = ref([])
 const usuariosSeleccionados = ref([])
 const savingJurados = ref(false)
+const busquedaAsignacionJurados = ref('')
 
 // Computed: solo mostrar escritura si la gestión está activa
 const esGestionActiva = computed(() => resumen.value.gestion?.activa !== false)
@@ -703,6 +752,56 @@ const juradosDisponibles = computed(() => {
   return juradosList.value.filter(j => j.tipoJurado === form.value.tipoConcurso || j.tipoJurado === 'AMBOS')
 })
 
+const normalizarTextoBusqueda = (valor) =>
+  String(valor || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+
+const juradosParaFaseFiltrados = computed(() => {
+  const q = normalizarTextoBusqueda(busquedaAsignacionJurados.value)
+  const list = juradosParaFase.value
+  if (!q) return list
+  return list.filter((j) =>
+    normalizarTextoBusqueda([j.nombre, j.ci, j.tipoJurado].join(' ')).includes(q),
+  )
+})
+
+const controladoresFiltrados = computed(() => {
+  const q = normalizarTextoBusqueda(busquedaAsignacionJurados.value)
+  const list = controladoresList.value
+  if (!q) return list
+  return list.filter((c) =>
+    normalizarTextoBusqueda([c.nombre, c.ci].join(' ')).includes(q),
+  )
+})
+
+const resumenFasesJurado = (j) => {
+  const fases = j.fasesHabilitadas || []
+  if (!fases.length) return 'Sin fases en perfil'
+  const nombres = fases.slice(0, 3).map((f) => f.nombre).join(', ')
+  return fases.length > 3 ? `${nombres}… (+${fases.length - 3})` : nombres
+}
+
+const seleccionarJuradosVisibles = () => {
+  if (esFaseDisciplina(faseParaJurados.value)) {
+    const ids = controladoresFiltrados.value.map((c) => c.idUsuario)
+    usuariosSeleccionados.value = Array.from(new Set([...usuariosSeleccionados.value, ...ids]))
+    return
+  }
+  const ids = juradosParaFaseFiltrados.value.map((j) => j.idJurado)
+  juradosSeleccionados.value = Array.from(new Set([...juradosSeleccionados.value, ...ids]))
+}
+
+const limpiarSeleccionJurados = () => {
+  if (esFaseDisciplina(faseParaJurados.value)) {
+    usuariosSeleccionados.value = []
+  } else {
+    juradosSeleccionados.value = []
+  }
+}
+
 // ── Carga de datos ────────────────────────────────────────────────────────
 const cargarFases = async () => {
   cargando.value = true
@@ -727,15 +826,17 @@ const cargarJurados = async () => {
   } catch (e) { console.error(e) }
 }
 
-const abrirModalJurados = (fase) => {
+const abrirModalJurados = async (fase) => {
   faseParaJurados.value = fase
-  // Pre-seleccionar los jurados ya asignados
+  busquedaAsignacionJurados.value = ''
+  await Promise.all([cargarJurados(), cargarControladores()])
   juradosSeleccionados.value = (fase.jurados || []).map(j => j.idJurado)
-  // Pre-seleccionar los controladores si es fase de disciplina
   if (esFaseDisciplina(fase)) {
     usuariosSeleccionados.value = (fase.jurados || [])
       .filter(j => j.usuario && j.usuario.rol?.nombre === 'controladorhcu')
       .map(j => j.usuario.idUsuario)
+  } else {
+    usuariosSeleccionados.value = []
   }
   modalJuradosOpen.value = true
 }
@@ -763,11 +864,12 @@ const guardarAsignacionJurados = async () => {
     }
 
     await api.post(`/usuarios/fases/${faseParaJurados.value.idFase}/jurados`, payload)
+    savingJurados.value = false
     modalJuradosOpen.value = false
-    notify.success('Asignación guardada', `Personal asignado a "${faseParaJurados.value.nombre}"`)
-    cargarFases()
+    notify.success('Asignación guardada', `${juradosSeleccionados.value.length || usuariosSeleccionados.value.length} persona(s) asignada(s) a "${faseParaJurados.value.nombre}"`)
+    await cargarFases()
   } catch (e) {
-    notify.error('Error', 'No se pudo guardar la asignación de jurados.')
+    notify.error('Error', e?.response?.data?.message || 'No se pudo guardar la asignación de jurados.')
   } finally {
     savingJurados.value = false
   }

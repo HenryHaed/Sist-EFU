@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -22,7 +22,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   // El payload que guardamos al hacer login: { sub, ci, rol }
   // Este objeto queda disponible como req.user en los controladores protegidos
-  async validate(payload: { sub: number; ci: string; rol: string; primerLogin: boolean }) {
+  async validate(payload: {
+    sub: number;
+    ci: string;
+    rol: string;
+    primerLogin: boolean;
+    purpose?: string;
+  }) {
+    // El JWT de recuperación de contraseña no debe autenticar APIs normales.
+    if (payload?.purpose === 'password_reset') {
+      throw new UnauthorizedException('Token de recuperación no válido para esta operación.');
+    }
+
     const usuario = await this.usuarioRepo.findOne({
       where: { idUsuario: payload.sub },
       relations: ['rol', 'fraternidad', 'fraternidad.categoria', 'fraternidad.facultad', 'fraternidad.carrera', 'fraternidad.institucionExterna'],

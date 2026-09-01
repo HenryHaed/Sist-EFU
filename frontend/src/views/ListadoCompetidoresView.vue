@@ -25,14 +25,25 @@
         </div>
       </div>
 
-      <div
-        class="flex items-center gap-3 px-4 py-2 border rounded-xl"
-        :class="urgenciaStatus.bgClass"
-      >
-        <span class="material-symbols-outlined animate-pulse" :class="urgenciaStatus.textClass">schedule</span>
-        <div>
-          <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo Restante de Fase</p>
-          <p class="text-sm font-black" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
+      <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+        <button
+          v-if="esAdmin"
+          type="button"
+          @click="abrirPanelAdmin()"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 font-black text-[10px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+        >
+          <span class="material-symbols-outlined text-[18px]">monitoring</span>
+          Calificaciones admin
+        </button>
+        <div
+          class="flex items-center gap-3 px-4 py-2.5 border rounded-xl w-full sm:w-auto"
+          :class="urgenciaStatus.bgClass"
+        >
+          <span class="material-symbols-outlined animate-pulse" :class="urgenciaStatus.textClass">schedule</span>
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo Restante de Fase</p>
+            <p class="text-sm font-black" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -149,7 +160,16 @@
             </div>
           </div>
 
-          <div class="p-4 bg-slate-50 border-t border-slate-100">
+          <div class="p-4 bg-slate-50 border-t border-slate-100 flex flex-col gap-2">
+            <button
+              v-if="esAdmin"
+              type="button"
+              @click="abrirPanelAdmin(p.idParticipante)"
+              class="w-full py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
+            >
+              <span class="material-symbols-outlined text-[18px]">monitoring</span>
+              Ver calificaciones
+            </button>
             <button
               type="button"
               @click="iniciarEvaluacion(p)"
@@ -184,6 +204,17 @@
       </div>
       </template>
     </div>
+
+    <ModalResumenCalificacionesAdmin
+      v-if="modalResumenAdmin"
+      :key="modalAdminKey"
+      v-model="modalResumenAdmin"
+      :id-fase="props.fase.idFase"
+      :nombre-fase="props.fase?.nombre"
+      tipo-concurso="EXTERNO"
+      :initial-id-participante="resumenAdminIdParticipante"
+      @actas-cerradas="cargarParticipantes"
+    />
   </div>
 </template>
 
@@ -192,6 +223,11 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Swal from 'sweetalert2'
 import api from '../services/api'
 import { esFaseChachaWarmi } from '../utils/chachaWarmi'
+import ModalResumenCalificacionesAdmin from '../components/ModalResumenCalificacionesAdmin.vue'
+import { useAuthStore } from '../store/auth'
+
+const authStore = useAuthStore()
+const esAdmin = computed(() => ['admin', 'superusuario'].includes(authStore.userRole))
 
 const props = defineProps({
   fase: { type: Object, required: true },
@@ -207,6 +243,16 @@ const plantillaDesdeApi = ref(null)
 
 const tiempoRestante = ref(0)
 let timerInterval = null
+
+const modalResumenAdmin = ref(false)
+const modalAdminKey = ref(0)
+const resumenAdminIdParticipante = ref(null)
+
+const abrirPanelAdmin = (idParticipante = null) => {
+  resumenAdminIdParticipante.value = idParticipante
+  modalAdminKey.value += 1
+  modalResumenAdmin.value = true
+}
 
 const esChacha = computed(() =>
   esFaseChachaWarmi({

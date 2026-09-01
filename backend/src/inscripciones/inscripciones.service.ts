@@ -857,6 +857,10 @@ export class InscripcionesService {
             relations: ['gestion', 'categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'delegado', 'fraternidadCreada']
         });
         if (!sol) throw new NotFoundException('Solicitud no encontrada');
+        // Tras oficializar, el nombre canónico vive en Fraternidad.
+        if (sol.fraternidadCreada?.nombre) {
+            sol.nombreFraternidad = sol.fraternidadCreada.nombre;
+        }
         return sol;
     }
 
@@ -879,7 +883,13 @@ export class InscripcionesService {
             qb.where('s.estado != :borrador', { borrador: EstadoSolicitud.BORRADOR });
         }
 
-        return qb.getMany();
+        const list = await qb.getMany();
+        for (const sol of list) {
+            if (sol.fraternidadCreada?.nombre) {
+                sol.nombreFraternidad = sol.fraternidadCreada.nombre;
+            }
+        }
+        return list;
     }
 
     private extraerItemsObservados(
@@ -1067,66 +1077,84 @@ export class InscripcionesService {
     }
 
     async updateSolicitudAdmin(id: number, data: Record<string, any>) {
-        const sol = await this.solicitudRepo.findOne({
-            where: { idSolicitud: id },
-            relations: ['categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'fraternidadCreada'],
-        });
-        if (!sol) throw new NotFoundException('Solicitud no encontrada');
-        if (sol.estado === EstadoSolicitud.RECHAZADO) {
-            throw new BadRequestException('No se pueden editar solicitudes rechazadas y anuladas.');
-        }
-
-        if (data.nombreFraternidad !== undefined) {
-            sol.nombreFraternidad = data.nombreFraternidad;
-        }
-        if (data.instanciaRepresentacion !== undefined) {
-            sol.instanciaRepresentacion = data.instanciaRepresentacion;
-        }
-        if (data.nombreInstitucionExterna !== undefined) {
-            sol.nombreInstitucionExterna = data.nombreInstitucionExterna || null;
-        }
-        if (data.idCategoria !== undefined) {
-            const idCategoria = parseInt(data.idCategoria, 10);
-            if (!isNaN(idCategoria)) sol.categoria = { idCategoria } as Categoria;
-        }
-        if (data.idTipoDanza !== undefined) {
-            sol.tipoDanza = await this.resolverTipoDanza(data.idTipoDanza, data.tipoDanzaOtro);
-        }
-        if (data.costosParticipacion !== undefined) {
-            sol.costosParticipacion = this.normalizarCostosParticipacion(data.costosParticipacion, true);
-        }
-        if (data.idFacultad !== undefined) {
-            const idFacultad = data.idFacultad ? parseInt(data.idFacultad, 10) : null;
-            sol.facultad = idFacultad && !isNaN(idFacultad) ? ({ idFacultad } as Facultad) : null;
-        }
-        if (data.idCarrera !== undefined) {
-            const idCarrera = data.idCarrera ? parseInt(data.idCarrera, 10) : null;
-            sol.carrera = idCarrera && !isNaN(idCarrera) ? ({ idCarrera } as Carrera) : null;
-        }
-
-        for (const p of PERSONAS_DIRECTIVA) {
-            for (const suffix of ['Nombres', 'PrimerApellido', 'SegundoApellido', 'Ci', 'CiComplemento']) {
-                const key = `${p.prefix}${suffix}`;
-                if (data[key] !== undefined) sol[key] = data[key];
+        return this.dataSource.transaction(async (manager) => {
+            const sol = await manager.findOne(SolicitudInscripcion, {
+                where: { idSolicitud: id },
+                relations: ['categoria', 'tipoDanza', 'facultad', 'carrera', 'institucionExterna', 'fraternidadCreada'],
+            });
+            if (!sol) throw new NotFoundException('Solicitud no encontrada');
+            if (sol.estado === EstadoSolicitud.RECHAZADO) {
+                throw new BadRequestException('No se pueden editar solicitudes rechazadas y anuladas.');
             }
-            if (p.hasCelular && data[`${p.prefix}Celular`] !== undefined) {
-                sol[`${p.prefix}Celular`] = data[`${p.prefix}Celular`];
+
+            if (data.nombreFraternidad !== undefined) {
+                sol.nombreFraternidad = data.nombreFraternidad;
             }
-        }
+            if (data.instanciaRepresentacion !== undefined) {
+                sol.instanciaRepresentacion = data.instanciaRepresentacion;
+            }
+            if (data.nombreInstitucionExterna !== undefined) {
+                sol.nombreInstitucionExterna = data.nombreInstitucionExterna || null;
+            }
+            if (data.idCategoria !== undefined) {
+                const idCategoria = parseInt(data.idCategoria, 10);
+                if (!isNaN(idCategoria)) sol.categoria = { idCategoria } as Categoria;
+            }
+            if (data.idTipoDanza !== undefined) {
+                sol.tipoDanza = await this.resolverTipoDanza(data.idTipoDanza, data.tipoDanzaOtro);
+            }
+            if (data.costosParticipacion !== undefined) {
+                sol.costosParticipacion = this.normalizarCostosParticipacion(data.costosParticipacion, true);
+            }
+            if (data.idFacultad !== undefined) {
+                const idFacultad = data.idFacultad ? parseInt(data.idFacultad, 10) : null;
+                sol.facultad = idFacultad && !isNaN(idFacultad) ? ({ idFacultad } as Facultad) : null;
+            }
+            if (data.idCarrera !== undefined) {
+                const idCarrera = data.idCarrera ? parseInt(data.idCarrera, 10) : null;
+                sol.carrera = idCarrera && !isNaN(idCarrera) ? ({ idCarrera } as Carrera) : null;
+            }
 
-        await this.assertCisDirectivaUnicos(sol, sol.idSolicitud);
-        this.normalizarSolicitudInscripcion(sol);
-        await this.solicitudRepo.save(sol);
+            for (const p of PERSONAS_DIRECTIVA) {
+                for (const suffix of ['Nombres', 'PrimerApellido', 'SegundoApellido', 'Ci', 'CiComplemento']) {
+                    const key = `${p.prefix}${suffix}`;
+                    if (data[key] !== undefined) sol[key] = data[key];
+                }
+                if (p.hasCelular && data[`${p.prefix}Celular`] !== undefined) {
+                    sol[`${p.prefix}Celular`] = data[`${p.prefix}Celular`];
+                }
+            }
 
-        // Si ya hay fraternidad oficial, propagar nombre (y datos clave) a fraternidad + ficha
-        if (sol.fraternidadCreada?.idFraternidad && data.nombreFraternidad !== undefined) {
-            const nombreNorm = String(sol.nombreFraternidad || '').trim();
-            if (nombreNorm) {
-                const frat = await this.fraternidadRepo.findOne({
-                    where: { idFraternidad: sol.fraternidadCreada.idFraternidad },
+            await this.assertCisDirectivaUnicos(sol, sol.idSolicitud);
+            this.normalizarSolicitudInscripcion(sol);
+
+            // Propagar a fraternidad oficial + ficha (nombre canónico = fraternidades.nombre)
+            const idFrat =
+                sol.fraternidadCreada?.idFraternidad ||
+                (sol as any).idFraternidadCreada ||
+                null;
+
+            if (idFrat) {
+                const frat = await manager.findOne(Fraternidad, {
+                    where: { idFraternidad: idFrat },
                 });
                 if (frat) {
-                    frat.nombre = this.aMayusculas(nombreNorm) as string;
+                    const nombreNuevo = String(sol.nombreFraternidad || '').trim();
+                    if (nombreNuevo && nombreNuevo !== String(frat.nombre || '').trim()) {
+                        const conflicto = await manager
+                            .createQueryBuilder(Fraternidad, 'f')
+                            .where('UPPER(TRIM(f.nombre)) = UPPER(TRIM(:nombre))', { nombre: nombreNuevo })
+                            .andWhere('f.id_fraternidad != :id', { id: idFrat })
+                            .getOne();
+                        if (conflicto) {
+                            throw new BadRequestException(
+                                `Ya existe otra fraternidad con el nombre "${nombreNuevo}".`,
+                            );
+                        }
+                        frat.nombre = this.aMayusculas(nombreNuevo) as string;
+                        sol.nombreFraternidad = frat.nombre;
+                    }
+
                     if (data.instanciaRepresentacion !== undefined) {
                         frat.nivelRepresentacion = sol.instanciaRepresentacion || frat.nivelRepresentacion;
                     }
@@ -1138,19 +1166,33 @@ export class InscripcionesService {
                     if (data.idTipoDanza !== undefined && sol.tipoDanza) {
                         frat.tipoDanza = sol.tipoDanza as any;
                     }
-                    await this.fraternidadRepo.save(frat);
 
-                    await this.fichaRepo
+                    await manager.save(Fraternidad, frat);
+                    sol.fraternidadCreada = frat;
+
+                    await manager
                         .createQueryBuilder()
                         .update(FichaTecnicaMonografia)
                         .set({ nombreFraternidad: frat.nombre })
                         .where('id_fraternidad = :id', { id: frat.idFraternidad })
                         .execute();
+                } else if (sol.estado === EstadoSolicitud.APROBADO) {
+                    throw new BadRequestException(
+                        'La solicitud está aprobada pero no se encontró la fraternidad oficial vinculada. Revisa Fraternidades o vuelve a aprobar.',
+                    );
                 }
+            } else if (
+                sol.estado === EstadoSolicitud.APROBADO &&
+                data.nombreFraternidad !== undefined
+            ) {
+                throw new BadRequestException(
+                    'La solicitud está aprobada sin fraternidad vinculada. No se puede renombrar solo en la solicitud; vincula/crea la fraternidad oficial primero.',
+                );
             }
-        }
 
-        return this.getSolicitudById(id);
+            await manager.save(SolicitudInscripcion, sol);
+            return this.getSolicitudById(id);
+        });
     }
 
     // ── Cronograma Management ──────────────────────────────────────────────

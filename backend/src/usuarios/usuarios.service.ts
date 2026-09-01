@@ -8,7 +8,7 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { Gestion } from '../entities/Gestion';
 import { Fase } from '../entities/Fase';
 import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
-import { normalizeEmail } from '../common/password-policy';
+import { normalizeEmail, validatePasswordPolicy } from '../common/password-policy';
 import { MailService } from '../mail/mail.service';
 import { validarCiUsuario } from '../common/ci-usuario.validation';
 import { ensureSystemRoles } from '../common/system-roles';
@@ -445,7 +445,9 @@ export class UsuariosService {
         cambios.push('Contraseña restablecida al CI (cuenta nueva)');
       }
     } else if (password && password.trim() !== '') {
-      updateData.password = await bcrypt.hash(password, 10);
+      validatePasswordPolicy(password.trim(), String(updateData.ci || user.ci));
+      updateData.password = await bcrypt.hash(password.trim(), 10);
+      updateData.primerLogin = true;
       passwordCambiada = true;
       cambios.push('Contraseña actualizada por un administrador');
     }
@@ -512,6 +514,13 @@ export class UsuariosService {
       throw error;
     }
 
+    if (passwordCambiada) {
+      await this.dataSource.query(
+        `UPDATE password_reset_tokens SET used_at = NOW() WHERE id_usuario = $1 AND used_at IS NULL`,
+        [savedUser.idUsuario],
+      );
+    }
+
     // Si el rol resultante es jurado, actualizar o crear su perfil
     const rolFinal = rolActualizado || user.rol;
     const tieneUpdateJurado = tipoJurado !== undefined || fasesEfuIds !== undefined || fasesExternasIds !== undefined || fasesIds !== undefined || fraternidadesIds !== undefined;
@@ -524,15 +533,20 @@ export class UsuariosService {
       }
     }
 
-    const notificacionCorreo = await this.notificarActualizacionUsuario({
-      usuario: savedUser,
-      correoAnterior,
-      correoNuevo: correoNuevoNorm || savedUser.correo || null,
-      correoCambio,
-      cambios,
-      passwordCambiada,
-      rolNombre: rolFinal?.nombre || 'usuario',
-    });
+    const notificacionCorreo = await Promise.race([
+      this.notificarActualizacionUsuario({
+        usuario: savedUser,
+        correoAnterior,
+        correoNuevo: correoNuevoNorm || savedUser.correo || null,
+        correoCambio,
+        cambios,
+        passwordCambiada,
+        rolNombre: rolFinal?.nombre || 'usuario',
+      }),
+      new Promise<{ enviado: boolean }>((resolve) =>
+        setTimeout(() => resolve({ enviado: false }), 6000),
+      ),
+    ]);
 
     return { ...savedUser, notificacionCorreo };
   }
@@ -589,12 +603,15 @@ export class UsuariosService {
     }
 
     // Solo asignar fraternidades para jurados EFU o AMBOS
-    if (tipoJurado !== 'EXTERNO' && fraternidadesIds.length > 0) {
+    if (tipoJurado === 'EXTERNO') {
+      perfil.fraternidadesHabilitadas = [];
+    } else if (fraternidadesIds.length > 0) {
       perfil.fraternidadesHabilitadas = await this.fraternidadRepo.findBy({
         idFraternidad: In(fraternidadesIds),
         habilitadoEfu: true,
       });
-    } else if (tipoJurado === 'EXTERNO') {
+    } else {
+      // Vacío = sin restricción (puede calificar todas las fraternidades habilitadas)
       perfil.fraternidadesHabilitadas = [];
     }
 
@@ -639,12 +656,17 @@ export class UsuariosService {
   // Obtener todos los jurados disponibles (para asignación en fases)
   async findAllJurados() {
     const jurados = await this.juradoRepo.find({
-      relations: ['usuario', 'fasesHabilitadas'],
+      relations: ['usuario', 'fasesHabilitadas', 'fraternidadesHabilitadas'],
     });
     return jurados.map(j => ({
       idJurado: j.idJurado,
       tipoJurado: j.tipoJurado,
-      fasesHabilitadas: j.fasesHabilitadas,
+      fasesHabilitadas: (j.fasesHabilitadas || []).map((f) => ({
+        idFase: f.idFase,
+        nombre: f.nombre,
+        tipoConcurso: f.tipoConcurso,
+      })),
+      cantidadFraternidades: j.fraternidadesHabilitadas?.length ?? 0,
       nombre: j.usuario ? `${j.usuario.nombres} ${j.usuario.primerApellido}` : 'Sin usuario',
       ci: j.usuario?.ci || '',
     }));

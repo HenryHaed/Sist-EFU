@@ -1,10 +1,11 @@
 import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { Request } from 'express';
 import { Usuario } from '../entities/Usuario';
+import { PasswordResetToken } from '../entities/PasswordResetToken';
 import { LoginDto } from './dto/login.dto';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import {
@@ -17,6 +18,8 @@ export class AuthService {
   constructor(
     @InjectRepository(Usuario)
     private readonly usuarioRepo: Repository<Usuario>,
+    @InjectRepository(PasswordResetToken)
+    private readonly resetTokenRepo: Repository<PasswordResetToken>,
     private readonly jwtService: JwtService,
     private readonly auditoriaService: AuditoriaService,
   ) {}
@@ -98,6 +101,12 @@ export class AuthService {
       password: hashedPassword,
       primerLogin: false,
     });
+
+    await this.resetTokenRepo.update(
+      { usuario: { idUsuario: userId }, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
+
     return { message: 'Contraseña actualizada correctamente' };
   }
 }

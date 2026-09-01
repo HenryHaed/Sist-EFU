@@ -77,8 +77,15 @@ export class PasswordResetService {
     try {
       const nombre = `${usuario.nombres} ${usuario.primerApellido}`.trim();
       await this.mailService.sendPasswordResetCode(usuario.correo, nombre, code);
-    } catch {
-      this.logger.warn(`No se pudo enviar correo de recuperación para CI ${ci}`);
+    } catch (err) {
+      token.usedAt = new Date();
+      await this.resetTokenRepo.save(token);
+      this.logger.error(
+        `No se pudo enviar correo de recuperación para CI ${ci}: ${err?.message || err}`,
+      );
+      throw new BadRequestException(
+        'No se pudo enviar el correo de recuperación. Verifica la configuración de correo o intenta más tarde.',
+      );
     }
 
     return { message: GENERIC_FORGOT_MESSAGE };
@@ -121,6 +128,8 @@ export class PasswordResetService {
 
     const sessionId = randomUUID();
     token.resetSessionId = sessionId;
+    // Extender vigencia para que el JWT de 10 min sea usable tras verificar el OTP.
+    token.expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await this.resetTokenRepo.save(token);
 
     const resetToken = this.jwtService.sign(

@@ -1,4 +1,4 @@
-﻿import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Response } from 'express';
@@ -159,6 +159,21 @@ export class FraternidadesService {
       updateData.nombre = String(updateData.nombre || '')
         .trim()
         .toUpperCase();
+      if (!updateData.nombre) {
+        throw new BadRequestException('El nombre de la fraternidad no puede estar vacío.');
+      }
+      if (updateData.nombre !== String(nombreAnterior || '').trim()) {
+        const conflicto = await this.fraternidadRepo
+          .createQueryBuilder('f')
+          .where('UPPER(TRIM(f.nombre)) = :nombre', { nombre: updateData.nombre })
+          .andWhere('f.id_fraternidad != :id', { id })
+          .getOne();
+        if (conflicto) {
+          throw new BadRequestException(
+            `Ya existe otra fraternidad con el nombre "${updateData.nombre}".`,
+          );
+        }
+      }
     }
     if (idFacultad !== undefined) updateData.facultad = idFacultad ? { idFacultad } : null;
     if (idCarrera !== undefined) updateData.carrera = idCarrera ? { idCarrera } : null;

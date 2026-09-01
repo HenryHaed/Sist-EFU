@@ -119,6 +119,39 @@ export class EvaluacionesController {
     return this.evaluacionesService.getEvaluacionActual(req.user.idUsuario, req.user.rol, idFase, { idParticipante });
   }
 
+  @Get('fase/:idFase/resumen-calificaciones')
+  @Roles('superusuario', 'admin')
+  getResumenCalificacionesAdmin(
+    @Param('idFase', ParseIntPipe) idFase: number,
+    @Query('idFraternidad') idFraternidad?: string,
+    @Query('idParticipante') idParticipante?: string,
+  ) {
+    const idFrat = idFraternidad ? parseInt(idFraternidad, 10) : undefined;
+    const idPart = idParticipante ? parseInt(idParticipante, 10) : undefined;
+    return this.evaluacionesService.getResumenCalificacionesAdmin(idFase, {
+      idFraternidad: Number.isFinite(idFrat) ? idFrat : undefined,
+      idParticipante: Number.isFinite(idPart) ? idPart : undefined,
+    });
+  }
+
+  @Get('fase/:idFase/listado-calificaciones-admin')
+  @Roles('superusuario', 'admin')
+  getListadoCalificacionesAdmin(@Param('idFase', ParseIntPipe) idFase: number) {
+    return this.evaluacionesService.getListadoCalificacionesAdmin(idFase);
+  }
+
+  @Post('fase/:idFase/cerrar-actas')
+  @Roles('superusuario', 'admin')
+  cerrarActasAdmin(
+    @Param('idFase', ParseIntPipe) idFase: number,
+    @Body() body: { idFraternidad?: number; idParticipante?: number },
+  ) {
+    return this.evaluacionesService.cerrarActasAdmin(idFase, {
+      idFraternidad: body?.idFraternidad,
+      idParticipante: body?.idParticipante,
+    });
+  }
+
   @Post('guardar')
   guardarEvaluacion(
     @Request() req: any,

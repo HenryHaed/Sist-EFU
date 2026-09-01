@@ -350,6 +350,280 @@ export class EvaluacionesService {
     return this.evaluacionRepo.findOne({ where, relations: ['participante', 'fraternidad'] });
   }
 
+  private esCalificadorAdmin(jurado?: Jurado | null): boolean {
+    const rol = String(jurado?.usuario?.rol?.nombre || '').toLowerCase();
+    if (rol === 'admin' || rol === 'superusuario') return true;
+    return String(jurado?.tipoOrigen || '').toLowerCase().includes('admin');
+  }
+
+  /**
+   * Resumen de todas las actas de una fraternidad o participante en una fase (solo admin/super).
+   */
+  async getResumenCalificacionesAdmin(
+    idFase: number,
+    opts: { idFraternidad?: number; idParticipante?: number },
+  ) {
+    const { idFraternidad, idParticipante } = opts;
+    if ((!idFraternidad && !idParticipante) || (idFraternidad && idParticipante)) {
+      throw new BadRequestException('Indica idFraternidad o idParticipante, no ambos.');
+    }
+
+    const fase = await this.faseRepo.findOne({ where: { idFase } });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+
+    const criterios = await this.getCriteriosPorFase(idFase);
+    const mapCriterio = new Map(criterios.map((c) => [c.idCriterio, c]));
+
+    let sujeto: Record<string, any>;
+    const where: any = { fase: { idFase } };
+
+    if (idParticipante) {
+      const participante = await this.participanteRepo.findOne({
+        where: { idParticipante },
+        relations: ['fraternidad'],
+      });
+      if (!participante) throw new NotFoundException('Participante no encontrado');
+      sujeto = {
+        tipo: 'participante',
+        idParticipante: participante.idParticipante,
+        nombre: participante.nombre,
+        tipoParticipante: participante.tipo || null,
+        fraternidad: participante.fraternidad?.nombre || null,
+        idFraternidad: participante.fraternidad?.idFraternidad ?? null,
+      };
+      where.participante = { idParticipante };
+    } else {
+      const frat = await this.fraternidadRepo.findOne({
+        where: { idFraternidad },
+        relations: ['categoria'],
+      });
+      if (!frat) throw new NotFoundException('Fraternidad no encontrada');
+      sujeto = {
+        tipo: 'fraternidad',
+        idFraternidad: frat.idFraternidad,
+        nombre: frat.nombre,
+        categoria: frat.categoria?.nombre || null,
+      };
+      where.fraternidad = { idFraternidad };
+    }
+
+    const evaluaciones = await this.evaluacionRepo.find({
+      where,
+      relations: ['jurado', 'jurado.usuario', 'jurado.usuario.rol'],
+      order: { puntajeTotal: 'DESC', updatedAt: 'DESC' },
+    });
+
+    const calificaciones = evaluaciones.map((ev) => {
+      const esAdmin = this.esCalificadorAdmin(ev.jurado);
+      const criteriosDetalle = Object.entries(ev.criteriosEvaluados || {}).map(([id, valor]) => {
+        const crit = mapCriterio.get(Number(id));
+        return {
+          idCriterio: Number(id),
+          nombre: crit?.nombre || `Criterio #${id}`,
+          puntaje: Number(valor) || 0,
+          puntajeMaximo: crit?.puntajeMaximo != null ? Number(crit.puntajeMaximo) : null,
+        };
+      });
+
+      return {
+        idEvaluacion: ev.idEvaluacion,
+        idJurado: ev.jurado?.idJurado ?? null,
+        juradoNombre: nombreJuradoDesdeUsuario(ev.jurado),
+        tipoCalificador: esAdmin ? 'admin' : 'jurado',
+        esAdmin,
+        puntajeTotal: round2(Number(ev.puntajeTotal) || 0),
+        estado: ev.estado,
+        criterios: criteriosDetalle,
+        fechaApertura: ev.fechaApertura,
+        fechaCierre: ev.fechaCierre,
+        updatedAt: ev.updatedAt,
+      };
+    });
+
+    const selladas = calificaciones.filter((c) => c.estado === 'COMPLETADO');
+    const promedio =
+      selladas.length > 0
+        ? round2(selladas.reduce((s, c) => s + c.puntajeTotal, 0) / selladas.length)
+        : null;
+
+    return {
+      fase: {
+        idFase: fase.idFase,
+        nombre: fase.nombre,
+        tipoConcurso: fase.tipoConcurso || 'EFU',
+      },
+      sujeto,
+      criterios: criterios.map((c) => ({
+        idCriterio: c.idCriterio,
+        nombre: c.nombre,
+        puntajeMaximo: Number(c.puntajeMaximo),
+      })),
+      calificaciones,
+      resumen: {
+        totalCalificadores: calificaciones.length,
+        totalJurados: calificaciones.filter((c) => !c.esAdmin).length,
+        totalAdmins: calificaciones.filter((c) => c.esAdmin).length,
+        completadas: selladas.length,
+        promedioSellado: promedio,
+      },
+    };
+  }
+
+  /**
+   * Listado de fraternidades o participantes de una fase con resumen de calificaciones (admin).
+   */
+  async getListadoCalificacionesAdmin(idFase: number) {
+    const fase = await this.faseRepo.findOne({
+      where: { idFase },
+      relations: ['gestion'],
+    });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+
+    const evaluaciones = await this.evaluacionRepo.find({
+      where: { fase: { idFase } },
+      relations: ['jurado', 'jurado.usuario', 'jurado.usuario.rol', 'fraternidad', 'participante'],
+    });
+
+    const faseInfo = {
+      idFase: fase.idFase,
+      nombre: fase.nombre,
+      tipoConcurso: fase.tipoConcurso || 'EFU',
+    };
+
+    if (fase.tipoConcurso === 'EXTERNO') {
+      const participantes = await this.participanteRepo.find({
+        where: { fase: { idFase } },
+        relations: ['fraternidad'],
+        order: { nombre: 'ASC' },
+      });
+
+      const mapEv = new Map<number, typeof evaluaciones>();
+      for (const ev of evaluaciones) {
+        const id = ev.participante?.idParticipante;
+        if (!id) continue;
+        if (!mapEv.has(id)) mapEv.set(id, []);
+        mapEv.get(id)!.push(ev);
+      }
+
+      const sujetos = participantes.map((p) => {
+        const evs = mapEv.get(p.idParticipante) || [];
+        const selladas = evs.filter((e) => e.estado === 'COMPLETADO');
+        const promedio =
+          selladas.length > 0
+            ? round2(
+                selladas.reduce((s, e) => s + Number(e.puntajeTotal || 0), 0) / selladas.length,
+              )
+            : null;
+        return {
+          idParticipante: p.idParticipante,
+          nombre: p.nombre,
+          tipoParticipante: p.tipo || null,
+          fraternidad: p.fraternidad?.nombre || null,
+          cantidadCalificadores: evs.length,
+          cantidadCompletadas: selladas.length,
+          cantidadPendientes: evs.filter((e) => e.estado !== 'COMPLETADO').length,
+          promedioSellado: promedio,
+          todasSelladas: evs.length > 0 && evs.every((e) => e.estado === 'COMPLETADO'),
+        };
+      });
+
+      return { fase: faseInfo, sujetos };
+    }
+
+    const idGestionFase = fase.gestion?.idGestion || (await this.getGestionActiva())?.idGestion;
+    const fraternidades = await this.fraternidadRepo.find({
+      where: {
+        habilitadoEfu: true,
+        ...(idGestionFase ? { gestion: { idGestion: idGestionFase } } : {}),
+      },
+      relations: ['categoria'],
+      order: { nombre: 'ASC' },
+    });
+
+    const mapEv = new Map<number, typeof evaluaciones>();
+    for (const ev of evaluaciones) {
+      const id = ev.fraternidad?.idFraternidad;
+      if (!id) continue;
+      if (!mapEv.has(id)) mapEv.set(id, []);
+      mapEv.get(id)!.push(ev);
+    }
+
+    const sujetos = fraternidades.map((frat) => {
+      const evs = mapEv.get(frat.idFraternidad) || [];
+      const selladas = evs.filter((e) => e.estado === 'COMPLETADO');
+      const promedio =
+        selladas.length > 0
+          ? round2(
+              selladas.reduce((s, e) => s + Number(e.puntajeTotal || 0), 0) / selladas.length,
+            )
+          : null;
+      return {
+        idFraternidad: frat.idFraternidad,
+        nombre: frat.nombre,
+        categoria: frat.categoria?.nombre || null,
+        cantidadCalificadores: evs.length,
+        cantidadCompletadas: selladas.length,
+        cantidadPendientes: evs.filter((e) => e.estado !== 'COMPLETADO').length,
+        promedioSellado: promedio,
+        todasSelladas: evs.length > 0 && evs.every((e) => e.estado === 'COMPLETADO'),
+      };
+    });
+
+    return { fase: faseInfo, sujetos };
+  }
+
+  /**
+   * Sella actas en la fase indicada.
+   * - Con idFraternidad o idParticipante: solo ese sujeto.
+   * - Sin sujeto: todas las actas abiertas de la fase (todos los jurados/admins y sujetos).
+   */
+  async cerrarActasAdmin(
+    idFase: number,
+    opts: { idFraternidad?: number; idParticipante?: number } = {},
+  ) {
+    const { idFraternidad, idParticipante } = opts;
+    if (idFraternidad && idParticipante) {
+      throw new BadRequestException('Indica idFraternidad o idParticipante, no ambos.');
+    }
+
+    const fase = await this.faseRepo.findOne({ where: { idFase } });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+
+    const where: any = { fase: { idFase } };
+    if (idParticipante) where.participante = { idParticipante };
+    else if (idFraternidad) where.fraternidad = { idFraternidad };
+
+    const evaluaciones = await this.evaluacionRepo.find({ where });
+    const pendientes = evaluaciones.filter((e) => e.estado !== 'COMPLETADO');
+
+    if (!pendientes.length) {
+      const alcance = idParticipante || idFraternidad
+        ? 'para el sujeto seleccionado'
+        : 'en esta fase';
+      return {
+        cerradas: 0,
+        mensaje: `No hay actas pendientes de cierre ${alcance}.`,
+      };
+    }
+
+    const ahora = new Date();
+    for (const ev of pendientes) {
+      ev.estado = 'COMPLETADO';
+      if (!ev.fechaApertura) ev.fechaApertura = ahora;
+      ev.fechaCierre = ahora;
+    }
+    await this.evaluacionRepo.save(pendientes);
+
+    const alcanceMsg = idParticipante || idFraternidad
+      ? `para el sujeto indicado en la fase "${fase.nombre}"`
+      : `de toda la fase "${fase.nombre}"`;
+
+    return {
+      cerradas: pendientes.length,
+      mensaje: `Se cerraron ${pendientes.length} acta(s) ${alcanceMsg}.`,
+    };
+  }
+
   async guardarEvaluacion(idUsuario: number, rol: string, args: { idFase: number, idFraternidad?: number, idParticipante?: number, criterios: any, finalizar: boolean }) {
     const { idFase, idFraternidad, idParticipante, criterios, finalizar } = args;
     const jurado = await this.getValidadorJurado(idUsuario, rol, idFase);
@@ -1187,10 +1461,11 @@ export class EvaluacionesService {
       payload.fechaFinInscripcion = null;
     }
 
-    const f = await this.faseRepo.save(this.faseRepo.create(payload));
+    const created = this.faseRepo.create(payload);
+    const nuevaFase = Array.isArray(created) ? created[0] : created;
+    const f = await this.faseRepo.save(nuevaFase);
     if (juradosIds?.length) {
-      const jurados = await this.juradoRepo.find({ where: { idJurado: In(juradosIds) }, relations: ['fasesHabilitadas'] });
-      for (const j of jurados) { j.fasesHabilitadas.push(f as any); await this.juradoRepo.save(j); }
+      await this.syncJuradosFase(f, juradosIds);
     }
     return f;
   }
@@ -1223,7 +1498,32 @@ export class EvaluacionesService {
     }
 
     Object.assign(f, payload);
-    return this.faseRepo.save(f);
+    const saved = await this.faseRepo.save(f);
+
+    if (juradosIds !== undefined) {
+      await this.syncJuradosFase(saved, Array.isArray(juradosIds) ? juradosIds : []);
+    }
+
+    return saved;
+  }
+
+  /** Sincroniza qué jurados tienen habilitada una fase (crear/editar fase o modal de asignación). */
+  private async syncJuradosFase(fase: Fase, juradoIds: number[]) {
+    const target = new Set(juradoIds.filter((id) => Number.isFinite(id)));
+    const jurados = await this.juradoRepo.find({ relations: ['fasesHabilitadas'] });
+
+    for (const jurado of jurados) {
+      const tieneFase = jurado.fasesHabilitadas.some((hf) => hf.idFase === fase.idFase);
+      const debeTener = target.has(jurado.idJurado);
+
+      if (debeTener && !tieneFase) {
+        jurado.fasesHabilitadas.push(fase);
+        await this.juradoRepo.save(jurado);
+      } else if (!debeTener && tieneFase) {
+        jurado.fasesHabilitadas = jurado.fasesHabilitadas.filter((hf) => hf.idFase !== fase.idFase);
+        await this.juradoRepo.save(jurado);
+      }
+    }
   }
 
   async deleteFase(id: number) {
