@@ -353,7 +353,9 @@ export class EvaluacionesService {
   private esCalificadorAdmin(jurado?: Jurado | null): boolean {
     const rol = String(jurado?.usuario?.rol?.nombre || '').toLowerCase();
     if (rol === 'admin' || rol === 'superusuario') return true;
-    return String(jurado?.tipoOrigen || '').toLowerCase().includes('admin');
+    const origen = String(jurado?.tipoOrigen || '').toLowerCase();
+    if (origen.includes('admin') || origen.includes('bypass')) return true;
+    return false;
   }
 
   /**
@@ -415,6 +417,7 @@ export class EvaluacionesService {
 
     const calificaciones = evaluaciones.map((ev) => {
       const esAdmin = this.esCalificadorAdmin(ev.jurado);
+      const rolNombre = String(ev.jurado?.usuario?.rol?.nombre || '').toLowerCase();
       const criteriosDetalle = Object.entries(ev.criteriosEvaluados || {}).map(([id, valor]) => {
         const crit = mapCriterio.get(Number(id));
         return {
@@ -428,7 +431,10 @@ export class EvaluacionesService {
       return {
         idEvaluacion: ev.idEvaluacion,
         idJurado: ev.jurado?.idJurado ?? null,
+        idUsuario: ev.jurado?.usuario?.idUsuario ?? null,
         juradoNombre: nombreJuradoDesdeUsuario(ev.jurado),
+        ci: ev.jurado?.usuario?.ci || null,
+        rolUsuario: rolNombre || null,
         tipoCalificador: esAdmin ? 'admin' : 'jurado',
         esAdmin,
         puntajeTotal: round2(Number(ev.puntajeTotal) || 0),
@@ -1587,7 +1593,162 @@ export class EvaluacionesService {
     try { const p = path.join(process.cwd(), url.replace('/api/v1/archivos/', 'uploads/')); if (fs.existsSync(p)) fs.unlinkSync(p); } catch (e) {}
   }
 
-  async registrarPenalizacionDisciplina(idUsuario: number, idFase: number, idFraternidad: number, tipo: string, observacion?: string) {
+  /** Presets de infracciones por gestión (no sobrescribe valores ya guardados en producción). */
+  static readonly PRESETS_INFRACCION: Array<{
+    codigo: string;
+    nombre: string;
+    valorImpacto: number;
+    tipoImpacto: string;
+  }> = [
+    { codigo: 'AMARILLA', nombre: 'Bandera Amarilla - Disciplina', valorImpacto: -1, tipoImpacto: 'RESTA_PUNTOS' },
+    { codigo: 'ROJA', nombre: 'Bandera Roja - Disciplina', valorImpacto: -2, tipoImpacto: 'RESTA_PUNTOS' },
+    { codigo: 'SANCION_ALCOHOL', nombre: 'Sanción: Consumo de Bebidas Alcohólicas', valorImpacto: -30, tipoImpacto: 'RESTA_PUNTOS' },
+    { codigo: 'SANCION_AGRESION', nombre: 'Sanción: Agresividad (Suspensión 1 Año)', valorImpacto: 0, tipoImpacto: 'SUSPENSION' },
+    { codigo: 'SANCION_BANDA', nombre: 'Sanción: Exceso de Bandas/Músicos', valorImpacto: -30, tipoImpacto: 'RESTA_PUNTOS' },
+    { codigo: 'SANCION_AJENO', nombre: 'Sanción: Personal ajeno a la UMSA (Suspensión 1 Año)', valorImpacto: 0, tipoImpacto: 'SUSPENSION' },
+  ];
+
+  async ensureInfraccionesPreset(idGestion: number) {
+    const gestion = await this.gestionRepo.findOne({ where: { idGestion } });
+    if (!gestion) throw new NotFoundException('Gestión no encontrada');
+    const creadas: Infraccion[] = [];
+    for (const p of EvaluacionesService.PRESETS_INFRACCION) {
+      let inf = await this.infraccionRepo.findOne({
+        where: { nombre: p.nombre, gestion: { idGestion } },
+      });
+      if (!inf) {
+        inf = await this.infraccionRepo.save(
+          this.infraccionRepo.create({
+            nombre: p.nombre,
+            tipoImpacto: p.tipoImpacto,
+            valorImpacto: p.valorImpacto,
+            gestion,
+          }),
+        );
+        creadas.push(inf);
+      }
+    }
+    return { gestion: { idGestion: gestion.idGestion, anio: gestion.anio }, creadas: creadas.length };
+  }
+
+  async listarInfracciones(idGestion?: number) {
+    const gestion = idGestion
+      ? await this.gestionRepo.findOne({ where: { idGestion } })
+      : await this.getGestionActiva();
+    if (!gestion) throw new NotFoundException('No hay gestión activa');
+    await this.ensureInfraccionesPreset(gestion.idGestion);
+    const items = await this.infraccionRepo.find({
+      where: { gestion: { idGestion: gestion.idGestion } },
+      order: { nombre: 'ASC' },
+    });
+    return {
+      gestion: { idGestion: gestion.idGestion, anio: gestion.anio },
+      items: items.map((i) => ({
+        idInfraccion: i.idInfraccion,
+        nombre: i.nombre,
+        tipoImpacto: i.tipoImpacto || 'RESTA_PUNTOS',
+        valorImpacto: Number(i.valorImpacto) || 0,
+        codigoPreset:
+          EvaluacionesService.PRESETS_INFRACCION.find((p) => p.nombre === i.nombre)?.codigo || null,
+      })),
+    };
+  }
+
+  async crearInfraccion(data: {
+    idGestion?: number;
+    nombre: string;
+    tipoImpacto?: string;
+    valorImpacto?: number;
+  }) {
+    const gestion = data.idGestion
+      ? await this.gestionRepo.findOne({ where: { idGestion: data.idGestion } })
+      : await this.getGestionActiva();
+    if (!gestion) throw new NotFoundException('No hay gestión activa');
+    const nombre = String(data.nombre || '').trim();
+    if (!nombre) throw new BadRequestException('El nombre de la infracción es obligatorio.');
+    const existe = await this.infraccionRepo.findOne({
+      where: { nombre, gestion: { idGestion: gestion.idGestion } },
+    });
+    if (existe) {
+      throw new BadRequestException('Ya existe una infracción con ese nombre en esta gestión.');
+    }
+    const tipoImpacto =
+      data.tipoImpacto === 'SUSPENSION' ? 'SUSPENSION' : 'RESTA_PUNTOS';
+    const valorImpacto = Number(data.valorImpacto) || 0;
+    const saved = await this.infraccionRepo.save(
+      this.infraccionRepo.create({
+        nombre,
+        tipoImpacto,
+        valorImpacto,
+        gestion,
+      }),
+    );
+    return {
+      idInfraccion: saved.idInfraccion,
+      nombre: saved.nombre,
+      tipoImpacto: saved.tipoImpacto,
+      valorImpacto: Number(saved.valorImpacto) || 0,
+    };
+  }
+
+  async actualizarInfraccion(
+    idInfraccion: number,
+    data: { nombre?: string; tipoImpacto?: string; valorImpacto?: number },
+  ) {
+    const inf = await this.infraccionRepo.findOne({
+      where: { idInfraccion },
+      relations: ['gestion'],
+    });
+    if (!inf) throw new NotFoundException('Infracción no encontrada');
+    if (data.nombre !== undefined) {
+      const nombre = String(data.nombre || '').trim();
+      if (!nombre) throw new BadRequestException('Nombre inválido.');
+      const dup = await this.infraccionRepo.findOne({
+        where: { nombre, gestion: { idGestion: inf.gestion.idGestion } },
+      });
+      if (dup && dup.idInfraccion !== idInfraccion) {
+        throw new BadRequestException('Ya existe otra infracción con ese nombre.');
+      }
+      inf.nombre = nombre;
+    }
+    if (data.tipoImpacto !== undefined) {
+      inf.tipoImpacto = data.tipoImpacto === 'SUSPENSION' ? 'SUSPENSION' : 'RESTA_PUNTOS';
+    }
+    if (data.valorImpacto !== undefined) {
+      inf.valorImpacto = Number(data.valorImpacto) || 0;
+    }
+    const saved = await this.infraccionRepo.save(inf);
+    return {
+      idInfraccion: saved.idInfraccion,
+      nombre: saved.nombre,
+      tipoImpacto: saved.tipoImpacto,
+      valorImpacto: Number(saved.valorImpacto) || 0,
+    };
+  }
+
+  async eliminarInfraccion(idInfraccion: number) {
+    const inf = await this.infraccionRepo.findOne({ where: { idInfraccion } });
+    if (!inf) throw new NotFoundException('Infracción no encontrada');
+    const usadas = await this.incidenciaRepo.count({
+      where: { infraccion: { idInfraccion } },
+    });
+    if (usadas > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar: hay ${usadas} incidencia(s) que usan esta infracción. Puedes editar su valor para futuros casos.`,
+      );
+    }
+    await this.infraccionRepo.delete(idInfraccion);
+    return { ok: true };
+  }
+
+  async registrarPenalizacionDisciplina(
+    idUsuario: number,
+    idFase: number,
+    idFraternidad: number,
+    tipo: string,
+    observacion?: string,
+    idInfraccion?: number,
+  ) {
     const gestion = await this.getGestionActiva();
     if (!gestion) throw new BadRequestException('No hay gestión activa.');
 
@@ -1599,50 +1760,43 @@ export class EvaluacionesService {
 
     const usuario = await this.usuarioRepo.findOne({ where: { idUsuario } });
 
-    // Definir valores de impacto
-    let valorImpacto = 0;
-    let nombreInfraccion = tipo;
-    let tipoImpacto = 'RESTA_PUNTOS';
+    await this.ensureInfraccionesPreset(gestion.idGestion);
 
-    switch (tipo) {
-      case 'AMARILLA':
-        valorImpacto = -1;
-        nombreInfraccion = 'Bandera Amarilla - Disciplina';
-        break;
-      case 'ROJA':
-        valorImpacto = -2;
-        nombreInfraccion = 'Bandera Roja - Disciplina';
-        break;
-      case 'SANCION_ALCOHOL':
-        valorImpacto = -30;
-        nombreInfraccion = 'Sanción: Consumo de Bebidas Alcohólicas';
-        break;
-      case 'SANCION_AGRESION':
-        valorImpacto = 0;
-        nombreInfraccion = 'Sanción: Agresividad (Suspensión 1 Año)';
-        tipoImpacto = 'SUSPENSION';
-        break;
-      case 'SANCION_BANDA':
-        valorImpacto = -30;
-        nombreInfraccion = 'Sanción: Exceso de Bandas/Músicos';
-        break;
-      case 'SANCION_AJENO':
-        valorImpacto = 0;
-        nombreInfraccion = 'Sanción: Personal ajeno a la UMSA (Suspensión 1 Año)';
-        tipoImpacto = 'SUSPENSION';
-        break;
-    }
+    let infraccion: Infraccion | null = null;
 
-    // Buscar o crear la infracción
-    let infraccion = await this.infraccionRepo.findOne({ where: { nombre: nombreInfraccion, gestion: { idGestion: gestion.idGestion } } });
-    if (!infraccion) {
-      infraccion = this.infraccionRepo.create({
-        nombre: nombreInfraccion,
-        tipoImpacto: tipoImpacto,
-        valorImpacto: valorImpacto,
-        gestion
+    if (idInfraccion) {
+      infraccion = await this.infraccionRepo.findOne({
+        where: { idInfraccion, gestion: { idGestion: gestion.idGestion } },
       });
-      infraccion = await this.infraccionRepo.save(infraccion);
+      if (!infraccion) {
+        throw new NotFoundException('Infracción no encontrada en la gestión activa.');
+      }
+    } else {
+      const preset = EvaluacionesService.PRESETS_INFRACCION.find(
+        (p) => p.codigo === tipo || p.nombre === tipo,
+      );
+      const nombreInfraccion = preset?.nombre || String(tipo || '').trim();
+      if (!nombreInfraccion) {
+        throw new BadRequestException('Indica el tipo de sanción o el id de infracción.');
+      }
+      infraccion = await this.infraccionRepo.findOne({
+        where: { nombre: nombreInfraccion, gestion: { idGestion: gestion.idGestion } },
+      });
+      if (!infraccion && preset) {
+        infraccion = await this.infraccionRepo.save(
+          this.infraccionRepo.create({
+            nombre: preset.nombre,
+            tipoImpacto: preset.tipoImpacto,
+            valorImpacto: preset.valorImpacto,
+            gestion,
+          }),
+        );
+      }
+      if (!infraccion) {
+        throw new BadRequestException(
+          'Infracción no encontrada. Crea el tipo en el catálogo de infracciones o usa un preset válido.',
+        );
+      }
     }
 
     const incidencia = this.incidenciaRepo.create({
@@ -1650,7 +1804,7 @@ export class EvaluacionesService {
       fraternidad,
       usuario,
       infraccion,
-      observacion: observacion || `Registrado por controlador HCU`
+      observacion: observacion || `Registrado por controlador HCU`,
     });
 
     return this.incidenciaRepo.save(incidencia);
@@ -1669,6 +1823,178 @@ export class EvaluacionesService {
       select: ['idGestion', 'anio', 'lema', 'activa'],
       order: { anio: 'DESC' }
     });
+  }
+
+  /**
+   * Matriz de calificaciones EFU: por fraternidad → jurados (notas por fase) +
+   * promedio final + sanciones dinámicas + nota Chacha-Warmi (1 pareja).
+   */
+  async getMatrizCalificaciones(idGestion: number) {
+    const gestion = await this.gestionRepo.findOne({ where: { idGestion } });
+    if (!gestion) throw new NotFoundException('Gestión no encontrada');
+
+    const fasesEfu = await this.faseRepo.find({
+      where: { gestion: { idGestion }, tipoConcurso: 'EFU' },
+      order: { idFase: 'ASC' },
+    });
+    const fasesEfuMeta = fasesEfu.map((f) => ({
+      idFase: f.idFase,
+      nombre: f.nombre,
+      categoriaEfu: f.categoriaEfu || null,
+    }));
+
+    const frats = await this.fraternidadRepo.find({
+      where: {
+        habilitadoEfu: true,
+        gestion: { idGestion },
+        nivelRepresentacion: Not('Externo'),
+      },
+      relations: ['categoria', 'facultad', 'carrera', 'institucionExterna', 'tipoDanza'],
+      order: { nombre: 'ASC' },
+    });
+
+    const evsEfu = await this.evaluacionRepo.find({
+      where: {
+        estado: 'COMPLETADO',
+        fase: { gestion: { idGestion }, tipoConcurso: 'EFU' },
+      },
+      relations: ['fraternidad', 'fase', 'jurado', 'jurado.usuario'],
+    });
+
+    const incidencias = await this.incidenciaRepo.find({
+      where: { gestion: { idGestion } },
+      relations: ['fraternidad', 'infraccion'],
+    });
+
+    const scores = calcularScoresEfu(
+      evsEfu.map((e) => actaDesdeEvaluacion(e)).filter((a): a is NonNullable<typeof a> => !!a),
+    );
+
+    // Chacha-Warmi: promedio de Chacha + Warmi por fraternidad
+    const evsChacha = await this.evaluacionRepo
+      .createQueryBuilder('e')
+      .leftJoinAndSelect('e.participante', 'p')
+      .leftJoinAndSelect('p.fraternidad', 'pf')
+      .leftJoinAndSelect('e.fase', 'fase')
+      .leftJoin('fase.gestion', 'g')
+      .where('e.estado = :est', { est: 'COMPLETADO' })
+      .andWhere('g.id_gestion = :idGestion', { idGestion })
+      .andWhere('fase.tipo_concurso = :tipo', { tipo: 'EXTERNO' })
+      .andWhere(
+        `(fase.plantilla_requisitos = :plant OR LOWER(fase.nombre) LIKE :nom)`,
+        { plant: 'chacha_warmi', nom: '%chacha%' },
+      )
+      .getMany();
+    const chachaPorFrat = new Map<
+      number,
+      { sum: number; count: number; nombres: string[]; idFase: number | null; nombreFase: string | null }
+    >();
+    for (const e of evsChacha) {
+      const idFrat = e.participante?.fraternidad?.idFraternidad;
+      if (!idFrat || !e.participante) continue;
+      let acc = chachaPorFrat.get(idFrat);
+      if (!acc) {
+        acc = {
+          sum: 0,
+          count: 0,
+          nombres: [],
+          idFase: e.fase?.idFase ?? null,
+          nombreFase: e.fase?.nombre ?? null,
+        };
+        chachaPorFrat.set(idFrat, acc);
+      }
+      const pts = Number(e.puntajeTotal) || 0;
+      acc.sum += pts;
+      acc.count++;
+      const nom = e.participante.nombre;
+      if (nom && !acc.nombres.includes(nom)) acc.nombres.push(nom);
+    }
+
+    const grupos = frats.map((f) => {
+      const score = scores.get(f.idFraternidad);
+      const sanciones = incidencias
+        .filter((i) => i.fraternidad?.idFraternidad === f.idFraternidad && i.infraccion)
+        .map((i) => ({
+          nombre: i.infraccion.nombre,
+          valor: Number(i.infraccion.valorImpacto) || 0,
+          tipoImpacto: i.infraccion.tipoImpacto || 'RESTA_PUNTOS',
+        }));
+      const impactoSanciones = round2(
+        sanciones.reduce((s, x) => s + (Number(x.valor) || 0), 0),
+      );
+      const promedioFinal = score?.promedioFinal ?? 0;
+      const puntajeFinal = Math.max(0, round2(promedioFinal + impactoSanciones));
+      const suspendida = sanciones.some((s) => s.tipoImpacto === 'SUSPENSION');
+
+      const jurados = (score?.jurados || []).map((j) => {
+        const notasPorFase: Record<number, number | null> = {};
+        for (const fase of fasesEfuMeta) {
+          const acta = j.fases.find((x) => x.idFase === fase.idFase);
+          notasPorFase[fase.idFase] = acta ? round2(acta.puntajeTotal) : null;
+        }
+        return {
+          idJurado: j.idJurado,
+          juradoNombre: j.juradoNombre,
+          notasPorFase,
+          totalEfu: j.notaFraternidad,
+          fasesCalificadas: j.fasesCalificadas,
+        };
+      });
+
+      const chachaAcc = chachaPorFrat.get(f.idFraternidad);
+      const chachaWarmi = chachaAcc && chachaAcc.count > 0
+        ? {
+            nota: round2(chachaAcc.sum / chachaAcc.count),
+            nombres: chachaAcc.nombres,
+            idFase: chachaAcc.idFase,
+            nombreFase: chachaAcc.nombreFase,
+          }
+        : null;
+
+      const pertenencia =
+        f.facultad?.nombre ||
+        f.carrera?.nombre ||
+        f.institucionExterna?.nombre ||
+        f.nivelRepresentacion ||
+        '—';
+
+      return {
+        idFraternidad: f.idFraternidad,
+        nombreFraternidad: f.nombre,
+        categoria: f.categoria?.nombre || 'General',
+        tipoDanza: f.tipoDanza?.nombre || '—',
+        pertenencia,
+        cantidadJurados: score?.cantidadJurados ?? 0,
+        jurados,
+        promedioFinal,
+        promedioJurado: promedioFinal,
+        impactoSanciones,
+        detalleSanciones: sanciones.map((s) => s.nombre).join(' · ') || '—',
+        sanciones,
+        suspendida,
+        puntajeFinal,
+        chachaWarmi,
+      };
+    });
+
+    // Orden por puntaje final (ranking)
+    grupos.sort((a, b) => b.puntajeFinal - a.puntajeFinal);
+    grupos.forEach((g, i) => {
+      (g as any).puesto = i + 1;
+      (g as any).nro = i + 1;
+    });
+
+    return {
+      gestion: {
+        idGestion: gestion.idGestion,
+        anio: gestion.anio,
+        lema: gestion.lema,
+        activa: gestion.activa,
+      },
+      fasesEfu: fasesEfuMeta,
+      formula: `${FORMULA_EFU_PROMEDIO}; final = max(0, Promedio Final + sanciones); fases no calificadas no restan`,
+      grupos,
+    };
   }
 
   async getReporteHistorico(idGestion: number) {

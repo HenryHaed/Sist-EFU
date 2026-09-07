@@ -165,9 +165,64 @@ export class EvaluacionesController {
     @Request() req: any,
     @Param('idFase', ParseIntPipe) idFase: number,
     @Param('idFraternidad', ParseIntPipe) idFraternidad: number,
-    @Body() payload: { tipo: string, observacion?: string }
+    @Body() payload: { tipo?: string; idInfraccion?: number; observacion?: string }
   ) {
-    return this.evaluacionesService.registrarPenalizacionDisciplina(req.user.idUsuario, idFase, idFraternidad, payload.tipo, payload.observacion);
+    return this.evaluacionesService.registrarPenalizacionDisciplina(
+      req.user.idUsuario,
+      idFase,
+      idFraternidad,
+      payload.tipo || '',
+      payload.observacion,
+      payload.idInfraccion ? Number(payload.idInfraccion) : undefined,
+    );
+  }
+
+  @Get('infracciones')
+  @Roles('superusuario', 'admin', 'controladorhcu')
+  listarInfracciones(@Query('idGestion') idGestion?: string) {
+    const id = idGestion ? parseInt(idGestion, 10) : undefined;
+    return this.evaluacionesService.listarInfracciones(Number.isFinite(id) ? id : undefined);
+  }
+
+  @Post('infracciones')
+  @Roles('superusuario', 'admin')
+  crearInfraccion(
+    @Body()
+    body: {
+      idGestion?: number;
+      nombre: string;
+      tipoImpacto?: string;
+      valorImpacto?: number;
+    },
+  ) {
+    return this.evaluacionesService.crearInfraccion(body);
+  }
+
+  @Post('infracciones/ensure-presets')
+  @Roles('superusuario', 'admin')
+  async ensurePresets(@Body() body: { idGestion?: number }) {
+    let id = body?.idGestion ? Number(body.idGestion) : NaN;
+    if (!Number.isFinite(id)) {
+      const g = await this.evaluacionesService.getGestionActiva();
+      if (!g) throw new BadRequestException('No hay gestión activa');
+      id = g.idGestion;
+    }
+    return this.evaluacionesService.ensureInfraccionesPreset(id);
+  }
+
+  @Put('infracciones/:id')
+  @Roles('superusuario', 'admin')
+  actualizarInfraccion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { nombre?: string; tipoImpacto?: string; valorImpacto?: number },
+  ) {
+    return this.evaluacionesService.actualizarInfraccion(id, body);
+  }
+
+  @Delete('infracciones/:id')
+  @Roles('superusuario', 'admin')
+  eliminarInfraccion(@Param('id', ParseIntPipe) id: number) {
+    return this.evaluacionesService.eliminarInfraccion(id);
   }
 
   @Delete('fase/:idFase/fraternidad/:idFraternidad/penalizaciones/:idIncidencia')

@@ -7,6 +7,9 @@ import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { FichaTecnicaMonografia } from '../entities/FichaTecnicaMonografia';
+import { Jurado } from '../entities/Jurado';
+import { Participante } from '../entities/Participante';
+import { Fase } from '../entities/Fase';
 import { CreateFraternidadDto, UpdateFraternidadDto } from './dto/fraternidad.dto';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
@@ -25,6 +28,12 @@ export class FraternidadesService {
     private readonly solicitudRepo: Repository<SolicitudInscripcion>,
     @InjectRepository(FichaTecnicaMonografia)
     private readonly fichaRepo: Repository<FichaTecnicaMonografia>,
+    @InjectRepository(Jurado)
+    private readonly juradoRepo: Repository<Jurado>,
+    @InjectRepository(Participante)
+    private readonly participanteRepo: Repository<Participante>,
+    @InjectRepository(Fase)
+    private readonly faseRepo: Repository<Fase>,
   ) {}
 
   async getGestionActiva() {
@@ -152,28 +161,11 @@ export class FraternidadesService {
   async update(id: number, updateDto: UpdateFraternidadDto) {
     const fraternidad = await this.findOne(id);
     const { idFacultad, idCarrera, idInstitucionExterna, idCategoria, ...data } = updateDto;
-    const nombreAnterior = fraternidad.nombre;
 
     const updateData: any = { ...data };
     if (updateData.nombre !== undefined) {
-      updateData.nombre = String(updateData.nombre || '')
-        .trim()
-        .toUpperCase();
-      if (!updateData.nombre) {
-        throw new BadRequestException('El nombre de la fraternidad no puede estar vacío.');
-      }
-      if (updateData.nombre !== String(nombreAnterior || '').trim()) {
-        const conflicto = await this.fraternidadRepo
-          .createQueryBuilder('f')
-          .where('UPPER(TRIM(f.nombre)) = :nombre', { nombre: updateData.nombre })
-          .andWhere('f.id_fraternidad != :id', { id })
-          .getOne();
-        if (conflicto) {
-          throw new BadRequestException(
-            `Ya existe otra fraternidad con el nombre "${updateData.nombre}".`,
-          );
-        }
-      }
+      // El nombre canónico solo se cambia desde Usuarios → Delegados
+      delete updateData.nombre;
     }
     if (idFacultad !== undefined) updateData.facultad = idFacultad ? { idFacultad } : null;
     if (idCarrera !== undefined) updateData.carrera = idCarrera ? { idCarrera } : null;
@@ -187,19 +179,53 @@ export class FraternidadesService {
     Object.assign(fraternidad, updateData);
     const saved = await this.fraternidadRepo.save(fraternidad);
 
-    // Propagar nombre a solicitud aprobada y ficha técnica (copias desnormalizadas)
-    if (
-      updateData.nombre !== undefined &&
-      String(updateData.nombre) !== String(nombreAnterior || '')
-    ) {
-      await this.sincronizarNombreRelacionados(id, updateData.nombre);
-    }
-
     return saved;
   }
 
-  /** Actualiza nombre_fraternidad en solicitud y ficha técnica vinculadas. */
-  private async sincronizarNombreRelacionados(idFraternidad: number, nombre: string) {
+  /**
+   * Renombra la fraternidad canónica y sincroniza copias desnormalizadas.
+   * Solo actualiza el campo nombre en fraternidad / solicitud / ficha.
+   * No elimina ni recrea fraternidades, fichas técnicas ni monografías.
+   */
+  async renombrarFraternidad(idFraternidad: number, nombreNuevo: string) {
+    const nombreNorm = String(nombreNuevo || '')
+      .trim()
+      .toUpperCase();
+    if (!nombreNorm) {
+      throw new BadRequestException('El nombre de la fraternidad no puede estar vacío.');
+    }
+
+    const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
+    if (!frat) throw new NotFoundException('Fraternidad no encontrada');
+
+    const anterior = String(frat.nombre || '').trim().toUpperCase();
+    if (nombreNorm === anterior) {
+      await this.sincronizarNombreRelacionados(idFraternidad, frat.nombre);
+      return frat;
+    }
+
+    const conflicto = await this.fraternidadRepo
+      .createQueryBuilder('f')
+      .where('UPPER(TRIM(f.nombre)) = :nombre', { nombre: nombreNorm })
+      .andWhere('f.id_fraternidad != :id', { id: idFraternidad })
+      .getOne();
+    if (conflicto) {
+      throw new BadRequestException(
+        `Ya existe otra fraternidad con el nombre "${nombreNorm}".`,
+      );
+    }
+
+    frat.nombre = nombreNorm;
+    const saved = await this.fraternidadRepo.save(frat);
+    await this.sincronizarNombreRelacionados(idFraternidad, nombreNorm);
+    return saved;
+  }
+
+  /**
+   * Actualiza SOLO el texto nombre_fraternidad en solicitud y ficha vinculadas.
+   * No toca URLs, PDFs, criterios ni el FK id_fraternidad de monografías/fichas.
+   */
+  async sincronizarNombreRelacionados(idFraternidad: number, nombre: string) {
     const nombreNorm = String(nombre || '').trim();
     if (!nombreNorm) return;
 
@@ -210,12 +236,105 @@ export class FraternidadesService {
       .where('id_fraternidad_creada = :id', { id: idFraternidad })
       .execute();
 
+    // Solo columna nombre_fraternidad; el resto del contenido de la ficha se conserva
     await this.fichaRepo
       .createQueryBuilder()
       .update(FichaTecnicaMonografia)
       .set({ nombreFraternidad: nombreNorm })
       .where('id_fraternidad = :id', { id: idFraternidad })
       .execute();
+  }
+
+  /**
+   * Reparación producción: resincroniza nombres denormalizados y detecta desalineaciones.
+   * dryRun=true solo reporta; no escribe.
+   */
+  async repararNombresDesalineados(dryRun = true) {
+    const frats = await this.fraternidadRepo.find({ order: { nombre: 'ASC' } });
+    const syncPreview: Array<{ idFraternidad: number; nombre: string; solicitudes: number; fichas: number }> = [];
+    let solicitudesActualizadas = 0;
+    let fichasActualizadas = 0;
+
+    for (const frat of frats) {
+      const solCount = await this.solicitudRepo
+        .createQueryBuilder('s')
+        .where('s.id_fraternidad_creada = :id', { id: frat.idFraternidad })
+        .andWhere('UPPER(TRIM(s.nombre_fraternidad)) != UPPER(TRIM(:nombre))', {
+          nombre: frat.nombre,
+        })
+        .getCount();
+
+      const fichaCount = await this.fichaRepo
+        .createQueryBuilder('f')
+        .where('f.id_fraternidad = :id', { id: frat.idFraternidad })
+        .andWhere('UPPER(TRIM(f.nombre_fraternidad)) != UPPER(TRIM(:nombre))', {
+          nombre: frat.nombre,
+        })
+        .getCount();
+
+      if (solCount || fichaCount) {
+        syncPreview.push({
+          idFraternidad: frat.idFraternidad,
+          nombre: frat.nombre,
+          solicitudes: solCount,
+          fichas: fichaCount,
+        });
+        if (!dryRun) {
+          await this.sincronizarNombreRelacionados(frat.idFraternidad, frat.nombre);
+          solicitudesActualizadas += solCount;
+          fichasActualizadas += fichaCount;
+        }
+      }
+    }
+
+    // Desalineación: delegado.usuario.fraternidad ≠ solicitud.fraternidadCreada
+    const desalineados = await this.solicitudRepo
+      .createQueryBuilder('s')
+      .innerJoinAndSelect('s.delegado', 'd')
+      .leftJoinAndSelect('d.fraternidad', 'uf')
+      .leftJoinAndSelect('s.fraternidadCreada', 'sf')
+      .where('d.id_fraternidad IS NOT NULL')
+      .andWhere(
+        '(s.id_fraternidad_creada IS NULL OR s.id_fraternidad_creada != d.id_fraternidad)',
+      )
+      .getMany();
+
+    const desalineacionPreview = desalineados.map((s) => ({
+      idSolicitud: s.idSolicitud,
+      nombreSolicitud: s.nombreFraternidad,
+      idFraternidadDelegado: s.delegado?.fraternidad?.idFraternidad ?? null,
+      nombreDelegado: s.delegado?.fraternidad?.nombre ?? null,
+      idFraternidadCreada: s.fraternidadCreada?.idFraternidad ?? null,
+      nombreCreada: s.fraternidadCreada?.nombre ?? null,
+    }));
+
+    if (!dryRun) {
+      for (const s of desalineados) {
+        const idFrat = s.delegado?.fraternidad?.idFraternidad;
+        const nombre = s.delegado?.fraternidad?.nombre;
+        if (!idFrat || !nombre) continue;
+        s.fraternidadCreada = { idFraternidad: idFrat } as Fraternidad;
+        s.nombreFraternidad = nombre;
+        await this.solicitudRepo.save(s);
+        // Solo actualiza texto en fichas de esa fraternidad canónica; no mueve ni borra fichas
+        await this.sincronizarNombreRelacionados(idFrat, nombre);
+      }
+    }
+
+    return {
+      dryRun,
+      syncPreview,
+      desalineacionPreview,
+      aplicados: dryRun
+        ? null
+        : {
+            fraternidadesSincronizadas: syncPreview.length,
+            solicitudesActualizadas,
+            fichasActualizadas,
+            solicitudesRevinculadas: desalineados.length,
+          },
+      nota: 'El resync solo actualiza el texto del nombre. No elimina fichas técnicas ni monografías.',
+    };
   }
 
   async remove(id: number) {
@@ -307,6 +426,78 @@ export class FraternidadesService {
           : null,
       },
       miembros,
+    };
+  }
+
+  async getDetalle(idFraternidad: number) {
+    const fraternidad = await this.fraternidadRepo.findOne({
+      where: { idFraternidad },
+      relations: ['facultad', 'carrera', 'institucionExterna', 'categoria', 'tipoDanza', 'gestion'],
+    });
+    if (!fraternidad) throw new NotFoundException(`Fraternidad con ID ${idFraternidad} no encontrada`);
+
+    // --- Directiva (soft: no lanza error si no hay) ---
+    let directivaData: any = null;
+    try {
+      directivaData = await this.getDirectiva(idFraternidad);
+    } catch (_) {
+      // sin directiva aún
+    }
+
+    // --- Jurados asignados a esta fraternidad ---
+    const jurados = await this.juradoRepo
+      .createQueryBuilder('j')
+      .innerJoin('j.fraternidadesHabilitadas', 'fh', 'fh.idFraternidad = :idF', { idF: idFraternidad })
+      .leftJoinAndSelect('j.usuario', 'u')
+      .leftJoinAndSelect('j.fasesHabilitadas', 'fases')
+      .getMany();
+
+    const juradosMapped = jurados.map((j) => ({
+      idJurado: j.idJurado,
+      tipoJurado: j.tipoJurado,
+      nombre: j.usuario
+        ? [j.usuario.nombres, j.usuario.primerApellido, j.usuario.segundoApellido].filter(Boolean).join(' ')
+        : 'Sin usuario',
+      ci: j.usuario?.ci || '',
+      fases: (j.fasesHabilitadas || []).map((f) => ({
+        idFase: f.idFase,
+        nombre: f.nombre,
+        tipoConcurso: f.tipoConcurso,
+      })),
+    }));
+
+    // --- Participantes de concursos externos vinculados a esta fraternidad ---
+    const participantes = await this.participanteRepo.find({
+      where: { fraternidad: { idFraternidad } },
+      relations: ['fase', 'facultad', 'carrera'],
+      order: { nombre: 'ASC' },
+    });
+
+    const participantesMapped = participantes.map((p) => ({
+      idParticipante: p.idParticipante,
+      nombre: p.nombre,
+      tipo: p.tipo,
+      esUmsa: p.esUmsa,
+      fase: p.fase ? { idFase: p.fase.idFase, nombre: p.fase.nombre, plantilla: (p.fase as any).plantillaRequisitos } : null,
+      facultad: p.facultad?.nombre || p.institucionExterna || null,
+      carrera: p.carrera?.nombre || null,
+    }));
+
+    return {
+      fraternidad: {
+        idFraternidad: fraternidad.idFraternidad,
+        nombre: fraternidad.nombre,
+        tipoDanza: fraternidad.tipoDanza?.nombre || null,
+        categoria: fraternidad.categoria?.nombre || null,
+        nivelRepresentacion: fraternidad.nivelRepresentacion,
+        habilitadoEfu: fraternidad.habilitadoEfu,
+        gestionAnio: fraternidad.gestion?.anio || null,
+        facultad: fraternidad.facultad?.nombre || fraternidad.institucionExterna?.nombre || null,
+        carrera: fraternidad.carrera?.nombre || null,
+      },
+      directiva: directivaData,
+      jurados: juradosMapped,
+      participantes: participantesMapped,
     };
   }
 

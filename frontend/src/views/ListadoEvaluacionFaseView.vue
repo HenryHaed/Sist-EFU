@@ -362,23 +362,59 @@
 
         <v-card-text class="pa-6 sm:pa-8 bg-red-50 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
           <p class="text-red-900 text-sm mb-6 font-medium leading-relaxed">
-            Seleccione una sanción grave según el reglamento de disciplina.
-            <b class="uppercase">Estas acciones son irreversibles</b> y afectan de forma severa la participación de la fraternidad.
+            Seleccione una sanción del catálogo (valores dinámicos por gestión).
+            <b class="uppercase">Estas acciones afectan el puntaje final</b> de la fraternidad.
           </p>
           
           <div class="grid gap-3">
-            <button v-for="s in sancionesReglamento" :key="s.id"
+            <button v-for="s in sancionesCatalogo" :key="s.idInfraccion"
               @click="preconfirmarSancion(s)"
               class="w-full p-4 rounded-xl border-2 border-red-200 bg-white hover:border-red-700 hover:bg-red-100 text-left transition-all flex items-center gap-4 group"
             >
               <div class="size-11 rounded-lg bg-red-100 group-hover:bg-red-700 flex items-center justify-center text-red-700 group-hover:text-white shrink-0">
-                <span class="material-symbols-outlined">{{ s.icono }}</span>
+                <span class="material-symbols-outlined">{{ iconoInfraccion(s) }}</span>
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-black text-red-950">{{ s.titulo }}</p>
-                <p class="text-[10px] text-red-700 uppercase tracking-widest font-black mt-0.5">{{ s.penalidad }}</p>
+                <p class="text-sm font-black text-red-950">{{ s.nombre }}</p>
+                <p class="text-[10px] text-red-700 uppercase tracking-widest font-black mt-0.5">
+                  {{ etiquetaImpactoInfraccion(s) }}
+                </p>
               </div>
               <span class="material-symbols-outlined text-red-300 group-hover:text-red-700 shrink-0">chevron_right</span>
+            </button>
+            <p v-if="!sancionesCatalogo.length" class="text-sm text-red-700/80 text-center py-4">
+              No hay infracciones en el catálogo. {{ esAdmin ? 'Crea una abajo.' : 'Contacta al administrador.' }}
+            </p>
+          </div>
+
+          <div v-if="esAdmin" class="mt-6 pt-5 border-t border-red-200 space-y-3">
+            <p class="text-[10px] font-black uppercase tracking-widest text-red-800">Nueva infracción (catálogo)</p>
+            <input
+              v-model="nuevaInfraccion.nombre"
+              type="text"
+              placeholder="Nombre / motivo"
+              class="w-full px-3 py-2.5 rounded-xl border border-red-200 bg-white text-sm font-medium outline-none focus:border-red-500"
+            />
+            <div class="grid grid-cols-2 gap-2">
+              <select v-model="nuevaInfraccion.tipoImpacto" class="px-3 py-2.5 rounded-xl border border-red-200 bg-white text-sm font-bold">
+                <option value="RESTA_PUNTOS">Resta puntos</option>
+                <option value="SUSPENSION">Suspensión</option>
+              </select>
+              <input
+                v-model.number="nuevaInfraccion.valorImpacto"
+                type="number"
+                step="0.01"
+                placeholder="Impacto (ej. -5)"
+                class="px-3 py-2.5 rounded-xl border border-red-200 bg-white text-sm font-bold"
+              />
+            </div>
+            <button
+              type="button"
+              :disabled="guardandoInfraccion || !nuevaInfraccion.nombre?.trim()"
+              @click="crearInfraccionCatalogo"
+              class="w-full py-2.5 rounded-xl bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+            >
+              {{ guardandoInfraccion ? 'Guardando…' : 'Agregar al catálogo' }}
             </button>
           </div>
         </v-card-text>
@@ -398,9 +434,9 @@
         </div>
         
         <v-card-text class="pa-8 text-center bg-red-50">
-          <p class="text-red-950 font-black text-lg mb-2">{{ sancionSeleccionada?.titulo }}</p>
-          <p class="text-red-800 text-sm mb-2 font-bold uppercase tracking-widest">{{ sancionSeleccionada?.penalidad }}</p>
-          <p class="text-red-700/80 text-sm mb-6">{{ sancionSeleccionada?.descripcion }}</p>
+          <p class="text-red-950 font-black text-lg mb-2">{{ sancionSeleccionada?.nombre || sancionSeleccionada?.titulo }}</p>
+          <p class="text-red-800 text-sm mb-2 font-bold uppercase tracking-widest">{{ etiquetaImpactoInfraccion(sancionSeleccionada) || sancionSeleccionada?.penalidad }}</p>
+          <p class="text-red-700/80 text-sm mb-6">Se aplicará esta infracción del catálogo al puntaje final de la fraternidad.</p>
 
           <div v-if="contador > 0" class="size-16 rounded-full border-4 border-slate-100 flex items-center justify-center mx-auto mb-4">
              <span class="text-2xl font-black text-primary">{{ contador }}</span>
@@ -498,12 +534,9 @@ const contador = ref(5)
 const cargandoSancion = ref(false)
 let countdownInterval = null
 
-const sancionesReglamento = [
-  { id: 'SANCION_ALCOHOL', titulo: 'Consumo de Bebidas Alcohólicas', penalidad: 'Puntaje 0 en Disciplina', icono: 'local_bar', descripcion: 'Se ha detectado consumo de alcohol por parte de los integrantes durante el recorrido.', tipo: 'SANCION_ALCOHOL' },
-  { id: 'SANCION_AGRESION', titulo: 'Mostrar Agresividad', penalidad: 'Suspensión de 1 año', icono: 'person_off', descripcion: 'Comportamiento violento o agresivo hacia el público o personal de la UMSA.', tipo: 'SANCION_AGRESION' },
-  { id: 'SANCION_BANDA', titulo: 'Exceso de Bandas/Músicos', penalidad: 'Puntaje 0 en Disciplina', icono: 'music_off', descripcion: 'Más de 2 bandas de 80 músicos cada una o exceso de personal musical permitido.', tipo: 'SANCION_BANDA' },
-  { id: 'SANCION_AJENO', titulo: 'Personal ajeno a la UMSA', penalidad: 'Suspensión de 1 año', icono: 'group_remove', descripcion: 'Se detectó personal externo no perteneciente a la universidad dentro de las filas.', tipo: 'SANCION_AJENO' }
-]
+const sancionesCatalogo = ref([])
+const nuevaInfraccion = ref({ nombre: '', tipoImpacto: 'RESTA_PUNTOS', valorImpacto: -1 })
+const guardandoInfraccion = ref(false)
 
 const esSancionGrave = (p) => p?.tipoImpacto === 'SUSPENSION' || Number(p?.valor) <= -10
 const tieneSancionGrave = (item) => (item?.penalizaciones || []).some(esSancionGrave)
@@ -512,6 +545,58 @@ const etiquetaPenalizacion = (p) => {
   if (p.tipoImpacto === 'SUSPENSION') return p.nombre
   if (Number(p.valor)) return `${p.nombre} (${p.valor})`
   return p.nombre
+}
+
+const etiquetaImpactoInfraccion = (s) => {
+  if (!s) return ''
+  if (s.tipoImpacto === 'SUSPENSION') return 'Suspensión'
+  const v = Number(s.valorImpacto)
+  if (Number.isFinite(v) && v !== 0) return `${v > 0 ? '+' : ''}${v} pts`
+  return s.penalidad || 'Sin descuento numérico'
+}
+
+const iconoInfraccion = (s) => {
+  const n = String(s?.nombre || '').toLowerCase()
+  if (n.includes('alcohol')) return 'local_bar'
+  if (n.includes('agres')) return 'person_off'
+  if (n.includes('banda') || n.includes('músic')) return 'music_off'
+  if (n.includes('ajeno')) return 'group_remove'
+  if (n.includes('roja')) return 'flag'
+  if (n.includes('amarilla')) return 'flag'
+  return 'gavel'
+}
+
+const cargarInfracciones = async () => {
+  try {
+    const { data } = await api.get('/evaluaciones/infracciones')
+    const items = data.items || []
+    // En el modal de sanciones graves: excluir banderas (tienen botones propios)
+    sancionesCatalogo.value = items.filter(
+      (i) => i.codigoPreset !== 'AMARILLA' && i.codigoPreset !== 'ROJA',
+    )
+  } catch (e) {
+    console.error('No se pudo cargar catálogo de infracciones', e)
+    sancionesCatalogo.value = []
+  }
+}
+
+const crearInfraccionCatalogo = async () => {
+  if (!nuevaInfraccion.value.nombre?.trim()) return
+  guardandoInfraccion.value = true
+  try {
+    await api.post('/evaluaciones/infracciones', {
+      nombre: nuevaInfraccion.value.nombre.trim(),
+      tipoImpacto: nuevaInfraccion.value.tipoImpacto,
+      valorImpacto: Number(nuevaInfraccion.value.valorImpacto) || 0,
+    })
+    nuevaInfraccion.value = { nombre: '', tipoImpacto: 'RESTA_PUNTOS', valorImpacto: -1 }
+    await cargarInfracciones()
+    Swal.fire('Catálogo', 'Infracción agregada. Ya se puede aplicar a fraternidades.', 'success')
+  } catch (e) {
+    Swal.fire('Error', e.response?.data?.message || 'No se pudo crear la infracción.', 'error')
+  } finally {
+    guardandoInfraccion.value = false
+  }
 }
 
 const cargarFaseData = async () => {
@@ -640,9 +725,10 @@ const iniciarEvaluacion = (fraternidad) => {
 
 // LÓGICA DE DISCIPLINA
 const aplicarPenalizacion = async (fraternidad, tipo) => {
+  const pts = tipo === 'AMARILLA' ? '1 punto' : '2 puntos'
   const result = await Swal.fire({
     title: tipo === 'AMARILLA' ? '¿Bandera Amarilla?' : '¿Bandera Roja?',
-    text: `Se descontarán ${tipo === 'AMARILLA' ? '1 punto' : '2 puntos'} de la nota de disciplina.`,
+    text: `Se descontarán ${pts} del puntaje final (valor del catálogo de infracciones de la gestión).`,
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: tipo === 'AMARILLA' ? '#facc15' : '#dc2626',
@@ -654,15 +740,16 @@ const aplicarPenalizacion = async (fraternidad, tipo) => {
     try {
       await api.post(`/evaluaciones/fase/${fase.value.idFase}/fraternidad/${fraternidad.idFraternidad}/penalizar`, { tipo })
       Swal.fire('Aplicado', 'La penalización se registró correctamente.', 'success')
-      cargarFaseData() // recargar para ver el puntaje
+      cargarFaseData()
     } catch (e) {
-      Swal.fire('Error', 'No se pudo aplicar la penalización.', 'error')
+      Swal.fire('Error', e.response?.data?.message || 'No se pudo aplicar la penalización.', 'error')
     }
   }
 }
 
-const abrirSanciones = (fraternidad) => {
+const abrirSanciones = async (fraternidad) => {
   fraternidadParaSancion.value = fraternidad
+  await cargarInfracciones()
   modalSanciones.value = true
 }
 
@@ -681,15 +768,19 @@ const preconfirmarSancion = (sancion) => {
 const confirmarSancion = async () => {
   cargandoSancion.value = true
   try {
-    await api.post(`/evaluaciones/fase/${fase.value.idFase}/fraternidad/${fraternidadParaSancion.value.idFraternidad}/penalizar`, { 
-      tipo: sancionSeleccionada.value.tipo 
-    })
+    const payload = sancionSeleccionada.value.idInfraccion
+      ? { idInfraccion: sancionSeleccionada.value.idInfraccion }
+      : { tipo: sancionSeleccionada.value.tipo || sancionSeleccionada.value.codigoPreset }
+    await api.post(
+      `/evaluaciones/fase/${fase.value.idFase}/fraternidad/${fraternidadParaSancion.value.idFraternidad}/penalizar`,
+      payload,
+    )
     modalConfirmacion.value = false
     modalSanciones.value = false
-    Swal.fire('Sanción Aplicada', 'Se ha registrado la sanción definitiva.', 'error')
+    Swal.fire('Sanción Aplicada', 'Se ha registrado la sanción en el puntaje final.', 'error')
     cargarFaseData()
   } catch (e) {
-    Swal.fire('Error', 'No se pudo aplicar la sanción.', 'error')
+    Swal.fire('Error', e.response?.data?.message || 'No se pudo aplicar la sanción.', 'error')
   } finally {
     cargandoSancion.value = false
   }
@@ -719,6 +810,7 @@ const removerPenalizacion = async (fraternidad, idIncidencia) => {
 
 onMounted(() => {
   cargarFaseData()
+  cargarInfracciones()
 })
 
 onUnmounted(() => {

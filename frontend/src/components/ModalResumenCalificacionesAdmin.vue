@@ -189,8 +189,12 @@
                         class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
                         :class="cal.esAdmin ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'"
                       >
-                        {{ cal.esAdmin ? 'Administrador' : 'Jurado' }}
+                        {{ cal.esAdmin ? (cal.rolUsuario || 'Administrador') : 'Jurado' }}
                       </span>
+                      <span
+                        v-if="cal.ci"
+                        class="text-[9px] font-bold text-slate-400"
+                      >CI {{ cal.ci }}</span>
                       <span
                         class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
                         :class="badgeEstado(cal.estado)"
@@ -279,7 +283,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import Swal from 'sweetalert2'
 import api from '../services/api'
 
@@ -289,9 +293,9 @@ const props = defineProps({
   nombreFase: { type: String, default: '' },
   tipoConcurso: { type: String, default: 'EFU' },
   /** Atajo: abrir directamente el detalle de esta fraternidad */
-  initialIdFraternidad: { type: Number, default: null },
+  initialIdFraternidad: { type: [Number, String], default: null },
   /** Atajo: abrir directamente el detalle de este participante */
-  initialIdParticipante: { type: Number, default: null },
+  initialIdParticipante: { type: [Number, String], default: null },
 })
 
 const emit = defineEmits(['update:modelValue', 'actas-cerradas'])
@@ -305,6 +309,7 @@ const sujetoSeleccionado = ref(null)
 const busqueda = ref('')
 const expandido = ref(null)
 const cerrandoActas = ref(false)
+let iniciando = false
 
 const esExterno = computed(() => String(props.tipoConcurso || '').toUpperCase() === 'EXTERNO')
 const etiquetaSujeto = computed(() => (esExterno.value ? 'Participante' : 'Fraternidad'))
@@ -343,6 +348,11 @@ const todasSelladasDetalle = computed(() => {
   return cals.length > 0 && cals.every((c) => c.estado === 'COMPLETADO')
 })
 
+const mismoId = (a, b) => {
+  if (a == null || b == null || a === '' || b === '') return false
+  return Number(a) === Number(b)
+}
+
 const claveSujeto = (s) => s.idFraternidad ?? s.idParticipante
 
 const badgeEstado = (estado) => ({
@@ -372,10 +382,18 @@ const cargarListado = async () => {
 
 const cargarDetalle = async (sujeto) => {
   const params = {}
-  if (sujeto.idFraternidad) params.idFraternidad = sujeto.idFraternidad
-  if (sujeto.idParticipante) params.idParticipante = sujeto.idParticipante
+  if (sujeto.idFraternidad != null) params.idFraternidad = Number(sujeto.idFraternidad)
+  if (sujeto.idParticipante != null) params.idParticipante = Number(sujeto.idParticipante)
   const { data } = await api.get(`/evaluaciones/fase/${props.idFase}/resumen-calificaciones`, { params })
   resumen.value = data
+  // Preferir nombre canónico del backend
+  if (data?.sujeto?.nombre) {
+    sujetoSeleccionado.value = {
+      ...sujeto,
+      ...data.sujeto,
+      nombre: data.sujeto.nombre,
+    }
+  }
 }
 
 const abrirDetalle = async (sujeto) => {
@@ -387,7 +405,8 @@ const abrirDetalle = async (sujeto) => {
     await cargarDetalle(sujeto)
     vista.value = 'detalle'
   } catch (e) {
-    error.value = e?.response?.data?.message || 'No se pudo cargar el detalle.'
+    error.value = e?.response?.data?.message || 'No se pudo cargar el detalle de calificaciones.'
+    vista.value = 'detalle'
   } finally {
     loading.value = false
   }
@@ -461,11 +480,11 @@ const confirmarCerrarActas = async () => {
   cerrandoActas.value = true
   try {
     const payload = {}
-    if (sujetoSeleccionado.value?.idFraternidad) {
-      payload.idFraternidad = sujetoSeleccionado.value.idFraternidad
+    if (sujetoSeleccionado.value?.idFraternidad != null) {
+      payload.idFraternidad = Number(sujetoSeleccionado.value.idFraternidad)
     }
-    if (sujetoSeleccionado.value?.idParticipante) {
-      payload.idParticipante = sujetoSeleccionado.value.idParticipante
+    if (sujetoSeleccionado.value?.idParticipante != null) {
+      payload.idParticipante = Number(sujetoSeleccionado.value.idParticipante)
     }
     const { data } = await api.post(`/evaluaciones/fase/${props.idFase}/cerrar-actas`, payload)
     await cargarDetalle(sujetoSeleccionado.value)
@@ -495,35 +514,46 @@ const resetModal = () => {
 }
 
 const iniciar = async () => {
-  if (!props.idFase) return
+  if (!props.idFase || !props.modelValue || iniciando) return
+  iniciando = true
   resetModal()
   loading.value = true
+  error.value = ''
   try {
     await cargarListado()
-    if (props.initialIdFraternidad || props.initialIdParticipante) {
+
+    const idFrat = props.initialIdFraternidad
+    const idPart = props.initialIdParticipante
+    if (idFrat != null || idPart != null) {
       const sujeto = sujetos.value.find((s) =>
-        (props.initialIdFraternidad && s.idFraternidad === props.initialIdFraternidad) ||
-        (props.initialIdParticipante && s.idParticipante === props.initialIdParticipante),
+        (idFrat != null && mismoId(s.idFraternidad, idFrat)) ||
+        (idPart != null && mismoId(s.idParticipante, idPart)),
       )
       if (sujeto) {
         await abrirDetalle(sujeto)
         return
       }
-      const stub = props.initialIdFraternidad
-        ? { idFraternidad: props.initialIdFraternidad, nombre: 'Fraternidad' }
-        : { idParticipante: props.initialIdParticipante, nombre: 'Participante' }
+      // Aunque no esté en el listado filtrado, cargar detalle directo
+      const stub = idFrat != null
+        ? { idFraternidad: Number(idFrat), nombre: 'Fraternidad' }
+        : { idParticipante: Number(idPart), nombre: 'Participante' }
       await abrirDetalle(stub)
     }
   } catch (e) {
     error.value = e?.response?.data?.message || 'No se pudo cargar el panel de calificaciones.'
   } finally {
     loading.value = false
+    iniciando = false
   }
 }
 
 const cerrar = () => {
   emit('update:modelValue', false)
 }
+
+onMounted(() => {
+  if (props.modelValue) iniciar()
+})
 
 watch(
   () => props.modelValue,

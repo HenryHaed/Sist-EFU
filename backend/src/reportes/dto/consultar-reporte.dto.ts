@@ -14,6 +14,15 @@ export enum TipoReporte {
   CALIFICACIONES = 'calificaciones',
   DISCIPLINA = 'disciplina',
   COSTOS = 'costos',
+  CONCURSANTES_EXTERNOS = 'concursantes_externos',
+}
+
+/** Filtro de plantilla de concurso externo (además de idFase concreto). */
+export enum PlantillaConcursoExterno {
+  TODOS = 'todos',
+  CHACHA_WARMI = 'chacha_warmi',
+  FOTOGRAFIA = 'fotografia',
+  GENERICO = 'generico',
 }
 
 /** Filtro de banderas / sanciones (una fila por caso) */
@@ -117,4 +126,15 @@ export class ConsultarReporteDto {
    */
   @IsOptional()
   columnasOpcionales?: Array<'cupo' | 'estado' | 'gestion'>;
+
+  /** Fase EXTERNO concreta (concurso). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  idFase?: number;
+
+  /** Filtrar por plantilla cuando no se elige una fase concreta. */
+  @IsOptional()
+  @IsEnum(PlantillaConcursoExterno)
+  plantillaRequisitos?: PlantillaConcursoExterno;
 }

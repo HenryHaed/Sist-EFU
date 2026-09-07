@@ -291,6 +291,16 @@
             </button>
 
             <button
+              v-if="can('subir_nomina_excel')"
+              @click="setVista('subir_nomina_excel')"
+              :class="vistaActual === 'subir_nomina_excel' ? 'bg-slate-50 text-secondary border-l-4 border-l-primary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'subir_nomina_excel' ? 'text-primary' : 'text-slate-400'">table</span>
+              <span class="text-sm font-bold">Nómina Excel</span>
+            </button>
+
+            <button
               v-if="can('ficha_tecnica')"
               @click="setVista('ficha_tecnica')"
               :class="vistaActual === 'ficha_tecnica' ? 'bg-slate-50 text-secondary border-l-4 border-l-primary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
@@ -308,6 +318,16 @@
             >
               <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'admin_fichas_tecnicas' ? 'text-secondary' : 'text-slate-400'">folder_special</span>
               <span class="text-sm font-bold">Fichas Técnicas</span>
+            </button>
+
+            <button
+              v-if="can('admin_nominas_excel')"
+              @click="setVista('admin_nominas_excel')"
+              :class="vistaActual === 'admin_nominas_excel' ? 'bg-slate-50 text-primary border-l-4 border-l-secondary font-bold' : 'text-slate-600 hover:bg-slate-50 border-l-4 border-l-transparent'"
+              class="w-full flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all text-left"
+            >
+              <span class="material-symbols-outlined text-[20px]" :class="vistaActual === 'admin_nominas_excel' ? 'text-secondary' : 'text-slate-400'">grid_on</span>
+              <span class="text-sm font-bold">Nóminas Excel</span>
             </button>
 
 
@@ -598,6 +618,11 @@
               key="subir_monografia"
             />
 
+            <SubirNominaExcelView
+              v-else-if="vistaActual === 'subir_nomina_excel'"
+              key="subir_nomina_excel"
+            />
+
             <FichaTecnicaMonografiaView
               v-else-if="vistaActual === 'ficha_tecnica'"
               key="ficha_tecnica"
@@ -606,6 +631,11 @@
             <AdminFichasTecnicasView
               v-else-if="vistaActual === 'admin_fichas_tecnicas'"
               key="admin_fichas_tecnicas"
+            />
+
+            <AdminNominasExcelView
+              v-else-if="vistaActual === 'admin_nominas_excel'"
+              key="admin_nominas_excel"
             />
 
             <!-- Vista: Monografías (Veedor / solo lectura) -->
@@ -773,8 +803,10 @@ import SolicitudesInscripcionView from './SolicitudesInscripcionView.vue'
 import AsistenciaView from './AsistenciaView.vue'
 import DirectivaFraternidadView from './DirectivaFraternidadView.vue'
 import SubirMonografiaView from './SubirMonografiaView.vue'
+import SubirNominaExcelView from './SubirNominaExcelView.vue'
 import FichaTecnicaMonografiaView from './FichaTecnicaMonografiaView.vue'
 import AdminFichasTecnicasView from './AdminFichasTecnicasView.vue'
+import AdminNominasExcelView from './AdminNominasExcelView.vue'
 import VeedorMonografiasView from './VeedorMonografiasView.vue'
 
 import { getImageUrl } from '../utils/url'
@@ -879,11 +911,11 @@ const passPolicyRules = computed(() => {
 const can = (permission) => {
   const role = authStore.userRole?.toLowerCase()
   const permissions = {
-    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'auditoria_reportes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin', 'ver_monografias', 'revision_inscripciones_concurso', 'admin_fichas_tecnicas'],
-    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria_reportes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'ver_monografias', 'revision_inscripciones_concurso', 'admin_fichas_tecnicas'],
+    superusuario: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria', 'auditoria_reportes', 'gestion_sistema', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'gestion_admin', 'ver_monografias', 'revision_inscripciones_concurso', 'admin_fichas_tecnicas', 'admin_nominas_excel'],
+    admin: ['estadisticas', 'calificar', 'evaluar', 'fraternidades', 'gestionar_participantes', 'reglamento', 'ajustes', 'enviar_mensaje', 'auditoria_reportes', 'gestion_evento', 'asistencias', 'disciplina', 'gestion_usuarios', 'ver_monografias', 'revision_inscripciones_concurso', 'admin_fichas_tecnicas', 'admin_nominas_excel'],
     jurado: ['estadisticas', 'calificar', 'evaluar', 'reglamento'],
     controladorhcu: ['estadisticas', 'reglamento', 'asistencias', 'disciplina'],
-    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'ficha_tecnica', 'inscripcion_chacha_warmi', 'inscripcion_fraternidad'],
+    delegado: ['estadisticas', 'reglamento', 'subir_monografia', 'subir_nomina_excel', 'ficha_tecnica', 'inscripcion_chacha_warmi', 'inscripcion_fraternidad'],
     veedor: ['estadisticas', 'reglamento', 'ver_monografias'],
     concursante: ['reglamento', 'mi_inscripcion_concurso'],
   }
@@ -995,7 +1027,7 @@ const tituloVista = computed(() => {
     seleccionar_fase: 'Calificación de Fraternidades',
     seleccionar_concurso: 'Calificación de Concursos',
     fraternidades_crud: 'Listado de Fraternidades',
-    directiva_fraternidad: 'Directiva de Fraternidad',
+    directiva_fraternidad: 'Detalle de Fraternidad',
     listado_fase: 'Listado de Fraternidades por Fase',
     listado_competidores: 'Listado de Competidores',
     wizard: 'Evaluación de Fraternidad',
@@ -1016,8 +1048,10 @@ const tituloVista = computed(() => {
     solicitudes_inscripcion: 'Solicitudes de Preinscripción',
     asistencias: 'Directorio de Delegados',
     subir_monografia: 'Subir Monografía',
+    subir_nomina_excel: 'Nómina Excel',
     ficha_tecnica: 'Ficha Técnica Monografía',
     admin_fichas_tecnicas: 'Fichas Técnicas Monografía',
+    admin_nominas_excel: 'Nóminas Excel',
     veedor_monografias: 'Monografías de Fraternidades',
     seleccionar_fase_disciplina: 'Control de Disciplina HCU'
   }

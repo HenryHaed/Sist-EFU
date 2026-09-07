@@ -56,6 +56,23 @@ export class FraternidadesController {
     return this.fraternidadesService.buscar(q || '');
   }
 
+  @Post('reparar-nombres')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({
+    summary:
+      'Resincroniza nombres denormalizados (solicitud/ficha). dryRun=true solo reporta. No elimina fichas ni monografías.',
+  })
+  repararNombres(@Body() body: { dryRun?: boolean }) {
+    return this.fraternidadesService.repararNombresDesalineados(body?.dryRun !== false);
+  }
+
+  @Get(':id/detalle')
+  @Roles('superusuario', 'admin', 'controladorhcu')
+  @ApiOperation({ summary: 'Detalle completo: directiva, jurados asignados y concursantes externos' })
+  getDetalle(@Param('id', ParseIntPipe) id: number) {
+    return this.fraternidadesService.getDetalle(id);
+  }
+
   @Get(':id/directiva/pdf')
   @Roles('superusuario', 'admin', 'controladorhcu')
   @ApiOperation({ summary: 'Generar PDF de la directiva de una fraternidad inscrita' })

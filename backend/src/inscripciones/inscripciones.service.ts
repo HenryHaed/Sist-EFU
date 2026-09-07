@@ -37,6 +37,15 @@ const PERSONAS_DIRECTIVA = [
     { prefix: 'delSuplente', checklist: 'Delegado Suplente', hasCelular: true, required: true },
 ] as const;
 
+/** Datos de identidad heredados (Usuarios → Delegados / sistema). No requieren ✓/✕. */
+const CHECKLIST_KEYS_IDENTIDAD = new Set([
+    'delegadoNombre',
+    'delegadoCi',
+    'fechaSolicitud',
+    'gestion',
+    'nombreFraternidad',
+]);
+
 const CAMPOS_NOMBRE_PERSONA = PERSONAS_DIRECTIVA.flatMap((p) => [
     `${p.prefix}Nombres`,
     `${p.prefix}PrimerApellido`,
@@ -985,17 +994,21 @@ export class InscripcionesService {
         const estadoAnterior = sol.estado;
         const checklistNormalizado = revisionChecklist || sol.revisionChecklist || {};
         if (estado === EstadoSolicitud.APROBADO) {
-            const items = Object.values(checklistNormalizado);
-            const todosOk = items.length > 0 && items.every((item: any) => item?.estado === 'OK');
+            const itemsRevisables = Object.entries(checklistNormalizado as Record<string, any>).filter(
+                ([key]) => !CHECKLIST_KEYS_IDENTIDAD.has(key),
+            );
+            const todosOk =
+                itemsRevisables.length > 0 &&
+                itemsRevisables.every(([, item]) => item?.estado === 'OK');
             if (!todosOk) {
                 throw new BadRequestException('Solo se puede aprobar una solicitud cuando todos los datos revisados están marcados como correctos.');
             }
         }
 
         if (estado === EstadoSolicitud.OBSERVADO) {
-            const itemsObservados = Object.values(checklistNormalizado).filter(
-                (item: any) => item?.estado === 'X',
-            );
+            const itemsObservados = Object.entries(checklistNormalizado as Record<string, any>)
+                .filter(([key, item]) => !CHECKLIST_KEYS_IDENTIDAD.has(key) && item?.estado === 'X')
+                .map(([, item]) => item);
             if (!itemsObservados.length) {
                 throw new BadRequestException(
                     'Marca con ✕ al menos un dato o documento incorrecto antes de observar la solicitud.',
@@ -1088,7 +1101,17 @@ export class InscripcionesService {
             }
 
             if (data.nombreFraternidad !== undefined) {
-                sol.nombreFraternidad = data.nombreFraternidad;
+                const nombreIntentado = String(data.nombreFraternidad || '').trim().toUpperCase();
+                const nombreCanonico = String(
+                    sol.fraternidadCreada?.nombre || sol.nombreFraternidad || '',
+                )
+                    .trim()
+                    .toUpperCase();
+                if (nombreIntentado && nombreIntentado !== nombreCanonico) {
+                    throw new BadRequestException(
+                        'El nombre de la fraternidad no se edita aquí. Cámbialo en Usuarios → Delegados; se propagará a solicitudes, fichas y demás módulos.',
+                    );
+                }
             }
             if (data.instanciaRepresentacion !== undefined) {
                 sol.instanciaRepresentacion = data.instanciaRepresentacion;
@@ -1139,21 +1162,8 @@ export class InscripcionesService {
                     where: { idFraternidad: idFrat },
                 });
                 if (frat) {
-                    const nombreNuevo = String(sol.nombreFraternidad || '').trim();
-                    if (nombreNuevo && nombreNuevo !== String(frat.nombre || '').trim()) {
-                        const conflicto = await manager
-                            .createQueryBuilder(Fraternidad, 'f')
-                            .where('UPPER(TRIM(f.nombre)) = UPPER(TRIM(:nombre))', { nombre: nombreNuevo })
-                            .andWhere('f.id_fraternidad != :id', { id: idFrat })
-                            .getOne();
-                        if (conflicto) {
-                            throw new BadRequestException(
-                                `Ya existe otra fraternidad con el nombre "${nombreNuevo}".`,
-                            );
-                        }
-                        frat.nombre = this.aMayusculas(nombreNuevo) as string;
-                        sol.nombreFraternidad = frat.nombre;
-                    }
+                    // Nombre canónico solo desde Usuarios → Delegados; aquí solo se hereda
+                    sol.nombreFraternidad = frat.nombre;
 
                     if (data.instanciaRepresentacion !== undefined) {
                         frat.nivelRepresentacion = sol.instanciaRepresentacion || frat.nivelRepresentacion;
@@ -1170,6 +1180,7 @@ export class InscripcionesService {
                     await manager.save(Fraternidad, frat);
                     sol.fraternidadCreada = frat;
 
+                    // Solo actualiza el texto nombre en ficha; no borra contenido ni monografías
                     await manager
                         .createQueryBuilder()
                         .update(FichaTecnicaMonografia)
@@ -1186,7 +1197,7 @@ export class InscripcionesService {
                 data.nombreFraternidad !== undefined
             ) {
                 throw new BadRequestException(
-                    'La solicitud está aprobada sin fraternidad vinculada. No se puede renombrar solo en la solicitud; vincula/crea la fraternidad oficial primero.',
+                    'La solicitud está aprobada sin fraternidad vinculada. El nombre se gestiona en Usuarios → Delegados.',
                 );
             }
 

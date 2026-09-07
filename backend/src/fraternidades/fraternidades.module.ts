@@ -8,6 +8,9 @@ import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
 import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
 import { FichaTecnicaMonografia } from '../entities/FichaTecnicaMonografia';
+import { Jurado } from '../entities/Jurado';
+import { Participante } from '../entities/Participante';
+import { Fase } from '../entities/Fase';
 import { CategoriasController } from './categorias.controller';
 import { CategoriasService } from './categorias.service';
 
@@ -20,6 +23,9 @@ import { CategoriasService } from './categorias.service';
       Usuario,
       SolicitudInscripcion,
       FichaTecnicaMonografia,
+      Jurado,
+      Participante,
+      Fase,
     ]),
   ],
   controllers: [FraternidadesController, CategoriasController],

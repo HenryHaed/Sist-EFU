@@ -11,6 +11,7 @@ import { InscripcionesModule } from './inscripciones/inscripciones.module';
 import { InscripcionesConcursoModule } from './inscripciones-concurso/inscripciones-concurso.module';
 import { AsistenciasModule } from './asistencias/asistencias.module';
 import { MonografiasModule } from './monografias/monografias.module';
+import { ListasNominaModule } from './listas-nomina/listas-nomina.module';
 import { FichaTecnicaModule } from './ficha-tecnica/ficha-tecnica.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { ReportesModule } from './reportes/reportes.module';
@@ -63,6 +64,7 @@ import { join } from 'path';
     InscripcionesConcursoModule,
     AsistenciasModule,
     MonografiasModule,
+    ListasNominaModule,
     FichaTecnicaModule,
     AuditoriaModule,
     ReportesModule,

@@ -156,10 +156,10 @@
                   <button
                     @click="verDirectiva(f)"
                     class="px-3 py-1.5 rounded-lg flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-all"
-                    title="Ver directiva"
+                    title="Ver más datos de esta fraternidad"
                   >
-                    <span class="material-symbols-outlined text-[16px]">badge</span>
-                    Ver Directiva
+                    <span class="material-symbols-outlined text-[16px]">info</span>
+                    Más datos
                   </button>
                   <button @click="editarFraternidad(f)" class="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-primary hover:bg-primary/5 transition-all">
                     <span class="material-symbols-outlined text-[18px]">edit</span>
@@ -226,8 +226,8 @@
                 @click="verDirectiva(f)"
                 class="px-3 py-1.5 rounded-lg flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-indigo-700 bg-white border border-indigo-200 shadow-sm"
               >
-                <span class="material-symbols-outlined text-[14px]">badge</span>
-                Directiva
+                <span class="material-symbols-outlined text-[14px]">info</span>
+                Más datos
               </button>
               <button @click="editarFraternidad(f)" class="size-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 shadow-sm">
                 <span class="material-symbols-outlined text-[16px]">edit</span>
@@ -257,7 +257,17 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="col-span-2">
                   <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Nombre de la Fraternidad</label>
-                  <input v-model="form.nombre" type="text" placeholder="Ej. Morenada Central" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold" />
+                  <input
+                    v-model="form.nombre"
+                    type="text"
+                    placeholder="Ej. Morenada Central"
+                    :disabled="editando"
+                    :readonly="editando"
+                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold disabled:opacity-70 disabled:cursor-not-allowed"
+                  />
+                  <p v-if="editando" class="text-[10px] text-slate-500 mt-1.5 font-medium">
+                    El nombre solo se cambia en <strong>Usuarios → Delegados</strong>. Así se propaga a solicitudes y fichas sin borrar monografías.
+                  </p>
                 </div>
 
                 <div class="col-span-2">

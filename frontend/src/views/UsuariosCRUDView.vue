@@ -566,7 +566,7 @@
                     clearable
                     density="comfortable"
                     variant="outlined"
-                    placeholder="Escribe el nombre de la fraternidad o crea una nueva"
+                    :placeholder="editando ? 'Busca o escribe el nombre correcto para renombrar' : 'Escribe el nombre de la fraternidad o crea una nueva'"
                     class="text-sm w-full"
                     menu-icon="mdi-chevron-down"
                     no-data-text="Escribe para buscar o añadir una nueva"
@@ -587,7 +587,13 @@
                     </template>
                   </v-combobox>
                   <p class="text-[9px] text-slate-400 mt-1 italic">
-                    Puedes escribir para buscar coincidencias históricas de otras gestiones. Si no corresponde a ninguna, deja el campo vacío.
+                    <template v-if="editando">
+                      Si escribes un nombre nuevo, se <strong>renombra</strong> la fraternidad actual y se actualiza en solicitudes/fichas.
+                      No se borran monografías ni fichas técnicas subidas.
+                    </template>
+                    <template v-else>
+                      Puedes escribir para buscar coincidencias históricas. Si no existe, se creará al guardar.
+                    </template>
                   </p>
                 </div>
               </div>

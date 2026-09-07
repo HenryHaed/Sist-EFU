@@ -6,12 +6,18 @@ import { Jurado } from '../entities/Jurado';
 import { Gestion } from '../entities/Gestion';
 import { Fase } from '../entities/Fase';
 import { Fraternidad } from '../entities/Fraternidad';
+import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
 import { UsuariosService } from './usuarios.service';
 import { UsuariosController } from './usuarios.controller';
 import { MailModule } from '../mail/mail.module';
+import { FraternidadesModule } from '../fraternidades/fraternidades.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Usuario, Role, Jurado, Gestion, Fase, Fraternidad]), MailModule],
+  imports: [
+    TypeOrmModule.forFeature([Usuario, Role, Jurado, Gestion, Fase, Fraternidad, SolicitudInscripcion]),
+    MailModule,
+    FraternidadesModule,
+  ],
   controllers: [UsuariosController],
   providers: [UsuariosService],
   exports: [UsuariosService],

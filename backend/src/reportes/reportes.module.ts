@@ -10,6 +10,9 @@ import { Carrera } from '../entities/Carrera';
 import { Categoria } from '../entities/Categoria';
 import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
 import { Incidencia } from '../entities/Incidencia';
+import { Participante } from '../entities/Participante';
+import { Fase } from '../entities/Fase';
+import { InscripcionConcurso } from '../entities/InscripcionConcurso';
 import { EvaluacionesModule } from '../evaluaciones/evaluaciones.module';
 
 @Module({
@@ -23,6 +26,9 @@ import { EvaluacionesModule } from '../evaluaciones/evaluaciones.module';
       Categoria,
       SolicitudInscripcion,
       Incidencia,
+      Participante,
+      Fase,
+      InscripcionConcurso,
     ]),
     EvaluacionesModule,
   ],

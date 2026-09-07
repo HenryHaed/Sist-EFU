@@ -7,9 +7,11 @@ import { Jurado } from '../entities/Jurado';
 import { Fraternidad } from '../entities/Fraternidad';
 import { Gestion } from '../entities/Gestion';
 import { Fase } from '../entities/Fase';
+import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
 import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
 import { normalizeEmail, validatePasswordPolicy } from '../common/password-policy';
 import { MailService } from '../mail/mail.service';
+import { FraternidadesService } from '../fraternidades/fraternidades.service';
 import { validarCiUsuario } from '../common/ci-usuario.validation';
 import { ensureSystemRoles } from '../common/system-roles';
 import * as bcrypt from 'bcryptjs';
@@ -31,7 +33,10 @@ export class UsuariosService {
     private readonly faseRepo: Repository<Fase>,
     @InjectRepository(Fraternidad)
     private readonly fraternidadRepo: Repository<Fraternidad>,
+    @InjectRepository(SolicitudInscripcion)
+    private readonly solicitudRepo: Repository<SolicitudInscripcion>,
     private readonly mailService: MailService,
+    private readonly fraternidadesService: FraternidadesService,
     private readonly dataSource: DataSource,
   ) { }
 
@@ -132,20 +137,50 @@ export class UsuariosService {
     idFraternidad?: number;
     nuevaFraternidad?: string;
     excludeUsuarioId?: number;
+    /** Si el delegado ya tiene fraternidad, renombrar in-place en lugar de crear otra. */
+    idFraternidadActual?: number | null;
   }): Promise<Fraternidad | null> {
-    const { idFraternidad, nuevaFraternidad, excludeUsuarioId } = opts;
+    const { idFraternidad, nuevaFraternidad, excludeUsuarioId, idFraternidadActual } = opts;
 
     if (idFraternidad) {
       await this.assertFraternidadDisponibleParaDelegado(idFraternidad, excludeUsuarioId);
-      return this.fraternidadRepo.findOne({ where: { idFraternidad } });
+      const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
+      if (!frat) throw new BadRequestException('La fraternidad seleccionada no existe.');
+      return frat;
     }
 
     if (nuevaFraternidad?.trim()) {
       const nombreNorm = nuevaFraternidad.trim().toUpperCase();
+
       const existente = await this.fraternidadRepo
         .createQueryBuilder('f')
         .where('LOWER(TRIM(f.nombre)) = LOWER(:nombre)', { nombre: nombreNorm })
         .getOne();
+
+      // Edición con fraternidad ya asignada
+      if (idFraternidadActual) {
+        // Mismo nombre o misma fila → sync y listo
+        if (existente && existente.idFraternidad === idFraternidadActual) {
+          await this.fraternidadesService.sincronizarNombreRelacionados(
+            idFraternidadActual,
+            existente.nombre,
+          );
+          return existente;
+        }
+        // El nombre ya pertenece a otra fraternidad → reasignar (no crear fantasma)
+        if (existente) {
+          await this.assertFraternidadDisponibleParaDelegado(
+            existente.idFraternidad,
+            excludeUsuarioId,
+          );
+          return existente;
+        }
+        // Nombre nuevo libre → renombrar in-place (conserva fichas/monografías por FK)
+        return this.fraternidadesService.renombrarFraternidad(
+          idFraternidadActual,
+          nombreNorm,
+        );
+      }
 
       if (existente) {
         await this.assertFraternidadDisponibleParaDelegado(existente.idFraternidad, excludeUsuarioId);
@@ -162,6 +197,30 @@ export class UsuariosService {
     }
 
     return null;
+  }
+
+  /** Alinea solicitudes del delegado a su fraternidad canónica (solo FK + nombre texto). */
+  private async alinearSolicitudesDelegadoAFraternidad(
+    idUsuario: number,
+    frat: Fraternidad,
+  ) {
+    const solicitudes = await this.solicitudRepo.find({
+      where: { delegado: { idUsuario } },
+      relations: ['fraternidadCreada'],
+    });
+    for (const sol of solicitudes) {
+      const idActual = sol.fraternidadCreada?.idFraternidad ?? null;
+      if (idActual !== frat.idFraternidad) {
+        sol.fraternidadCreada = frat;
+      }
+      sol.nombreFraternidad = frat.nombre;
+      await this.solicitudRepo.save(sol);
+    }
+    // Sync fichas de la fraternidad canónica (solo columna nombre)
+    await this.fraternidadesService.sincronizarNombreRelacionados(
+      frat.idFraternidad,
+      frat.nombre,
+    );
   }
 
   private async assertCorreoUnico(correo: string | undefined | null, excludeUsuarioId?: number) {
@@ -457,12 +516,17 @@ export class UsuariosService {
         idFraternidad,
         nuevaFraternidad,
         excludeUsuarioId: id,
+        idFraternidadActual: fraternidadAnteriorId,
       });
       if (frat) {
+        const nombreAnterior = user.fraternidad?.nombre || '(ninguna)';
         if (frat.idFraternidad !== fraternidadAnteriorId) {
-          cambios.push(
-            `Fraternidad: ${user.fraternidad?.nombre || '(ninguna)'} → ${frat.nombre}`,
-          );
+          cambios.push(`Fraternidad: ${nombreAnterior} → ${frat.nombre}`);
+        } else if (
+          String(frat.nombre || '').trim().toUpperCase() !==
+          String(nombreAnterior || '').trim().toUpperCase()
+        ) {
+          cambios.push(`Nombre fraternidad: ${nombreAnterior} → ${frat.nombre}`);
         }
         user.fraternidad = frat;
       }
@@ -530,6 +594,23 @@ export class UsuariosService {
       await this.crearOActualizarPerfilJurado(savedUser, resolvedTipo, allFasesIds, fraternidadesIds || []);
       if (!cambios.some((c) => c.toLowerCase().includes('jurado'))) {
         cambios.push('Perfil / asignaciones de jurado actualizadas');
+      }
+    }
+
+    // Propagar fraternidad canónica a solicitudes del delegado (solo FK + texto nombre)
+    if (
+      rolFinal?.nombre === 'delegado' &&
+      savedUser.fraternidad?.idFraternidad &&
+      (idFraternidad !== undefined || nuevaFraternidad !== undefined)
+    ) {
+      const frat =
+        savedUser.fraternidad.nombre
+          ? savedUser.fraternidad
+          : await this.fraternidadRepo.findOne({
+              where: { idFraternidad: savedUser.fraternidad.idFraternidad },
+            });
+      if (frat) {
+        await this.alinearSolicitudesDelegadoAFraternidad(savedUser.idUsuario, frat);
       }
     }
 

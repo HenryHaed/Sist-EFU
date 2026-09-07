@@ -1,11 +1,11 @@
 # Entrada Universitaria (EFU) — Diccionario y Esquema de Base de Datos
 
-Documentación generada a partir de las **26 entidades TypeORM** en `backend/src/entities/` (+ 2 tablas junction).
+Documentación generada a partir de las **entidades TypeORM** en `backend/src/entities/` (+ tablas junction).
 
 - **Motor:** PostgreSQL  
 - **Base de datos:** `efu_db` (configurable vía `.env`)  
 - **ORM:** TypeORM (`synchronize` según entorno; en producción se usan patches idempotentes en `ensureSchemaPatches`)  
-- **Última revisión:** 30 julio 2026  
+- **Última revisión:** 6 septiembre 2026  
 
 ---
 
@@ -16,21 +16,25 @@ Documentación generada a partir de las **26 entidades TypeORM** en `backend/src
 | Tipo | Tablas |
 |------|--------|
 | **Globales** (no dependen del año) | `roles`, `facultades`, `carreras`, `instituciones_externas`, `tipos_danza`, `usuarios`, `eventos_control`, `password_reset_tokens` |
-| **Por gestión** (año del evento) | `gestiones`, `categorias`, `fraternidades`, `fases`, `criterios`, `jurados`, `evaluaciones`, `participantes_concurso`, `infracciones`, `incidencias`, `asistencias`, `solicitudes_inscripcion`, `cronograma_inscripciones`, `documentos_gestion`, `sesiones_usuario` (opcional), `auditoria_acciones` (opcional) |
-| **Por fraternidad** | `documentos_fraternidad`, `monografias` |
+| **Por gestión** (año del evento) | `gestiones`, `categorias`, `fraternidades`, `fases`, `criterios`, `jurados`, `evaluaciones`, `participantes_concurso`, `infracciones`, `incidencias`, `asistencias`, `solicitudes_inscripcion`, `cronograma_inscripciones`, `cronogramas_actividad`, `documentos_gestion`, `inscripciones_concurso`, `inscripcion_concurso_archivos`, `listas_nomina_fraternidad`, `sesiones_usuario` (opcional), `auditoria_acciones` (opcional) |
+| **Por fraternidad** | `documentos_fraternidad`, `monografias`, `fichas_tecnicas_monografia`, `listas_nomina_fraternidad` (también por gestión) |
 | **Auditoría / sesiones** | `sesiones_usuario`, `auditoria_acciones` (pueden ser globales si `id_gestion` es NULL: usuarios, organización, mail) |
 
 ### Reglas de negocio relevantes (aplicación)
 
 - Solo puede existir **un usuario con rol `delegado` por fraternidad** (validado en `UsuariosService`).
+- **Nombre canónico de fraternidad:** la fuente de verdad es `fraternidades.nombre`. Solo se renombra desde **Usuarios → Delegados** (rename in-place + sync de `nombre_fraternidad` denormalizado en solicitudes/fichas **sin borrar** monografías ni PDFs). En Solicitudes (admin-datos) y CRUD Fraternidades el nombre es **solo lectura**. Endpoint de reparación: `POST /fraternidades/reparar-nombres` (`dryRun`).
 - Los textos de **solicitudes de inscripción** (nombres, fraternidad, directiva) se persisten en **MAYÚSCULAS**.
 - **Preinscripción — directiva:** cada cargo tiene nombres, apellidos, CI y complemento SEGIP opcional; cargos obligatorios vs opcionales según reglamento.
 - **Preinscripción — documentos:** **4 PDFs por integrante** (CI, Matrícula, No deudas fraternidad, No deudas áreas). Sin certificados globales de deuda. **3 PDFs institucionales** globales (carta, resolución, acta).
 - Al **aprobar** una solicitud se crea o reutiliza la fraternidad oficial y se vincula al delegado.
 - **Directorio de delegados:** solo delegado **titular** y **suplente** (datos en `solicitudes_inscripcion`).
 - **Monografía:** cada fraternidad sube **un único PDF** vía su delegado (`uploads/Doc_Monografia/`). Admin/jurado/superusuario la consultan al calificar; el rol **`veedor`** (solo lectura) lista fraternidades y ve/descarga la monografía real subida. Si no hay fila en `monografias`, se informa que aún no subieron.
+- **Nómina Excel:** cada fraternidad+gestión tiene **un único** `.xlsx`/`.xls` (`listas_nomina_fraternidad`, carpeta `uploads/Doc_Nomina_Excel/`). Lo sube el **delegado**; admin/superusuario listan, previsualizan (tabla in-app vía exceljs) y descargan/eliminan.
 - **DELETE físico:** las eliminaciones en organización (facultad/carrera/institución) borran filas de la BD (hard delete); no hay soft-delete. Las facultades eliminan carreras en cascada (`ON DELETE CASCADE`).
 - **Asistencia:** basta con que asista titular o suplente; si ninguno asiste → incidencia de −10 pts en disciplina.
+- **Infracciones dinámicas:** catálogo por gestión en `infracciones` (CRUD admin). Al aplicar bandera/sanción se usa `id_infraccion` o presets (Amarilla/Roja/…); el **puntaje final EFU** suma `valor_impacto` real de la BD (`max(0, Promedio Final + Σ sanciones)`). No reescribir valores históricos al seed de presets.
+- **Puntuación EFU:** `NotaFraternidad` = suma de fases que el jurado **sí** calificó; `Promedio Final` = suma(NotaFraternidad) / N jurados. Fases no calificadas **no** se rellenan con 0.
 - **Rol `veedor`:** acceso de solo lectura a Estadísticas, Reglamento y listado de monografías. Sin permisos de escritura, calificación, reportes, gestión de usuarios ni ajustes.
 
 ### Diagrama de relaciones (resumen)
@@ -50,6 +54,8 @@ erDiagram
     gestiones ||--o{ solicitudes_inscripcion : tiene
     gestiones ||--o{ cronograma_inscripciones : tiene
     gestiones ||--o{ documentos_gestion : tiene
+    gestiones ||--o{ listas_nomina_fraternidad : nominas
+    gestiones ||--o{ infracciones : catalogo
 
     roles ||--o{ usuarios : asigna
     fraternidades ||--o{ usuarios : delegado
@@ -63,6 +69,7 @@ erDiagram
     usuarios ||--o{ solicitudes_inscripcion : delegado
     usuarios ||--o{ incidencias : registra
     usuarios ||--o{ asistencias : registra
+    usuarios ||--o{ listas_nomina_fraternidad : sube
 
     jurados }o--o{ fases : jurado_fases
     jurados }o--o{ fraternidades : jurado_fraternidades
@@ -77,6 +84,8 @@ erDiagram
     fraternidades ||--o{ asistencias : control
     fraternidades ||--o{ documentos_fraternidad : archivos
     fraternidades ||--o| monografias : monografia
+    fraternidades ||--o| fichas_tecnicas_monografia : ficha
+    fraternidades ||--o| listas_nomina_fraternidad : nomina_excel
     fraternidades ||--o{ solicitudes_inscripcion : creada
 
     infracciones ||--o{ incidencias : aplica
@@ -248,6 +257,40 @@ Monografía única por fraternidad, subida por el delegado. Archivo en `uploads/
 | `updated_at` | TIMESTAMP | NOT NULL | Última actualización |
 
 **Reglas:** una fraternidad solo puede tener una monografía; solo el delegado asignado puede subirla o reemplazarla; admin, jurado, superusuario y **veedor** pueden consultarla. El listado `GET /monografias/listado-fraternidades` (veedor/admin/superusuario) incluye el estado `tieneMonografia` y los metadatos del PDF realmente subido.
+
+### `listas_nomina_fraternidad`
+
+Nómina Excel única por **fraternidad + gestión**, subida por el delegado. Archivo en `uploads/Doc_Nomina_Excel/`.
+
+| Columna | Tipo | Restricciones | Descripción |
+|---------|------|---------------|-------------|
+| `id_lista` | SERIAL | PK | Identificador |
+| `id_fraternidad` | INTEGER | FK → `fraternidades`, ON DELETE CASCADE | Fraternidad |
+| `id_gestion` | INTEGER | FK → `gestiones`, ON DELETE CASCADE | Gestión del evento |
+| `nombre_original` | VARCHAR(255) | NOT NULL | Nombre del archivo subido |
+| `url_archivo` | VARCHAR(500) | NOT NULL | Ruta (`/uploads/Doc_Nomina_Excel/...`) |
+| `mime_type` | VARCHAR(120) | NULL | MIME del Excel |
+| `tamano_bytes` | BIGINT | NULL | Tamaño en bytes |
+| `id_usuario_subio` | INTEGER | FK → `usuarios`, ON DELETE SET NULL | Delegado que subió |
+| `created_at` | TIMESTAMP | NOT NULL | Primera subida |
+| `updated_at` | TIMESTAMP | NOT NULL | Última actualización / reemplazo |
+
+**Unique:** `(id_fraternidad, id_gestion)` — un solo Excel vigente; al re-subir se reemplaza el archivo en disco y se actualiza la fila (sin historial).
+
+**API** (`/api/v1/listas-nomina`):
+
+| Método | Ruta | Roles | Uso |
+|--------|------|-------|-----|
+| `GET` | `/listas-nomina/mi` | delegado | Estado de su nómina |
+| `POST` | `/listas-nomina/mi` | delegado | Subir/reemplazar `.xlsx`/`.xls` (máx. 15 MB) |
+| `DELETE` | `/listas-nomina/mi` | delegado | Eliminar su nómina |
+| `GET` | `/listas-nomina/mi/archivo` | delegado | Descargar |
+| `GET` | `/listas-nomina` | admin, superusuario | Listado por fraternidad (gestión activa) |
+| `GET` | `/listas-nomina/:id/preview` | admin, superusuario | Primera hoja → headers/rows (exceljs, ≤2000 filas; `.xls` solo descarga) |
+| `GET` | `/listas-nomina/:id/archivo` | admin, superusuario | Descargar |
+| `DELETE` | `/listas-nomina/:id` | admin, superusuario | Eliminar |
+
+**Nota:** no se persisten filas de integrantes en BD; el visor admin parsea el archivo al abrir.
 
 ---
 
@@ -516,16 +559,18 @@ Perfil de calificador vinculado a un usuario.
 
 ### `infracciones`
 
-Catálogo de sanciones por gestión.
+Catálogo **dinámico** de sanciones por gestión (CRUD admin/superusuario). Los presets (Bandera Amarilla −1, Roja −2, alcohol −30, suspensiones, etc.) se aseguran con `ensureInfraccionesPreset` **sin sobrescribir** `valor_impacto` ya guardado en producción.
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
 | `id_infraccion` | SERIAL PK | Identificador |
 | `id_gestion` | FK → `gestiones` | Gestión |
-| `nombre` | VARCHAR(255) | Nombre (ej. INASISTENCIA DE DELEGADO) |
-| `tipo_impacto` | VARCHAR(100) | Ej. DESCUENTO_DISCIPLINA, RESTA_PUNTOS |
-| `valor_impacto` | NUMERIC(5,2) | Valor (negativo = descuento) |
+| `nombre` | VARCHAR(255) | Nombre (ej. Bandera Amarilla - Disciplina) |
+| `tipo_impacto` | VARCHAR(100) | `RESTA_PUNTOS` \| `SUSPENSION` (u otros legacy) |
+| `valor_impacto` | NUMERIC(5,2) | Valor (negativo = descuento en puntaje final EFU) |
 | `created_at`, `updated_at` | TIMESTAMP | Auditoría |
+
+**API:** `GET/POST /evaluaciones/infracciones`, `PUT/DELETE /evaluaciones/infracciones/:id`, `POST /evaluaciones/infracciones/ensure-presets`. Al penalizar: `POST .../penalizar` con `{ idInfraccion }` o `{ tipo }` (preset).
 
 ### `incidencias`
 
@@ -537,10 +582,12 @@ Registro de sanciones aplicadas a una fraternidad.
 | `id_gestion` | FK → `gestiones` | Gestión |
 | `id_fraternidad` | FK → `fraternidades` | Fraternidad sancionada |
 | `id_usuario` | FK → `usuarios` | Usuario que registra |
-| `id_infraccion` | FK → `infracciones` | Tipo de infracción |
+| `id_infraccion` | FK → `infracciones` | Tipo de infracción (impacto leído de esta fila) |
 | `fecha_hora` | TIMESTAMP | Fecha del hecho |
 | `observacion` | TEXT | Detalle |
 | `created_at`, `updated_at` | TIMESTAMP | Auditoría |
+
+**Impacto en ranking/reportes:** `impactoSanciones = Σ infraccion.valor_impacto`; `puntajeFinal = max(0, promedioFinal + impactoSanciones)`.
 
 ---
 
@@ -966,11 +1013,101 @@ CREATE INDEX IF NOT EXISTS idx_evaluaciones_fase ON evaluaciones(id_fase);
 CREATE INDEX IF NOT EXISTS idx_evaluaciones_fraternidad ON evaluaciones(id_fraternidad);
 CREATE INDEX IF NOT EXISTS idx_incidencias_fraternidad ON incidencias(id_fraternidad);
 CREATE INDEX IF NOT EXISTS idx_participantes_fase ON participantes_concurso(id_fase);
+
+-- ------------------------------------------------------------
+-- 10. Extensiones recientes (nómina, ficha, concursos, cronograma)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS listas_nomina_fraternidad (
+    id_lista            SERIAL PRIMARY KEY,
+    id_fraternidad      INTEGER NOT NULL REFERENCES fraternidades(id_fraternidad) ON DELETE CASCADE,
+    id_gestion          INTEGER NOT NULL REFERENCES gestiones(id_gestion) ON DELETE CASCADE,
+    nombre_original     VARCHAR(255) NOT NULL,
+    url_archivo         VARCHAR(500) NOT NULL,
+    mime_type           VARCHAR(120),
+    tamano_bytes        BIGINT,
+    id_usuario_subio    INTEGER REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (id_fraternidad, id_gestion)
+);
+
+CREATE TABLE IF NOT EXISTS fichas_tecnicas_monografia (
+    id_ficha                SERIAL PRIMARY KEY,
+    id_fraternidad          INTEGER NOT NULL UNIQUE REFERENCES fraternidades(id_fraternidad) ON DELETE CASCADE,
+    id_gestion              INTEGER NOT NULL REFERENCES gestiones(id_gestion) ON DELETE CASCADE,
+    nombre_fraternidad      VARCHAR(255) NOT NULL,
+    categoria               VARCHAR(150),
+    facultad_carrera        TEXT,
+    instancia_representacion VARCHAR(50),
+    danza                   VARCHAR(255),
+    lugar_origen_danza      TEXT,
+    sinopsis_danza          TEXT,
+    resena_historica        TEXT,
+    fecha_fundacion         DATE,
+    fundadores              TEXT,
+    premios                 TEXT,
+    nombre_firmante         VARCHAR(255),
+    expositores             JSONB,
+    representantes_traje    JSONB,
+    estado                  VARCHAR(20) NOT NULL DEFAULT 'BORRADOR',
+    url_pdf                 VARCHAR(500),
+    fecha_generacion        TIMESTAMP,
+    id_usuario_actualizo    INTEGER REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+    created_at              TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS cronogramas_actividad (
+    id_cronograma_actividad SERIAL PRIMARY KEY,
+    id_gestion              INTEGER NOT NULL REFERENCES gestiones(id_gestion) ON DELETE CASCADE,
+    tipo                    VARCHAR(40) NOT NULL,
+    fecha_inicio            TIMESTAMP NOT NULL,
+    fecha_fin               TIMESTAMP NOT NULL,
+    created_at              TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (id_gestion, tipo)
+);
+
+CREATE TABLE IF NOT EXISTS inscripciones_concurso (
+    id_inscripcion          SERIAL PRIMARY KEY,
+    id_usuario              INTEGER NOT NULL REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    id_fase                 INTEGER NOT NULL REFERENCES fases(id_fase) ON DELETE CASCADE,
+    id_gestion              INTEGER NOT NULL REFERENCES gestiones(id_gestion) ON DELETE CASCADE,
+    id_fraternidad          INTEGER REFERENCES fraternidades(id_fraternidad) ON DELETE SET NULL,
+    estado                  VARCHAR(20) NOT NULL DEFAULT 'BORRADOR',
+    datos                   JSONB,
+    observacion_admin       TEXT,
+    revision_checklist      JSONB DEFAULT '{}',
+    id_participante         INTEGER REFERENCES participantes_concurso(id_participante) ON DELETE SET NULL,
+    id_participante_pareja  INTEGER REFERENCES participantes_concurso(id_participante) ON DELETE SET NULL,
+    created_at              TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (id_usuario, id_fase)
+);
+
+-- Regla Chacha: 1 pareja por fraternidad+fase (además de unique parcial / validación en servicio)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inscripcion_chacha_frat_fase
+    ON inscripciones_concurso (id_fraternidad, id_fase)
+    WHERE id_fraternidad IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS inscripcion_concurso_archivos (
+    id_archivo          SERIAL PRIMARY KEY,
+    id_inscripcion      INTEGER NOT NULL REFERENCES inscripciones_concurso(id_inscripcion) ON DELETE CASCADE,
+    clave_documento     VARCHAR(100) NOT NULL,
+    url                 VARCHAR(500) NOT NULL,
+    mime                VARCHAR(120),
+    nombre_original     VARCHAR(255),
+    orden               INTEGER NOT NULL DEFAULT 0,
+    created_at          TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_listas_nomina_gestion ON listas_nomina_fraternidad(id_gestion);
+CREATE INDEX IF NOT EXISTS idx_inscripciones_concurso_fase ON inscripciones_concurso(id_fase);
 ```
 
 ---
 
-## 11. Inventario de tablas (26 entidades + 2 junction)
+## 11. Inventario de tablas (31 entidades + 2 junction)
 
 | # | Tabla SQL | Entidad TypeORM |
 |---|-----------|-----------------|
@@ -981,27 +1118,32 @@ CREATE INDEX IF NOT EXISTS idx_participantes_fase ON participantes_concurso(id_f
 | 5 | `gestiones` | Gestion |
 | 6 | `categorias` | Categoria |
 | 7 | `cronograma_inscripciones` | CronogramaInscripcion |
-| 8 | `documentos_gestion` | DocumentoGestion |
-| 9 | `fraternidades` | Fraternidad |
-| 10 | `documentos_fraternidad` | DocumentoFraternidad |
-| 11 | `monografias` | Monografia |
-| 12 | `roles` | Role |
-| 13 | `usuarios` | Usuario |
-| 14 | `password_reset_tokens` | PasswordResetToken |
-| 15 | `sesiones_usuario` | SesionUsuario |
-| 16 | `auditoria_acciones` | AuditoriaAccion |
-| 17 | `solicitudes_inscripcion` | SolicitudInscripcion |
-| 18 | `fases` | Fase |
-| 19 | `criterios` | Criterio |
-| 20 | `jurados` | Jurado |
-| 21 | `jurado_fases` | (M:N Jurado ↔ Fase) |
-| 22 | `jurado_fraternidades` | (M:N Jurado ↔ Fraternidad) |
-| 23 | `evaluaciones` | Evaluacion |
-| 24 | `participantes_concurso` | Participante |
-| 25 | `infracciones` | Infraccion |
-| 26 | `incidencias` | Incidencia |
-| 27 | `eventos_control` | EventoControl |
-| 28 | `asistencias` | Asistencia |
+| 8 | `cronogramas_actividad` | CronogramaActividad |
+| 9 | `documentos_gestion` | DocumentoGestion |
+| 10 | `fraternidades` | Fraternidad |
+| 11 | `documentos_fraternidad` | DocumentoFraternidad |
+| 12 | `monografias` | Monografia |
+| 13 | `fichas_tecnicas_monografia` | FichaTecnicaMonografia |
+| 14 | `listas_nomina_fraternidad` | ListaNominaFraternidad |
+| 15 | `roles` | Role |
+| 16 | `usuarios` | Usuario |
+| 17 | `password_reset_tokens` | PasswordResetToken |
+| 18 | `sesiones_usuario` | SesionUsuario |
+| 19 | `auditoria_acciones` | AuditoriaAccion |
+| 20 | `solicitudes_inscripcion` | SolicitudInscripcion |
+| 21 | `fases` | Fase |
+| 22 | `criterios` | Criterio |
+| 23 | `jurados` | Jurado |
+| 24 | `jurado_fases` | (M:N Jurado ↔ Fase) |
+| 25 | `jurado_fraternidades` | (M:N Jurado ↔ Fraternidad) |
+| 26 | `evaluaciones` | Evaluacion |
+| 27 | `participantes_concurso` | Participante |
+| 28 | `inscripciones_concurso` | InscripcionConcurso |
+| 29 | `inscripcion_concurso_archivos` | InscripcionConcursoArchivo |
+| 30 | `infracciones` | Infraccion |
+| 31 | `incidencias` | Incidencia |
+| 32 | `eventos_control` | EventoControl |
+| 33 | `asistencias` | Asistencia |
 
 ---
 
@@ -1010,9 +1152,9 @@ CREATE INDEX IF NOT EXISTS idx_participantes_fase ON participantes_concurso(id_f
 | Rol | Descripción | Acceso típico UI |
 |-----|-------------|------------------|
 | `superusuario` | Acceso total | Todo + auditoría de sistema + gestión de admins |
-| `admin` | Administración general y usuarios | Evento, usuarios (excepto crear superusuario), reportes |
+| `admin` | Administración general y usuarios | Evento, usuarios (excepto crear superusuario), reportes, **nóminas Excel** (listar/previsualizar/eliminar), infracciones |
 | `controladorhcu` | Asistencia y disciplina HCU | Directorio delegados, disciplina, estadísticas |
-| `delegado` | Fraternidad, monografía, Chacha-Warmi | Inscripción EFU, monografía/ficha, inscripción pareja Chacha-Warmi |
+| `delegado` | Fraternidad, monografía, nómina, Chacha-Warmi | Inscripción EFU, monografía/ficha, **subir/reemplazar nómina Excel**, inscripción pareja Chacha-Warmi |
 | `jurado` | Calificación de fases | Calificar EFU/concursos, estadísticas |
 | `veedor` | **Solo lectura** | Estadísticas, Reglamento, Monografías de fraternidades (ver/descargar PDF subido) |
 | `concursante` | Concursos externos (fotografía / otros) | Completa inscripción de su fase EXTERNO asignada (no Chacha-Warmi) |
@@ -1023,12 +1165,12 @@ CREATE INDEX IF NOT EXISTS idx_participantes_fase ON participantes_concurso(id_f
 
 - `fases.plantilla_requisitos`: `fotografia` | `chacha_warmi` | `generico` (Otros) + `requisitos_inscripcion` (JSONB).
 - **Concursante:** `usuarios.id_fase_concurso` → solo fases EXTERNO con plantilla `fotografia` o `generico`. Fraternidad opcional.
-- **Chacha-Warmi:** lo inscribe el **delegado** (1 expediente por fraternidad+fase). Columnas `inscripciones_concurso.id_fraternidad`, `id_participante` (Chacha), `id_participante_pareja` (Warmi). Índice único parcial `(id_fraternidad, id_fase) WHERE id_fraternidad IS NOT NULL`.
+- **Chacha-Warmi:** lo inscribe el **delegado**. Regla dura: **1 pareja (expediente) por fraternidad+fase** — índice único parcial `(id_fraternidad, id_fase) WHERE id_fraternidad IS NOT NULL` + validación en servicio. Columnas `inscripciones_concurso.id_fraternidad`, `id_participante` (Chacha), `id_participante_pareja` (Warmi).
 - Al **aprobar** Chacha: 2 filas en `participantes_concurso` (`tipo` Chacha / Warmi). En fotografía/otros: 1 participante.
 
 ### Ficha técnica monografía
 
-Tabla `fichas_tecnicas_monografia` (1:1 con fraternidad): datos del formulario oficial + `expositores` / `representantes_traje` (JSONB, 2 personas c/u). Estados `BORRADOR` | `GENERADA`. El delegado llena y genera PDF carta; **Corregir** borra el PDF y vuelve a borrador. Admin lista/descarga en dashboard.
+Tabla `fichas_tecnicas_monografia` (1:1 con fraternidad): datos del formulario oficial + `expositores` / `representantes_traje` (JSONB, 2 personas c/u). Estados `BORRADOR` | `GENERADA`. El delegado llena y genera PDF carta; **Corregir** borra el PDF y vuelve a borrador. Admin lista/descarga en dashboard. Ventanas de carga: `cronogramas_actividad` (`tipo` = `MONOGRAFIA` \| `FICHA_TECNICA`).
 
 ---
 
@@ -1064,17 +1206,19 @@ Rutas bajo `/api/v1/reportes` (JWT + roles indicados):
 | `POST` | `/reportes/consultar/pdf` | superusuario, admin | Mismo criterio → PDF |
 
 **Tipos de reporte (`tipoReporte`):**
-- `fraternidades` — nombre, tipo de danza, categoría, instancia, pertenencia, gestión.
+- `fraternidades` — listado / preinscripciones (`alcanceListado`: inscritas | pendientes | observadas | todos).
 - `directiva` — filas por cargo (nombre, CI, celular) desde solicitud APROBADA vinculada.
-- `calificaciones` — requiere `idGestion`; puesto, promedio jurado, sanciones, puntaje final.
+- `calificaciones` — **matriz** por gestión (`getMatrizCalificaciones`): `fasesEfu`, por fraternidad `jurados[]` con notas por fase, `promedioJurado`, `sanciones` / `impactoSanciones`, `puntajeFinal`, `puesto`, y bloque `chachaWarmi` (nota pareja). PDF en landscape.
+- `disciplina` — incidencias/sanciones por fraternidad (filtros por tipo bandera/sanción).
 - `costos` — informe de costos de participación.
+- `concursantes_externos` — inscritos por fase EXTERNO; variante `chacha_warmi` cuando aplica plantilla Chacha.
 
-**Filtros opcionales:** `idGestion`, `idTipoDanza`, `idFacultad`, `idCarrera`, `idCategoria`, `instanciaRepresentacion`, `busqueda`, `ordenarPor`, `orden`, `page`, `limit`.
+**Filtros opcionales:** `idGestion`, `idTipoDanza`, `idFacultad`, `idCarrera`, `idCategoria`, `instanciaRepresentacion`, `alcanceListado`, `plantillaConcurso` / `idFase`, filtros de disciplina, `busqueda`, `ordenarPor`, `orden`, `page`, `limit`.
 
 ### UI: Auditoría y Reportes
 
 Vista lateral **Auditoría y Reportes** (`auditoria_reportes`):
-- **superusuario / admin:** tabs de auditoría (solo super), auditoría de calificaciones (admin+), reportes e informe de costos.
+- **superusuario / admin:** tabs de auditoría (solo super), auditoría de calificaciones (admin+), reportes (matriz calificaciones, disciplina, concursantes, costos).
 - **veedor:** no tiene acceso a reportes; usa Estadísticas, Reglamento y Monografías.
 
 ### Módulo monografías (API)
@@ -1092,21 +1236,23 @@ Archivos en disco: `uploads/Doc_Monografia/monografia-{idFraternidad}-{timestamp
 
 | Reporte solicitado | ¿Soportado? | Tablas / campos clave | Observaciones |
 |--------------------|-------------|------------------------|---------------|
-| Fraternidades inscritas en gestión X | **Sí** | `fraternidades.id_gestion` | `POST /reportes/consultar` con `tipoReporte=fraternidades`. |
+| Fraternidades inscritas en gestión X | **Sí** | `fraternidades.id_gestion` | `tipoReporte=fraternidades` + `alcanceListado`. |
 | Por facultad / carrera / instancia | **Sí** | FKs en `fraternidades` | Filtros en módulo reportes. |
 | Por tipo de danza (Morenada, Tinku…) | **Sí** | `tipos_danza` + FK | Obligatorio en inscripción delegado. |
 | Directiva por fraternidad | **Sí** | `solicitudes_inscripcion` APROBADA | `tipoReporte=directiva` o `GET /fraternidades/:id/directiva`. |
-| Calificaciones / ranking por gestión | **Sí** | `evaluaciones` + agregación | `tipoReporte=calificaciones` o `GET /evaluaciones/reporte/:idGestion`. |
-| Ganadores (1.er puesto) por gestión | **Sí (calculado)** | Ranking EFU | Sin tabla `resultados_oficiales` persistida. |
+| Calificaciones / ranking por gestión | **Sí** | matriz `evaluaciones` + sanciones | `tipoReporte=calificaciones` (matriz) o `GET /evaluaciones/reporte/:idGestion`. |
+| Disciplina / banderas | **Sí** | `incidencias` + `infracciones` | `tipoReporte=disciplina`. |
+| Concursantes externos / Chacha | **Sí** | `inscripciones_concurso`, `participantes_concurso` | `tipoReporte=concursantes_externos`. |
+| Ganadores (1.er puesto) por gestión | **Sí (calculado)** | Ranking EFU en matriz | Sin tabla `resultados_oficiales` persistida. |
 | Monografías subidas / pendientes | **Sí** | `monografias` 1:1 | `GET /monografias/listado-fraternidades` (veedor). |
+| Nóminas Excel por fraternidad | **Sí** | `listas_nomina_fraternidad` | UI admin + API `/listas-nomina` (no es tipo de reporte PDF). |
 
 ### Pendientes opcionales
 
 1. **Tabla `resultados` / snapshot de puestos** — persistir puesto oficial al cerrar evaluación.
 2. **Fraternidades legacy** — pueden tener `id_tipo_danza` NULL hasta edición manual.
-3. **Ganadores por fase EFU** — agregación por `evaluaciones.id_fase` (no expuesta aún en reportes).
-4. **Soft-delete / backups** — el DELETE de organización es físico; se recomienda `pg_dump` periódico en producción.
+3. **Soft-delete / backups** — el DELETE de organización es físico; se recomienda `pg_dump` periódico en producción.
 
 ### Conclusión
 
-El esquema actual contempla **26 entidades TypeORM**, auditoría de sesiones/acciones, catálogo `tipos_danza`, monografías 1:1 y el rol **`veedor`** de solo lectura (estadísticas, reglamento y monografías). El ranking histórico sigue disponible en `GET /evaluaciones/reporte/:idGestion` y en reportes de calificaciones filtrados.
+El esquema contempla **31 entidades TypeORM** (+ 2 junction `jurado_*`), auditoría, catálogo `tipos_danza`, monografías y fichas 1:1, nómina Excel por fraternidad+gestión, infracciones dinámicas, inscripciones de concursos (incl. Chacha 1 pareja), y el rol **`veedor`** de solo lectura. Ranking y matriz de calificaciones: `getMatrizCalificaciones` / `POST /reportes/consultar` (`calificaciones`) y `GET /evaluaciones/reporte/:idGestion`.

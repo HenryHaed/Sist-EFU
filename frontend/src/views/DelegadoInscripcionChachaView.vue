@@ -3,7 +3,9 @@
     <div class="mb-6">
       <h2 class="dashboard-page-title text-primary italic uppercase">Inscripción Chacha-Warmi</h2>
       <p class="text-slate-500 text-sm font-medium mt-1">
-        Completa los datos de la pareja y sube los documentos. Al enviar, la pareja queda registrada en Concursantes Chacha-Warmi para revisión y calificación.
+        Completa los datos de la pareja (un Chacha y una Warmi) y sube los documentos.
+        <span class="text-slate-700 font-semibold">Solo se permite una pareja por fraternidad</span>
+        en este concurso. Al enviar, queda registrada en Concursantes Chacha-Warmi para revisión y calificación.
       </p>
     </div>
 

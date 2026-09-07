@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder, In } from 'typeorm';
 import { Response } from 'express';
 import { Fraternidad } from '../entities/Fraternidad';
 import { TipoDanza } from '../entities/TipoDanza';
@@ -21,8 +21,12 @@ import {
   TipoReporte,
   AlcanceListadoFraternidades,
   TipoIncidenciaReporte,
+  PlantillaConcursoExterno,
 } from './dto/consultar-reporte.dto';
 import { Incidencia } from '../entities/Incidencia';
+import { Participante } from '../entities/Participante';
+import { Fase } from '../entities/Fase';
+import { InscripcionConcurso } from '../entities/InscripcionConcurso';
 import { FORMULA_EFU_PROMEDIO } from '../evaluaciones/efu-scoring';
 import { EvaluacionesService } from '../evaluaciones/evaluaciones.service';
 import { drawPdfInstitutionalHeader, PDF_UMSA_BLUE, PDF_UMSA_RED } from '../common/pdf-layout';
@@ -47,6 +51,12 @@ export class ReportesService implements OnModuleInit {
     private readonly solicitudRepo: Repository<SolicitudInscripcion>,
     @InjectRepository(Incidencia)
     private readonly incidenciaRepo: Repository<Incidencia>,
+    @InjectRepository(Participante)
+    private readonly participanteRepo: Repository<Participante>,
+    @InjectRepository(Fase)
+    private readonly faseRepo: Repository<Fase>,
+    @InjectRepository(InscripcionConcurso)
+    private readonly inscConcursoRepo: Repository<InscripcionConcurso>,
     private readonly evaluacionesService: EvaluacionesService,
   ) {}
 
@@ -80,6 +90,25 @@ export class ReportesService implements OnModuleInit {
       });
     }
     const tiposDanza = await this.getTiposDanza();
+    let fasesExternas: Array<{
+      idFase: number;
+      nombre: string;
+      plantillaRequisitos: string | null;
+      idGestion: number | null;
+    }> = [];
+    if (idGestion) {
+      const fases = await this.faseRepo.find({
+        where: { gestion: { idGestion }, tipoConcurso: 'EXTERNO' },
+        relations: ['gestion'],
+        order: { nombre: 'ASC' },
+      });
+      fasesExternas = fases.map((f) => ({
+        idFase: f.idFase,
+        nombre: f.nombre,
+        plantillaRequisitos: f.plantillaRequisitos || 'generico',
+        idGestion: f.gestion?.idGestion ?? idGestion,
+      }));
+    }
     return {
       gestiones,
       facultades,
@@ -87,6 +116,13 @@ export class ReportesService implements OnModuleInit {
       categorias,
       tiposDanza,
       instancias: Object.values(InstanciaRepresentacion),
+      fasesExternas,
+      plantillasExternas: [
+        { id: PlantillaConcursoExterno.TODOS, label: 'Todos los concursos externos' },
+        { id: PlantillaConcursoExterno.CHACHA_WARMI, label: 'Solo Chacha-Warmi' },
+        { id: PlantillaConcursoExterno.FOTOGRAFIA, label: 'Solo Fotografía' },
+        { id: PlantillaConcursoExterno.GENERICO, label: 'Otros concursos' },
+      ],
     };
   }
 
@@ -312,7 +348,7 @@ export class ReportesService implements OnModuleInit {
     }
     if (dto.busqueda?.trim()) {
       qb.andWhere(
-        '(LOWER(s.nombre_fraternidad) LIKE LOWER(:q) OR LOWER(tipoDanza.nombre) LIKE LOWER(:q))',
+        '(LOWER(s.nombre_fraternidad) LIKE LOWER(:q) OR LOWER(fraternidadCreada.nombre) LIKE LOWER(:q) OR LOWER(tipoDanza.nombre) LIKE LOWER(:q))',
         { q: `%${dto.busqueda.trim()}%` },
       );
     }
@@ -406,6 +442,10 @@ export class ReportesService implements OnModuleInit {
       return this.consultarCostos(dto, page, limit, skip);
     }
 
+    if (dto.tipoReporte === TipoReporte.CONCURSANTES_EXTERNOS) {
+      return this.consultarConcursantesExternos(dto, page, limit, skip);
+    }
+
     if (dto.tipoReporte === TipoReporte.FRATERNIDADES) {
       return this.consultarListadoFraternidades(dto, page, limit, skip);
     }
@@ -450,55 +490,59 @@ export class ReportesService implements OnModuleInit {
       };
     }
 
-    // CALIFICACIONES
-    const reporte = await this.evaluacionesService.getReporteHistorico(dto.idGestion!);
+    // CALIFICACIONES — matriz por fraternidad / jurado / fase
+    const matriz = await this.evaluacionesService.getMatrizCalificaciones(dto.idGestion!);
     const idsFiltrados = new Set(fraternidades.map((f) => f.idFraternidad));
-    const ranking = reporte.rankingEfu
-      .filter((r) => idsFiltrados.has(r.idFraternidad))
-      .filter((r) => {
+    let grupos: any[] = matriz.grupos
+      .filter((g) => idsFiltrados.has(g.idFraternidad))
+      .filter((g) => {
         if (!dto.tipoIncidencia || dto.tipoIncidencia === TipoIncidenciaReporte.TODOS) return true;
-        const claves = (r.sanciones || []).map((s: any) => this.clasificarInfraccion(s));
+        const claves = (g.sanciones || []).map((s: any) => this.clasificarInfraccion(s));
         return claves.some((c) => this.coincideTipoIncidencia(c, dto.tipoIncidencia));
       })
-      .map((r) => {
-        const frat = fraternidades.find((f) => f.idFraternidad === r.idFraternidad);
-        const detalleSanciones = (r.sanciones || [])
-          .map((s: any) => s.nombre)
-          .filter(Boolean)
-          .join(' · ');
+      .map((g) => {
+        const frat = fraternidades.find((f) => f.idFraternidad === g.idFraternidad);
+        const base = frat ? this.mapFraternidadRow(frat) : {};
         return {
-          ...this.mapFraternidadRow(frat!),
-          puesto: r.puesto,
-          promedioJurado: r.promedioJurado,
-          promedioFinal: r.promedioFinal ?? r.promedioJurado,
-          cantidadJurados: r.cantidadJurados ?? 0,
-          impactoSanciones: r.impactoSanciones,
-          detalleSanciones: detalleSanciones || '—',
-          suspendida: !!r.suspendida,
-          puntajeFinal: r.puntajeFinal,
-          fechaHoraCalificacion: r.fechaHoraCalificacion,
+          ...base,
+          ...g,
+          nombreFraternidad: g.nombreFraternidad || (base as any).nombreFraternidad,
+          categoria: g.categoria || (base as any).categoria,
+          tipoDanza: g.tipoDanza || (base as any).tipoDanza,
         };
       });
 
     if (dto.ordenarPor === 'puntajeFinal' || dto.ordenarPor === 'puesto') {
       const desc = dto.orden === 'DESC';
-      ranking.sort((a, b) => {
+      grupos.sort((a, b) => {
         const va = dto.ordenarPor === 'puesto' ? a.puesto : a.puntajeFinal;
         const vb = dto.ordenarPor === 'puesto' ? b.puesto : b.puntajeFinal;
         return desc ? vb - va : va - vb;
       });
+    } else if (dto.ordenarPor === 'nombre' || dto.ordenarPor === 'nombreFraternidad') {
+      const desc = dto.orden === 'DESC';
+      grupos.sort((a, b) => {
+        const cmp = String(a.nombreFraternidad || '').localeCompare(String(b.nombreFraternidad || ''), 'es');
+        return desc ? -cmp : cmp;
+      });
     }
 
-    const total = ranking.length;
+    // Renumerar nro tras filtros/orden
+    grupos.forEach((g, i) => {
+      g.nro = i + 1;
+    });
+
+    const total = grupos.length;
     return {
       tipoReporte: dto.tipoReporte,
       total,
       page,
       limit,
       filtros: dto,
-      gestion: reporte.gestion,
-      formula: FORMULA_EFU_PROMEDIO,
-      data: ranking.slice(skip, skip + limit),
+      gestion: matriz.gestion,
+      fasesEfu: matriz.fasesEfu,
+      formula: matriz.formula,
+      data: grupos.slice(skip, skip + limit),
     };
   }
 
@@ -852,6 +896,199 @@ export class ReportesService implements OnModuleInit {
     };
   }
 
+  /**
+   * Reporte de concursantes de fases EXTERNO (Chacha-Warmi, Fotografía u otros).
+   * Usa Fraternidad.nombre canónico cuando hay vínculo.
+   */
+  private async consultarConcursantesExternos(
+    dto: ConsultarReporteDto,
+    page: number,
+    limit: number,
+    skip: number,
+  ) {
+    const qb = this.participanteRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.fase', 'fase')
+      .leftJoinAndSelect('fase.gestion', 'gestionFase')
+      .leftJoinAndSelect('p.gestion', 'gestion')
+      .leftJoinAndSelect('p.fraternidad', 'frat')
+      .leftJoinAndSelect('frat.facultad', 'fratFacultad')
+      .leftJoinAndSelect('frat.carrera', 'fratCarrera')
+      .leftJoinAndSelect('frat.tipoDanza', 'fratTipoDanza')
+      .leftJoinAndSelect('frat.categoria', 'fratCategoria')
+      .leftJoinAndSelect('frat.institucionExterna', 'fratInstitucion')
+      .leftJoinAndSelect('p.facultad', 'facultad')
+      .leftJoinAndSelect('p.carrera', 'carrera')
+      .andWhere('fase.tipo_concurso = :tipoExt', { tipoExt: 'EXTERNO' });
+
+    if (dto.idGestion) {
+      qb.andWhere(
+        '(gestion.id_gestion = :idGestion OR gestionFase.id_gestion = :idGestion)',
+        { idGestion: dto.idGestion },
+      );
+    }
+    if (dto.idFase) {
+      qb.andWhere('fase.id_fase = :idFase', { idFase: dto.idFase });
+    } else if (
+      dto.plantillaRequisitos &&
+      dto.plantillaRequisitos !== PlantillaConcursoExterno.TODOS
+    ) {
+      qb.andWhere('LOWER(COALESCE(fase.plantilla_requisitos, :gen)) = :plantilla', {
+        plantilla: dto.plantillaRequisitos,
+        gen: 'generico',
+      });
+    }
+
+    const instancia = dto.instanciaRepresentacion;
+    const esCentral = instancia && this.INSTANCIAS_CENTRALES.includes(instancia);
+    const esExterno = instancia === 'Externo';
+    const esFacultad = instancia === 'Facultad';
+    const esCarrera = instancia === 'Carrera';
+
+    if (instancia) {
+      qb.andWhere(
+        '(LOWER(COALESCE(frat.nivel_representacion, \'\')) = LOWER(:instancia) OR (frat.id_fraternidad IS NULL AND :instancia = \'Externo\'))',
+        { instancia },
+      );
+    }
+    const puedeFiltrarFacultad =
+      !esCentral && !esExterno && (esFacultad || esCarrera || !instancia);
+    if (dto.idFacultad && puedeFiltrarFacultad) {
+      qb.andWhere(
+        '(facultad.id_facultad = :idFacultad OR fratFacultad.id_facultad = :idFacultad)',
+        { idFacultad: dto.idFacultad },
+      );
+    }
+    const puedeFiltrarCarrera = esCarrera || (!instancia && dto.idFacultad);
+    if (dto.idCarrera && puedeFiltrarCarrera) {
+      qb.andWhere(
+        '(carrera.id_carrera = :idCarrera OR fratCarrera.id_carrera = :idCarrera)',
+        { idCarrera: dto.idCarrera },
+      );
+    }
+    if (dto.idCategoria) {
+      qb.andWhere('fratCategoria.id_categoria = :idCategoria', {
+        idCategoria: dto.idCategoria,
+      });
+    }
+    if (dto.idTipoDanza) {
+      qb.andWhere('fratTipoDanza.id_tipo_danza = :idTipoDanza', {
+        idTipoDanza: dto.idTipoDanza,
+      });
+    }
+    if (dto.busqueda?.trim()) {
+      qb.andWhere(
+        '(LOWER(p.nombre) LIKE LOWER(:q) OR LOWER(frat.nombre) LIKE LOWER(:q) OR LOWER(COALESCE(p.institucion_externa, \'\')) LIKE LOWER(:q))',
+        { q: `%${dto.busqueda.trim()}%` },
+      );
+    }
+
+    const ordenarPor = dto.ordenarPor || 'nombre';
+    const orden = dto.orden === 'DESC' ? 'DESC' : 'ASC';
+    const orderMap: Record<string, string> = {
+      nombre: 'p.nombre',
+      nombreFraternidad: 'frat.nombre',
+      tipo: 'p.tipo',
+      concurso: 'fase.nombre',
+      tipoDanza: 'fratTipoDanza.nombre',
+      categoria: 'fratCategoria.nombre',
+      facultad: 'fratFacultad.nombre',
+    };
+    qb.orderBy(orderMap[ordenarPor] || 'p.nombre', orden);
+
+    const participantes = await qb.getMany();
+
+    // Inscripciones de las fases involucradas (datos personales)
+    const faseIds = [...new Set(participantes.map((p) => p.fase?.idFase).filter(Boolean))];
+    const inscs =
+      faseIds.length > 0
+        ? await this.inscConcursoRepo.find({
+            where: { fase: { idFase: In(faseIds as number[]) } },
+            relations: ['fraternidad', 'participante', 'participantePareja', 'fase'],
+          })
+        : [];
+
+    const inscPorParticipante = new Map<number, InscripcionConcurso>();
+    for (const insc of inscs) {
+      if (insc.participante?.idParticipante) {
+        inscPorParticipante.set(insc.participante.idParticipante, insc);
+      }
+      if (insc.participantePareja?.idParticipante) {
+        inscPorParticipante.set(insc.participantePareja.idParticipante, insc);
+      }
+    }
+
+    const rows = participantes.map((p) => {
+      const insc = inscPorParticipante.get(p.idParticipante);
+      const datos = (insc?.datos || {}) as Record<string, any>;
+      const plantilla = String(p.fase?.plantillaRequisitos || 'generico').toLowerCase();
+      const esChacha = plantilla === 'chacha_warmi';
+      const esPareja = /warmi|pareja/i.test(String(p.tipo || ''));
+      const nombreFraternidad =
+        p.fraternidad?.nombre || insc?.fraternidad?.nombre || '—';
+      const ci = esPareja ? datos.ciPareja || datos.ci : datos.ci;
+      const celular = esPareja ? datos.celularPareja || datos.celular : datos.celular;
+      const correo = esPareja ? datos.correoPareja || datos.correo : datos.correo;
+      const facultadCarrera =
+        (esPareja ? datos.facultadCarreraPareja || datos.facultadCarrera : datos.facultadCarrera) ||
+        [p.facultad?.nombre || p.fraternidad?.facultad?.nombre, p.carrera?.nombre || p.fraternidad?.carrera?.nombre]
+          .filter(Boolean)
+          .join(' — ') ||
+        p.institucionExterna ||
+        p.fraternidad?.institucionExterna?.nombre ||
+        '—';
+      const instancia =
+        datos.instanciaRepresentacion ||
+        p.fraternidad?.nivelRepresentacion ||
+        (p.esUmsa ? 'UMSA' : '—');
+
+      return {
+        idParticipante: p.idParticipante,
+        nombre: p.nombre,
+        tipo: p.tipo || 'Participante',
+        nombreFraternidad,
+        concurso: p.fase?.nombre || '—',
+        plantillaRequisitos: plantilla,
+        esChacha,
+        ci: ci || '—',
+        celular: celular || '—',
+        correo: correo || '—',
+        facultadCarrera,
+        instancia,
+        tipoDanza: p.fraternidad?.tipoDanza?.nombre || '—',
+        categoria: p.fraternidad?.categoria?.nombre || '—',
+        estamento: datos.estamento || '—',
+        descripcionConceptual: datos.descripcionConceptual || '—',
+        institucionExterna:
+          p.institucionExterna || p.fraternidad?.institucionExterna?.nombre || '—',
+        estadoInscripcion: insc?.estado || '—',
+        gestionAnio: p.gestion?.anio || p.fase?.gestion?.anio || null,
+      };
+    });
+
+    const gestion = dto.idGestion
+      ? await this.gestionRepo.findOne({ where: { idGestion: dto.idGestion } })
+      : null;
+
+    // Detectar si el resultado es predominantemente Chacha (para columnas UI/PDF)
+    const esReporteChacha =
+      dto.plantillaRequisitos === PlantillaConcursoExterno.CHACHA_WARMI ||
+      (dto.idFase
+        ? rows.every((r) => r.esChacha)
+        : rows.length > 0 && rows.every((r) => r.esChacha));
+
+    return {
+      tipoReporte: dto.tipoReporte,
+      total: rows.length,
+      page,
+      limit,
+      filtros: dto,
+      gestion,
+      variante: esReporteChacha ? 'chacha_warmi' : 'general',
+      data: rows.slice(skip, skip + limit),
+    };
+  }
+
   async generarPdfConsulta(dto: ConsultarReporteDto, res: Response) {
     const resultado = await this.consultar({ ...dto, page: 1, limit: 500 });
     const PDFDocument = require('pdfkit');
@@ -875,9 +1112,10 @@ export class ReportesService implements OnModuleInit {
     const titulos: Record<string, string> = {
       fraternidades: 'REPORTE DE FRATERNIDADES',
       directiva: 'REPORTE DE DIRECTIVA',
-      calificaciones: 'REPORTE DE CALIFICACIONES',
+      calificaciones: 'REPORTE DE CALIFICACIONES Y ASIGNACIONES DE NOTAS DE JURADOS',
       disciplina: 'REPORTE DE DISCIPLINA Y SANCIONES',
       costos: 'INFORME DE COSTOS DE PARTICIPACIÓN',
+      concursantes_externos: 'REPORTE DE CONCURSANTES EXTERNOS',
     };
 
     const alcanceLabel: Record<string, string> = {
@@ -914,6 +1152,13 @@ export class ReportesService implements OnModuleInit {
       (dto.tipoReporte === TipoReporte.DISCIPLINA || dto.tipoReporte === TipoReporte.CALIFICACIONES) &&
       dto.tipoIncidencia
         ? `Filtro: ${incidenciaLabel[dto.tipoIncidencia] || dto.tipoIncidencia}`
+        : null,
+      dto.tipoReporte === TipoReporte.CONCURSANTES_EXTERNOS
+        ? (resultado as any).variante === 'chacha_warmi'
+          ? 'Chacha-Warmi'
+          : dto.plantillaRequisitos && dto.plantillaRequisitos !== PlantillaConcursoExterno.TODOS
+            ? `Plantilla: ${dto.plantillaRequisitos}`
+            : 'Concursos externos'
         : null,
     ].filter(Boolean);
     const subtitle = subtitleParts.length ? subtitleParts.join(' · ') : undefined;
@@ -1155,6 +1400,59 @@ export class ReportesService implements OnModuleInit {
         String(row.gestionAnio || '—'),
       ]);
       renderTable(headers, widths, dataRows);
+    } else if (dto.tipoReporte === TipoReporte.CONCURSANTES_EXTERNOS) {
+      const esChacha = (resultado as any).variante === 'chacha_warmi';
+      if (esChacha) {
+        const headers = [
+          'N°',
+          'Concurso',
+          'Fraternidad',
+          'Rol',
+          'Nombre',
+          'CI',
+          'Celular',
+          'Correo',
+          'Facultad/Carrera',
+        ];
+        const widths = [24, 90, 120, 50, 120, 55, 60, 90, 110];
+        const dataRows = rows.map((row, i) => [
+          String(i + 1),
+          row.concurso || '—',
+          row.nombreFraternidad || '—',
+          row.tipo || '—',
+          row.nombre || '—',
+          row.ci || '—',
+          row.celular || '—',
+          row.correo || '—',
+          row.facultadCarrera || '—',
+        ]);
+        renderTable(headers, widths, dataRows);
+      } else {
+        const headers = [
+          'N°',
+          'Concurso',
+          'Nombre',
+          'Tipo',
+          'CI',
+          'Celular',
+          'Correo',
+          'Facultad/Carrera',
+          'Estamento',
+        ];
+        const widths = [24, 100, 130, 60, 55, 60, 90, 110, 60];
+        const dataRows = rows.map((row, i) => [
+          String(i + 1),
+          row.concurso || '—',
+          row.nombre || '—',
+          row.tipo || '—',
+          row.ci || '—',
+          row.celular || '—',
+          row.correo || '—',
+          row.facultadCarrera || '—',
+          row.estamento || '—',
+        ]);
+        renderTable(headers, widths, dataRows);
+      }
     } else if (dto.tipoReporte === TipoReporte.COSTOS) {
       const resumen = (resultado as any).resumen;
       if (resumen) {
@@ -1235,6 +1533,117 @@ export class ReportesService implements OnModuleInit {
         Number(row.monto).toFixed(2),
       ]);
       renderTable(headers, widths, dataRows);
+    } else if (dto.tipoReporte === TipoReporte.CALIFICACIONES) {
+      const fasesEfu: Array<{ idFase: number; nombre: string }> =
+        (resultado as any).fasesEfu || [];
+      const faseHeaders = fasesEfu.map((f) =>
+        String(f.nombre || 'Fase')
+          .toUpperCase()
+          .slice(0, 14),
+      );
+      const headers = [
+        'NRO',
+        'CATEGORIA',
+        'FRATERNIDAD',
+        'DANZA',
+        'JURADO',
+        ...faseHeaders,
+        'SANCIONES',
+        'TOTAL EFU',
+        'CHACHA WARMI',
+      ];
+      // Anchos relativos; se escalan a contentW
+      const baseW = [28, 42, 95, 70, 90, ...fasesEfu.map(() => 48), 48, 50, 52];
+      const sumW = baseW.reduce((a, b) => a + b, 0) || 1;
+      const widths = baseW.map((w) => (w / sumW) * contentW);
+
+      const fmtNota = (v: any) =>
+        v === null || v === undefined || v === '' ? '—' : Number(v).toFixed(2);
+
+      const drawMatrixRow = (
+        cells: string[],
+        startY: number,
+        opts: { highlight?: boolean; bold?: boolean } = {},
+      ) => {
+        const rowH = measureRowHeight(cells, widths, 11);
+        if (opts.highlight) {
+          doc.save().rect(margin, startY, contentW, rowH).fill('#fef08a').restore();
+        }
+        let x = margin;
+        doc
+          .font(opts.bold || opts.highlight ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(fontSize)
+          .fillColor('#0f172a');
+        cells.forEach((cell, i) => {
+          doc.text(String(cell ?? '—'), x + 2, startY + 2, {
+            width: widths[i] - 4,
+            height: rowH - 3,
+            align: i === 0 ? 'center' : 'left',
+            ellipsis: true,
+          });
+          x += widths[i];
+        });
+        drawCellBorders(margin, startY, widths, rowH);
+        return rowH;
+      };
+
+      y += drawTableHeader(headers, widths, y);
+
+      for (const grupo of rows) {
+        const jurados = Array.isArray(grupo.jurados) ? grupo.jurados : [];
+        const filasJurado = jurados.length ? jurados : [null];
+
+        for (let ji = 0; ji < filasJurado.length; ji++) {
+          const j = filasJurado[ji];
+          const primera = ji === 0;
+          const notasFase = fasesEfu.map((f) =>
+            j ? fmtNota(j.notasPorFase?.[f.idFase]) : '—',
+          );
+          const cells = [
+            primera ? String(grupo.nro ?? grupo.puesto ?? '—') : '',
+            primera ? String(grupo.categoria || '—') : '',
+            primera ? String(grupo.nombreFraternidad || '—') : '',
+            primera ? String(grupo.tipoDanza || '—') : '',
+            j ? String(j.juradoNombre || '—') : '—',
+            ...notasFase,
+            '',
+            j ? fmtNota(j.totalEfu) : '—',
+            '',
+          ];
+          const previewH = measureRowHeight(cells, widths, 11);
+          ensureSpace(previewH + 14, headers, widths);
+          y += drawMatrixRow(cells, y, {});
+        }
+
+        const resumenCells = [
+          '',
+          '',
+          '',
+          '',
+          'PROMEDIO FINAL',
+          ...fasesEfu.map(() => ''),
+          grupo.suspendida
+            ? 'SUSP.'
+            : fmtNota(grupo.impactoSanciones),
+          fmtNota(grupo.promedioFinal),
+          grupo.chachaWarmi?.nota != null ? fmtNota(grupo.chachaWarmi.nota) : '—',
+        ];
+        const previewResumen = measureRowHeight(resumenCells, widths, 11);
+        ensureSpace(previewResumen + 4, headers, widths);
+        y += drawMatrixRow(resumenCells, y, { highlight: true, bold: true });
+
+        if (grupo.detalleSanciones && grupo.detalleSanciones !== '—') {
+          const detalle = `Sanciones: ${grupo.detalleSanciones} · Final: ${fmtNota(grupo.puntajeFinal)}`;
+          const detH = 10;
+          ensureSpace(detH + 2, headers, widths);
+          doc
+            .fontSize(5.5)
+            .fillColor('#64748b')
+            .font('Helvetica-Oblique')
+            .text(detalle, margin + 2, y, { width: contentW - 4, lineBreak: false });
+          y += detH;
+        }
+      }
     } else {
       const headers = [
         'N°',

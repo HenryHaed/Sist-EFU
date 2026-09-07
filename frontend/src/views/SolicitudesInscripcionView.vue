@@ -149,10 +149,9 @@
               <section id="sec-delegado" class="px-5 py-5 border-b border-slate-100">
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <h3 class="section-title mb-0">Delegado</h3>
-                  <div class="flex flex-wrap gap-2 shrink-0">
-                    <button type="button" @click="aceptarSeccion('delegado')" class="btn-revision-masiva btn-revision-aceptar">Aceptar todo</button>
-                    <button type="button" @click="rechazarSeccion('delegado')" class="btn-revision-masiva btn-revision-rechazar">Rechazar todo</button>
-                  </div>
+                  <p class="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                    Heredado de Usuarios → Delegados
+                  </p>
                 </div>
                 <div class="space-y-3">
                   <div v-for="item in itemsDelegado" :key="item.key" class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
@@ -162,24 +161,10 @@
                           <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
                             {{ item.label }}<span v-if="item.required" class="text-secondary"> *</span>
                           </p>
-                          <span :class="badgeRequisitoClase(item.required)">{{ item.required ? 'Obligatorio' : 'Opcional' }}</span>
+                          <span class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">Solo lectura</span>
                         </div>
                         <p class="text-sm font-medium text-slate-800 break-words">{{ item.value || '—' }}</p>
                       </div>
-                      <div class="flex items-center gap-2 shrink-0">
-                        <button type="button" @click.stop="setChecklistEstado(item, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(item.key, 'OK')]">✓</button>
-                        <button type="button" @click.stop="setChecklistEstado(item, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(item.key, 'X')]">✕</button>
-                      </div>
-                    </div>
-                    <div v-if="checklistEstado(item.key) === 'X'" class="mt-3 pt-3 border-t border-red-100">
-                      <label class="block text-[9px] font-black uppercase tracking-widest text-red-600 mb-1">Motivo del rechazo</label>
-                      <textarea
-                        :value="checklistComentario(item.key)"
-                        @input="setChecklistComentario(item.key, $event.target.value)"
-                        rows="2"
-                        placeholder="Indique por qué se rechaza este dato..."
-                        class="w-full px-3 py-2 bg-white border border-red-200 rounded-xl text-xs text-slate-700 resize-none focus:ring-2 focus:ring-red-200 outline-none"
-                      ></textarea>
                     </div>
                   </div>
                 </div>
@@ -202,11 +187,15 @@
                           <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">
                             {{ item.label }}<span v-if="item.required" class="text-secondary"> *</span>
                           </p>
-                          <span :class="badgeRequisitoClase(item.required)">{{ item.required ? 'Obligatorio' : 'Opcional' }}</span>
+                          <span
+                            v-if="CHECKLIST_KEYS_SIN_REVISION.has(item.key)"
+                            class="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200"
+                          >Solo lectura</span>
+                          <span v-else :class="badgeRequisitoClase(item.required)">{{ item.required ? 'Obligatorio' : 'Opcional' }}</span>
                         </div>
                         <div v-if="modoEdicionAdmin && adminCampoEditable(item.key)" class="mt-1">
                           <input
-                            v-if="item.key === 'nombreFraternidad' || item.key === 'institucionExterna'"
+                            v-if="item.key === 'institucionExterna'"
                             v-model="adminFormDraft[adminFieldKey(item.key)]"
                             type="text"
                             class="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm bg-white"
@@ -311,14 +300,19 @@
                             <option v-for="c in adminCarrerasFiltradas" :key="c.idCarrera" :value="c.idCarrera">{{ c.nombre }}</option>
                           </select>
                         </div>
-                        <p v-else class="text-sm font-medium text-slate-800 break-words">{{ item.value || '—' }}</p>
+                        <template v-else>
+                          <p class="text-sm font-medium text-slate-800 break-words">{{ item.value || '—' }}</p>
+                          <p v-if="item.key === 'nombreFraternidad'" class="text-[9px] text-slate-400 mt-1 font-medium">
+                            Se edita en Usuarios → Delegados (no afecta fichas ni monografías subidas).
+                          </p>
+                        </template>
                       </div>
-                      <div class="flex items-center gap-2 shrink-0">
+                      <div v-if="!CHECKLIST_KEYS_SIN_REVISION.has(item.key)" class="flex items-center gap-2 shrink-0">
                         <button type="button" @click.stop="setChecklistEstado(item, 'OK')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(item.key, 'OK')]">✓</button>
                         <button type="button" @click.stop="setChecklistEstado(item, 'X')" :class="['size-9 rounded-xl border text-sm font-black transition-all flex items-center justify-center', checklistBotonClase(item.key, 'X')]">✕</button>
                       </div>
                     </div>
-                    <div v-if="checklistEstado(item.key) === 'X'" class="mt-3 pt-3 border-t border-red-100">
+                    <div v-if="!CHECKLIST_KEYS_SIN_REVISION.has(item.key) && checklistEstado(item.key) === 'X'" class="mt-3 pt-3 border-t border-red-100">
                       <label class="block text-[9px] font-black uppercase tracking-widest text-red-600 mb-1">Motivo del rechazo</label>
                       <textarea
                         :value="checklistComentario(item.key)"
@@ -839,6 +833,26 @@ import { PERSONAS_DIRECTIVA, nombreCompletoPersona, formatCiSoloBase, normalizar
 
 const INSTANCIAS_OPCIONES = ['Facultad', 'Carrera', 'UMSA', 'FEDSIDUMSA', 'STUMSA', 'Externo']
 const DELEGADO_KEYS_NO_EDITABLES = new Set(['delegadoNombre', 'delegadoCi', 'fechaSolicitud', 'gestion'])
+/** Identidad heredada: sin edición ni ✓/✕ (no bloquea aprobación). */
+const CHECKLIST_KEYS_SIN_REVISION = new Set([
+  'delegadoNombre',
+  'delegadoCi',
+  'fechaSolicitud',
+  'gestion',
+  'nombreFraternidad',
+])
+const IDENTIDAD_KEYS_NO_EDITABLES = new Set([
+  ...DELEGADO_KEYS_NO_EDITABLES,
+  'nombreFraternidad',
+])
+
+const sanitizarChecklistSinIdentidad = (checklist) => {
+  const next = { ...(checklist || {}) }
+  for (const key of CHECKLIST_KEYS_SIN_REVISION) {
+    delete next[key]
+  }
+  return next
+}
 
 const DOC_BTN_LABELS = {
   ci: 'Ver CI',
@@ -931,8 +945,8 @@ const abrirDetalle = async (sol) => {
     solicitudActiva.value = data
     obsForm.value = data.estado === 'RECHAZADO' ? (data.observaciones || '') : ''
     const checklist = data.revisionChecklist ? JSON.parse(JSON.stringify(data.revisionChecklist)) : {}
-    revisionChecklistDraft.value = checklist
-    revisionChecklistGuardado.value = JSON.stringify(checklist)
+    revisionChecklistDraft.value = sanitizarChecklistSinIdentidad(checklist)
+    revisionChecklistGuardado.value = JSON.stringify(revisionChecklistDraft.value)
     seccionActiva.value = 'sec-delegado'
     mobileTab.value = 'datos'
     pdfSeleccionado.value = null
@@ -1044,8 +1058,7 @@ const formatearCostosParticipacion = (costos) => {
 const checklistItems = computed(() => {
   if (!solicitudActiva.value) return []
   return [
-    ...itemsDelegado.value,
-    ...itemsFraternidad.value,
+    ...itemsFraternidad.value.filter((i) => !CHECKLIST_KEYS_SIN_REVISION.has(i.key)),
     ...directiva.value.flatMap((c) => c.checklistItems),
     ...documentosTodos.value.map((doc) => ({
       key: doc.key,
@@ -1132,17 +1145,19 @@ const rechazarItems = (items) => {
   revisionChecklistDraft.value = next
 }
 
+const itemsFraternidadRevisables = computed(() =>
+  itemsFraternidad.value.filter((i) => !CHECKLIST_KEYS_SIN_REVISION.has(i.key)),
+)
+
 const aceptarSeccion = (tipo) => {
-  if (tipo === 'delegado') aceptarItems(itemsDelegado.value)
-  else if (tipo === 'fraternidad') aceptarItems(itemsFraternidad.value)
+  if (tipo === 'fraternidad') aceptarItems(itemsFraternidadRevisables.value)
   else if (tipo === 'institucionales') {
     aceptarItems(documentosInstitucionales.value.map((d) => docChecklistItem(d)))
   }
 }
 
 const rechazarSeccion = (tipo) => {
-  if (tipo === 'delegado') rechazarItems(itemsDelegado.value)
-  else if (tipo === 'fraternidad') rechazarItems(itemsFraternidad.value)
+  if (tipo === 'fraternidad') rechazarItems(itemsFraternidadRevisables.value)
   else if (tipo === 'institucionales') {
     rechazarItems(documentosInstitucionales.value.map((d) => docChecklistItem(d)))
   }
@@ -1226,21 +1241,22 @@ const guardarProgresoRevision = async () => {
   }
   guardandoProgreso.value = true
   try {
+    const checklistLimpio = sanitizarChecklistSinIdentidad(revisionChecklistDraft.value)
     const { data } = await api.put(
       `/inscripciones/${solicitudActiva.value.idSolicitud}/revision-progreso`,
-      { revisionChecklist: revisionChecklistDraft.value },
+      { revisionChecklist: checklistLimpio },
     )
     solicitudActiva.value = { ...solicitudActiva.value, ...data }
     const checklist = data.revisionChecklist
       ? JSON.parse(JSON.stringify(data.revisionChecklist))
       : {}
-    revisionChecklistDraft.value = checklist
-    revisionChecklistGuardado.value = JSON.stringify(checklist)
+    revisionChecklistDraft.value = sanitizarChecklistSinIdentidad(checklist)
+    revisionChecklistGuardado.value = JSON.stringify(revisionChecklistDraft.value)
     const idx = solicitudes.value.findIndex((s) => s.idSolicitud === data.idSolicitud)
     if (idx !== -1) {
       solicitudes.value[idx] = {
         ...solicitudes.value[idx],
-        revisionChecklist: data.revisionChecklist,
+        revisionChecklist: revisionChecklistDraft.value,
       }
     }
     notify.success(
@@ -1372,7 +1388,7 @@ const adminFieldKey = (itemKey) => {
   return map[itemKey] || itemKey
 }
 
-const adminCampoEditable = (key) => !DELEGADO_KEYS_NO_EDITABLES.has(key)
+const adminCampoEditable = (key) => !IDENTIDAD_KEYS_NO_EDITABLES.has(key)
 
 const hidratarCostosAdmin = (s) => {
   const raw = s.costosParticipacion
@@ -1470,7 +1486,7 @@ const adminCarrerasFiltradas = computed(() => {
 const activarEdicionAdmin = async () => {
   const { isConfirmed } = await Swal.fire({
     title: '¿Editar datos de entrada?',
-    html: 'Modificarás los datos enviados por el delegado en la preinscripción.<br><span class="text-sm text-slate-500">Usa esta opción solo para corregir errores de captura antes de la decisión final.</span>',
+    html: 'Puedes corregir categoría, danza, instancia, directiva, etc.<br><strong>Nombre del delegado, CI, fechas y nombre de fraternidad</strong> no se editan aquí: se heredan de <em>Usuarios → Delegados</em>.',
     icon: 'warning',
     showCancelButton: true,
     confirmButtonText: 'Sí, editar',
@@ -1494,6 +1510,7 @@ const guardarEdicionAdmin = async () => {
   guardandoAdmin.value = true
   try {
     const payload = { ...adminFormDraft.value }
+    delete payload.nombreFraternidad
     if (payload.costosParticipacion) {
       const multiple = Boolean(payload.costosParticipacion.multiple)
       const items = (payload.costosParticipacion.items || []).map((item) => ({
@@ -1649,14 +1666,14 @@ const cambiarEstado = async (nuevoEstado) => {
     const { data } = await api.put(`/inscripciones/${solicitudActiva.value.idSolicitud}/estado`, {
       estado: nuevoEstado,
       observaciones: nuevoEstado === 'RECHAZADO' ? (obsForm.value || undefined) : undefined,
-      revisionChecklist: revisionChecklistDraft.value,
+      revisionChecklist: sanitizarChecklistSinIdentidad(revisionChecklistDraft.value),
     })
     solicitudActiva.value = { ...solicitudActiva.value, ...data }
     const checklist = data.revisionChecklist
       ? JSON.parse(JSON.stringify(data.revisionChecklist))
       : JSON.parse(JSON.stringify(revisionChecklistDraft.value || {}))
-    revisionChecklistDraft.value = checklist
-    revisionChecklistGuardado.value = JSON.stringify(checklist)
+    revisionChecklistDraft.value = sanitizarChecklistSinIdentidad(checklist)
+    revisionChecklistGuardado.value = JSON.stringify(revisionChecklistDraft.value)
     const idx = solicitudes.value.findIndex(s => s.idSolicitud === data.idSolicitud)
     if (idx !== -1) solicitudes.value[idx] = { ...solicitudes.value[idx], ...data }
 

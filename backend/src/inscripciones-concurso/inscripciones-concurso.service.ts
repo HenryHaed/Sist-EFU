@@ -418,16 +418,22 @@ export class InscripcionesConcursoService {
       'usuario',
     ] as const;
 
-    let insc = await this.inscRepo.findOne({
+    // Regla: 1 pareja (1 inscripción) por fraternidad + fase Chacha-Warmi
+    const porFrat = await this.inscRepo.find({
       where: {
         fraternidad: { idFraternidad: opts.idFraternidad },
         fase: { idFase: opts.idFase },
       },
       relations: [...relations],
+      order: { idInscripcion: 'ASC' },
     });
-    if (insc) return insc;
+    if (porFrat.length > 0) {
+      // Preferir la del delegado actual si hay varias (datos legacy)
+      const propia = porFrat.find((i) => i.usuario?.idUsuario === opts.idUsuario);
+      return propia || porFrat[0];
+    }
 
-    insc = await this.inscRepo.findOne({
+    const insc = await this.inscRepo.findOne({
       where: {
         usuario: { idUsuario: opts.idUsuario },
         fase: { idFase: opts.idFase },
@@ -435,6 +441,48 @@ export class InscripcionesConcursoService {
       relations: [...relations],
     });
     return insc;
+  }
+
+  /**
+   * Regla dura: solo 1 inscripción Chacha-Warmi (1 pareja) por fraternidad y fase.
+   * No elimina datos legacy; bloquea altas nuevas duplicadas.
+   */
+  private async assertUnaParejaChachaPorFraternidad(opts: {
+    idFraternidad: number;
+    idFase: number;
+    idUsuario: number;
+    idInscripcionActual?: number;
+  }) {
+    const existentes = await this.inscRepo.find({
+      where: {
+        fraternidad: { idFraternidad: opts.idFraternidad },
+        fase: { idFase: opts.idFase },
+      },
+      relations: ['usuario'],
+      order: { idInscripcion: 'ASC' },
+    });
+    const otras = existentes.filter(
+      (i) =>
+        i.idInscripcion !== opts.idInscripcionActual &&
+        i.usuario?.idUsuario !== opts.idUsuario,
+    );
+    if (otras.length > 0) {
+      throw new BadRequestException(
+        'Solo se permite una pareja (Chacha + Warmi) por fraternidad en este concurso. Ya existe una inscripción Chacha-Warmi para esta fraternidad.',
+      );
+    }
+    if (existentes.length > 1) {
+      // Varias del mismo contexto: no crear más; el flujo debe reutilizar la primera
+      const ids = existentes.map((i) => i.idInscripcion);
+      if (
+        opts.idInscripcionActual &&
+        !ids.includes(opts.idInscripcionActual)
+      ) {
+        throw new BadRequestException(
+          'Solo se permite una pareja (Chacha + Warmi) por fraternidad en este concurso.',
+        );
+      }
+    }
   }
 
   private esConflictoUnico(err: unknown): boolean {
@@ -662,6 +710,11 @@ export class InscripcionesConcursoService {
       }
 
       try {
+        await this.assertUnaParejaChachaPorFraternidad({
+          idFraternidad: frat.idFraternidad,
+          idFase: fase.idFase,
+          idUsuario: usuario.idUsuario,
+        });
         const created = await this.inscRepo.save(
           this.inscRepo.create({
             // Solo PKs: evitar cascadas/conflictos al persistir el grafo del usuario cargado.
@@ -676,6 +729,7 @@ export class InscripcionesConcursoService {
         insc = await this.cargarInscripcionChacha(created.idInscripcion);
       } catch (err) {
         // Doble carga del GET (p. ej. remount Vue) puede chocar con UNIQUE(usuario,fase).
+        if (err instanceof BadRequestException) throw err;
         if (!this.esConflictoUnico(err)) throw err;
         insc = await this.findInscripcionChacha({
           idFraternidad: frat.idFraternidad,
@@ -727,6 +781,9 @@ export class InscripcionesConcursoService {
       camposHeredados: ['facultadCarrera', 'facultadCarreraPareja', 'instanciaRepresentacion'],
       cronogramaInscripcion,
       inscripcionCerrada: !cronogramaInscripcion.abierto,
+      unaParejaPorFraternidad: true,
+      mensajeReglaPareja:
+        'Solo se permite una pareja (Chacha + Warmi) por fraternidad en este concurso.',
     });
   }
 
@@ -844,6 +901,15 @@ export class InscripcionesConcursoService {
     const gestion = insc.fase?.gestion || insc.gestion;
     if (!insc.fase) {
       throw new BadRequestException('La inscripción no tiene fase asociada.');
+    }
+
+    if (frat?.idFraternidad) {
+      await this.assertUnaParejaChachaPorFraternidad({
+        idFraternidad: frat.idFraternidad,
+        idFase: insc.fase.idFase,
+        idUsuario: insc.usuario?.idUsuario || 0,
+        idInscripcionActual: insc.idInscripcion,
+      });
     }
 
     const nombreChacha =

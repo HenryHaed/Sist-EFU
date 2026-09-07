@@ -1,7 +1,7 @@
 <template>
   <div class="w-full">
     <!-- Tipo de reporte -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
       <button
         v-for="tipo in tiposReporte"
         :key="tipo.id"
@@ -80,7 +80,7 @@
         </div>
 
         <!-- 4. Tipo de danza -->
-        <div>
+        <div v-if="filtros.tipoReporte !== 'concursantes_externos' || esFiltroChachaActivo">
           <label class="label-xs">Tipo de danza</label>
           <select v-model="filtros.idTipoDanza" class="form-input !py-2 !text-sm">
             <option :value="null">Ninguno</option>
@@ -92,7 +92,7 @@
         </div>
 
         <!-- 5. Categoría -->
-        <div>
+        <div v-if="filtros.tipoReporte !== 'concursantes_externos' || esFiltroChachaActivo">
           <label class="label-xs">Categoría</label>
           <select v-model="filtros.idCategoria" class="form-input !py-2 !text-sm">
             <option :value="null">Ninguno</option>
@@ -103,9 +103,40 @@
           </select>
         </div>
 
+        <!-- Concursos externos -->
+        <template v-if="filtros.tipoReporte === 'concursantes_externos'">
+          <div>
+            <label class="label-xs">Tipo de concurso</label>
+            <select v-model="filtros.plantillaRequisitos" class="form-input !py-2 !text-sm" @change="onPlantillaExternaChange">
+              <option v-for="p in plantillasExternasUI" :key="p.id" :value="p.id">{{ p.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="label-xs">Concurso específico</label>
+            <select v-model="filtros.idFase" class="form-input !py-2 !text-sm" :disabled="!filtros.idGestion || filtros.idGestion === TODOS">
+              <option :value="null">Todos los de la gestión</option>
+              <option v-for="f in fasesExternasFiltradas" :key="f.idFase" :value="f.idFase">
+                {{ f.nombre }} ({{ etiquetaPlantilla(f.plantillaRequisitos) }})
+              </option>
+            </select>
+            <p v-if="!filtros.idGestion || filtros.idGestion === TODOS" class="text-[9px] text-amber-600 font-bold mt-1 uppercase">
+              Elige una gestión para listar concursos
+            </p>
+          </div>
+        </template>
+
         <div class="sm:col-span-2 lg:col-span-3">
-          <label class="label-xs">Búsqueda (nombre fraternidad o danza)</label>
-          <input v-model="filtros.busqueda" type="text" class="form-input !py-2 !text-sm" placeholder="Ej. Morenada, Tinku..." />
+          <label class="label-xs">
+            {{ filtros.tipoReporte === 'concursantes_externos'
+              ? 'Búsqueda (nombre concursante o fraternidad)'
+              : 'Búsqueda (nombre fraternidad o danza)' }}
+          </label>
+          <input
+            v-model="filtros.busqueda"
+            type="text"
+            class="form-input !py-2 !text-sm"
+            :placeholder="filtros.tipoReporte === 'concursantes_externos' ? 'Ej. Juan, Reyes Zambos…' : 'Ej. Morenada, Tinku...'"
+          />
         </div>
 
         <!-- Alcance listado fraternidades -->
@@ -230,7 +261,78 @@
       </div>
 
       <div class="overflow-x-auto">
-        <table class="w-full text-left min-w-[720px]">
+        <!-- Matriz de calificaciones -->
+        <table
+          v-if="filtros.tipoReporte === 'calificaciones'"
+          class="w-full text-left min-w-[960px] border-collapse"
+        >
+          <thead>
+            <tr class="bg-slate-800 text-white border-b border-slate-700">
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Nro</th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Categoría</th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Fraternidad</th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Danza</th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Jurado</th>
+              <th
+                v-for="f in fasesEfuMatriz"
+                :key="'fh-' + f.idFase"
+                class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider whitespace-nowrap"
+              >
+                {{ f.nombre }}
+              </th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Sanciones</th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Total EFU</th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Chacha Warmi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!resultado.data?.length">
+              <td :colspan="5 + fasesEfuMatriz.length + 3" class="px-6 py-12 text-center text-slate-400 text-sm">
+                No hay resultados con los filtros aplicados.
+              </td>
+            </tr>
+            <template v-for="grupo in resultado.data" :key="'g-' + grupo.idFraternidad">
+              <tr
+                v-for="(fila, ji) in filasMatrizGrupo(grupo)"
+                :key="'g-' + grupo.idFraternidad + '-' + ji"
+                class="border-b border-slate-100"
+                :class="fila.esPromedio
+                  ? 'bg-amber-100/90 font-bold'
+                  : ji % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'"
+              >
+                <td class="px-2 py-2 text-xs text-slate-700">{{ fila.nro }}</td>
+                <td class="px-2 py-2 text-xs text-slate-700">{{ fila.categoria }}</td>
+                <td class="px-2 py-2 text-xs font-bold text-slate-800 max-w-[160px]">{{ fila.fraternidad }}</td>
+                <td class="px-2 py-2 text-xs text-slate-600">{{ fila.danza }}</td>
+                <td class="px-2 py-2 text-xs" :class="fila.esPromedio ? 'text-amber-900 uppercase tracking-wide text-[10px] font-black' : 'text-slate-700'">
+                  {{ fila.jurado }}
+                </td>
+                <td
+                  v-for="f in fasesEfuMatriz"
+                  :key="'c-' + grupo.idFraternidad + '-' + ji + '-' + f.idFase"
+                  class="px-2 py-2 text-xs text-slate-700 text-center"
+                >
+                  {{ fila.notas[f.idFase] }}
+                </td>
+                <td class="px-2 py-2 text-xs text-center" :class="fila.suspendida ? 'text-red-700 font-black' : 'text-slate-700'">
+                  {{ fila.sanciones }}
+                </td>
+                <td class="px-2 py-2 text-xs font-bold text-slate-800 text-center">{{ fila.totalEfu }}</td>
+                <td class="px-2 py-2 text-xs text-slate-700 text-center">{{ fila.chacha }}</td>
+              </tr>
+              <tr v-if="grupo.detalleSanciones && grupo.detalleSanciones !== '—'" :key="'d-' + grupo.idFraternidad">
+                <td :colspan="5 + fasesEfuMatriz.length + 3" class="px-3 py-1.5 text-[10px] text-slate-500 italic bg-amber-50/40 border-b border-slate-100">
+                  Sanciones: {{ grupo.detalleSanciones }}
+                  · Puntaje final: {{ Number(grupo.puntajeFinal ?? 0).toFixed(2) }}
+                  <span v-if="grupo.chachaWarmi?.nombres?.length"> · Pareja: {{ grupo.chachaWarmi.nombres.join(' / ') }}</span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+
+        <!-- Tabla plana (otros reportes) -->
+        <table v-else class="w-full text-left min-w-[720px]">
           <thead>
             <tr class="bg-white border-b border-slate-100">
               <th v-for="col in columnas" :key="col.key" class="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -330,8 +432,9 @@ const esValorFiltroActivo = (val) => val !== null && val !== '' && val !== TODOS
 const tiposReporte = [
   { id: 'fraternidades', label: 'Fraternidades', icon: 'groups', desc: 'Listado con tipo de danza, categoría e instancia.' },
   { id: 'directiva', label: 'Directiva', icon: 'badge', desc: 'Integrantes por cargo de cada fraternidad.' },
-  { id: 'calificaciones', label: 'Calificaciones', icon: 'leaderboard', desc: 'Promedio Final (suma de NotaFraternidad / N jurados) y puntaje final.' },
+  { id: 'calificaciones', label: 'Calificaciones', icon: 'leaderboard', desc: 'Matriz jurados × fases EFU, Promedio Final justo y Chacha-Warmi.' },
   { id: 'disciplina', label: 'Disciplina', icon: 'gavel', desc: 'Todos los casos: banderas amarillas/rojas y sanciones por tipo.' },
+  { id: 'concursantes_externos', label: 'Concursantes externos', icon: 'emoji_events', desc: 'Chacha-Warmi, fotografía u otros concursos externos de la gestión.' },
 ]
 
 const alcancesListado = [
@@ -368,6 +471,8 @@ const filtros = ref({
   orden: 'ASC',
   page: 1,
   limit: 50,
+  idFase: null,
+  plantillaRequisitos: 'todos',
 })
 
 /** Columnas opcionales del reporte de fraternidades (off por defecto). */
@@ -407,7 +512,47 @@ const opciones = ref({
   categorias: [],
   tiposDanza: [],
   instancias: [],
+  fasesExternas: [],
+  plantillasExternas: [],
 })
+
+const plantillasExternasUI = computed(() => {
+  if (opciones.value.plantillasExternas?.length) return opciones.value.plantillasExternas
+  return [
+    { id: 'todos', label: 'Todos los concursos externos' },
+    { id: 'chacha_warmi', label: 'Solo Chacha-Warmi' },
+    { id: 'fotografia', label: 'Solo Fotografía' },
+    { id: 'generico', label: 'Otros concursos' },
+  ]
+})
+
+const etiquetaPlantilla = (p) => {
+  const id = String(p || 'generico').toLowerCase()
+  if (id === 'chacha_warmi') return 'Chacha-Warmi'
+  if (id === 'fotografia') return 'Fotografía'
+  return 'Otros'
+}
+
+const fasesExternasFiltradas = computed(() => {
+  const list = opciones.value.fasesExternas || []
+  const plantilla = filtros.value.plantillaRequisitos
+  if (!plantilla || plantilla === 'todos') return list
+  return list.filter((f) => String(f.plantillaRequisitos || 'generico').toLowerCase() === plantilla)
+})
+
+const esFiltroChachaActivo = computed(() => {
+  if (filtros.value.tipoReporte !== 'concursantes_externos') return false
+  if (filtros.value.plantillaRequisitos === 'chacha_warmi') return true
+  if (filtros.value.idFase) {
+    const fase = (opciones.value.fasesExternas || []).find((f) => f.idFase === filtros.value.idFase)
+    return String(fase?.plantillaRequisitos || '').toLowerCase() === 'chacha_warmi'
+  }
+  return resultado.value?.variante === 'chacha_warmi'
+})
+
+const onPlantillaExternaChange = () => {
+  filtros.value.idFase = null
+}
 
 const filtrosAbiertos = ref(true)
 const loading = ref(false)
@@ -479,9 +624,37 @@ const columnasPorTipo = {
     { key: 'categoria', label: 'Categoría' },
     { key: 'gestionAnio', label: 'Gestión' },
   ],
+  concursantes_externos_chacha: [
+    { key: 'concurso', label: 'Concurso' },
+    { key: 'nombreFraternidad', label: 'Fraternidad' },
+    { key: 'tipo', label: 'Rol' },
+    { key: 'nombre', label: 'Concursante' },
+    { key: 'ci', label: 'CI' },
+    { key: 'celular', label: 'Celular' },
+    { key: 'correo', label: 'Correo' },
+    { key: 'facultadCarrera', label: 'Facultad / Carrera' },
+    { key: 'instancia', label: 'Instancia' },
+  ],
+  concursantes_externos: [
+    { key: 'concurso', label: 'Concurso' },
+    { key: 'nombre', label: 'Concursante' },
+    { key: 'tipo', label: 'Tipo' },
+    { key: 'ci', label: 'CI' },
+    { key: 'celular', label: 'Celular' },
+    { key: 'correo', label: 'Correo' },
+    { key: 'facultadCarrera', label: 'Facultad / Carrera' },
+    { key: 'estamento', label: 'Estamento' },
+    { key: 'nombreFraternidad', label: 'Fraternidad' },
+  ],
 }
 
 const columnas = computed(() => {
+  if (filtros.value.tipoReporte === 'concursantes_externos') {
+    const variante = resultado.value?.variante || (esFiltroChachaActivo.value ? 'chacha_warmi' : 'general')
+    return variante === 'chacha_warmi'
+      ? columnasPorTipo.concursantes_externos_chacha
+      : columnasPorTipo.concursantes_externos
+  }
   const base = columnasPorTipo[filtros.value.tipoReporte] || columnasPorTipo.fraternidades
   if (filtros.value.tipoReporte !== 'fraternidades') return base
   const extras = columnasOpcionalesDisponibles
@@ -490,7 +663,64 @@ const columnas = computed(() => {
   return [...base, ...extras]
 })
 
+const fasesEfuMatriz = computed(() => resultado.value?.fasesEfu || [])
+
+const fmtNotaMatriz = (v) => {
+  if (v === null || v === undefined || v === '') return '—'
+  return Number(v).toFixed(2)
+}
+
+const filasMatrizGrupo = (grupo) => {
+  const jurados = Array.isArray(grupo.jurados) ? grupo.jurados : []
+  const filas = []
+  const lista = jurados.length ? jurados : [null]
+  lista.forEach((j, ji) => {
+    const primera = ji === 0
+    const notas = {}
+    for (const f of fasesEfuMatriz.value) {
+      notas[f.idFase] = j ? fmtNotaMatriz(j.notasPorFase?.[f.idFase]) : '—'
+    }
+    filas.push({
+      esPromedio: false,
+      nro: primera ? (grupo.nro ?? grupo.puesto ?? '—') : '',
+      categoria: primera ? (grupo.categoria || '—') : '',
+      fraternidad: primera ? (grupo.nombreFraternidad || '—') : '',
+      danza: primera ? (grupo.tipoDanza || '—') : '',
+      jurado: j ? (j.juradoNombre || '—') : '—',
+      notas,
+      sanciones: '',
+      totalEfu: j ? fmtNotaMatriz(j.totalEfu) : '—',
+      chacha: '',
+      suspendida: false,
+    })
+  })
+  const notasVacias = {}
+  for (const f of fasesEfuMatriz.value) notasVacias[f.idFase] = ''
+  filas.push({
+    esPromedio: true,
+    nro: '',
+    categoria: '',
+    fraternidad: '',
+    danza: '',
+    jurado: 'PROMEDIO FINAL',
+    notas: notasVacias,
+    sanciones: grupo.suspendida ? 'SUSP.' : fmtNotaMatriz(grupo.impactoSanciones),
+    totalEfu: fmtNotaMatriz(grupo.promedioFinal),
+    chacha: grupo.chachaWarmi?.nota != null ? fmtNotaMatriz(grupo.chachaWarmi.nota) : '—',
+    suspendida: !!grupo.suspendida,
+  })
+  return filas
+}
+
 const opcionesOrden = computed(() => {
+  if (filtros.value.tipoReporte === 'concursantes_externos') {
+    return [
+      { value: 'nombre', label: 'Nombre concursante' },
+      { value: 'nombreFraternidad', label: 'Fraternidad' },
+      { value: 'concurso', label: 'Concurso' },
+      { value: 'tipo', label: 'Tipo / Rol' },
+    ]
+  }
   const base = [
     { value: 'nombreFraternidad', label: 'Nombre fraternidad' },
     { value: 'tipoDanza', label: 'Tipo de danza' },
@@ -552,6 +782,11 @@ const seleccionarTipo = (id) => {
   } else if (id === 'disciplina') {
     filtros.value.ordenarPor = 'fechaHora'
     filtros.value.orden = 'DESC'
+  } else if (id === 'concursantes_externos') {
+    filtros.value.ordenarPor = 'nombre'
+    filtros.value.orden = 'ASC'
+    filtros.value.plantillaRequisitos = 'todos'
+    filtros.value.idFase = null
   } else {
     filtros.value.ordenarPor = 'nombreFraternidad'
     filtros.value.orden = 'ASC'
@@ -562,6 +797,10 @@ const seleccionarTipo = (id) => {
   }
   if (id !== 'disciplina' && id !== 'calificaciones') {
     filtros.value.tipoIncidencia = 'todos'
+  }
+  if (id !== 'concursantes_externos') {
+    filtros.value.idFase = null
+    filtros.value.plantillaRequisitos = 'todos'
   }
   resultado.value = null
   error.value = ''
@@ -588,6 +827,12 @@ const buildPayload = (page) => {
   if (p.tipoReporte !== 'disciplina' && p.tipoReporte !== 'calificaciones') {
     delete p.tipoIncidencia
   }
+  if (p.tipoReporte !== 'concursantes_externos') {
+    delete p.idFase
+    delete p.plantillaRequisitos
+  } else if (!p.plantillaRequisitos || p.plantillaRequisitos === 'todos') {
+    delete p.plantillaRequisitos
+  }
   Object.keys(p).forEach((k) => {
     if (p[k] === null || p[k] === '' || p[k] === TODOS) delete p[k]
   })
@@ -604,6 +849,8 @@ const cargarOpciones = async (idGestion) => {
     categorias: data.categorias || [],
     tiposDanza: data.tiposDanza || [],
     instancias: data.instancias || [],
+    fasesExternas: data.fasesExternas || [],
+    plantillasExternas: data.plantillasExternas || [],
   }
 }
 
@@ -611,6 +858,7 @@ const onGestionChange = async () => {
   const idGestion = esValorFiltroActivo(filtros.value.idGestion) ? filtros.value.idGestion : null
   await cargarOpciones(idGestion)
   filtros.value.idCategoria = null
+  filtros.value.idFase = null
 }
 
 const buscar = async (page = 1) => {
