@@ -117,28 +117,41 @@ export class EvaluacionesService {
 
     const pesoEFUTotal = fases.filter(f => f.tipoConcurso === 'EFU').reduce((s, f) => s + Number(f.pesoPorcentaje), 0);
 
+    // Padre → hija (1:1 en UI): primera hija enlazada a cada padre
+    const hijaPorPadre = new Map<number, { idFase: number; nombre: string }>();
+    for (const f of fases) {
+      const idPadre = f.fasePadre?.idFase ?? null;
+      if (!idPadre || hijaPorPadre.has(idPadre)) continue;
+      hijaPorPadre.set(idPadre, { idFase: f.idFase, nombre: f.nombre });
+    }
+
     return {
       gestion: { idGestion: gestion.idGestion, anio: gestion.anio, activa: gestion.activa, lema: gestion.lema },
       pesoEFUTotal,
       disponibleEFU: Math.max(0, 100 - pesoEFUTotal),
-      fases: fases.map(f => ({
-        idFase: f.idFase,
-        nombre: f.nombre,
-        tipoConcurso: f.tipoConcurso || 'EFU',
-        pesoPorcentaje: f.pesoPorcentaje,
-        fechaInicio: f.fechaInicio,
-        fechaFin: f.fechaFin,
-        fechaInicioInscripcion: f.fechaInicioInscripcion || null,
-        fechaFinInscripcion: f.fechaFinInscripcion || null,
-        estaActiva: f.estaActiva,
-        urlImagen: f.urlImagen,
-        plantillaRequisitos: f.plantillaRequisitos || null,
-        requisitosInscripcion: f.requisitosInscripcion || null,
-        cupoFinalistas: f.cupoFinalistas ?? null,
-        idFasePadre: f.fasePadre?.idFase ?? (f as any).idFasePadre ?? null,
-        fasePadreNombre: f.fasePadre?.nombre ?? null,
-        jurados: (f as any).jurados || [],
-      }))
+      fases: fases.map(f => {
+        const hija = hijaPorPadre.get(f.idFase) || null;
+        return {
+          idFase: f.idFase,
+          nombre: f.nombre,
+          tipoConcurso: f.tipoConcurso || 'EFU',
+          pesoPorcentaje: f.pesoPorcentaje,
+          fechaInicio: f.fechaInicio,
+          fechaFin: f.fechaFin,
+          fechaInicioInscripcion: f.fechaInicioInscripcion || null,
+          fechaFinInscripcion: f.fechaFinInscripcion || null,
+          estaActiva: f.estaActiva,
+          urlImagen: f.urlImagen,
+          plantillaRequisitos: f.plantillaRequisitos || null,
+          requisitosInscripcion: f.requisitosInscripcion || null,
+          cupoFinalistas: f.cupoFinalistas ?? null,
+          idFasePadre: f.fasePadre?.idFase ?? (f as any).idFasePadre ?? null,
+          fasePadreNombre: f.fasePadre?.nombre ?? null,
+          idFaseHija: hija?.idFase ?? null,
+          faseHijaNombre: hija?.nombre ?? null,
+          jurados: (f as any).jurados || [],
+        };
+      })
     };
   }
 
@@ -2372,18 +2385,53 @@ export class EvaluacionesService {
     }
   }
 
-  /** Normaliza enlace padre/cupo en fases EXTERNO. */
+  /** Normaliza cupo en fases EXTERNO. El enlace padre→hija se aplica con `sincronizarFaseHija`. */
   private async aplicarEnlaceYCupoFase(
     payload: any,
     opts: { idGestion: number; idFaseActual?: number; faseActual?: Fase },
   ) {
     const tipo = String(payload.tipoConcurso || opts.faseActual?.tipoConcurso || 'EFU');
+    // Extraer idFaseHija (no es columna de Fase; se aplica post-save)
+    let idFaseHijaPendiente: number | null | undefined = undefined;
+    if ('idFaseHija' in payload) {
+      const raw = payload.idFaseHija;
+      delete payload.idFaseHija;
+      if (raw === null || raw === '' || raw === undefined) {
+        idFaseHijaPendiente = null;
+      } else {
+        const n = Number.parseInt(String(raw), 10);
+        if (!Number.isFinite(n) || n < 1) {
+          throw new BadRequestException('Fase hija inválida.');
+        }
+        idFaseHijaPendiente = n;
+      }
+    }
+    // Compat: si aún llega idFasePadre desde clientes viejos, ignorarlo en favor del modelo padre→hija
+    if ('idFasePadre' in payload) {
+      delete payload.idFasePadre;
+    }
+
     if (tipo !== 'EXTERNO') {
       payload.fasePadre = null;
       payload.cupoFinalistas = null;
-      delete payload.idFasePadre;
+      (payload as any).__idFaseHija = undefined;
       return;
     }
+
+    // Si esta fase ya es hija, no configura cupo ni elige otra hija
+    const esHijaActual = !!(opts.faseActual?.fasePadre?.idFase);
+    if (esHijaActual || payload.heredaFinalistas === true) {
+      payload.cupoFinalistas = null;
+      payload.fechaInicioInscripcion = null;
+      payload.fechaFinInscripcion = null;
+      if (!payload.requisitosInscripcion) {
+        payload.requisitosInscripcion = { campos: [], documentos: [] };
+      }
+      delete payload.heredaFinalistas;
+      (payload as any).__idFaseHija = undefined;
+      return;
+    }
+    delete payload.heredaFinalistas;
 
     if ('cupoFinalistas' in payload) {
       const raw = payload.cupoFinalistas;
@@ -2398,49 +2446,81 @@ export class EvaluacionesService {
       }
     }
 
-    if ('idFasePadre' in payload) {
-      const idPadre = payload.idFasePadre == null || payload.idFasePadre === ''
-        ? null
-        : Number.parseInt(String(payload.idFasePadre), 10);
-      delete payload.idFasePadre;
+    (payload as any).__idFaseHija = idFaseHijaPendiente;
+  }
 
-      if (!idPadre) {
-        payload.fasePadre = null;
-      } else {
-        if (opts.idFaseActual && idPadre === opts.idFaseActual) {
-          throw new BadRequestException('Una fase no puede enlazarse a sí misma.');
-        }
-        const padre = await this.faseRepo.findOne({
-          where: { idFase: idPadre },
-          relations: ['gestion', 'fasePadre'],
-        });
-        if (!padre) throw new NotFoundException('Fase padre no encontrada.');
-        if (padre.tipoConcurso !== 'EXTERNO') {
-          throw new BadRequestException('La fase padre debe ser un concurso externo.');
-        }
-        if (padre.gestion?.idGestion !== opts.idGestion) {
-          throw new BadRequestException('La fase padre debe pertenecer a la misma gestión.');
-        }
-        // Evitar ciclos: caminar ancestros
-        let cursor: Fase | null = padre;
-        const visited = new Set<number>([opts.idFaseActual || 0].filter(Boolean));
-        while (cursor) {
-          if (visited.has(cursor.idFase)) {
-            throw new BadRequestException('El enlace de fases formaría un ciclo.');
-          }
-          visited.add(cursor.idFase);
-          if (!cursor.fasePadre?.idFase) break;
-          cursor = await this.faseRepo.findOne({
-            where: { idFase: cursor.fasePadre.idFase },
-            relations: ['fasePadre'],
-          });
-        }
-        payload.fasePadre = { idFase: idPadre } as Fase;
-        // Hija no abre inscripción propia
-        payload.fechaInicioInscripcion = null;
-        payload.fechaFinInscripcion = null;
-      }
+  /**
+   * La fase padre elige a su hija (1:1): escribe `id_fase_padre` en la hija
+   * y desvincula otras hijas previas del mismo padre.
+   */
+  private async sincronizarFaseHija(
+    idPadre: number,
+    idHija: number | null | undefined,
+    idGestion: number,
+  ) {
+    if (idHija === undefined) return; // no tocar enlace si el cliente no envió el campo
+
+    const hijasActuales = await this.faseRepo.find({
+      where: { fasePadre: { idFase: idPadre } },
+      relations: ['fasePadre', 'gestion'],
+    });
+
+    for (const h of hijasActuales) {
+      if (idHija != null && h.idFase === idHija) continue;
+      h.fasePadre = null;
+      await this.faseRepo.save(h);
     }
+
+    if (idHija == null) return;
+
+    if (idHija === idPadre) {
+      throw new BadRequestException('Una fase no puede ser hija de sí misma.');
+    }
+
+    const hija = await this.faseRepo.findOne({
+      where: { idFase: idHija },
+      relations: ['gestion', 'fasePadre'],
+    });
+    if (!hija) throw new NotFoundException('Fase hija no encontrada.');
+    if (hija.tipoConcurso !== 'EXTERNO') {
+      throw new BadRequestException('La fase hija debe ser un concurso externo.');
+    }
+    if (hija.gestion?.idGestion !== idGestion) {
+      throw new BadRequestException('La fase hija debe pertenecer a la misma gestión.');
+    }
+
+    // La hija no puede tener a su vez hijas
+    const nietas = await this.faseRepo.count({ where: { fasePadre: { idFase: idHija } } });
+    if (nietas > 0) {
+      throw new BadRequestException('La fase elegida ya tiene una fase hija; no puede ser hija a la vez.');
+    }
+
+    // Evitar ciclos (si la hija es ancestro del padre)
+    let cursor: Fase | null = await this.faseRepo.findOne({
+      where: { idFase: idPadre },
+      relations: ['fasePadre'],
+    });
+    const visited = new Set<number>();
+    while (cursor?.fasePadre?.idFase) {
+      if (cursor.fasePadre.idFase === idHija) {
+        throw new BadRequestException('El enlace de fases formaría un ciclo.');
+      }
+      if (visited.has(cursor.idFase)) break;
+      visited.add(cursor.idFase);
+      cursor = await this.faseRepo.findOne({
+        where: { idFase: cursor.fasePadre.idFase },
+        relations: ['fasePadre'],
+      });
+    }
+
+    hija.fasePadre = { idFase: idPadre } as Fase;
+    hija.fechaInicioInscripcion = null;
+    hija.fechaFinInscripcion = null;
+    hija.cupoFinalistas = null;
+    if (!hija.requisitosInscripcion) {
+      hija.requisitosInscripcion = { campos: [], documentos: [] };
+    }
+    await this.faseRepo.save(hija);
   }
 
   async createFase(data: any) {
@@ -2460,7 +2540,12 @@ export class EvaluacionesService {
         );
       }
       payload.plantillaRequisitos = plantilla;
-      if (payload.requisitosInscripcion) {
+      if (payload.heredaFinalistas === true) {
+        payload.requisitosInscripcion = { campos: [], documentos: [] };
+        payload.fechaInicioInscripcion = null;
+        payload.fechaFinInscripcion = null;
+        payload.cupoFinalistas = null;
+      } else if (payload.requisitosInscripcion) {
         payload.requisitosInscripcion = normalizarRequisitos(payload.requisitosInscripcion);
       } else {
         payload.requisitosInscripcion = buildRequisitosFromSeleccion(
@@ -2477,6 +2562,8 @@ export class EvaluacionesService {
     }
 
     await this.aplicarEnlaceYCupoFase(payload, { idGestion: gestion.idGestion });
+    const idFaseHija = (payload as any).__idFaseHija;
+    delete (payload as any).__idFaseHija;
 
     const created = this.faseRepo.create(payload);
     const nuevaFase = Array.isArray(created) ? created[0] : created;
@@ -2484,6 +2571,7 @@ export class EvaluacionesService {
     if (juradosIds?.length) {
       await this.syncJuradosFase(f, juradosIds);
     }
+    await this.sincronizarFaseHija(f.idFase, idFaseHija, gestion.idGestion);
     return this.faseRepo.findOne({ where: { idFase: f.idFase }, relations: ['fasePadre', 'gestion'] });
   }
 
@@ -2499,9 +2587,17 @@ export class EvaluacionesService {
     const payload: any = { ...rest };
     this.normalizarFechasFase(payload);
 
+    const esHija = !!(f.fasePadre?.idFase) || payload.heredaFinalistas === true;
+
     if ((payload.tipoConcurso || f.tipoConcurso) === 'EXTERNO') {
       const { buildRequisitosFromSeleccion, normalizarRequisitos } = await import('../common/requisitos-concurso');
-      if (payload.requisitosInscripcion) {
+      if (esHija) {
+        payload.requisitosInscripcion = { campos: [], documentos: [] };
+        payload.fechaInicioInscripcion = null;
+        payload.fechaFinInscripcion = null;
+        payload.cupoFinalistas = null;
+        // No permitir que una hija se desvincule sola vía update; el padre controla el enlace
+      } else if (payload.requisitosInscripcion) {
         payload.requisitosInscripcion = normalizarRequisitos(payload.requisitosInscripcion);
       } else if (clavesCampos || clavesDocumentos || payload.plantillaRequisitos) {
         payload.requisitosInscripcion = buildRequisitosFromSeleccion(
@@ -2522,12 +2618,19 @@ export class EvaluacionesService {
       idFaseActual: f.idFase,
       faseActual: f,
     });
+    const idFaseHija = (payload as any).__idFaseHija;
+    delete (payload as any).__idFaseHija;
 
     Object.assign(f, payload);
     const saved = await this.faseRepo.save(f);
 
     if (juradosIds !== undefined) {
       await this.syncJuradosFase(saved, Array.isArray(juradosIds) ? juradosIds : []);
+    }
+
+    // Solo el padre (no hija) sincroniza su fase hija
+    if (!esHija && !saved.fasePadre?.idFase) {
+      await this.sincronizarFaseHija(saved.idFase, idFaseHija, f.gestion?.idGestion);
     }
 
     return this.faseRepo.findOne({ where: { idFase: saved.idFase }, relations: ['fasePadre', 'gestion'] });

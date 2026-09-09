@@ -102,8 +102,11 @@
                 <p v-if="fase.cupoFinalistas" class="text-[9px] font-black uppercase tracking-widest text-amber-700 mt-0.5">
                   Cupo finalistas: {{ fase.cupoFinalistas }}
                 </p>
+                <p v-if="fase.idFaseHija" class="text-[9px] font-black uppercase tracking-widest text-emerald-700 mt-0.5">
+                  Fase hija: {{ fase.faseHijaNombre || ('#' + fase.idFaseHija) }}
+                </p>
                 <p v-if="fase.idFasePadre" class="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-0.5">
-                  Hija de: {{ fase.fasePadreNombre || ('#' + fase.idFasePadre) }}
+                  Hereda de: {{ fase.fasePadreNombre || ('#' + fase.idFasePadre) }}
                 </p>
               </div>
             </td>
@@ -418,7 +421,29 @@
               </div>
             </div>
 
-            <div v-if="form.tipoConcurso === 'EXTERNO'" class="border-2 border-amber-100 bg-amber-50/50 rounded-2xl p-4 sm:p-5 space-y-5">
+            <div v-if="form.tipoConcurso === 'EXTERNO' && esFaseHijaForm" class="border-2 border-emerald-100 bg-emerald-50/60 rounded-2xl p-4 sm:p-5 space-y-3">
+              <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-emerald-700 text-2xl">account_tree</span>
+                <div>
+                  <p class="text-[11px] font-black uppercase tracking-widest text-emerald-800">Fase hija · hereda finalistas</p>
+                  <p class="text-[12px] text-slate-600 font-medium mt-1 leading-relaxed">
+                    No pide documentos ni inscripción propia. Los inscritos llegan al promover los
+                    <b>N finalistas</b> desde la fase padre
+                    <template v-if="form.fasePadreNombre"> (<b>{{ form.fasePadreNombre }}</b>)</template>.
+                    El enlace lo define la fase padre en su modal.
+                  </p>
+                </div>
+              </div>
+              <label
+                v-if="!form.idFasePadre"
+                class="flex items-center gap-2.5 cursor-pointer select-none"
+              >
+                <input type="checkbox" v-model="form.heredaFinalistas" class="size-4 accent-emerald-700" />
+                <span class="text-xs font-bold text-slate-700">Confirmar: esta fase hereda finalistas (sin requisitos de inscripción)</span>
+              </label>
+            </div>
+
+            <div v-if="form.tipoConcurso === 'EXTERNO' && !esFaseHijaForm" class="border-2 border-amber-100 bg-amber-50/50 rounded-2xl p-4 sm:p-5 space-y-5">
               <div>
                 <label class="block text-[10px] font-black uppercase tracking-widest text-amber-800 mb-2">Plantilla base *</label>
                 <p class="text-[10px] text-amber-900/80 font-medium mb-3 leading-relaxed">
@@ -485,6 +510,19 @@
                   </div>
                 </div>
               </div>
+
+              <label
+                v-if="esFaseChachaWarmi({ nombre: form.nombre, plantillaRequisitos: form.plantillaRequisitos })"
+                class="flex items-start gap-2.5 cursor-pointer select-none rounded-xl border border-emerald-200 bg-white/80 p-3"
+              >
+                <input type="checkbox" v-model="form.heredaFinalistas" class="mt-0.5 size-4 accent-emerald-700" />
+                <span class="min-w-0">
+                  <span class="text-xs font-black uppercase tracking-widest text-emerald-800 block">Convertir en fase hija</span>
+                  <span class="text-[11px] text-slate-600 font-medium leading-relaxed">
+                    Sin documentos ni inscripción. Luego la fase padre la elige como hija y hereda los N finalistas.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -529,12 +567,12 @@
               class="rounded-2xl border border-secondary/20 bg-red-50/40 p-4 space-y-4"
             >
               <div
-                v-if="esFaseChachaWarmi({ nombre: form.nombre, plantillaRequisitos: form.plantillaRequisitos })"
+                v-if="esFaseChachaWarmi({ nombre: form.nombre, plantillaRequisitos: form.plantillaRequisitos }) && !esFaseHijaForm"
                 class="grid grid-cols-1 sm:grid-cols-2 gap-4"
               >
                 <div>
                   <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                    Cupo de finalistas (fase padre)
+                    Cupo de finalistas (N)
                   </label>
                   <input
                     v-model.number="form.cupoFinalistas"
@@ -550,46 +588,43 @@
                 </div>
                 <div>
                   <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                    Enlazar con fase padre
+                    Fase hija (elige una)
                   </label>
                   <select
-                    v-model="form.idFasePadre"
+                    v-model="form.idFaseHija"
                     class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold"
                   >
-                    <option :value="null">Ninguna (fase de inscripción)</option>
+                    <option :value="null">Ninguna</option>
                     <option
-                      v-for="fp in fasesPadreOpciones"
-                      :key="fp.idFase"
-                      :value="fp.idFase"
+                      v-for="fh in fasesHijaOpciones"
+                      :key="fh.idFase"
+                      :value="fh.idFase"
                     >
-                      {{ fp.nombre }}
+                      {{ fh.nombre }}
                     </option>
                   </select>
                   <p class="text-[10px] text-slate-500 mt-1 font-medium">
-                    Si se enlaza, solo recibe finalistas promovidos (sin inscripción).
+                    La fase padre elige a su hija. Solo puede seleccionarse una; hereda los N finalistas promovidos (sin inscripción propia).
                   </p>
                 </div>
               </div>
 
-              <div>
+              <div v-if="!esFaseHijaForm">
                 <p class="text-[10px] font-black uppercase tracking-widest text-secondary mb-1">Periodo de inscripción</p>
                 <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
                   {{ esFaseChachaWarmi({ nombre: form.nombre, plantillaRequisitos: form.plantillaRequisitos })
-                    ? (form.idFasePadre
-                      ? 'Fase hija: la inscripción queda bloqueada; los finalistas se promueven desde la fase padre.'
-                      : 'Define cuándo los delegados pueden inscribir a sus participantes Chacha-Warmi.')
+                    ? 'Define cuándo los delegados pueden inscribir a sus participantes Chacha-Warmi.'
                     : 'Define cuándo los concursantes pueden completar su inscripción.' }}
-                  <span v-if="!form.idFasePadre"> Si dejas ambas vacías, la inscripción permanece abierta.</span>
+                  <span> Si dejas ambas vacías, la inscripción permanece abierta.</span>
                 </p>
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div v-if="!esFaseHijaForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Inicio inscripción</label>
                   <input
                     v-model="form.fechaInicioInscripcion"
                     type="datetime-local"
-                    class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm disabled:opacity-50"
-                    :disabled="!!form.idFasePadre"
+                    class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm"
                   />
                 </div>
                 <div>
@@ -597,11 +632,13 @@
                   <input
                     v-model="form.fechaFinInscripcion"
                     type="datetime-local"
-                    class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm disabled:opacity-50"
-                    :disabled="!!form.idFasePadre"
+                    class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm"
                   />
                 </div>
               </div>
+              <p v-else class="text-[11px] text-slate-600 font-medium leading-relaxed">
+                Sin periodo de inscripción: los participantes se heredan al promover desde la fase padre.
+              </p>
             </div>
 
             <div class="flex items-center gap-4">
@@ -739,15 +776,29 @@ const form = ref({
   clavesCampos: [],
   clavesDocumentos: [],
   cupoFinalistas: null,
+  idFaseHija: null,
   idFasePadre: null,
+  fasePadreNombre: '',
+  heredaFinalistas: false,
 })
 
-const fasesPadreOpciones = computed(() => {
+/** Fase hija: ya enlazada por el padre, o marcada para heredar finalistas. */
+const esFaseHijaForm = computed(() => !!(form.value.idFasePadre || form.value.heredaFinalistas))
+
+/** Opciones que el padre puede elegir como única hija. */
+const fasesHijaOpciones = computed(() => {
   const fases = resumen.value.fases || []
   return fases.filter((f) => {
     if (f.tipoConcurso !== 'EXTERNO') return false
     if (editandoId.value && f.idFase === editandoId.value) return false
-    return esFaseChachaWarmi(f) || String(f.plantillaRequisitos || '').toLowerCase() === 'chacha_warmi'
+    // No elegir otra fase que ya es padre (tiene hija propia)
+    if (f.idFaseHija) return false
+    // No elegir otra fase de inscripción (con cupo) salvo la ya vinculada
+    if (f.cupoFinalistas && f.idFase !== form.value.idFaseHija) return false
+    const esChacha = esFaseChachaWarmi(f) || String(f.plantillaRequisitos || '').toLowerCase() === 'chacha_warmi'
+    const yaHijaDeEste = form.value.idFaseHija === f.idFase || f.idFasePadre === editandoId.value
+    const sinReqs = !(f.requisitosInscripcion?.campos?.length || f.requisitosInscripcion?.documentos?.length)
+    return esChacha || yaHijaDeEste || sinReqs || !!f.idFasePadre
   })
 })
 
@@ -959,6 +1010,7 @@ const abrirModal = (item = null) => {
   if (item) {
     editandoId.value = item.idFase
     const req = item.requisitosInscripcion || {}
+    const esHija = !!item.idFasePadre
     form.value = {
       nombre: item.nombre,
       tipoConcurso: item.tipoConcurso || 'EFU',
@@ -974,13 +1026,17 @@ const abrirModal = (item = null) => {
       clavesCampos: (req.campos || []).map((c) => c.clave),
       clavesDocumentos: (req.documentos || []).map((d) => d.clave),
       cupoFinalistas: item.cupoFinalistas ?? null,
+      idFaseHija: item.idFaseHija ?? null,
       idFasePadre: item.idFasePadre ?? null,
+      fasePadreNombre: item.fasePadreNombre || '',
+      heredaFinalistas: esHija,
     }
-    if (form.value.tipoConcurso === 'EXTERNO' && !form.value.clavesCampos.length && !form.value.clavesDocumentos.length) {
+    if (!esHija && form.value.tipoConcurso === 'EXTERNO' && !form.value.clavesCampos.length && !form.value.clavesDocumentos.length) {
       aplicarPlantilla(form.value.plantillaRequisitos)
     }
     // Migrar documentos legados de Chacha-Warmi (CI ambos) a CI/matrícula separados
     if (
+      !esHija &&
       form.value.tipoConcurso === 'EXTERNO' &&
       esFaseChachaWarmi({ nombre: form.value.nombre, plantillaRequisitos: form.value.plantillaRequisitos }) &&
       !form.value.clavesDocumentos.includes('ci_chacha_pdf')
@@ -994,7 +1050,8 @@ const abrirModal = (item = null) => {
       fechaInicio: '', fechaFin: '', fechaInicioInscripcion: '', fechaFinInscripcion: '',
       estaActiva: true, urlImagen: '', juradosIds: [],
       plantillaRequisitos: 'generico', clavesCampos: [], clavesDocumentos: [],
-      cupoFinalistas: null, idFasePadre: null,
+      cupoFinalistas: null, idFaseHija: null, idFasePadre: null, fasePadreNombre: '',
+      heredaFinalistas: false,
     }
   }
   
@@ -1014,7 +1071,8 @@ const guardar = async () => {
   if (form.value.tipoConcurso === 'EFU' && pesoEFUConActual.value > 100) {
     return notify.error('Error', `La suma de fases EFU no puede superar el 100%. Disponible: ${disponibleEFUCalc.value + Number(form.value.pesoPorcentaje || 0)}%`)
   }
-  if (form.value.tipoConcurso === 'EXTERNO') {
+  const esHija = esFaseHijaForm.value
+  if (form.value.tipoConcurso === 'EXTERNO' && !esHija) {
     if (!form.value.clavesCampos?.length && !form.value.clavesDocumentos?.length) {
       return notify.error('Error', 'Selecciona al menos un campo o documento a solicitar en el concurso externo.')
     }
@@ -1032,7 +1090,7 @@ const guardar = async () => {
       return notify.error('Error Lógico', 'La fecha fin de calificación debe ser posterior o igual a la de inicio.')
     }
   }
-  if (form.value.tipoConcurso === 'EXTERNO') {
+  if (form.value.tipoConcurso === 'EXTERNO' && !esHija) {
     const iniIns = form.value.fechaInicioInscripcion
     const finIns = form.value.fechaFinInscripcion
     if ((iniIns && !finIns) || (!iniIns && finIns)) {
@@ -1048,6 +1106,8 @@ const guardar = async () => {
       ...form.value,
       gestionId: props.gestionSeleccionada?.idGestion || null,
     }
+    delete payloadInfo.idFasePadre
+    delete payloadInfo.fasePadreNombre
     if (payloadInfo.tipoConcurso !== 'EXTERNO') {
       delete payloadInfo.plantillaRequisitos
       delete payloadInfo.clavesCampos
@@ -1055,14 +1115,27 @@ const guardar = async () => {
       delete payloadInfo.fechaInicioInscripcion
       delete payloadInfo.fechaFinInscripcion
       delete payloadInfo.cupoFinalistas
-      delete payloadInfo.idFasePadre
+      delete payloadInfo.idFaseHija
+      delete payloadInfo.heredaFinalistas
+    } else if (esHija) {
+      payloadInfo.heredaFinalistas = true
+      payloadInfo.clavesCampos = []
+      payloadInfo.clavesDocumentos = []
+      payloadInfo.fechaInicioInscripcion = null
+      payloadInfo.fechaFinInscripcion = null
+      payloadInfo.cupoFinalistas = null
+      delete payloadInfo.idFaseHija
+      if (!payloadInfo.plantillaRequisitos) payloadInfo.plantillaRequisitos = 'chacha_warmi'
     } else {
+      payloadInfo.heredaFinalistas = false
       if (payloadInfo.cupoFinalistas === '' || Number.isNaN(Number(payloadInfo.cupoFinalistas))) {
         payloadInfo.cupoFinalistas = null
       }
-      if (payloadInfo.idFasePadre) {
-        payloadInfo.fechaInicioInscripcion = null
-        payloadInfo.fechaFinInscripcion = null
+      if (!esFaseChachaWarmi({ nombre: payloadInfo.nombre, plantillaRequisitos: payloadInfo.plantillaRequisitos })) {
+        delete payloadInfo.cupoFinalistas
+        delete payloadInfo.idFaseHija
+      } else if (payloadInfo.idFaseHija === '' || payloadInfo.idFaseHija === undefined) {
+        payloadInfo.idFaseHija = null
       }
     }
     

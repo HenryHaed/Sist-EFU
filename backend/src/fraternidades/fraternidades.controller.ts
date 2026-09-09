@@ -100,6 +100,18 @@ export class FraternidadesController {
     return this.fraternidadesService.create(createDto);
   }
 
+  @Post(':id/renombrar')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({
+    summary: 'Renombrar fraternidad canónica y sincronizar solicitudes/fichas/calificar',
+  })
+  renombrar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { nombre: string },
+  ) {
+    return this.fraternidadesService.renombrarFraternidad(id, body?.nombre);
+  }
+
   @Put(':id')
   @Roles('superusuario', 'admin')
   @ApiOperation({ summary: 'Actualizar una fraternidad (Solo Admin/Superuser)' })

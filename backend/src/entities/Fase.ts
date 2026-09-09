@@ -58,13 +58,13 @@ export class Fase {
 
     /**
      * Fase origen (padre) de la que esta fase hereda finalistas.
-     * Solo EXTERNO; null = fase de inscripción / ronda inicial.
+     * Se escribe desde la fase padre (elige a su hija); null = fase de inscripción / ronda inicial.
      */
     @ManyToOne(() => Fase, { nullable: true, onDelete: 'SET NULL' })
     @JoinColumn({ name: 'id_fase_padre' })
     fasePadre: Fase | null;
 
-    /** Cuántas fraternidades pasan a la fase hija (configurado en la fase padre Chacha). */
+    /** Cuántas fraternidades pasan a la fase hija (configurado en la fase padre). */
     @Column({ name: 'cupo_finalistas', type: 'int', nullable: true })
     cupoFinalistas: number | null;
 

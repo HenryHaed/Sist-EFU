@@ -211,8 +211,8 @@ export class FraternidadesService {
     const { idFacultad, idCarrera, idInstitucionExterna, idCategoria, ...data } = updateDto;
 
     const updateData: any = { ...data };
+    // Nombre: solo vía renombrarFraternidad / POST :id/renombrar
     if (updateData.nombre !== undefined) {
-      // El nombre canónico solo se cambia desde Usuarios → Delegados
       delete updateData.nombre;
     }
     if (idFacultad !== undefined) updateData.facultad = idFacultad ? { idFacultad } : null;
@@ -300,7 +300,7 @@ export class FraternidadesService {
       await this.solicitudRepo.query(
         `UPDATE solicitudes_inscripcion
          SET id_fraternidad_creada = $1, nombre_fraternidad = $2
-         WHERE id_delegado = $3`,
+         WHERE id_usuario_delegado = $3`,
         [idFraternidad, nombreNorm, d.idUsuario],
       );
     }

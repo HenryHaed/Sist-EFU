@@ -311,12 +311,11 @@
                     v-model="form.nombre"
                     type="text"
                     placeholder="Ej. Morenada Central"
-                    :disabled="editando"
-                    :readonly="editando"
-                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold disabled:opacity-70 disabled:cursor-not-allowed"
+                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold uppercase"
+                    @input="form.nombre = String(form.nombre || '').toUpperCase()"
                   />
-                  <p v-if="editando" class="text-[10px] text-slate-400 mt-1">
-                    El nombre solo se cambia en <strong>Usuarios → Delegados</strong>. Así se propaga a solicitudes, fichas, calificar, reportes y nóminas.
+                  <p v-if="editando" class="text-[10px] text-slate-500 mt-1.5 font-medium">
+                    Puedes cambiar el nombre aquí. Se propagará a solicitudes, fichas, calificar, reportes y nóminas (debe ser único).
                   </p>
                 </div>
 
@@ -446,6 +445,7 @@ const form = ref({
   habilitadoEfu: true,
   idSolicitud: null // Para guardar si viene desde una preinscripción
 })
+const nombreOriginalEdicion = ref('')
 
 const cargarCategorias = async () => {
   try {
@@ -630,6 +630,7 @@ const onFacultadChange = async () => {
 
 const abrirModalCrear = () => {
   editando.value = false
+  nombreOriginalEdicion.value = ''
   form.value = {
     idFraternidad: null,
     nombre: '',
@@ -646,8 +647,10 @@ const abrirModalCrear = () => {
 
 const editarFraternidad = async (fraternidad) => {
   editando.value = true
+  nombreOriginalEdicion.value = String(fraternidad.nombre || '').trim().toUpperCase()
   form.value = { 
     ...fraternidad,
+    nombre: String(fraternidad.nombre || '').toUpperCase(),
     idCategoria: fraternidad.categoria ? fraternidad.categoria.idCategoria : (categorias.value.length > 0 ? categorias.value[0].idCategoria : null),
     idFacultad: fraternidad.facultad ? fraternidad.facultad.idFacultad : null,
     idCarrera: fraternidad.carrera ? fraternidad.carrera.idCarrera : null,
@@ -668,8 +671,8 @@ const guardar = async () => {
     return
   }
 
+  const nombreNorm = String(form.value.nombre || '').trim().toUpperCase()
   const payload = {
-    nombre: form.value.nombre,
     nivelRepresentacion: form.value.nivelRepresentacion,
     idCategoria: form.value.idCategoria,
     idFacultad: form.value.idFacultad,
@@ -680,19 +683,32 @@ const guardar = async () => {
 
   try {
     if (form.value.idSolicitud) {
-      await api.post(`/inscripciones/inscribir-desde-solicitud/${form.value.idSolicitud}`, payload)
+      await api.post(`/inscripciones/inscribir-desde-solicitud/${form.value.idSolicitud}`, {
+        ...payload,
+        nombre: nombreNorm,
+      })
       router.replace({ query: { v: 'fraternidades_crud' } })
     } else if (editando.value) {
+      const cambioNombre = nombreNorm !== nombreOriginalEdicion.value
+      if (cambioNombre) {
+        const conf = await notify.confirm(
+          '¿Renombrar fraternidad?',
+          `Se cambiará de «${nombreOriginalEdicion.value}» a «${nombreNorm}» y se propagará a todo el sistema.`,
+          'Sí, renombrar y guardar',
+        )
+        if (!conf.isConfirmed) return
+        await api.post(`/fraternidades/${form.value.idFraternidad}/renombrar`, { nombre: nombreNorm })
+      }
       await api.put(`/fraternidades/${form.value.idFraternidad}`, payload)
     } else {
-      await api.post('/fraternidades', payload)
+      await api.post('/fraternidades', { ...payload, nombre: nombreNorm })
     }
     modalAbierto.value = false
-    notify.success('¡Guardado!', `Fraternidad ${editando.value || form.value.idSolicitud ? 'actualizada e inscrita' : 'registrada'} correctamente.`)
+    notify.success('¡Guardado!', `Fraternidad ${editando.value || form.value.idSolicitud ? 'actualizada' : 'registrada'} correctamente.`)
     cargarDatos()
   } catch (error) {
     console.error('Error al guardar:', error)
-    notify.error('Error', 'No se pudo guardar la fraternidad.')
+    notify.error('Error', error?.response?.data?.message || 'No se pudo guardar la fraternidad.')
   }
 }
 

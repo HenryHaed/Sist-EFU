@@ -595,10 +595,10 @@
                     clearable
                     density="comfortable"
                     variant="outlined"
-                    :placeholder="editando ? 'Busca o escribe el nombre correcto para renombrar' : 'Escribe el nombre de la fraternidad o crea una nueva'"
+                    :placeholder="editando ? 'Busca y selecciona la fraternidad' : 'Busca existente o escribe una nueva'"
                     class="text-sm w-full"
                     menu-icon="mdi-chevron-down"
-                    no-data-text="Escribe para buscar o añadir una nueva"
+                    no-data-text="Escribe para buscar o crear una nueva"
                     :menu-props="{ maxWidth: 760, minWidth: 560, contentClass: 'fraternidad-menu-elevado' }"
                   >
                     <template #item="{ props, item }">
@@ -616,14 +616,17 @@
                     </template>
                   </v-combobox>
                   <p class="text-[9px] text-slate-400 mt-1 italic">
-                    <template v-if="editando">
-                      Si escribes un nombre nuevo (aunque quede seleccionado el ID actual), se <strong>renombra</strong> la fraternidad
-                      y se propaga a solicitudes, fichas, calificar, reportes y nóminas. El PDF de ficha se regenera al descargar.
-                    </template>
-                    <template v-else>
-                      Puedes escribir para buscar coincidencias históricas. Si no existe, se creará al guardar.
-                    </template>
+                    Selecciona una fraternidad existente (única por delegado) o escribe un nombre nuevo para crearla.
+                    Para <strong>cambiar el nombre</strong> usa el botón de abajo.
                   </p>
+                  <button
+                    type="button"
+                    class="mt-3 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 flex items-center justify-center gap-2"
+                    @click="abrirModalRenombrarFraternidad"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">drive_file_rename_outline</span>
+                    Cambiar nombre de fraternidad
+                  </button>
                 </div>
               </div>
 
@@ -723,6 +726,84 @@
       </v-card>
     </v-dialog>
 
+    <!-- Modal renombrar fraternidad (solo 1 seleccionada) -->
+    <v-dialog v-model="modalRenombrarOpen" max-width="520" persistent>
+      <v-card class="rounded-xl overflow-hidden border border-slate-200">
+        <v-card-title class="bg-amber-50 border-b border-amber-100 px-5 py-4 flex items-center justify-between">
+          <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-amber-700">Renombrar</p>
+            <h3 class="font-black text-slate-900 text-base">Cambiar nombre de fraternidad</h3>
+          </div>
+          <button type="button" class="text-slate-400" @click="cerrarModalRenombrar">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </v-card-title>
+        <v-card-text class="px-5 py-5 space-y-4">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+              Fraternidad a renombrar (solo una)
+            </label>
+            <v-select
+              v-model="renombrarForm.idFraternidad"
+              :items="todasFraternidadesOrdenadas"
+              item-title="nombre"
+              item-value="idFraternidad"
+              density="comfortable"
+              variant="outlined"
+              clearable
+              placeholder="Selecciona una fraternidad…"
+              :menu-props="{ maxHeight: 320 }"
+            >
+              <template #item="{ props: itemProps, item }">
+                <v-list-item v-bind="itemProps">
+                  <v-list-item-title class="font-bold">{{ item.raw.nombre }}</v-list-item-title>
+                  <v-list-item-subtitle class="text-xs">
+                    {{ item.raw.nivelRepresentacion || '—' }}
+                    <span v-if="item.raw.categoria?.nombre"> · {{ item.raw.categoria.nombre }}</span>
+                  </v-list-item-subtitle>
+                </v-list-item>
+              </template>
+            </v-select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+              Nombre actual
+            </label>
+            <p class="text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              {{ fraternidadSeleccionadaRenombrar?.nombre || '—' }}
+            </p>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+              Nuevo nombre
+            </label>
+            <input
+              v-model="renombrarForm.nombreNuevo"
+              type="text"
+              class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-bold uppercase bg-white focus:border-primary outline-none"
+              placeholder="Ej. CAPORALES INGENIERÍA"
+              @input="renombrarForm.nombreNuevo = String(renombrarForm.nombreNuevo || '').toUpperCase()"
+            />
+          </div>
+          <p class="text-[10px] text-slate-500 font-medium">
+            El cambio se aplica a solicitudes, fichas, calificar, reportes y nóminas. Los nombres deben ser únicos.
+          </p>
+          <p v-if="errorRenombrar" class="text-xs font-bold text-secondary">{{ errorRenombrar }}</p>
+        </v-card-text>
+        <v-card-actions class="px-5 py-4 border-t border-slate-100 justify-end gap-2">
+          <button type="button" class="px-4 py-2 text-sm font-bold text-slate-600" @click="cerrarModalRenombrar">Cancelar</button>
+          <button
+            type="button"
+            class="px-5 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-black disabled:opacity-50"
+            :disabled="guardandoRenombrar || !puedeGuardarRenombrar"
+            @click="guardarRenombrarFraternidad"
+          >
+            {{ guardandoRenombrar ? 'Guardando…' : 'Guardar nuevo nombre' }}
+          </button>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
   </div>
 </template>
 
@@ -767,6 +848,120 @@ const categoriaFiltroJurado = ref('')
 let fraternidadBusquedaTimeout = null
 const loading = ref(true)
 const saving = ref(false)
+
+const modalRenombrarOpen = ref(false)
+const guardandoRenombrar = ref(false)
+const errorRenombrar = ref('')
+const renombrarForm = ref({ idFraternidad: null, nombreNuevo: '' })
+
+const todasFraternidadesOrdenadas = computed(() =>
+  [...todasFraternidades.value].sort((a, b) =>
+    String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'),
+  ),
+)
+
+const fraternidadSeleccionadaRenombrar = computed(() =>
+  todasFraternidades.value.find((f) => f.idFraternidad === renombrarForm.value.idFraternidad) || null,
+)
+
+const puedeGuardarRenombrar = computed(() => {
+  const id = renombrarForm.value.idFraternidad
+  const nuevo = String(renombrarForm.value.nombreNuevo || '').trim()
+  const actual = fraternidadSeleccionadaRenombrar.value?.nombre || ''
+  return !!id && !!nuevo && nuevo.toUpperCase() !== String(actual).trim().toUpperCase()
+})
+
+watch(
+  () => renombrarForm.value.idFraternidad,
+  (id) => {
+    const f = todasFraternidades.value.find((x) => x.idFraternidad === id)
+    if (f) renombrarForm.value.nombreNuevo = String(f.nombre || '').toUpperCase()
+  },
+)
+
+const abrirModalRenombrarFraternidad = async () => {
+  errorRenombrar.value = ''
+  if (!todasFraternidades.value.length) {
+    try {
+      const { data } = await api.get('/fraternidades')
+      todasFraternidades.value = Array.isArray(data) ? data : []
+    } catch {
+      /* ignore */
+    }
+  }
+  const preselect =
+    typeof form.value.idFraternidad === 'object' && form.value.idFraternidad !== null
+      ? form.value.idFraternidad.idFraternidad
+      : (typeof form.value.idFraternidad === 'number' ? form.value.idFraternidad : null)
+  const actual = preselect
+    ? todasFraternidades.value.find((f) => f.idFraternidad === preselect)
+    : null
+  renombrarForm.value = {
+    idFraternidad: preselect || null,
+    nombreNuevo: actual?.nombre || '',
+  }
+  modalRenombrarOpen.value = true
+}
+
+const cerrarModalRenombrar = () => {
+  if (guardandoRenombrar.value) return
+  modalRenombrarOpen.value = false
+  errorRenombrar.value = ''
+}
+
+const guardarRenombrarFraternidad = async () => {
+  if (!puedeGuardarRenombrar.value) return
+  const id = renombrarForm.value.idFraternidad
+  const nombre = String(renombrarForm.value.nombreNuevo || '').trim().toUpperCase()
+  const conf = await Swal.fire({
+    title: '¿Renombrar fraternidad?',
+    html: `Se cambiará a <strong>${nombre}</strong> y se propagará a solicitudes, fichas, calificar, reportes y nóminas.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, renombrar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#d97706',
+  })
+  if (!conf.isConfirmed) return
+
+  guardandoRenombrar.value = true
+  errorRenombrar.value = ''
+  try {
+    const { data } = await api.post(`/fraternidades/${id}/renombrar`, { nombre })
+    const idx = todasFraternidades.value.findIndex((f) => f.idFraternidad === id)
+    if (idx >= 0) {
+      todasFraternidades.value[idx] = { ...todasFraternidades.value[idx], nombre: data.nombre || nombre }
+    }
+    // Si el delegado del modal tiene esa fraternidad, actualizar UI
+    const uid = form.value.idUsuario
+    const uIdx = usuarios.value.findIndex((u) => u.idUsuario === uid)
+    if (uIdx >= 0 && usuarios.value[uIdx].fraternidad?.idFraternidad === id) {
+      usuarios.value[uIdx].fraternidad = {
+        ...usuarios.value[uIdx].fraternidad,
+        nombre: data.nombre || nombre,
+      }
+    }
+    if (
+      (typeof form.value.idFraternidad === 'number' && form.value.idFraternidad === id) ||
+      (form.value.idFraternidad?.idFraternidad === id)
+    ) {
+      fraternidadBusqueda.value = data.nombre || nombre
+    }
+    modalRenombrarOpen.value = false
+    await Swal.fire({
+      title: 'Nombre actualizado',
+      text: `Ahora se llama «${data.nombre || nombre}».`,
+      icon: 'success',
+      confirmButtonColor: '#003399',
+      timer: 2200,
+    })
+    void cargarDatos()
+  } catch (e) {
+    errorRenombrar.value = e?.response?.data?.message || 'No se pudo renombrar la fraternidad.'
+  } finally {
+    guardandoRenombrar.value = false
+  }
+}
 const ciOriginalAlAbrir = ref('')
 const searchQuery = ref('')
 const modalOpen = ref(false)
@@ -1132,6 +1327,8 @@ const guardarUsuario = async () => {
           confirmButtonText: 'Sí, otorgar',
           cancelButtonText: 'Cancelar',
           confirmButtonColor: '#003399',
+          heightAuto: false,
+          target: document.body,
         })
         if (!conf.isConfirmed) {
           form.value.esDecisor = false
@@ -1175,27 +1372,8 @@ const guardarUsuario = async () => {
     }
 
     if (esRolDelegado.value) {
-      const idActual =
-        typeof form.value.idFraternidad === 'object' && form.value.idFraternidad !== null
-          ? form.value.idFraternidad.idFraternidad
-          : (typeof form.value.idFraternidad === 'number' ? form.value.idFraternidad : null)
-      const nombreBusqueda = String(fraternidadBusqueda.value || '').trim()
-      const nombreActual = String(
-        usuarios.value.find((u) => u.idUsuario === form.value.idUsuario)?.fraternidad?.nombre || '',
-      ).trim()
-
-      // Combobox: al editar el texto de búsqueda el modelo puede seguir siendo el ID numérico.
-      // Si el texto cambió, forzar renombre in-place.
-      if (
-        editando.value &&
-        idActual &&
-        nombreBusqueda &&
-        nombreBusqueda.toUpperCase() !== nombreActual.toUpperCase() &&
-        typeof form.value.idFraternidad !== 'string'
-      ) {
-        payload.nuevaFraternidad = nombreBusqueda
-        payload.idFraternidad = null
-      } else if (typeof form.value.idFraternidad === 'string') {
+      // Solo asignar / crear. El renombre va por modal dedicado → POST /fraternidades/:id/renombrar
+      if (typeof form.value.idFraternidad === 'string') {
         payload.nuevaFraternidad = form.value.idFraternidad
         payload.idFraternidad = null
       } else if (typeof form.value.idFraternidad === 'object' && form.value.idFraternidad !== null) {
