@@ -315,8 +315,7 @@
                     :readonly="editando"
                     class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold disabled:opacity-70 disabled:cursor-not-allowed"
                   />
-                  <p v-if="editando" class="text-[10px] text-slate-500 mt-1.5 font-medium">
-                  <p class="text-[10px] text-slate-400 mt-1">
+                  <p v-if="editando" class="text-[10px] text-slate-400 mt-1">
                     El nombre solo se cambia en <strong>Usuarios → Delegados</strong>. Así se propaga a solicitudes, fichas, calificar, reportes y nóminas.
                   </p>
                 </div>
