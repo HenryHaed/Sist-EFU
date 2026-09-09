@@ -289,6 +289,72 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     ON cronogramas_actividad (id_gestion, tipo)
   `);
 
+  await runPatch(dataSource, 'inscripciones_concurso.fecha_envio', `
+    ALTER TABLE inscripciones_concurso
+    ADD COLUMN IF NOT EXISTS fecha_envio TIMESTAMP NULL
+  `);
+  await runPatch(dataSource, 'inscripciones_concurso.fecha_envio backfill', `
+    UPDATE inscripciones_concurso
+    SET fecha_envio = COALESCE(updated_at, created_at)
+    WHERE estado <> 'BORRADOR'
+      AND fecha_envio IS NULL
+  `);
+
+  await runPatch(dataSource, 'fases.id_fase_padre', `
+    ALTER TABLE fases
+    ADD COLUMN IF NOT EXISTS id_fase_padre INTEGER NULL
+      REFERENCES fases(id_fase) ON DELETE SET NULL
+  `);
+  await runPatch(dataSource, 'fases.cupo_finalistas', `
+    ALTER TABLE fases
+    ADD COLUMN IF NOT EXISTS cupo_finalistas INTEGER NULL
+  `);
+  await runPatch(dataSource, 'idx fases.id_fase_padre', `
+    CREATE INDEX IF NOT EXISTS idx_fases_fase_padre ON fases(id_fase_padre)
+  `);
+
+  await runPatch(dataSource, 'usuarios.es_decisor', `
+    ALTER TABLE usuarios
+    ADD COLUMN IF NOT EXISTS es_decisor boolean NOT NULL DEFAULT false
+  `);
+  await runPatch(dataSource, 'uq usuarios.es_decisor unico', `
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_usuarios_es_decisor_true
+    ON usuarios (es_decisor)
+    WHERE es_decisor = true
+  `);
+
+  await runPatch(dataSource, 'tabla desempates_fase', `
+    CREATE TABLE IF NOT EXISTS desempates_fase (
+      id_desempate SERIAL PRIMARY KEY,
+      id_fase INTEGER NOT NULL REFERENCES fases(id_fase) ON DELETE CASCADE,
+      tipo VARCHAR(30) NOT NULL,
+      estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+      cupo INTEGER NOT NULL,
+      plazas_libres INTEGER NOT NULL DEFAULT 0,
+      id_usuario_decisor INTEGER NULL REFERENCES usuarios(id_usuario) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+  await runPatch(dataSource, 'tabla desempate_candidatos', `
+    CREATE TABLE IF NOT EXISTS desempate_candidatos (
+      id_candidato SERIAL PRIMARY KEY,
+      id_desempate INTEGER NOT NULL REFERENCES desempates_fase(id_desempate) ON DELETE CASCADE,
+      id_fraternidad INTEGER NOT NULL REFERENCES fraternidades(id_fraternidad) ON DELETE CASCADE,
+      nota NUMERIC(8,2) NULL,
+      puesto_provisional INTEGER NULL,
+      decision VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+      orden_podio INTEGER NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (id_desempate, id_fraternidad)
+    )
+  `);
+  await runPatch(dataSource, 'idx desempates_fase fase tipo', `
+    CREATE INDEX IF NOT EXISTS idx_desempates_fase_fase_tipo
+    ON desempates_fase (id_fase, tipo, estado)
+  `);
+
   try {
     await ensureSystemRoles(dataSource);
   } catch (err) {

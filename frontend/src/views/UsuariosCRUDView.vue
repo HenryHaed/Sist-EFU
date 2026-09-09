@@ -128,6 +128,12 @@
                 >
                   {{ user.rol?.nombre || 'Sin Rol' }}
                 </span>
+                <span
+                  v-if="user.esDecisor"
+                  class="ml-1 inline-flex px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-800 border border-amber-200"
+                >
+                  Decisor
+                </span>
                 <p v-if="user.rol?.nombre === 'delegado'" class="text-[9px] font-black mt-1 uppercase tracking-tighter"
                   :class="user.fraternidad ? 'text-slate-400' : 'text-amber-500'">
                    {{ user.fraternidad?.nombre || 'Sin fraternidad asignada' }}
@@ -319,6 +325,29 @@
                   Si cambias el correo, se envía un correo de bienvenida (cuenta nueva) al nuevo destinatario y se restablece la contraseña al CI.
                   Otros cambios se notifican por correo al usuario.
                 </p>
+              </div>
+
+              <!-- Decisor (solo admin + superusuario) -->
+              <div
+                v-if="props.rolFiltro === 'admin' && esSuperusuario && editando"
+                class="border border-amber-200 bg-amber-50/50 rounded-xl p-4 space-y-2"
+              >
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" v-model="form.esDecisor" class="size-4 accent-amber-600" />
+                  <span class="text-sm font-bold text-slate-800">Es Decisor (empates Chacha)</span>
+                </label>
+                <p class="text-[10px] text-slate-500 font-medium">
+                  Solo un administrador a la vez. Si activas, se quita al titular anterior.
+                  <span v-if="decisorActual && decisorActual.idUsuario !== form.idUsuario">
+                    Actual: {{ decisorActual.nombres }} (CI {{ decisorActual.ci }}).
+                  </span>
+                </p>
+              </div>
+              <div
+                v-else-if="props.rolFiltro === 'admin' && editando && form.esDecisor"
+                class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[11px] font-bold text-emerald-800"
+              >
+                Este administrador es el Decisor actual.
               </div>
 
               <!-- Password (solo edición) -->
@@ -588,8 +617,8 @@
                   </v-combobox>
                   <p class="text-[9px] text-slate-400 mt-1 italic">
                     <template v-if="editando">
-                      Si escribes un nombre nuevo, se <strong>renombra</strong> la fraternidad actual y se actualiza en solicitudes/fichas.
-                      No se borran monografías ni fichas técnicas subidas.
+                      Si escribes un nombre nuevo (aunque quede seleccionado el ID actual), se <strong>renombra</strong> la fraternidad
+                      y se propaga a solicitudes, fichas, calificar, reportes y nóminas. El PDF de ficha se regenera al descargar.
                     </template>
                     <template v-else>
                       Puedes escribir para buscar coincidencias históricas. Si no existe, se creará al guardar.
@@ -703,6 +732,11 @@ import api from '../services/api'
 import Swal from 'sweetalert2'
 import { validarCiUsuario, normalizarCiUsuario } from '../utils/ciUsuario'
 import { getPasswordPolicyErrors } from '../utils/passwordPolicy'
+import { useAuthStore } from '../store/auth'
+
+const authStore = useAuthStore()
+const esSuperusuario = computed(() => authStore.userRole?.toLowerCase() === 'superusuario')
+const decisorActual = ref(null)
 
 const props = defineProps({
   rolFiltro: { type: String, required: true }
@@ -753,7 +787,9 @@ const form = ref({
   fraternidadesIds: [],
   idFraternidad: null,
   idFaseConcurso: null,
+  esDecisor: false,
 })
+const esDecisorOriginal = ref(false)
 
 // ── Computed ──────────────────────────────────────────────────────────────
 const esRolJurado = computed(() => {
@@ -941,6 +977,14 @@ const cargarDatos = async () => {
     usuarios.value = resUsuarios.data
     roles.value = resRoles.data
     todasFraternidades.value = resFraternidades.data
+    if (props.rolFiltro === 'admin') {
+      try {
+        const { data } = await api.get('/usuarios/decisor')
+        decisorActual.value = data
+      } catch {
+        decisorActual.value = null
+      }
+    }
 
     // Fases de la gestión activa (para jurado y concursante)
     todasFases.value = []
@@ -996,7 +1040,9 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       fraternidadesIds: usuario._perfil?.fraternidadesHabilitadas?.map(f => f.idFraternidad) || [],
       idFraternidad: usuario.fraternidad?.idFraternidad || null,
       idFaseConcurso: usuario.faseConcurso?.idFase || null,
+      esDecisor: !!usuario.esDecisor,
     }
+    esDecisorOriginal.value = !!usuario.esDecisor
     fraternidadBusqueda.value = usuario.fraternidad?.nombre || ''
     fraternidadSugerencias.value = []
     resetFiltrosFraternidadesJurado()
@@ -1029,7 +1075,9 @@ const abrirModal = async (modoEdicion, usuario = null) => {
       fasesEfuIds: [], fasesExternasIds: [], fraternidadesIds: [],
       idFraternidad: null,
       idFaseConcurso: null,
+      esDecisor: false,
     }
+    esDecisorOriginal.value = false
     fraternidadBusqueda.value = ''
     fraternidadSugerencias.value = []
     resetFiltrosFraternidadesJurado()
@@ -1070,6 +1118,28 @@ const guardarUsuario = async () => {
       fraternidadesIds: form.value.fraternidadesIds
     }
     delete payload.idUsuario
+    delete payload.esDecisor
+
+    if (editando.value && props.rolFiltro === 'admin' && esSuperusuario.value) {
+      if (form.value.esDecisor && !esDecisorOriginal.value) {
+        const conf = await Swal.fire({
+          title: '¿Otorgar permiso Decisor?',
+          html: decisorActual.value
+            ? `Actualmente lo tiene <strong>${decisorActual.value.nombres}</strong>. Se lo quitarás al asignarlo a este admin.`
+            : 'Este administrador podrá resolver empates de Chacha-Warmi.',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Sí, otorgar',
+          cancelButtonText: 'Cancelar',
+          confirmButtonColor: '#003399',
+        })
+        if (!conf.isConfirmed) {
+          form.value.esDecisor = false
+          saving.value = false
+          return
+        }
+      }
+    }
 
     if (!editando.value && !form.value.correo?.trim()) {
       errorFormulario.value = 'El correo es obligatorio al crear un usuario.'
@@ -1105,7 +1175,27 @@ const guardarUsuario = async () => {
     }
 
     if (esRolDelegado.value) {
-      if (typeof form.value.idFraternidad === 'string') {
+      const idActual =
+        typeof form.value.idFraternidad === 'object' && form.value.idFraternidad !== null
+          ? form.value.idFraternidad.idFraternidad
+          : (typeof form.value.idFraternidad === 'number' ? form.value.idFraternidad : null)
+      const nombreBusqueda = String(fraternidadBusqueda.value || '').trim()
+      const nombreActual = String(
+        usuarios.value.find((u) => u.idUsuario === form.value.idUsuario)?.fraternidad?.nombre || '',
+      ).trim()
+
+      // Combobox: al editar el texto de búsqueda el modelo puede seguir siendo el ID numérico.
+      // Si el texto cambió, forzar renombre in-place.
+      if (
+        editando.value &&
+        idActual &&
+        nombreBusqueda &&
+        nombreBusqueda.toUpperCase() !== nombreActual.toUpperCase() &&
+        typeof form.value.idFraternidad !== 'string'
+      ) {
+        payload.nuevaFraternidad = nombreBusqueda
+        payload.idFraternidad = null
+      } else if (typeof form.value.idFraternidad === 'string') {
         payload.nuevaFraternidad = form.value.idFraternidad
         payload.idFraternidad = null
       } else if (typeof form.value.idFraternidad === 'object' && form.value.idFraternidad !== null) {
@@ -1134,6 +1224,15 @@ const guardarUsuario = async () => {
 
     if (editando.value) {
       const { data } = await api.put(`/usuarios/${form.value.idUsuario}`, payload)
+
+      if (props.rolFiltro === 'admin' && esSuperusuario.value) {
+        if (form.value.esDecisor && !esDecisorOriginal.value) {
+          await api.post('/usuarios/decisor/otorgar', { idUsuario: form.value.idUsuario })
+        } else if (!form.value.esDecisor && esDecisorOriginal.value) {
+          await api.post('/usuarios/decisor/renunciar', { idUsuario: form.value.idUsuario })
+        }
+      }
+
       const esJurado = esRolJurado.value
       const n = data?.notificacionCorreo
 

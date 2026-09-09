@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, DataSource } from 'typeorm';
 import { Usuario } from '../entities/Usuario';
@@ -436,6 +436,8 @@ export class UsuariosService {
     const rolAnteriorId = user.rol?.idRol;
 
     let updateData: any = { ...data };
+    delete updateData.esDecisor;
+    delete updateData.es_decisor;
     const cambios: string[] = [];
     let correoCambio = false;
     let passwordCambiada = false;
@@ -918,5 +920,136 @@ export class UsuariosService {
         }
         throw error;
     }
+  }
+
+  private mapDecisorPublico(u: Usuario | null) {
+    if (!u) return null;
+    return {
+      idUsuario: u.idUsuario,
+      nombres: [u.nombres, u.primerApellido, u.segundoApellido].filter(Boolean).join(' ').trim(),
+      ci: u.ci,
+      correo: u.correo || null,
+    };
+  }
+
+  async getDecisorActual() {
+    const u = await this.usuarioRepo.findOne({
+      where: { esDecisor: true },
+      relations: ['rol'],
+    });
+    return this.mapDecisorPublico(u);
+  }
+
+  private async assertEsAdmin(usuario: Usuario) {
+    const rol = String(usuario.rol?.nombre || '').toLowerCase();
+    if (rol !== 'admin') {
+      throw new BadRequestException('Solo un administrador puede ser Decisor.');
+    }
+  }
+
+  /** Superusuario otorga el permiso Decisor a un admin (quita al titular previo). */
+  async otorgarDecisor(idUsuario: number, actor: { idUsuario: number; rol?: string }) {
+    if (String(actor?.rol || '').toLowerCase() !== 'superusuario') {
+      throw new ForbiddenException('Solo el superusuario puede otorgar el permiso Decisor.');
+    }
+    const target = await this.findOne(idUsuario);
+    await this.assertEsAdmin(target);
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder()
+        .update(Usuario)
+        .set({ esDecisor: false })
+        .where('es_decisor = true')
+        .execute();
+      await manager.update(Usuario, { idUsuario }, { esDecisor: true });
+    });
+
+    return {
+      ok: true,
+      mensaje: `Permiso Decisor otorgado a ${target.nombres}.`,
+      decisor: this.mapDecisorPublico({ ...target, esDecisor: true } as Usuario),
+    };
+  }
+
+  /** Admin solicita autoasignarse; falla si otro titular lo tiene. */
+  async solicitarDecisor(actor: { idUsuario: number; rol?: string }) {
+    const rol = String(actor?.rol || '').toLowerCase();
+    if (rol !== 'admin') {
+      throw new ForbiddenException('Solo un administrador puede solicitar el permiso Decisor.');
+    }
+    const me = await this.findOne(actor.idUsuario);
+    await this.assertEsAdmin(me);
+
+    if (me.esDecisor) {
+      return {
+        ok: true,
+        mensaje: 'Ya eres el Decisor actual.',
+        decisor: this.mapDecisorPublico(me),
+      };
+    }
+
+    const actual = await this.usuarioRepo.findOne({
+      where: { esDecisor: true },
+      relations: ['rol'],
+    });
+    if (actual && actual.idUsuario !== me.idUsuario) {
+      throw new BadRequestException(
+        `Ya hay un Decisor activo (${[actual.nombres, actual.primerApellido].filter(Boolean).join(' ')}). Debe renunciar o un superusuario debe reasignar el permiso.`,
+      );
+    }
+
+    me.esDecisor = true;
+    await this.usuarioRepo.save(me);
+    return {
+      ok: true,
+      mensaje: 'Permiso Decisor asignado. Eres responsable de resolver empates de Chacha-Warmi.',
+      decisor: this.mapDecisorPublico(me),
+    };
+  }
+
+  /** El Decisor actual renuncia; superusuario puede forzar renuncia de otro. */
+  async renunciarDecisor(
+    actor: { idUsuario: number; rol?: string },
+    body?: { idUsuario?: number },
+  ) {
+    const rol = String(actor?.rol || '').toLowerCase();
+    const forzarId = body?.idUsuario != null ? Number(body.idUsuario) : null;
+    const esSuper = rol === 'superusuario';
+
+    let target: Usuario | null = null;
+    if (forzarId && Number.isFinite(forzarId)) {
+      if (!esSuper) {
+        throw new ForbiddenException('Solo el superusuario puede forzar la renuncia de otro Decisor.');
+      }
+      target = await this.findOne(forzarId);
+    } else {
+      target = await this.findOne(actor.idUsuario);
+      if (!target.esDecisor && !esSuper) {
+        throw new BadRequestException('No tienes el permiso Decisor para renunciar.');
+      }
+      if (!target.esDecisor) {
+        const actual = await this.usuarioRepo.findOne({ where: { esDecisor: true } });
+        if (!actual) {
+          return { ok: true, mensaje: 'No hay Decisor activo.', decisor: null };
+        }
+        if (!esSuper) {
+          throw new BadRequestException('No tienes el permiso Decisor para renunciar.');
+        }
+        target = actual;
+      }
+    }
+
+    if (!target.esDecisor) {
+      return { ok: true, mensaje: 'Ese usuario no es Decisor.', decisor: null };
+    }
+
+    target.esDecisor = false;
+    await this.usuarioRepo.save(target);
+    return {
+      ok: true,
+      mensaje: 'Permiso Decisor liberado.',
+      decisor: null,
+    };
   }
 }

@@ -158,6 +158,7 @@ const formatBytes = (n) => {
 const cargar = async () => {
   loading.value = true
   try {
+    await authStore.refreshProfile()
     const { data } = await api.get('/listas-nomina/mi')
     lista.value = data?.lista || null
   } catch (error) {

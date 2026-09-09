@@ -69,6 +69,7 @@ export class AuthService {
         correo: usuario.correo,
         rol: usuario.rol.nombre,
         primerLogin: usuario.primerLogin,
+        esDecisor: !!usuario.esDecisor,
         fraternidad: usuario.fraternidad ? {
           idFraternidad: usuario.fraternidad.idFraternidad,
           nombre: usuario.fraternidad.nombre,
@@ -85,6 +86,65 @@ export class AuthService {
   // Metodo util para verificar un token desde otros modulos si fuera necesario
   verifyToken(token: string) {
     return this.jwtService.verify(token);
+  }
+
+  /** Perfil fresco desde BD (incluye nombre actual de fraternidad). */
+  async getPerfil(userId: number) {
+    const usuario = await this.usuarioRepo.findOne({
+      where: { idUsuario: userId },
+      relations: [
+        'rol',
+        'fraternidad',
+        'fraternidad.categoria',
+        'fraternidad.facultad',
+        'fraternidad.carrera',
+        'fraternidad.institucionExterna',
+      ],
+    });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
+    return {
+      id: usuario.idUsuario,
+      idUsuario: usuario.idUsuario,
+      ci: usuario.ci,
+      nombres: usuario.nombres,
+      primerApellido: usuario.primerApellido,
+      segundoApellido: usuario.segundoApellido,
+      correo: usuario.correo,
+      rol: usuario.rol?.nombre,
+      primerLogin: usuario.primerLogin,
+      esDecisor: !!usuario.esDecisor,
+      fraternidad: usuario.fraternidad
+        ? {
+            idFraternidad: usuario.fraternidad.idFraternidad,
+            nombre: usuario.fraternidad.nombre,
+            nivelRepresentacion: usuario.fraternidad.nivelRepresentacion,
+            categoria: usuario.fraternidad.categoria
+              ? {
+                  idCategoria: usuario.fraternidad.categoria.idCategoria,
+                  nombre: usuario.fraternidad.categoria.nombre,
+                }
+              : null,
+            facultad: usuario.fraternidad.facultad
+              ? {
+                  idFacultad: usuario.fraternidad.facultad.idFacultad,
+                  nombre: usuario.fraternidad.facultad.nombre,
+                }
+              : null,
+            carrera: usuario.fraternidad.carrera
+              ? {
+                  idCarrera: usuario.fraternidad.carrera.idCarrera,
+                  nombre: usuario.fraternidad.carrera.nombre,
+                }
+              : null,
+            institucionExterna: usuario.fraternidad.institucionExterna
+              ? {
+                  idInstitucion: usuario.fraternidad.institucionExterna.idInstitucion,
+                  nombre: usuario.fraternidad.institucionExterna.nombre,
+                }
+              : null,
+          }
+        : null,
+    };
   }
 
   async changePassword(userId: number, newPassword: string) {

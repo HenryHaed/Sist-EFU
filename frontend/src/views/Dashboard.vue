@@ -1104,10 +1104,9 @@ const iniciarWizard = (data) => {
 }
 
 const iniciarWizardConcurso = ({ idParticipante, participanteNombre, participanteTipo, idFraternidad, fraternidadNombre }) => {
-  activeParticipanteId.value = idParticipante
+  activeParticipanteId.value = idParticipante || null
   activeParticipanteNombre.value = participanteNombre
   activeParticipanteTipo.value = participanteTipo
-  // Opcional: cargar fraternidad si existe
   activeFraternidadJurado.value = idFraternidad ? { idFraternidad, nombre: fraternidadNombre } : null
   vistaActual.value = 'wizard_concurso'
 }

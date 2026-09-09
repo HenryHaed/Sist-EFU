@@ -156,6 +156,8 @@ export class InscripcionesConcursoService {
       revisionChecklist: insc.revisionChecklist || {},
       createdAt: insc.createdAt,
       updatedAt: insc.updatedAt,
+      fechaEnvio: insc.fechaEnvio || null,
+      fechaSolicitud: insc.fechaEnvio || insc.createdAt || null,
       fase: insc.fase
         ? {
             idFase: insc.fase.idFase,
@@ -596,9 +598,11 @@ export class InscripcionesConcursoService {
     const fases = await this.faseRepo
       .createQueryBuilder('f')
       .leftJoinAndSelect('f.gestion', 'gestion')
+      .leftJoinAndSelect('f.fasePadre', 'fasePadre')
       .where('gestion.id_gestion = :gid', { gid: gestionId })
       .andWhere('f.tipo_concurso = :tipo', { tipo: 'EXTERNO' })
       .andWhere('f.esta_activa = true')
+      .andWhere('f.id_fase_padre IS NULL')
       .orderBy('f.id_fase', 'DESC')
       .getMany();
 
@@ -1058,6 +1062,9 @@ export class InscripcionesConcursoService {
 
     insc.estado = EstadoInscripcionConcurso.PENDIENTE;
     insc.observacionAdmin = null;
+    if (!insc.fechaEnvio) {
+      insc.fechaEnvio = new Date();
+    }
   }
 
   // ── Admin ────────────────────────────────────────────────────────────────
@@ -1065,7 +1072,7 @@ export class InscripcionesConcursoService {
   async listarAdmin(idFase?: number) {
     const where: any = {};
     if (idFase) where.fase = { idFase };
-    return this.inscRepo.find({
+    const rows = await this.inscRepo.find({
       where,
       relations: [
         'usuario',
@@ -1077,8 +1084,18 @@ export class InscripcionesConcursoService {
         'participante',
         'participantePareja',
       ],
-      order: { updatedAt: 'DESC' },
+      order: { idInscripcion: 'ASC' },
     });
+    // Revisión: más antigua primero (fecha de envío / solicitud)
+    rows.sort((a, b) => {
+      const fa = a.fechaEnvio || a.createdAt;
+      const fb = b.fechaEnvio || b.createdAt;
+      const ta = fa ? new Date(fa).getTime() : Number.POSITIVE_INFINITY;
+      const tb = fb ? new Date(fb).getTime() : Number.POSITIVE_INFINITY;
+      if (ta !== tb) return ta - tb;
+      return a.idInscripcion - b.idInscripcion;
+    });
+    return rows;
   }
 
   async getDetalleAdmin(idInscripcion: number) {
@@ -1190,6 +1207,13 @@ export class InscripcionesConcursoService {
       if (!texto) {
         throw new BadRequestException('Indica la observación para el inscrito.');
       }
+
+      const eraAprobado = insc.estado === EstadoInscripcionConcurso.APROBADO;
+      // Re-observar Chacha (u otra) ya aprobada: quitar de Concursantes si no hay evaluaciones
+      if (eraAprobado) {
+        await this.retirarParticipantesSiSinEvaluacion(insc);
+      }
+
       insc.estado = EstadoInscripcionConcurso.OBSERVADO;
       insc.observacionAdmin = texto;
       await this.inscRepo.save(insc);

@@ -56,56 +56,101 @@
       <template v-else>
         <div
           v-if="!(esChacha && vista === 'pareja')"
-          class="relative max-w-lg mb-6"
+          class="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 flex-wrap"
         >
-          <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-          <input
-            v-model="busqueda"
-            type="search"
-            :placeholder="esChacha && vista === 'fraternidades' ? 'Buscar fraternidad...' : 'Buscar participante o fraternidad...'"
-            class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
-          />
+          <div class="relative max-w-lg flex-1 min-w-[200px]">
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+            <input
+              v-model="busqueda"
+              type="search"
+              :placeholder="esChacha && vista === 'fraternidades' ? 'Buscar fraternidad...' : 'Buscar participante o fraternidad...'"
+              class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
+            />
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Ordenar</span>
+            <button
+              v-for="opt in opcionesOrden"
+              :key="opt.id"
+              type="button"
+              @click="setOrden(opt.id)"
+              class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all"
+              :class="ordenCriterio === opt.id
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
 
-      <!-- CHACHA: fraternidades -->
+      <!-- CHACHA: fraternidades (nota por pareja) -->
       <div v-if="esChacha && vista === 'fraternidades'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <button
+        <div
           v-for="grupo in fraternidadesGruposFiltrados"
           :key="grupo.idFraternidad ?? 'sin'"
-          type="button"
-          class="text-left bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all p-6 group"
-          @click="abrirFraternidad(grupo)"
+          class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all p-6 group flex flex-col"
         >
           <div class="flex justify-between items-start mb-4">
             <div class="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
               <span class="material-symbols-outlined text-3xl">groups</span>
             </div>
-            <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-600">
-              {{ grupo.participantes.length }} persona(s)
-            </span>
+            <div
+              class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest"
+              :class="grupo.estadoEvaluacion === 'COMPLETADO'
+                ? 'bg-emerald-100 text-emerald-700'
+                : (grupo.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500')"
+            >
+              {{ grupo.estadoEvaluacion || 'PENDIENTE' }}
+            </div>
           </div>
           <h3 class="font-black text-xl text-slate-800 uppercase tracking-tighter leading-tight mb-2">
             {{ grupo.nombre }}
           </h3>
-          <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">
-            {{ resumenTipos(grupo.participantes) }}
+          <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+            {{ (grupo.nombresPareja || []).join(' · ') || 'Pareja Chacha-Warmi' }}
           </p>
-          <div class="flex items-center justify-between text-sm font-black text-primary">
-            <span>Ver pareja</span>
-            <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+          <p class="text-[10px] font-medium text-slate-400 mb-2">
+            {{ formatFechaSolicitud(grupo.fechaSolicitud) }}
+            <span v-if="grupo.instanciaRepresentacion"> · {{ grupo.instanciaRepresentacion }}</span>
+          </p>
+          <p class="text-lg font-black text-primary mb-4">{{ grupo.puntajeActual || 0 }} <span class="text-[10px] text-slate-400">pts</span></p>
+
+          <div class="mt-auto flex flex-col gap-2">
+            <button
+              v-if="esAdmin"
+              type="button"
+              @click="abrirPanelAdminFraternidad(grupo.idFraternidad)"
+              class="w-full py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
+            >
+              <span class="material-symbols-outlined text-[18px]">monitoring</span>
+              Ver calificaciones
+            </button>
+            <button
+              type="button"
+              @click="iniciarEvaluacionFraternidad(grupo)"
+              :disabled="grupo.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0"
+              class="w-full py-3 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2"
+              :class="(grupo.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0)
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                : 'bg-primary text-white hover:bg-blue-900 shadow-xl shadow-primary/20'"
+            >
+              {{ (grupo.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0)
+                ? (tiempoRestante <= 0 ? 'Fase Cerrada' : 'Nota Sellada')
+                : (grupo.estadoEvaluacion === 'PENDIENTE' ? 'Calificar pareja' : 'Continuar calificación') }}
+              <span class="material-symbols-outlined text-[20px]">
+                {{ (grupo.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0) ? 'lock' : 'arrow_forward' }}
+              </span>
+            </button>
           </div>
-          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-500">
-            <span>Progreso calificación</span>
-            <span :class="progresoGrupo(grupo).clase">{{ progresoGrupo(grupo).texto }}</span>
-          </div>
-        </button>
+        </div>
 
         <div v-if="fraternidadesGruposFiltrados.length === 0" class="col-span-full py-20 text-center">
           <span class="material-symbols-outlined text-6xl text-slate-200 mb-4">groups</span>
           <p class="text-slate-400 font-bold uppercase tracking-widest max-w-md mx-auto">
             {{ busqueda.trim()
               ? `Ninguna fraternidad coincide con “${busqueda}”.`
-              : 'No hay fraternidades con Chacha-Warmi aprobado para calificar.' }}
+              : 'No hay fraternidades con Chacha-Warmi para calificar.' }}
           </p>
         </div>
       </div>
@@ -213,6 +258,7 @@
       :nombre-fase="props.fase?.nombre"
       tipo-concurso="EXTERNO"
       :initial-id-participante="resumenAdminIdParticipante"
+      :initial-id-fraternidad="resumenAdminIdFraternidad"
       @actas-cerradas="cargarParticipantes"
     />
   </div>
@@ -225,6 +271,7 @@ import api from '../services/api'
 import { esFaseChachaWarmi } from '../utils/chachaWarmi'
 import ModalResumenCalificacionesAdmin from '../components/ModalResumenCalificacionesAdmin.vue'
 import { useAuthStore } from '../store/auth'
+import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
 
 const authStore = useAuthStore()
 const esAdmin = computed(() => ['admin', 'superusuario'].includes(authStore.userRole))
@@ -240,6 +287,18 @@ const busqueda = ref('')
 const vista = ref('lista') // 'lista' | 'fraternidades' | 'pareja'
 const fraternidadActiva = ref(null)
 const plantillaDesdeApi = ref(null)
+const ordenCriterio = ref('fechaSolicitud')
+const ordenDir = ref('asc')
+const opcionesOrden = ORDEN_CRITERIOS
+
+const setOrden = (id) => {
+  if (ordenCriterio.value === id) {
+    ordenDir.value = ordenDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    ordenCriterio.value = id
+    ordenDir.value = 'asc'
+  }
+}
 
 const tiempoRestante = ref(0)
 let timerInterval = null
@@ -247,9 +306,19 @@ let timerInterval = null
 const modalResumenAdmin = ref(false)
 const modalAdminKey = ref(0)
 const resumenAdminIdParticipante = ref(null)
+const resumenAdminIdFraternidad = ref(null)
+const modoCalificacionApi = ref(null)
 
 const abrirPanelAdmin = (idParticipante = null) => {
   resumenAdminIdParticipante.value = idParticipante
+  resumenAdminIdFraternidad.value = null
+  modalAdminKey.value += 1
+  modalResumenAdmin.value = true
+}
+
+const abrirPanelAdminFraternidad = (idFraternidad = null) => {
+  resumenAdminIdFraternidad.value = idFraternidad
+  resumenAdminIdParticipante.value = null
   modalAdminKey.value += 1
   modalResumenAdmin.value = true
 }
@@ -262,6 +331,24 @@ const esChacha = computed(() =>
 )
 
 const fraternidadesGrupos = computed(() => {
+  // API Chacha ya entrega listado por fraternidad
+  if (modoCalificacionApi.value === 'fraternidad' || (esChacha.value && participantes.value[0]?.modoCalificacion === 'fraternidad')) {
+    return ordenarListado(
+      participantes.value.map((g) => ({
+        ...g,
+        nombresPareja: g.nombresPareja || [],
+      })),
+      ordenCriterio.value,
+      ordenDir.value,
+      {
+        fecha: (x) => x.fechaSolicitud,
+        nombre: (x) => x.nombre,
+        instancia: (x) => x.instanciaRepresentacion,
+        id: (x) => x.idFraternidad || 0,
+      },
+    )
+  }
+
   const map = new Map()
   for (const p of participantes.value) {
     const id = p.idFraternidad ?? null
@@ -270,14 +357,27 @@ const fraternidadesGrupos = computed(() => {
       map.set(key, {
         idFraternidad: id,
         nombre: p.fraternidad || 'Sin fraternidad',
+        instanciaRepresentacion: p.instanciaRepresentacion || null,
+        fechaSolicitud: p.fechaSolicitud || null,
+        nombresPareja: [],
+        estadoEvaluacion: p.estadoEvaluacion,
+        puntajeActual: p.puntajeActual,
         participantes: [],
       })
     }
-    map.get(key).participantes.push(p)
+    const g = map.get(key)
+    g.participantes.push(p)
+    if (p.nombre && !g.nombresPareja.includes(p.nombre)) g.nombresPareja.push(p.nombre)
+    if (p.fechaSolicitud && (!g.fechaSolicitud || new Date(p.fechaSolicitud) < new Date(g.fechaSolicitud))) {
+      g.fechaSolicitud = p.fechaSolicitud
+    }
   }
-  return Array.from(map.values()).sort((a, b) =>
-    String(a.nombre).localeCompare(String(b.nombre), 'es'),
-  )
+  return ordenarListado(Array.from(map.values()), ordenCriterio.value, ordenDir.value, {
+    fecha: (x) => x.fechaSolicitud,
+    nombre: (x) => x.nombre,
+    instancia: (x) => x.instanciaRepresentacion,
+    id: (x) => x.idFraternidad || 0,
+  })
 })
 
 const participantesVista = computed(() => {
@@ -291,7 +391,12 @@ const participantesVista = computed(() => {
       return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es')
     })
   }
-  return participantes.value
+  return ordenarListado(participantes.value, ordenCriterio.value, ordenDir.value, {
+    fecha: (x) => x.fechaSolicitud,
+    nombre: (x) => x.nombre,
+    instancia: (x) => x.instanciaRepresentacion || x.fraternidad,
+    id: (x) => x.idParticipante,
+  })
 })
 
 const fraternidadesGruposFiltrados = computed(() => {
@@ -306,7 +411,7 @@ const participantesVistaFiltrados = computed(() => {
   const q = busqueda.value.trim().toLowerCase()
   if (!q || (esChacha.value && vista.value === 'pareja')) return participantesVista.value
   return participantesVista.value.filter((p) => {
-    const haystack = [p.nombre, p.fraternidad, p.tipo]
+    const haystack = [p.nombre, p.fraternidad, p.tipo, p.instanciaRepresentacion]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()
@@ -338,6 +443,7 @@ const cargarParticipantes = async () => {
     const { data } = await api.get(`/evaluaciones/fase/${props.fase.idFase}/fraternidades`)
     participantes.value = data.listado || []
     plantillaDesdeApi.value = data.fase?.plantillaRequisitos || null
+    modoCalificacionApi.value = data.fase?.modoCalificacion || data.listado?.[0]?.modoCalificacion || null
 
     if (esFaseChachaWarmi({ ...props.fase, plantillaRequisitos: plantillaDesdeApi.value || props.fase?.plantillaRequisitos })) {
       vista.value = 'fraternidades'
@@ -372,8 +478,19 @@ const cargarParticipantes = async () => {
 }
 
 const abrirFraternidad = (grupo) => {
+  // Legacy: ya no se usa para calificar por persona
   fraternidadActiva.value = grupo
   vista.value = 'pareja'
+}
+
+const iniciarEvaluacionFraternidad = (grupo) => {
+  emit('evaluar-participante', {
+    idParticipante: null,
+    participanteNombre: (grupo.nombresPareja || []).join(' / ') || 'Pareja Chacha-Warmi',
+    participanteTipo: 'Pareja',
+    idFraternidad: grupo.idFraternidad,
+    fraternidadNombre: grupo.nombre,
+  })
 }
 
 const onVolver = () => {

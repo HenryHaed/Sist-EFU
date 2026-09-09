@@ -264,7 +264,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Swal from 'sweetalert2'
 import api from '../services/api'
+import { useAuthStore } from '../store/auth'
 
+const authStore = useAuthStore()
 const router = useRouter()
 const loading = ref(true)
 const working = ref(false)
@@ -314,6 +316,7 @@ const cargar = async () => {
   bloqueado.value = null
   form.value = null
   try {
+    await authStore.refreshProfile()
     const { data } = await api.get('/ficha-tecnica/mi')
     if (data?.accesoPermitido === false) {
       bloqueado.value = {

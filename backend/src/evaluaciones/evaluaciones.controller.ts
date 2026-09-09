@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, ParseIntPipe, Query, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException, Res } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, Req, ParseIntPipe, Query, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException, Res } from '@nestjs/common';
 import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
@@ -281,6 +281,32 @@ export class EvaluacionesController {
   @Roles('superusuario', 'admin')
   getFinalistasFase(@Param('idFase', ParseIntPipe) idFase: number) {
     return this.evaluacionesService.getFinalistasFase(idFase);
+  }
+
+  @Get('fases/:idFase/estado-promocion')
+  @Roles('superusuario', 'admin')
+  getEstadoPromocion(@Param('idFase', ParseIntPipe) idFase: number) {
+    return this.evaluacionesService.getEstadoPromocion(idFase);
+  }
+
+  @Put('desempates/:idDesempate/resolver')
+  @Roles('superusuario', 'admin')
+  resolverDesempate(
+    @Param('idDesempate', ParseIntPipe) idDesempate: number,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    return this.evaluacionesService.resolverDesempate(idDesempate, body, {
+      idUsuario: req.user.idUsuario,
+      rol: req.user.rol,
+      esDecisor: !!req.user.esDecisor,
+    });
+  }
+
+  @Post('fases/:idFase/promover-finalistas')
+  @Roles('superusuario', 'admin')
+  promoverFinalistas(@Param('idFase', ParseIntPipe) idFase: number) {
+    return this.evaluacionesService.promoverFinalistas(idFase);
   }
 
   // --- CRUD ADMINISTRATIVO FASES ---

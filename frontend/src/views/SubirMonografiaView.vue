@@ -167,6 +167,7 @@ const formatFecha = (fecha) => {
 const cargarMonografia = async () => {
   loading.value = true
   try {
+    await authStore.refreshProfile()
     const [res, resCrono] = await Promise.all([
       api.get('/monografias/mi-fraternidad'),
       api.get('/monografias/cronograma').catch(() => ({ data: null })),

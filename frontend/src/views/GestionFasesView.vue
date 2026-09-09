@@ -99,6 +99,12 @@
                   </div>
                 </div>
                 <span class="font-bold text-primary italic">{{ fase.nombre }}</span>
+                <p v-if="fase.cupoFinalistas" class="text-[9px] font-black uppercase tracking-widest text-amber-700 mt-0.5">
+                  Cupo finalistas: {{ fase.cupoFinalistas }}
+                </p>
+                <p v-if="fase.idFasePadre" class="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-0.5">
+                  Hija de: {{ fase.fasePadreNombre || ('#' + fase.idFasePadre) }}
+                </p>
               </div>
             </td>
             <td class="px-6 py-4">
@@ -520,25 +526,80 @@
 
             <div
               v-if="form.tipoConcurso === 'EXTERNO'"
-              class="rounded-2xl border border-secondary/20 bg-red-50/40 p-4 space-y-3"
+              class="rounded-2xl border border-secondary/20 bg-red-50/40 p-4 space-y-4"
             >
+              <div
+                v-if="esFaseChachaWarmi({ nombre: form.nombre, plantillaRequisitos: form.plantillaRequisitos })"
+                class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+              >
+                <div>
+                  <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                    Cupo de finalistas (fase padre)
+                  </label>
+                  <input
+                    v-model.number="form.cupoFinalistas"
+                    type="number"
+                    min="1"
+                    placeholder="Ej. 10"
+                    class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold"
+                  />
+                  <p class="text-[10px] text-slate-500 mt-1 font-medium">
+                    Fraternidades que pasan a la fase hija al promover.
+                    Si hay empate en el cupo, el Decisor debe resolverlo antes de promover (no se puede superar el cupo).
+                  </p>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                    Enlazar con fase padre
+                  </label>
+                  <select
+                    v-model="form.idFasePadre"
+                    class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold"
+                  >
+                    <option :value="null">Ninguna (fase de inscripción)</option>
+                    <option
+                      v-for="fp in fasesPadreOpciones"
+                      :key="fp.idFase"
+                      :value="fp.idFase"
+                    >
+                      {{ fp.nombre }}
+                    </option>
+                  </select>
+                  <p class="text-[10px] text-slate-500 mt-1 font-medium">
+                    Si se enlaza, solo recibe finalistas promovidos (sin inscripción).
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <p class="text-[10px] font-black uppercase tracking-widest text-secondary mb-1">Periodo de inscripción</p>
                 <p class="text-[11px] text-slate-600 font-medium leading-relaxed">
                   {{ esFaseChachaWarmi({ nombre: form.nombre, plantillaRequisitos: form.plantillaRequisitos })
-                    ? 'Define cuándo los delegados pueden inscribir a sus participantes Chacha-Warmi.'
+                    ? (form.idFasePadre
+                      ? 'Fase hija: la inscripción queda bloqueada; los finalistas se promueven desde la fase padre.'
+                      : 'Define cuándo los delegados pueden inscribir a sus participantes Chacha-Warmi.')
                     : 'Define cuándo los concursantes pueden completar su inscripción.' }}
-                  Si dejas ambas vacías, la inscripción permanece abierta.
+                  <span v-if="!form.idFasePadre"> Si dejas ambas vacías, la inscripción permanece abierta.</span>
                 </p>
               </div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Inicio inscripción</label>
-                  <input v-model="form.fechaInicioInscripcion" type="datetime-local" class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm" />
+                  <input
+                    v-model="form.fechaInicioInscripcion"
+                    type="datetime-local"
+                    class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm disabled:opacity-50"
+                    :disabled="!!form.idFasePadre"
+                  />
                 </div>
                 <div>
                   <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fin inscripción</label>
-                  <input v-model="form.fechaFinInscripcion" type="datetime-local" class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm" />
+                  <input
+                    v-model="form.fechaFinInscripcion"
+                    type="datetime-local"
+                    class="w-full px-3 py-3 bg-white border border-slate-200 rounded-xl text-sm disabled:opacity-50"
+                    :disabled="!!form.idFasePadre"
+                  />
                 </div>
               </div>
             </div>
@@ -677,6 +738,17 @@ const form = ref({
   plantillaRequisitos: 'generico',
   clavesCampos: [],
   clavesDocumentos: [],
+  cupoFinalistas: null,
+  idFasePadre: null,
+})
+
+const fasesPadreOpciones = computed(() => {
+  const fases = resumen.value.fases || []
+  return fases.filter((f) => {
+    if (f.tipoConcurso !== 'EXTERNO') return false
+    if (editandoId.value && f.idFase === editandoId.value) return false
+    return esFaseChachaWarmi(f) || String(f.plantillaRequisitos || '').toLowerCase() === 'chacha_warmi'
+  })
 })
 
 const plantillasMeta = ref([])
@@ -901,6 +973,8 @@ const abrirModal = (item = null) => {
       plantillaRequisitos: item.plantillaRequisitos || 'generico',
       clavesCampos: (req.campos || []).map((c) => c.clave),
       clavesDocumentos: (req.documentos || []).map((d) => d.clave),
+      cupoFinalistas: item.cupoFinalistas ?? null,
+      idFasePadre: item.idFasePadre ?? null,
     }
     if (form.value.tipoConcurso === 'EXTERNO' && !form.value.clavesCampos.length && !form.value.clavesDocumentos.length) {
       aplicarPlantilla(form.value.plantillaRequisitos)
@@ -920,6 +994,7 @@ const abrirModal = (item = null) => {
       fechaInicio: '', fechaFin: '', fechaInicioInscripcion: '', fechaFinInscripcion: '',
       estaActiva: true, urlImagen: '', juradosIds: [],
       plantillaRequisitos: 'generico', clavesCampos: [], clavesDocumentos: [],
+      cupoFinalistas: null, idFasePadre: null,
     }
   }
   
@@ -979,6 +1054,16 @@ const guardar = async () => {
       delete payloadInfo.clavesDocumentos
       delete payloadInfo.fechaInicioInscripcion
       delete payloadInfo.fechaFinInscripcion
+      delete payloadInfo.cupoFinalistas
+      delete payloadInfo.idFasePadre
+    } else {
+      if (payloadInfo.cupoFinalistas === '' || Number.isNaN(Number(payloadInfo.cupoFinalistas))) {
+        payloadInfo.cupoFinalistas = null
+      }
+      if (payloadInfo.idFasePadre) {
+        payloadInfo.fechaInicioInscripcion = null
+        payloadInfo.fechaFinInscripcion = null
+      }
     }
     
     const formData = new FormData()

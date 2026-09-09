@@ -32,6 +32,26 @@
       </div>
     </div>
 
+    <!-- Orden -->
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">Ordenar por</span>
+      <button
+        v-for="opt in opcionesOrden"
+        :key="opt.id"
+        type="button"
+        @click="setOrden(opt.id)"
+        class="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all"
+        :class="sortField === opt.id
+          ? 'bg-primary text-white border-primary'
+          : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
+      >
+        {{ opt.label }}
+        <span v-if="sortField === opt.id" class="material-symbols-outlined text-[12px] align-middle ml-0.5">
+          {{ sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+        </span>
+      </button>
+    </div>
+
     <!-- Table Card -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div v-if="loading" class="p-20 flex flex-col items-center justify-center gap-4 text-slate-400">
@@ -55,7 +75,7 @@
           <thead>
             <tr class="bg-slate-50/50 border-b border-slate-100">
               <th
-                @click="toggleSort('nombre')"
+                @click="setOrden('nombre')"
                 class="px-6 py-4 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none transition-colors hover:text-primary"
                 :class="sortField === 'nombre' ? 'text-primary' : 'text-slate-400'"
               >
@@ -63,6 +83,30 @@
                   Nombre / Origen
                   <span class="material-symbols-outlined text-[14px]" :class="sortField === 'nombre' ? 'text-primary' : 'text-slate-300'">
                     {{ sortIcon('nombre') }}
+                  </span>
+                </span>
+              </th>
+              <th
+                @click="setOrden('fechaSolicitud')"
+                class="px-6 py-4 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none transition-colors hover:text-primary"
+                :class="sortField === 'fechaSolicitud' ? 'text-primary' : 'text-slate-400'"
+              >
+                <span class="inline-flex items-center gap-1">
+                  Fecha solicitud
+                  <span class="material-symbols-outlined text-[14px]" :class="sortField === 'fechaSolicitud' ? 'text-primary' : 'text-slate-300'">
+                    {{ sortIcon('fechaSolicitud') }}
+                  </span>
+                </span>
+              </th>
+              <th
+                @click="setOrden('instancia')"
+                class="px-6 py-4 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none transition-colors hover:text-primary"
+                :class="sortField === 'instancia' ? 'text-primary' : 'text-slate-400'"
+              >
+                <span class="inline-flex items-center gap-1">
+                  Instancia
+                  <span class="material-symbols-outlined text-[14px]" :class="sortField === 'instancia' ? 'text-primary' : 'text-slate-300'">
+                    {{ sortIcon('instancia') }}
                   </span>
                 </span>
               </th>
@@ -129,6 +173,12 @@
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{{ f.nivelRepresentacion || '—' }}</p>
                   </div>
                 </div>
+              </td>
+              <td class="px-6 py-4">
+                <p class="text-xs font-bold text-slate-700">{{ formatFechaSolicitud(f.fechaSolicitud) }}</p>
+              </td>
+              <td class="px-6 py-4">
+                <p class="text-xs font-bold text-slate-700">{{ f.instanciaRepresentacion || f.nivelRepresentacion || '—' }}</p>
               </td>
               <td class="px-6 py-4">
                 <span class="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-wider">
@@ -266,7 +316,8 @@
                     class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold disabled:opacity-70 disabled:cursor-not-allowed"
                   />
                   <p v-if="editando" class="text-[10px] text-slate-500 mt-1.5 font-medium">
-                    El nombre solo se cambia en <strong>Usuarios → Delegados</strong>. Así se propaga a solicitudes y fichas sin borrar monografías.
+                  <p class="text-[10px] text-slate-400 mt-1">
+                    El nombre solo se cambia en <strong>Usuarios → Delegados</strong>. Así se propaga a solicitudes, fichas, calificar, reportes y nóminas.
                   </p>
                 </div>
 
@@ -352,6 +403,7 @@ import api from '../services/api'
 import { notify } from '../utils/notify'
 import { useRoute, useRouter } from 'vue-router'
 import { getImageUrl } from '../utils/url'
+import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
 
 const route = useRoute()
 const router = useRouter()
@@ -361,8 +413,9 @@ const loading = ref(true)
 const busqueda = ref('')
 const modalAbierto = ref(false)
 const editando = ref(false)
-const sortField = ref('nombre')
+const sortField = ref('fechaSolicitud')
 const sortDir = ref('asc')
+const opcionesOrden = ORDEN_CRITERIOS
 
 const categorias = ref([])
 const loadingCategorias = ref(true)
@@ -431,6 +484,15 @@ const toggleSort = (field) => {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
     sortField.value = field
+    sortDir.value = field === 'fechaSolicitud' ? 'asc' : 'asc'
+  }
+}
+
+const setOrden = (field) => {
+  if (sortField.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
     sortDir.value = 'asc'
   }
 }
@@ -449,6 +511,7 @@ const fraternidadesOrdenadas = computed(() => {
       const haystack = [
         f.nombre,
         f.nivelRepresentacion,
+        f.instanciaRepresentacion,
         f.categoria?.nombre,
         f.facultad?.sigla,
         f.facultad?.nombre,
@@ -463,6 +526,15 @@ const fraternidadesOrdenadas = computed(() => {
     })
   }
 
+  if (['fechaSolicitud', 'nombre', 'instancia'].includes(sortField.value)) {
+    return ordenarListado(list, sortField.value, sortDir.value, {
+      fecha: (x) => x.fechaSolicitud || x.createdAt,
+      nombre: (x) => x.nombre,
+      instancia: (x) => x.instanciaRepresentacion || x.nivelRepresentacion,
+      id: (x) => x.idFraternidad,
+    })
+  }
+
   const dir = sortDir.value === 'asc' ? 1 : -1
 
   const compareText = (a, b) => {
@@ -473,11 +545,6 @@ const fraternidadesOrdenadas = computed(() => {
 
   list.sort((a, b) => {
     switch (sortField.value) {
-      case 'nombre': {
-        const byNombre = compareText((a.nombre || '').toLowerCase(), (b.nombre || '').toLowerCase())
-        if (byNombre !== 0) return byNombre
-        return compareText((a.nivelRepresentacion || '').toLowerCase(), (b.nivelRepresentacion || '').toLowerCase())
-      }
       case 'categoria':
         return compareText((a.categoria?.nombre || 'General').toLowerCase(), (b.categoria?.nombre || 'General').toLowerCase())
       case 'pertenencia':

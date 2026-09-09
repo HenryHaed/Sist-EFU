@@ -575,8 +575,8 @@ const guardar = async (finalizar = false) => {
   try {
     await api.post('/evaluaciones/guardar', {
       idFase: props.faseSeleccionada.idFase,
-      idFraternidad: props.fraternidad ? props.fraternidad.idFraternidad : null,
-      idParticipante: props.participanteId,
+      idFraternidad: props.fraternidad ? props.fraternidad.idFraternidad : undefined,
+      idParticipante: props.participanteId || undefined,
       criterios: payloadCriterios,
       finalizar
     })

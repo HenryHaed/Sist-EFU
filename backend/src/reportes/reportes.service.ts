@@ -356,13 +356,13 @@ export class ReportesService implements OnModuleInit {
     const orden = dto.orden === 'DESC' ? 'DESC' : 'ASC';
     const ordenarPor = dto.ordenarPor || 'nombreFraternidad';
     const sortMap: Record<string, string> = {
-      nombreFraternidad: 's.nombre_fraternidad',
+      nombreFraternidad: 'COALESCE(fraternidadCreada.nombre, s.nombre_fraternidad)',
       tipoDanza: 'tipoDanza.nombre',
       facultad: 'facultad.nombre',
       categoria: 'categoria.nombre',
       gestion: 'gestion.anio',
     };
-    qb.orderBy(sortMap[ordenarPor] || 's.nombre_fraternidad', orden as 'ASC' | 'DESC');
+    qb.orderBy(sortMap[ordenarPor] || 'COALESCE(fraternidadCreada.nombre, s.nombre_fraternidad)', orden as 'ASC' | 'DESC');
 
     return qb;
   }

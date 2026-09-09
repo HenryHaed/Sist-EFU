@@ -10,13 +10,30 @@
     </div>
 
     <!-- Search bar -->
-    <div class="relative max-w-lg mb-6">
-      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
-      <input
-        v-model="busqueda"
-        class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary text-sm shadow-sm transition-all"
-        placeholder="Buscar fraternidad (Morenada, Caporales...)..."
-      />
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 flex-wrap">
+      <div class="relative max-w-lg flex-1 min-w-[200px]">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
+        <input
+          v-model="busqueda"
+          class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary text-sm shadow-sm transition-all"
+          placeholder="Buscar fraternidad (Morenada, Caporales...)..."
+        />
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Ordenar</span>
+        <button
+          v-for="opt in opcionesOrden"
+          :key="opt.id"
+          type="button"
+          @click="setOrden(opt.id)"
+          class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all"
+          :class="ordenCriterio === opt.id
+            ? 'bg-primary text-white border-primary'
+            : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
     </div>
 
     <!-- Tabs -->
@@ -63,6 +80,7 @@
           <div class="absolute bottom-3 left-3">
             <p class="text-white font-black text-sm leading-tight">{{ fra.nombre }}</p>
             <p class="text-white/70 text-[10px] uppercase tracking-wide">{{ fra.facultad }}</p>
+            <p class="text-white/60 text-[9px] mt-0.5">{{ formatFechaSolicitud(fra.fechaSolicitud) }}</p>
           </div>
         </div>
 
@@ -89,6 +107,7 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '../services/api'
 import { getImageUrl } from '../utils/url'
+import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
 
 const emit = defineEmits(['seleccionar-fraternidad'])
 
@@ -96,6 +115,18 @@ const busqueda = ref('')
 const tabActivo = ref('todas')
 const loading = ref(true)
 const fraternidades = ref([])
+const ordenCriterio = ref('fechaSolicitud')
+const ordenDir = ref('asc')
+const opcionesOrden = ORDEN_CRITERIOS
+
+const setOrden = (id) => {
+  if (ordenCriterio.value === id) {
+    ordenDir.value = ordenDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    ordenCriterio.value = id
+    ordenDir.value = 'asc'
+  }
+}
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1590076215667-873d31484126?q=80&w=800&auto=format&fit=crop'
 
@@ -116,14 +147,15 @@ const cargarFraternidades = async () => {
   loading.value = true
   try {
     const response = await api.get('/fraternidades')
-    // Mapeamos la data del API a nuestra estructura visual
     fraternidades.value = response.data.map(f => ({
       id: f.idFraternidad,
       nombre: f.nombre,
       facultad: f.facultad?.sigla || f.nivelRepresentacion,
       tipo: f.categoria?.nombre || 'General',
       categoria: f.categoria?.nombre,
-      calificado: false, // Esto se conectará luego con las evaluaciones reales
+      instanciaRepresentacion: f.instanciaRepresentacion || f.nivelRepresentacion || '',
+      fechaSolicitud: f.fechaSolicitud || f.createdAt || null,
+      calificado: false,
       imagen: f.logoUrl || FALLBACK_IMAGE
     }))
   } catch (error) {
@@ -146,13 +178,19 @@ const fraternidadesFiltradas = computed(() => {
   }
   if (busqueda.value.trim()) {
     const q = busqueda.value.toLowerCase()
-    lista = lista.filter(f => 
-      f.nombre.toLowerCase().includes(q) || 
-      f.facultad.toLowerCase().includes(q) || 
-      f.tipo.toLowerCase().includes(q)
+    lista = lista.filter(f =>
+      f.nombre.toLowerCase().includes(q) ||
+      String(f.facultad || '').toLowerCase().includes(q) ||
+      String(f.tipo || '').toLowerCase().includes(q) ||
+      String(f.instanciaRepresentacion || '').toLowerCase().includes(q)
     )
   }
-  return lista
+  return ordenarListado(lista, ordenCriterio.value, ordenDir.value, {
+    fecha: (x) => x.fechaSolicitud,
+    nombre: (x) => x.nombre,
+    instancia: (x) => x.instanciaRepresentacion,
+    id: (x) => x.id,
+  })
 })
 
 const seleccionar = (fra) => {

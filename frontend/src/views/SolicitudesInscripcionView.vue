@@ -729,20 +729,37 @@
       </div>
 
       <!-- Buscador -->
-      <div class="flex flex-col sm:flex-row gap-3 mb-6">
-        <div class="flex-1 relative">
-          <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
-          <input
-            v-model="busqueda"
-            type="text"
-            placeholder="Buscar por nombre de fraternidad o delegado..."
-            class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
-          />
+      <div class="flex flex-col gap-3 mb-6">
+        <div class="flex flex-col sm:flex-row gap-3">
+          <div class="flex-1 relative">
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
+            <input
+              v-model="busqueda"
+              type="text"
+              placeholder="Buscar por nombre de fraternidad o delegado..."
+              class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
+            />
+          </div>
+          <button @click="cargarSolicitudes" class="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-black text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
+            <span class="material-symbols-outlined text-slate-400">refresh</span>
+            Actualizar
+          </button>
         </div>
-        <button @click="cargarSolicitudes" class="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-black text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
-          <span class="material-symbols-outlined text-slate-400">refresh</span>
-          Actualizar
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Ordenar</span>
+          <button
+            v-for="opt in opcionesOrden"
+            :key="opt.id"
+            type="button"
+            @click="setOrden(opt.id)"
+            class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all"
+            :class="ordenCriterio === opt.id
+              ? 'bg-primary text-white border-primary'
+              : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
       </div>
 
       <!-- Loading -->
@@ -830,6 +847,7 @@ import Swal from 'sweetalert2'
 import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
 import { PERSONAS_DIRECTIVA, nombreCompletoPersona, formatCiSoloBase, normalizarComplementoCi, DOCUMENTOS_POR_PERSONA, DOCUMENTOS_INSTITUCIONALES } from '../utils/personaDirectiva'
+import { ORDEN_CRITERIOS, ordenarListado } from '../utils/ordenListado'
 
 const INSTANCIAS_OPCIONES = ['Facultad', 'Carrera', 'UMSA', 'FEDSIDUMSA', 'STUMSA', 'Externo']
 const DELEGADO_KEYS_NO_EDITABLES = new Set(['delegadoNombre', 'delegadoCi', 'fechaSolicitud', 'gestion'])
@@ -867,6 +885,18 @@ const loading = ref(true)
 const actualizando = ref(false)
 const filtroEstado = ref('')
 const busqueda = ref('')
+const ordenCriterio = ref('fechaSolicitud')
+const ordenDir = ref('asc')
+const opcionesOrden = ORDEN_CRITERIOS
+
+const setOrden = (id) => {
+  if (ordenCriterio.value === id) {
+    ordenDir.value = ordenDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    ordenCriterio.value = id
+    ordenDir.value = 'asc'
+  }
+}
 const solicitudActiva = ref(null)
 const obsForm = ref('')
 const revisionChecklistDraft = ref({})
@@ -918,14 +948,21 @@ const cargarSolicitudes = async () => {
 
 // ── Filtros y búsqueda ────────────────────────────────────────────────────────
 const solicitudesFiltradas = computed(() => {
-  return solicitudes.value.filter(s => {
+  const filtradas = solicitudes.value.filter(s => {
     const matchEstado = !filtroEstado.value || s.estado === filtroEstado.value
     const q = busqueda.value.toLowerCase()
     const matchBusq = !q ||
       s.nombreFraternidad?.toLowerCase().includes(q) ||
       s.delegado?.nombres?.toLowerCase().includes(q) ||
-      s.delegado?.primerApellido?.toLowerCase().includes(q)
+      s.delegado?.primerApellido?.toLowerCase().includes(q) ||
+      instanciaLabel(s)?.toLowerCase().includes(q)
     return matchEstado && matchBusq
+  })
+  return ordenarListado(filtradas, ordenCriterio.value, ordenDir.value, {
+    fecha: (x) => x.createdAt,
+    nombre: (x) => x.nombreFraternidad,
+    instancia: (x) => instanciaLabel(x),
+    id: (x) => x.idSolicitud,
   })
 })
 

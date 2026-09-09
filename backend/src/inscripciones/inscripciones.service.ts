@@ -884,7 +884,8 @@ export class InscripcionesService {
             .leftJoinAndSelect('s.institucionExterna', 'institucionExterna')
             .leftJoinAndSelect('s.delegado', 'delegado')
             .leftJoinAndSelect('s.fraternidadCreada', 'fraternidadCreada')
-            .orderBy('s.createdAt', 'DESC');
+            .orderBy('s.createdAt', 'ASC')
+            .addOrderBy('s.idSolicitud', 'ASC');
 
         if (estado) {
             qb.where('s.estado = :estado', { estado });

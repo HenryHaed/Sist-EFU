@@ -1,7 +1,9 @@
 ﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Fraternidad } from '../entities/Fraternidad';
 import { Gestion } from '../entities/Gestion';
 import { Usuario } from '../entities/Usuario';
@@ -14,6 +16,7 @@ import { CreateFraternidadDto, UpdateFraternidadDto } from './dto/fraternidad.dt
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 import { buildMiembrosDirectiva } from '../common/personas-directiva';
+import { compareFechaAsc, compareTextoEs } from '../common/orden-por-fecha';
 
 @Injectable()
 export class FraternidadesService {
@@ -42,7 +45,7 @@ export class FraternidadesService {
 
   async findAll() {
     const gestion = await this.getGestionActiva();
-    return this.fraternidadRepo.find({
+    const fraternidades = await this.fraternidadRepo.find({
       where: {
         habilitadoEfu: true,
         ...(gestion ? { gestion: { idGestion: gestion.idGestion } } : {}),
@@ -50,6 +53,51 @@ export class FraternidadesService {
       relations: ['facultad', 'carrera', 'institucionExterna', 'categoria', 'tipoDanza'],
       order: { nombre: 'ASC' },
     });
+
+    const ids = fraternidades.map((f) => f.idFraternidad);
+    const metaPorFrat = new Map<
+      number,
+      { fechaSolicitud: Date; instanciaRepresentacion: string | null }
+    >();
+
+    if (ids.length) {
+      const solicitudes = await this.solicitudRepo.find({
+        where: {
+          estado: EstadoSolicitud.APROBADO,
+          fraternidadCreada: { idFraternidad: In(ids) },
+        },
+        relations: ['fraternidadCreada'],
+        order: { createdAt: 'ASC' },
+      });
+      for (const sol of solicitudes) {
+        const fid = sol.fraternidadCreada?.idFraternidad;
+        if (!fid || metaPorFrat.has(fid)) continue;
+        metaPorFrat.set(fid, {
+          fechaSolicitud: sol.createdAt,
+          instanciaRepresentacion: sol.instanciaRepresentacion || null,
+        });
+      }
+    }
+
+    const enriquecidas = fraternidades.map((f) => {
+      const meta = metaPorFrat.get(f.idFraternidad);
+      return {
+        ...f,
+        fechaSolicitud: meta?.fechaSolicitud || f.createdAt,
+        instanciaRepresentacion:
+          meta?.instanciaRepresentacion || f.nivelRepresentacion || null,
+      };
+    });
+
+    enriquecidas.sort((a, b) => {
+      const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
+      if (byFecha !== 0) return byFecha;
+      const byNombre = compareTextoEs(a.nombre, b.nombre);
+      if (byNombre !== 0) return byNombre;
+      return a.idFraternidad - b.idFraternidad;
+    });
+
+    return enriquecidas;
   }
 
   async buscar(q: string) {
@@ -183,8 +231,7 @@ export class FraternidadesService {
   }
 
   /**
-   * Renombra la fraternidad canónica y sincroniza copias desnormalizadas.
-   * Solo actualiza el campo nombre en fraternidad / solicitud / ficha.
+   * Renombra la fraternidad canónica y sincroniza copias desnormalizadas + invalidación de PDF.
    * No elimina ni recrea fraternidades, fichas técnicas ni monografías.
    */
   async renombrarFraternidad(idFraternidad: number, nombreNuevo: string) {
@@ -217,15 +264,22 @@ export class FraternidadesService {
 
     frat.nombre = nombreNorm;
     const saved = await this.fraternidadRepo.save(frat);
-    await this.sincronizarNombreRelacionados(idFraternidad, nombreNorm);
+    await this.sincronizarNombreRelacionados(idFraternidad, nombreNorm, {
+      invalidarPdf: true,
+      nombreAnterior: anterior,
+    });
     return saved;
   }
 
   /**
-   * Actualiza SOLO el texto nombre_fraternidad en solicitud y ficha vinculadas.
-   * No toca URLs, PDFs, criterios ni el FK id_fraternidad de monografías/fichas.
+   * Actualiza nombre_fraternidad en solicitud/ficha y, si cambia el nombre, invalida PDF de ficha
+   * para que se regenere con el nombre nuevo. También alinea solicitudes del delegado vinculado.
    */
-  async sincronizarNombreRelacionados(idFraternidad: number, nombre: string) {
+  async sincronizarNombreRelacionados(
+    idFraternidad: number,
+    nombre: string,
+    opts?: { invalidarPdf?: boolean; nombreAnterior?: string },
+  ) {
     const nombreNorm = String(nombre || '').trim();
     if (!nombreNorm) return;
 
@@ -236,13 +290,49 @@ export class FraternidadesService {
       .where('id_fraternidad_creada = :id', { id: idFraternidad })
       .execute();
 
-    // Solo columna nombre_fraternidad; el resto del contenido de la ficha se conserva
+    // Solicitudes del delegado de esta fraternidad (alinea FK + nombre)
+    const delegados = await this.usuarioRepo.find({
+      where: { fraternidad: { idFraternidad } },
+      relations: ['rol'],
+    });
+    for (const d of delegados) {
+      if (String(d.rol?.nombre || '').toLowerCase() !== 'delegado') continue;
+      await this.solicitudRepo.query(
+        `UPDATE solicitudes_inscripcion
+         SET id_fraternidad_creada = $1, nombre_fraternidad = $2
+         WHERE id_delegado = $3`,
+        [idFraternidad, nombreNorm, d.idUsuario],
+      );
+    }
+
     await this.fichaRepo
       .createQueryBuilder()
       .update(FichaTecnicaMonografia)
       .set({ nombreFraternidad: nombreNorm })
       .where('id_fraternidad = :id', { id: idFraternidad })
       .execute();
+
+    if (opts?.invalidarPdf) {
+      const fichas = await this.fichaRepo.find({
+        where: { fraternidad: { idFraternidad } },
+      });
+      for (const ficha of fichas) {
+        if (ficha.urlPdf) {
+          const filename = String(ficha.urlPdf).split('/').pop();
+          if (filename) {
+            const filePath = path.join(process.cwd(), 'uploads', 'Doc_Ficha_Tecnica', filename);
+            try {
+              if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        ficha.urlPdf = null;
+        ficha.fechaGeneracion = null;
+        await this.fichaRepo.save(ficha);
+      }
+    }
   }
 
   /**
@@ -280,7 +370,9 @@ export class FraternidadesService {
           fichas: fichaCount,
         });
         if (!dryRun) {
-          await this.sincronizarNombreRelacionados(frat.idFraternidad, frat.nombre);
+          await this.sincronizarNombreRelacionados(frat.idFraternidad, frat.nombre, {
+            invalidarPdf: true,
+          });
           solicitudesActualizadas += solCount;
           fichasActualizadas += fichaCount;
         }

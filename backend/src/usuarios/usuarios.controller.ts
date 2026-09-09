@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
@@ -42,6 +42,43 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Listar todos los controladores HCU disponibles' })
   findAllControladores() {
     return this.usuariosService.findAllControladores();
+  }
+
+  @Get('decisor')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Obtener el admin Decisor actual (empates Chacha)' })
+  getDecisor() {
+    return this.usuariosService.getDecisorActual();
+  }
+
+  @Post('decisor/otorgar')
+  @Roles('superusuario')
+  @ApiOperation({ summary: 'Superusuario otorga permiso Decisor a un admin' })
+  otorgarDecisor(@Body() body: { idUsuario: number }, @Req() req: any) {
+    return this.usuariosService.otorgarDecisor(Number(body?.idUsuario), {
+      idUsuario: req.user.idUsuario,
+      rol: req.user.rol,
+    });
+  }
+
+  @Post('decisor/solicitar')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Admin solicita autoasignarse como Decisor' })
+  solicitarDecisor(@Req() req: any) {
+    return this.usuariosService.solicitarDecisor({
+      idUsuario: req.user.idUsuario,
+      rol: req.user.rol,
+    });
+  }
+
+  @Post('decisor/renunciar')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Renunciar al permiso Decisor (o forzar si superusuario)' })
+  renunciarDecisor(@Body() body: { idUsuario?: number }, @Req() req: any) {
+    return this.usuariosService.renunciarDecisor(
+      { idUsuario: req.user.idUsuario, rol: req.user.rol },
+      body,
+    );
   }
 
   @Get()

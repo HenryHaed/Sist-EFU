@@ -17,12 +17,17 @@ import { DocumentoGestion } from '../entities/DocumentoGestion';
 import { Incidencia } from '../entities/Incidencia';
 import { Infraccion } from '../entities/Infraccion';
 import { Usuario } from '../entities/Usuario';
+import { SolicitudInscripcion } from '../entities/SolicitudInscripcion';
+import { InscripcionConcurso } from '../entities/InscripcionConcurso';
+import { DesempateFase } from '../entities/DesempateFase';
+import { DesempateCandidato } from '../entities/DesempateCandidato';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Evaluacion, Jurado, Fase, Fraternidad, DocumentoFraternidad, Criterio, Gestion, Participante, DocumentoGestion,
-      Incidencia, Infraccion, Usuario, Categoria
+      Incidencia, Infraccion, Usuario, Categoria, SolicitudInscripcion, InscripcionConcurso,
+      DesempateFase, DesempateCandidato,
     ])
   ],
   controllers: [EvaluacionesController, ArchivosController],

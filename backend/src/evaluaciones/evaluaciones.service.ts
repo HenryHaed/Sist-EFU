@@ -16,10 +16,16 @@ import { DocumentoGestion } from '../entities/DocumentoGestion';
 import { Incidencia } from '../entities/Incidencia';
 import { Infraccion } from '../entities/Infraccion';
 import { Usuario } from '../entities/Usuario';
+import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
+import { InscripcionConcurso } from '../entities/InscripcionConcurso';
+import { DesempateFase, TipoDesempate, EstadoDesempate } from '../entities/DesempateFase';
+import { DesempateCandidato, DecisionDesempate } from '../entities/DesempateCandidato';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { ensureCategoriasDefault } from '../common/categorias-default';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 import { recalcularExcedentesGestion } from '../common/cupo-fraternidades';
+import { compareFechaAsc, compareTextoEs } from '../common/orden-por-fecha';
+import { esFaseChachaWarmi } from '../common/requisitos-concurso';
 import {
   actaDesdeEvaluacion,
   calcularScoresEfu,
@@ -57,6 +63,14 @@ export class EvaluacionesService {
     private readonly infraccionRepo: Repository<Infraccion>,
     @InjectRepository(Usuario)
     private readonly usuarioRepo: Repository<Usuario>,
+    @InjectRepository(SolicitudInscripcion)
+    private readonly solicitudRepo: Repository<SolicitudInscripcion>,
+    @InjectRepository(InscripcionConcurso)
+    private readonly inscConcursoRepo: Repository<InscripcionConcurso>,
+    @InjectRepository(DesempateFase)
+    private readonly desempateRepo: Repository<DesempateFase>,
+    @InjectRepository(DesempateCandidato)
+    private readonly desempateCandRepo: Repository<DesempateCandidato>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -92,6 +106,7 @@ export class EvaluacionesService {
 
     const fases = await this.faseRepo.find({
       where: { gestion: { idGestion } },
+      relations: ['fasePadre'],
       order: { idFase: 'ASC' }
     });
 
@@ -119,6 +134,9 @@ export class EvaluacionesService {
         urlImagen: f.urlImagen,
         plantillaRequisitos: f.plantillaRequisitos || null,
         requisitosInscripcion: f.requisitosInscripcion || null,
+        cupoFinalistas: f.cupoFinalistas ?? null,
+        idFasePadre: f.fasePadre?.idFase ?? (f as any).idFasePadre ?? null,
+        fasePadreNombre: f.fasePadre?.nombre ?? null,
         jurados: (f as any).jurados || [],
       }))
     };
@@ -139,7 +157,7 @@ export class EvaluacionesService {
         fases = await this.faseRepo.find({
           where: whereFases,
           order: { idFase: 'ASC' },
-          relations: ['gestion'],
+          relations: ['gestion', 'fasePadre'],
         });
         const todosJurados = await this.juradoRepo.find({ 
           relations: ['fasesHabilitadas', 'usuario', 'usuario.rol'] 
@@ -192,6 +210,8 @@ export class EvaluacionesService {
           tipoConcurso: fase.tipoConcurso || 'EFU',
           categoriaEfu: fase.categoriaEfu || null,
           plantillaRequisitos: fase.plantillaRequisitos || null,
+          cupoFinalistas: fase.cupoFinalistas ?? null,
+          idFasePadre: fase.fasePadre?.idFase ?? null,
           fechaInicio: fase.fechaInicio,
           fechaFin: fase.fechaFin,
           jurados: (fase as any).jurados || [],
@@ -232,14 +252,188 @@ export class EvaluacionesService {
     const jurado = await this.getValidadorJurado(idUsuario, rol, idFase);
     const fase = await this.faseRepo.findOne({ 
       where: { idFase },
-      relations: ['gestion']
+      relations: ['gestion', 'fasePadre'],
     });
     if (!fase) throw new NotFoundException('Fase no encontrada');
 
     if (fase.tipoConcurso === 'EXTERNO') {
-      const participantes = await this.participanteRepo.find({ where: { fase: { idFase } }, relations: ['fraternidad'], order: { nombre: 'ASC' } });
-      const evaluaciones = await this.evaluacionRepo.find({ where: { jurado: { idJurado: jurado.idJurado }, fase: { idFase } }, relations: ['participante'] });
+      const esChacha = esFaseChachaWarmi(fase);
+
+      // Chacha-Warmi: calificación por fraternidad (una nota por pareja)
+      if (esChacha) {
+        const participantes = await this.participanteRepo.find({
+          where: { fase: { idFase } },
+          relations: ['fraternidad'],
+          order: { nombre: 'ASC' },
+        });
+        const evaluaciones = await this.evaluacionRepo.find({
+          where: { jurado: { idJurado: jurado.idJurado }, fase: { idFase } },
+          relations: ['fraternidad'],
+        });
+        const mapEv = new Map(
+          evaluaciones
+            .filter((ev) => ev.fraternidad?.idFraternidad)
+            .map((ev) => [ev.fraternidad!.idFraternidad, ev]),
+        );
+
+        const inscs = await this.inscConcursoRepo.find({
+          where: { fase: { idFase } },
+          relations: ['fraternidad', 'participante', 'participantePareja'],
+        });
+        const metaPorFrat = new Map<
+          number,
+          { fechaSolicitud: Date | null; instancia: string | null; nombres: string[] }
+        >();
+        for (const insc of inscs) {
+          const fid = insc.fraternidad?.idFraternidad;
+          if (!fid) continue;
+          const nombres = [
+            insc.participante?.nombre,
+            insc.participantePareja?.nombre,
+          ].filter(Boolean) as string[];
+          metaPorFrat.set(fid, {
+            fechaSolicitud: insc.fechaEnvio || insc.createdAt || null,
+            instancia: insc.fraternidad?.nivelRepresentacion || null,
+            nombres,
+          });
+        }
+
+        const byFrat = new Map<
+          number,
+          {
+            idFraternidad: number;
+            nombre: string;
+            nombresPareja: string[];
+            instanciaRepresentacion: string | null;
+            fechaSolicitud: Date | null;
+          }
+        >();
+        for (const p of participantes) {
+          const fid = p.fraternidad?.idFraternidad;
+          if (!fid) continue;
+          if (!byFrat.has(fid)) {
+            const meta = metaPorFrat.get(fid);
+            byFrat.set(fid, {
+              idFraternidad: fid,
+              nombre: p.fraternidad!.nombre,
+              nombresPareja: meta?.nombres?.length
+                ? [...meta.nombres]
+                : [],
+              instanciaRepresentacion:
+                meta?.instancia || p.fraternidad?.nivelRepresentacion || null,
+              fechaSolicitud: meta?.fechaSolicitud || p.createdAt || null,
+            });
+          }
+          const g = byFrat.get(fid)!;
+          if (p.nombre && !g.nombresPareja.includes(p.nombre)) {
+            g.nombresPareja.push(p.nombre);
+          }
+        }
+
+        const listado = Array.from(byFrat.values()).map((g) => {
+          const ev = mapEv.get(g.idFraternidad);
+          return {
+            idFraternidad: g.idFraternidad,
+            nombre: g.nombre,
+            nombresPareja: g.nombresPareja,
+            instanciaRepresentacion: g.instanciaRepresentacion,
+            fechaSolicitud: g.fechaSolicitud,
+            modoCalificacion: 'fraternidad' as const,
+            estadoEvaluacion: ev ? ev.estado : 'PENDIENTE',
+            idEvaluacion: ev ? ev.idEvaluacion : null,
+            puntajeActual: ev ? ev.puntajeTotal : 0,
+            fechaApertura: ev?.fechaApertura || null,
+            fechaCierre: ev?.fechaCierre || null,
+          };
+        });
+
+        listado.sort((a, b) => {
+          const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
+          if (byFecha !== 0) return byFecha;
+          const byNombre = compareTextoEs(a.nombre, b.nombre);
+          if (byNombre !== 0) return byNombre;
+          return a.idFraternidad - b.idFraternidad;
+        });
+
+        return {
+          fase: {
+            idFase: fase.idFase,
+            nombre: fase.nombre,
+            tipoConcurso: 'EXTERNO',
+            categoriaEfu: fase.categoriaEfu || null,
+            plantillaRequisitos: fase.plantillaRequisitos || null,
+            cupoFinalistas: fase.cupoFinalistas ?? null,
+            idFasePadre: (fase as any).fasePadre?.idFase ?? null,
+            modoCalificacion: 'fraternidad',
+          },
+          listado,
+        };
+      }
+
+      const participantes = await this.participanteRepo.find({
+        where: { fase: { idFase } },
+        relations: ['fraternidad'],
+        order: { nombre: 'ASC' },
+      });
+      const evaluaciones = await this.evaluacionRepo.find({
+        where: { jurado: { idJurado: jurado.idJurado }, fase: { idFase } },
+        relations: ['participante'],
+      });
       const mapEv = new Map(evaluaciones.map(ev => [ev.participante?.idParticipante, ev]));
+
+      const inscs = await this.inscConcursoRepo.find({
+        where: { fase: { idFase } },
+        relations: ['participante', 'participantePareja', 'fraternidad'],
+      });
+      const metaPorParticipante = new Map<
+        number,
+        { fechaSolicitud: Date | null; instancia: string | null }
+      >();
+      for (const insc of inscs) {
+        const fecha = insc.fechaEnvio || insc.createdAt || null;
+        const instancia =
+          insc.fraternidad?.nivelRepresentacion ||
+          (insc.datos as any)?.instanciaRepresentacion ||
+          null;
+        const ids = [
+          insc.participante?.idParticipante,
+          insc.participantePareja?.idParticipante,
+        ].filter(Boolean) as number[];
+        for (const pid of ids) {
+          if (!metaPorParticipante.has(pid)) {
+            metaPorParticipante.set(pid, { fechaSolicitud: fecha, instancia });
+          }
+        }
+      }
+
+      const listado = participantes.map(p => {
+        const ev = mapEv.get(p.idParticipante);
+        const meta = metaPorParticipante.get(p.idParticipante);
+        return {
+          idParticipante: p.idParticipante,
+          nombre: p.nombre,
+          tipo: p.tipo,
+          idFraternidad: p.fraternidad?.idFraternidad ?? null,
+          fraternidad: p.fraternidad?.nombre || 'Sin fraternidad',
+          instanciaRepresentacion:
+            meta?.instancia || p.fraternidad?.nivelRepresentacion || null,
+          fechaSolicitud: meta?.fechaSolicitud || p.createdAt || null,
+          modoCalificacion: 'participante' as const,
+          estadoEvaluacion: ev ? ev.estado : 'PENDIENTE',
+          idEvaluacion: ev ? ev.idEvaluacion : null,
+          puntajeActual: ev ? ev.puntajeTotal : 0,
+          fechaApertura: ev?.fechaApertura || null,
+          fechaCierre: ev?.fechaCierre || null,
+        };
+      });
+
+      listado.sort((a, b) => {
+        const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
+        if (byFecha !== 0) return byFecha;
+        const byNombre = compareTextoEs(a.nombre, b.nombre);
+        if (byNombre !== 0) return byNombre;
+        return a.idParticipante - b.idParticipante;
+      });
 
       return {
         fase: {
@@ -248,37 +442,55 @@ export class EvaluacionesService {
           tipoConcurso: 'EXTERNO',
           categoriaEfu: fase.categoriaEfu || null,
           plantillaRequisitos: fase.plantillaRequisitos || null,
+          modoCalificacion: 'participante',
         },
-        listado: participantes.map(p => {
-          const ev = mapEv.get(p.idParticipante);
-          return {
-            idParticipante: p.idParticipante,
-            nombre: p.nombre,
-            tipo: p.tipo,
-            idFraternidad: p.fraternidad?.idFraternidad ?? null,
-            fraternidad: p.fraternidad?.nombre || 'Sin fraternidad',
-            estadoEvaluacion: ev ? ev.estado : 'PENDIENTE',
-            idEvaluacion: ev ? ev.idEvaluacion : null,
-            puntajeActual: ev ? ev.puntajeTotal : 0,
-            fechaApertura: ev?.fechaApertura || null,
-            fechaCierre: ev?.fechaCierre || null,
-          };
-        })
+        listado,
       };
     }
 
     let fraternidades: Fraternidad[];
     const idGestionFase = fase.gestion?.idGestion || (await this.getGestionActiva())?.idGestion;
     if (jurado.fraternidadesHabilitadas && jurado.fraternidadesHabilitadas.length > 0) {
-      fraternidades = jurado.fraternidadesHabilitadas.filter((f) => f.habilitadoEfu);
+      // Releer desde BD para no servir nombres stale de la relación M2M en memoria
+      const ids = jurado.fraternidadesHabilitadas.map((f) => f.idFraternidad);
+      fraternidades = await this.fraternidadRepo.find({
+        where: { idFraternidad: In(ids), habilitadoEfu: true },
+        relations: ['categoria'],
+        order: { nombre: 'ASC' },
+      });
     } else {
       fraternidades = await this.fraternidadRepo.find({
         where: {
           habilitadoEfu: true,
           ...(idGestionFase ? { gestion: { idGestion: idGestionFase } } : {}),
         },
+        relations: ['categoria'],
         order: { nombre: 'ASC' },
       });
+    }
+
+    const idsFrat = fraternidades.map((f) => f.idFraternidad);
+    const metaPorFrat = new Map<
+      number,
+      { fechaSolicitud: Date; instanciaRepresentacion: string | null }
+    >();
+    if (idsFrat.length) {
+      const solicitudes = await this.solicitudRepo.find({
+        where: {
+          estado: EstadoSolicitud.APROBADO,
+          fraternidadCreada: { idFraternidad: In(idsFrat) },
+        },
+        relations: ['fraternidadCreada'],
+        order: { createdAt: 'ASC' },
+      });
+      for (const sol of solicitudes) {
+        const fid = sol.fraternidadCreada?.idFraternidad;
+        if (!fid || metaPorFrat.has(fid)) continue;
+        metaPorFrat.set(fid, {
+          fechaSolicitud: sol.createdAt,
+          instanciaRepresentacion: sol.instanciaRepresentacion || null,
+        });
+      }
     }
 
     const evaluadas = await this.evaluacionRepo.find({ where: { jurado: { idJurado: jurado.idJurado }, fase: { idFase } }, relations: ['fraternidad'] });
@@ -307,28 +519,43 @@ export class EvaluacionesService {
       });
     });
 
+    const listado = fraternidades.map(frat => {
+      const ev = mapEv.get(frat.idFraternidad);
+      const penalties = mapInc.get(frat.idFraternidad) || [];
+      const totalPenalties = penalties.reduce((acc, p) => acc + p.valor, 0);
+      const meta = metaPorFrat.get(frat.idFraternidad);
+      
+      let score = ev?.puntajeTotal || 0;
+      score = Math.max(0, Number(score) + totalPenalties);
+
+      return { 
+        idFraternidad: frat.idFraternidad, 
+        nombre: frat.nombre,
+        categoria: (frat as any).categoria?.nombre || null,
+        instanciaRepresentacion:
+          meta?.instanciaRepresentacion || frat.nivelRepresentacion || null,
+        fechaSolicitud: meta?.fechaSolicitud || frat.createdAt || null,
+        idEvaluacion: ev?.idEvaluacion || null, 
+        estadoEvaluacion: ev?.estado || 'PENDIENTE', 
+        puntajeActual: score,
+        penalizaciones: penalties,
+        suspendida: penalties.some((p) => p.tipoImpacto === 'SUSPENSION'),
+        fechaApertura: ev?.fechaApertura || null,
+        fechaCierre: ev?.fechaCierre || null,
+      };
+    });
+
+    listado.sort((a, b) => {
+      const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
+      if (byFecha !== 0) return byFecha;
+      const byNombre = compareTextoEs(a.nombre, b.nombre);
+      if (byNombre !== 0) return byNombre;
+      return a.idFraternidad - b.idFraternidad;
+    });
+
     return {
       fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: 'EFU', categoriaEfu: fase.categoriaEfu || null },
-      listado: fraternidades.map(frat => {
-        const ev = mapEv.get(frat.idFraternidad);
-        const penalties = mapInc.get(frat.idFraternidad) || [];
-        const totalPenalties = penalties.reduce((acc, p) => acc + p.valor, 0);
-        
-        let score = ev?.puntajeTotal || 0;
-        // Si hay una sanción de puntaje 0 (valor -30 o similar), forzamos a 0 si el impacto es grande
-        // Pero el usuario dijo "descuenta", así que restamos.
-        score = Math.max(0, Number(score) + totalPenalties);
-
-        return { 
-          idFraternidad: frat.idFraternidad, 
-          nombre: frat.nombre, 
-          idEvaluacion: ev?.idEvaluacion || null, 
-          estadoEvaluacion: ev?.estado || 'PENDIENTE', 
-          puntajeActual: score,
-          penalizaciones: penalties,
-          suspendida: penalties.some((p) => p.tipoImpacto === 'SUSPENSION'),
-        };
-      })
+      listado,
     };
   }
 
@@ -497,6 +724,58 @@ export class EvaluacionesService {
     };
 
     if (fase.tipoConcurso === 'EXTERNO') {
+      if (esFaseChachaWarmi(fase)) {
+        const participantes = await this.participanteRepo.find({
+          where: { fase: { idFase } },
+          relations: ['fraternidad'],
+          order: { nombre: 'ASC' },
+        });
+        const byFrat = new Map<number, { idFraternidad: number; nombre: string; nombres: string[] }>();
+        for (const p of participantes) {
+          const fid = p.fraternidad?.idFraternidad;
+          if (!fid) continue;
+          if (!byFrat.has(fid)) {
+            byFrat.set(fid, {
+              idFraternidad: fid,
+              nombre: p.fraternidad!.nombre,
+              nombres: [],
+            });
+          }
+          if (p.nombre) byFrat.get(fid)!.nombres.push(p.nombre);
+        }
+
+        const mapEv = new Map<number, typeof evaluaciones>();
+        for (const ev of evaluaciones) {
+          const id = ev.fraternidad?.idFraternidad;
+          if (!id) continue;
+          if (!mapEv.has(id)) mapEv.set(id, []);
+          mapEv.get(id)!.push(ev);
+        }
+
+        const sujetos = Array.from(byFrat.values()).map((g) => {
+          const evs = mapEv.get(g.idFraternidad) || [];
+          const selladas = evs.filter((e) => e.estado === 'COMPLETADO');
+          const promedio =
+            selladas.length > 0
+              ? round2(
+                  selladas.reduce((s, e) => s + Number(e.puntajeTotal || 0), 0) / selladas.length,
+                )
+              : null;
+          return {
+            idFraternidad: g.idFraternidad,
+            nombre: g.nombre,
+            nombresPareja: g.nombres,
+            cantidadCalificadores: evs.length,
+            cantidadCompletadas: selladas.length,
+            cantidadPendientes: evs.filter((e) => e.estado !== 'COMPLETADO').length,
+            promedioSellado: promedio,
+            todasSelladas: evs.length > 0 && evs.every((e) => e.estado === 'COMPLETADO'),
+          };
+        });
+
+        return { fase: { ...faseInfo, modoCalificacion: 'fraternidad' }, sujetos };
+      }
+
       const participantes = await this.participanteRepo.find({
         where: { fase: { idFase } },
         relations: ['fraternidad'],
@@ -636,10 +915,29 @@ export class EvaluacionesService {
     const fase = await this.faseRepo.findOne({ where: { idFase } });
     if (!fase || !fase.estaActiva) throw new ForbiddenException('Fase inactiva.');
 
+    const esChacha = esFaseChachaWarmi(fase);
+    if (esChacha) {
+      if (!idFraternidad || idParticipante) {
+        throw new BadRequestException(
+          'Chacha-Warmi se califica por fraternidad (pareja). Envía solo idFraternidad.',
+        );
+      }
+    }
+
     if (idFraternidad) {
       const frat = await this.fraternidadRepo.findOne({ where: { idFraternidad } });
       if (!frat?.habilitadoEfu) {
         throw new ForbiddenException('Esta fraternidad aún no está habilitada para calificación (inscripción pendiente de aprobación).');
+      }
+      if (esChacha) {
+        const tienePareja = await this.participanteRepo.count({
+          where: { fase: { idFase }, fraternidad: { idFraternidad } },
+        });
+        if (!tienePareja) {
+          throw new BadRequestException(
+            'No hay pareja Chacha-Warmi registrada para esta fraternidad en la fase.',
+          );
+        }
       }
     }
 
@@ -1049,9 +1347,530 @@ export class EvaluacionesService {
   }
 
   // Top 3 finalistas para fase EXTERNO (Chacha-Warmi, etc.)
+  /**
+   * Ranking de fraternidades Chacha por promedio de actas COMPLETADO (por fraternidad).
+   * Orden: nota DESC; fecha solo como orden estable secundario (no decide cupo).
+   */
+  private async rankingChachaPorFraternidad(idFase: number) {
+    const participantes = await this.participanteRepo.find({
+      where: { fase: { idFase } },
+      relations: ['fraternidad'],
+    });
+    const evs = await this.evaluacionRepo.find({
+      where: { estado: 'COMPLETADO', fase: { idFase } },
+      relations: ['fraternidad'],
+    });
+    const inscs = await this.inscConcursoRepo.find({
+      where: { fase: { idFase } },
+      relations: ['fraternidad'],
+    });
+    const fechaPorFrat = new Map<number, Date | null>();
+    for (const insc of inscs) {
+      const fid = insc.fraternidad?.idFraternidad;
+      if (!fid) continue;
+      fechaPorFrat.set(fid, insc.fechaEnvio || insc.createdAt || null);
+    }
+
+    const nombresPorFrat = new Map<number, string[]>();
+    const nombreFrat = new Map<number, string>();
+    for (const p of participantes) {
+      const fid = p.fraternidad?.idFraternidad;
+      if (!fid) continue;
+      nombreFrat.set(fid, p.fraternidad!.nombre);
+      if (!nombresPorFrat.has(fid)) nombresPorFrat.set(fid, []);
+      if (p.nombre && !nombresPorFrat.get(fid)!.includes(p.nombre)) {
+        nombresPorFrat.get(fid)!.push(p.nombre);
+      }
+    }
+
+    const acc = new Map<number, { sum: number; count: number }>();
+    for (const ev of evs) {
+      const fid = ev.fraternidad?.idFraternidad;
+      if (!fid) continue;
+      const cur = acc.get(fid) || { sum: 0, count: 0 };
+      cur.sum += Number(ev.puntajeTotal) || 0;
+      cur.count++;
+      acc.set(fid, cur);
+    }
+
+    const rows = Array.from(nombreFrat.entries()).map(([idFraternidad, nombre]) => {
+      const a = acc.get(idFraternidad);
+      const nota = a && a.count > 0 ? round2(a.sum / a.count) : null;
+      return {
+        idFraternidad,
+        nombre,
+        nombresPareja: nombresPorFrat.get(idFraternidad) || [],
+        nota,
+        fechaSolicitud: fechaPorFrat.get(idFraternidad) || null,
+      };
+    });
+
+    rows.sort((a, b) => {
+      const na = a.nota == null ? -1 : a.nota;
+      const nb = b.nota == null ? -1 : b.nota;
+      if (nb !== na) return nb - na;
+      const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
+      if (byFecha !== 0) return byFecha;
+      return a.idFraternidad - b.idFraternidad;
+    });
+
+    return rows;
+  }
+
+  /** Análisis de corte Top N sin desempate automático por fecha. */
+  private analizarCorteCupo(
+    ranking: Array<{ idFraternidad: number; nombre: string; nombresPareja: string[]; nota: number | null }>,
+    cupo: number,
+  ) {
+    const conNota = ranking.filter((r) => r.nota != null);
+    if (!conNota.length || cupo < 1) {
+      return {
+        hayEmpate: false,
+        cupo,
+        plazasLibres: 0,
+        notaUmbral: null as number | null,
+        seguras: [] as typeof conNota,
+        candidatas: [] as typeof conNota,
+        finalistasAutomaticos: [] as typeof conNota,
+      };
+    }
+
+    if (conNota.length <= cupo) {
+      return {
+        hayEmpate: false,
+        cupo,
+        plazasLibres: 0,
+        notaUmbral: null as number | null,
+        seguras: conNota,
+        candidatas: [] as typeof conNota,
+        finalistasAutomaticos: conNota,
+      };
+    }
+
+    const notaUmbral = Number(conNota[cupo - 1].nota);
+    const seguras = conNota.filter((r) => Number(r.nota) > notaUmbral);
+    const candidatas = conNota.filter((r) => Number(r.nota) === notaUmbral);
+    const plazasLibres = cupo - seguras.length;
+    const hayEmpate = candidatas.length > plazasLibres;
+
+    return {
+      hayEmpate,
+      cupo,
+      plazasLibres,
+      notaUmbral,
+      seguras,
+      candidatas,
+      finalistasAutomaticos: hayEmpate ? seguras : [...seguras, ...candidatas].slice(0, cupo),
+    };
+  }
+
+  /** Empate de podio 1°–3°: notas iguales en zona de medallas. */
+  private analizarPodio(
+    ranking: Array<{ idFraternidad: number; nombre: string; nombresPareja: string[]; nota: number | null }>,
+  ) {
+    const conNota = ranking.filter((r) => r.nota != null);
+    const cupo = 3;
+    if (conNota.length < 2) {
+      return {
+        hayEmpate: false,
+        cupo,
+        plazasLibres: 0,
+        seguras: [] as typeof conNota,
+        candidatas: [] as typeof conNota,
+      };
+    }
+
+    const limite = Math.min(cupo, conNota.length);
+    const notaUmbral = Number(conNota[limite - 1].nota);
+    const enZona = conNota.filter((r) => Number(r.nota) >= notaUmbral);
+    const notasZona = enZona.map((r) => Number(r.nota));
+    const hayDuplicado = new Set(notasZona).size < notasZona.length;
+    const hayEmpate = enZona.length > cupo || hayDuplicado;
+
+    if (!hayEmpate) {
+      return {
+        hayEmpate: false,
+        cupo,
+        plazasLibres: 0,
+        seguras: enZona.slice(0, cupo),
+        candidatas: [] as typeof conNota,
+      };
+    }
+
+    // Candidatas = grupos con nota duplicada dentro de la zona ampliada
+    const countByNota = new Map<number, number>();
+    for (const n of notasZona) countByNota.set(n, (countByNota.get(n) || 0) + 1);
+    const candidatas = enZona.filter((r) => (countByNota.get(Number(r.nota)) || 0) > 1);
+    // Si la zona se expandió por cupo (>3 con misma nota umbral), todos en umbral son candidatas
+    const umbralGroup = enZona.filter((r) => Number(r.nota) === notaUmbral);
+    const pool =
+      candidatas.length > 0
+        ? candidatas
+        : umbralGroup.length > cupo - enZona.filter((r) => Number(r.nota) > notaUmbral).length
+          ? umbralGroup
+          : enZona;
+
+    const seguras = enZona.filter(
+      (r) => !pool.some((c) => c.idFraternidad === r.idFraternidad),
+    );
+
+    return {
+      hayEmpate: true,
+      cupo,
+      plazasLibres: Math.max(0, cupo - seguras.length),
+      seguras,
+      candidatas: pool,
+    };
+  }
+
+  private async syncDesempateTipo(
+    idFase: number,
+    tipo: TipoDesempate,
+    analisis: {
+      hayEmpate: boolean;
+      cupo: number;
+      plazasLibres: number;
+      candidatas: Array<{ idFraternidad: number; nota: number | null }>;
+    },
+  ) {
+    const existentes = await this.desempateRepo.find({
+      where: { fase: { idFase }, tipo },
+      relations: ['candidatos', 'candidatos.fraternidad', 'decisor'],
+      order: { idDesempate: 'DESC' },
+      take: 1,
+    });
+    let des = existentes[0] || null;
+
+    if (!analisis.hayEmpate) {
+      if (des && des.estado === EstadoDesempate.PENDIENTE) {
+        await this.desempateCandRepo.delete({ desempate: { idDesempate: des.idDesempate } });
+        await this.desempateRepo.remove(des);
+        des = null;
+      }
+      return des;
+    }
+
+    const idsActuales = new Set(analisis.candidatas.map((c) => c.idFraternidad));
+    const idsPrev = new Set((des?.candidatos || []).map((c) => c.fraternidad?.idFraternidad).filter(Boolean));
+    const mismoSet =
+      idsPrev.size === idsActuales.size && [...idsActuales].every((id) => idsPrev.has(id));
+
+    if (des?.estado === EstadoDesempate.RESUELTO && mismoSet) {
+      return des;
+    }
+
+    if (des?.estado === EstadoDesempate.PENDIENTE && mismoSet) {
+      des.cupo = analisis.cupo;
+      des.plazasLibres = analisis.plazasLibres;
+      for (const c of des.candidatos || []) {
+        const src = analisis.candidatas.find((x) => x.idFraternidad === c.fraternidad?.idFraternidad);
+        if (src) c.nota = src.nota as any;
+      }
+      await this.desempateRepo.save(des);
+      if (des.candidatos?.length) await this.desempateCandRepo.save(des.candidatos);
+      return des;
+    }
+
+    if (des?.estado === EstadoDesempate.PENDIENTE) {
+      await this.desempateCandRepo.delete({ desempate: { idDesempate: des.idDesempate } });
+      des.cupo = analisis.cupo;
+      des.plazasLibres = analisis.plazasLibres;
+      des = await this.desempateRepo.save(des);
+    } else {
+      des = this.desempateRepo.create({
+        fase: { idFase } as any,
+        tipo,
+        estado: EstadoDesempate.PENDIENTE,
+        cupo: analisis.cupo,
+        plazasLibres: analisis.plazasLibres,
+        decisor: null,
+      });
+      des = await this.desempateRepo.save(des);
+    }
+
+    const cands = analisis.candidatas.map((c, idx) =>
+      this.desempateCandRepo.create({
+        desempate: { idDesempate: des!.idDesempate } as any,
+        fraternidad: { idFraternidad: c.idFraternidad } as any,
+        nota: c.nota,
+        puestoProvisional: idx + 1,
+        decision: DecisionDesempate.PENDIENTE,
+        ordenPodio: null,
+      }),
+    );
+    await this.desempateCandRepo.save(cands);
+
+    return this.desempateRepo.findOne({
+      where: { idDesempate: des.idDesempate },
+      relations: ['candidatos', 'candidatos.fraternidad', 'decisor'],
+    });
+  }
+
+  private serializeDesempate(des: DesempateFase | null) {
+    if (!des) return null;
+    return {
+      idDesempate: des.idDesempate,
+      tipo: des.tipo,
+      estado: des.estado,
+      cupo: des.cupo,
+      plazasLibres: des.plazasLibres,
+      decisor: des.decisor
+        ? {
+            idUsuario: des.decisor.idUsuario,
+            nombres: [des.decisor.nombres, des.decisor.primerApellido].filter(Boolean).join(' '),
+          }
+        : null,
+      candidatos: (des.candidatos || []).map((c) => ({
+        idCandidato: c.idCandidato,
+        idFraternidad: c.fraternidad?.idFraternidad,
+        nombre: c.fraternidad?.nombre,
+        nota: c.nota != null ? Number(c.nota) : null,
+        puestoProvisional: c.puestoProvisional,
+        decision: c.decision,
+        ordenPodio: c.ordenPodio,
+      })),
+    };
+  }
+
+  async getEstadoPromocion(idFase: number) {
+    const fase = await this.faseRepo.findOne({ where: { idFase } });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+    if (!esFaseChachaWarmi(fase)) {
+      throw new BadRequestException('Solo aplica a fases Chacha-Warmi.');
+    }
+
+    const cupo = Number(fase.cupoFinalistas);
+    const hijas = await this.faseRepo.find({
+      where: { fasePadre: { idFase } },
+      relations: ['gestion'],
+    });
+
+    const ranking = await this.rankingChachaPorFraternidad(idFase);
+    const corte =
+      Number.isFinite(cupo) && cupo >= 1
+        ? this.analizarCorteCupo(ranking, cupo)
+        : {
+            hayEmpate: false,
+            cupo: 0,
+            plazasLibres: 0,
+            notaUmbral: null,
+            seguras: [],
+            candidatas: [],
+            finalistasAutomaticos: [],
+          };
+    const podio = this.analizarPodio(ranking);
+
+    const desCorte = await this.syncDesempateTipo(idFase, TipoDesempate.CORTE_FINALISTAS, corte);
+    const desPodio = await this.syncDesempateTipo(idFase, TipoDesempate.PODIO, podio);
+
+    const cortePendiente = desCorte?.estado === EstadoDesempate.PENDIENTE;
+    const podioPendiente = desPodio?.estado === EstadoDesempate.PENDIENTE;
+
+    let finalistasConfirmados = corte.finalistasAutomaticos.map((r) => ({
+      ...r,
+      nombresPareja: r.nombresPareja || [],
+    }));
+    if (corte.hayEmpate && desCorte?.estado === EstadoDesempate.RESUELTO) {
+      const pasan = (desCorte.candidatos || [])
+        .filter((c) => c.decision === DecisionDesempate.PASA)
+        .map((c) => {
+          const fromRank = ranking.find((r) => r.idFraternidad === c.fraternidad.idFraternidad);
+          return {
+            idFraternidad: c.fraternidad.idFraternidad,
+            nombre: c.fraternidad.nombre,
+            nombresPareja: fromRank?.nombresPareja || [],
+            nota: c.nota != null ? Number(c.nota) : null,
+          };
+        });
+      finalistasConfirmados = [...corte.seguras, ...pasan];
+    }
+    if (finalistasConfirmados.length > cupo) {
+      finalistasConfirmados = finalistasConfirmados.slice(0, cupo);
+    }
+
+    const decisor = await this.usuarioRepo.findOne({
+      where: { esDecisor: true },
+      relations: ['rol'],
+    });
+
+    const puedePromover =
+      Number.isFinite(cupo) &&
+      cupo >= 1 &&
+      hijas.length > 0 &&
+      !cortePendiente &&
+      finalistasConfirmados.length > 0 &&
+      finalistasConfirmados.length <= cupo;
+
+    return {
+      fase: {
+        idFase: fase.idFase,
+        nombre: fase.nombre,
+        cupoFinalistas: Number.isFinite(cupo) ? cupo : null,
+      },
+      fasesHijas: hijas.map((h) => ({ idFase: h.idFase, nombre: h.nombre })),
+      puedePromover,
+      empateCorte: !!corte.hayEmpate,
+      empatePodio: !!podio.hayEmpate,
+      cortePendiente,
+      podioPendiente,
+      plazasLibresCorte: corte.plazasLibres,
+      notaUmbral: corte.notaUmbral,
+      seguras: corte.seguras,
+      candidatas: corte.candidatas,
+      finalistasConfirmados,
+      desempateCorte: this.serializeDesempate(desCorte),
+      desempatePodio: this.serializeDesempate(desPodio),
+      decisorActual: decisor
+        ? {
+            idUsuario: decisor.idUsuario,
+            nombres: [decisor.nombres, decisor.primerApellido].filter(Boolean).join(' '),
+            ci: decisor.ci,
+          }
+        : null,
+    };
+  }
+
+  async resolverDesempate(
+    idDesempate: number,
+    body: {
+      decisiones?: Array<{ idFraternidad: number; decision: string }>;
+      ordenesPodio?: Array<{ idFraternidad: number; ordenPodio: number }>;
+    },
+    actor: { idUsuario: number; rol?: string; esDecisor?: boolean },
+  ) {
+    const des = await this.desempateRepo.findOne({
+      where: { idDesempate },
+      relations: ['fase', 'candidatos', 'candidatos.fraternidad'],
+    });
+    if (!des) throw new NotFoundException('Desempate no encontrado');
+
+    const esSuper = String(actor?.rol || '').toLowerCase() === 'superusuario';
+    if (!actor?.esDecisor && !esSuper) {
+      throw new ForbiddenException('Solo el Decisor (o superusuario) puede resolver empates.');
+    }
+
+    if (des.estado === EstadoDesempate.RESUELTO) {
+      throw new BadRequestException('Este desempate ya fue resuelto.');
+    }
+
+    const decisorUser = await this.usuarioRepo.findOne({ where: { idUsuario: actor.idUsuario } });
+    des.decisor = decisorUser;
+
+    if (des.tipo === TipoDesempate.CORTE_FINALISTAS) {
+      const decisiones = body?.decisiones || [];
+      const map = new Map(decisiones.map((d) => [Number(d.idFraternidad), String(d.decision).toUpperCase()]));
+      let pasaCount = 0;
+      for (const c of des.candidatos || []) {
+        const d = map.get(c.fraternidad.idFraternidad);
+        if (!d || ![DecisionDesempate.PASA, DecisionDesempate.NO_PASA].includes(d as DecisionDesempate)) {
+          throw new BadRequestException(
+            'Debes marcar PASA o NO_PASA para cada fraternidad empatada.',
+          );
+        }
+        c.decision = d as DecisionDesempate;
+        if (c.decision === DecisionDesempate.PASA) pasaCount++;
+      }
+      if (pasaCount !== des.plazasLibres) {
+        throw new BadRequestException(
+          `Debes marcar exactamente ${des.plazasLibres} fraternidad(es) como PASA (cupo restante). Marcaste ${pasaCount}.`,
+        );
+      }
+      await this.desempateCandRepo.save(des.candidatos);
+      des.estado = EstadoDesempate.RESUELTO;
+      await this.desempateRepo.save(des);
+      return {
+        ok: true,
+        mensaje: `Desempate de corte resuelto: ${pasaCount} pasan de ${des.candidatos.length} empatadas.`,
+        desempate: this.serializeDesempate(
+          await this.desempateRepo.findOne({
+            where: { idDesempate },
+            relations: ['candidatos', 'candidatos.fraternidad', 'decisor'],
+          }),
+        ),
+      };
+    }
+
+    // PODIO: el Decisor asigna orden 1..plazasLibres (únicos) entre empatadas; no puede superar plazas.
+    const ordenes = body?.ordenesPodio || [];
+    const needed = des.plazasLibres > 0 ? des.plazasLibres : Math.min(3, (des.candidatos || []).length);
+    const asignados = ordenes.filter((o) => {
+      const ord = Number(o.ordenPodio);
+      return Number.isFinite(ord) && ord >= 1 && ord <= needed;
+    });
+    if (asignados.length !== needed) {
+      throw new BadRequestException(
+        `Debes asignar exactamente ${needed} puesto(s) de podio (1–${needed}) entre las fraternidades empatadas.`,
+      );
+    }
+    const ordSet = new Set(asignados.map((o) => Number(o.ordenPodio)));
+    if (ordSet.size !== needed) {
+      throw new BadRequestException('Los puestos de podio deben ser únicos.');
+    }
+    const idSet = new Set(asignados.map((o) => Number(o.idFraternidad)));
+    if (idSet.size !== needed) {
+      throw new BadRequestException('Cada puesto debe asignarse a una fraternidad distinta.');
+    }
+    const mapOrd = new Map(asignados.map((o) => [Number(o.idFraternidad), Number(o.ordenPodio)]));
+    const candIds = new Set((des.candidatos || []).map((c) => c.fraternidad.idFraternidad));
+    for (const id of idSet) {
+      if (!candIds.has(id)) {
+        throw new BadRequestException('Solo puedes asignar podio a fraternidades empatadas.');
+      }
+    }
+    for (const c of des.candidatos || []) {
+      const ord = mapOrd.get(c.fraternidad.idFraternidad);
+      if (ord != null) {
+        c.ordenPodio = ord;
+        c.decision = DecisionDesempate.PASA;
+      } else {
+        c.ordenPodio = null;
+        c.decision = DecisionDesempate.NO_PASA;
+      }
+    }
+
+    await this.desempateCandRepo.save(des.candidatos);
+    des.estado = EstadoDesempate.RESUELTO;
+    await this.desempateRepo.save(des);
+    return {
+      ok: true,
+      mensaje: 'Desempate de podio resuelto.',
+      desempate: this.serializeDesempate(
+        await this.desempateRepo.findOne({
+          where: { idDesempate },
+          relations: ['candidatos', 'candidatos.fraternidad', 'decisor'],
+        }),
+      ),
+    };
+  }
+
   async getFinalistasFase(idFase: number) {
     const fase = await this.faseRepo.findOne({ where: { idFase } });
     if (!fase) throw new NotFoundException('Fase no encontrada');
+
+    if (esFaseChachaWarmi(fase)) {
+      const cupo = Number(fase.cupoFinalistas) > 0 ? Number(fase.cupoFinalistas) : 10;
+      const estado = await this.getEstadoPromocion(idFase);
+      const finalistas = (estado.finalistasConfirmados || []).map((r: any, idx: number) => ({
+        idFraternidad: r.idFraternidad,
+        nombre: r.nombre,
+        nombresPareja: r.nombresPareja,
+        fraternidad: r.nombre,
+        puntajePromedio: r.nota,
+        posicion: idx + 1,
+        tipo: 'Pareja',
+      }));
+      return {
+        fase: {
+          idFase: fase.idFase,
+          nombre: fase.nombre,
+          tipoConcurso: fase.tipoConcurso,
+          plantillaRequisitos: fase.plantillaRequisitos,
+          cupoFinalistas: cupo,
+          modoCalificacion: 'fraternidad',
+        },
+        finalistas,
+      };
+    }
 
     const evs = await this.evaluacionRepo.find({
       where: { estado: 'COMPLETADO', fase: { idFase } },
@@ -1059,7 +1878,6 @@ export class EvaluacionesService {
       order: { puntajeTotal: 'DESC' }
     });
 
-    // Calcular promedio por participante (puede haber múltiples jurados)
     const mapaParticipantes = new Map<number, { id: number, nombre: string, tipo: string, fraternidad: string, sum: number, count: number }>();
 
     evs.forEach(ev => {
@@ -1078,13 +1896,132 @@ export class EvaluacionesService {
       });
     });
 
+    const cupo = Number(fase.cupoFinalistas) > 0 ? Number(fase.cupoFinalistas) : 3;
     const finalistas = Array.from(mapaParticipantes.values())
       .map(p => ({ ...p, puntajePromedio: Number((p.sum / p.count).toFixed(2)) }))
       .sort((a, b) => b.puntajePromedio - a.puntajePromedio)
-      .slice(0, 3)
+      .slice(0, cupo)
       .map((p, idx) => ({ ...p, posicion: idx + 1 }));
 
     return { fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: fase.tipoConcurso }, finalistas };
+  }
+
+  /**
+   * Copia finalistas confirmados (seguras + PASA del Decisor) a fases hijas.
+   * Bloquea si hay desempate de corte PENDIENTE. Nunca supera el cupo.
+   */
+  async promoverFinalistas(idFase: number) {
+    const fase = await this.faseRepo.findOne({
+      where: { idFase },
+      relations: ['gestion'],
+    });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+    if (!esFaseChachaWarmi(fase)) {
+      throw new BadRequestException('Solo se pueden promover finalistas desde una fase Chacha-Warmi.');
+    }
+    const cupo = Number(fase.cupoFinalistas);
+    if (!Number.isFinite(cupo) || cupo < 1) {
+      throw new BadRequestException(
+        'Configura el cupo de finalistas en la fase padre (Gestión de fases) antes de promover.',
+      );
+    }
+
+    const hijas = await this.faseRepo.find({
+      where: { fasePadre: { idFase } },
+      relations: ['gestion'],
+    });
+    if (!hijas.length) {
+      throw new BadRequestException(
+        'No hay fases hijas enlazadas a esta fase. En Gestión de fases, crea/edita la fase 2 y selecciónala como hija.',
+      );
+    }
+
+    const estado = await this.getEstadoPromocion(idFase);
+    if (estado.cortePendiente) {
+      throw new BadRequestException(
+        'Hay empate en el cupo de finalistas pendiente de resolución del Decisor. No se puede promover aún.',
+      );
+    }
+
+    const finalistas = (estado.finalistasConfirmados || []).slice(0, cupo);
+    if (!finalistas.length) {
+      throw new BadRequestException('No hay fraternidades con calificación completada para promover.');
+    }
+    if (finalistas.length > cupo) {
+      throw new BadRequestException(`La lista de finalistas (${finalistas.length}) supera el cupo (${cupo}).`);
+    }
+
+    const origenParts = await this.participanteRepo.find({
+      where: { fase: { idFase } },
+      relations: ['fraternidad', 'facultad', 'carrera', 'gestion'],
+    });
+
+    let creados = 0;
+    let yaExistentes = 0;
+    const detalleHijas: Array<{ idFase: number; nombre: string; agregados: number }> = [];
+
+    for (const hija of hijas) {
+      let agregadosHija = 0;
+      for (const fin of finalistas) {
+        const origenes = origenParts.filter(
+          (p) => p.fraternidad?.idFraternidad === fin.idFraternidad,
+        );
+        for (const src of origenes) {
+          const existe = await this.participanteRepo.findOne({
+            where: {
+              fase: { idFase: hija.idFase },
+              fraternidad: { idFraternidad: fin.idFraternidad },
+              tipo: src.tipo || undefined,
+              nombre: src.nombre,
+            },
+          });
+          if (existe) {
+            yaExistentes++;
+            continue;
+          }
+          const nuevo = this.participanteRepo.create({
+            nombre: src.nombre,
+            tipo: src.tipo,
+            esUmsa: src.esUmsa,
+            institucionExterna: src.institucionExterna,
+            perteneceFraternidad: src.perteneceFraternidad,
+            fraternidad: src.fraternidad ? { idFraternidad: src.fraternidad.idFraternidad } as any : null,
+            facultad: src.facultad ? ({ idFacultad: (src.facultad as any).idFacultad } as any) : null,
+            carrera: src.carrera ? ({ idCarrera: (src.carrera as any).idCarrera } as any) : null,
+            fase: { idFase: hija.idFase } as any,
+            gestion: hija.gestion
+              ? ({ idGestion: hija.gestion.idGestion } as any)
+              : fase.gestion
+                ? ({ idGestion: fase.gestion.idGestion } as any)
+                : null,
+          });
+          await this.participanteRepo.save(nuevo);
+          creados++;
+          agregadosHija++;
+        }
+      }
+      detalleHijas.push({
+        idFase: hija.idFase,
+        nombre: hija.nombre,
+        agregados: agregadosHija,
+      });
+    }
+
+    return {
+      cupo,
+      promovidos: finalistas.length,
+      finalistas: finalistas.map((f: any, i: number) => ({
+        posicion: i + 1,
+        idFraternidad: f.idFraternidad,
+        nombre: f.nombre,
+        nota: f.nota,
+        nombresPareja: f.nombresPareja,
+      })),
+      participantesCreados: creados,
+      participantesYaExistentes: yaExistentes,
+      fasesHijas: detalleHijas,
+      mensaje: `Se promovieron ${finalistas.length} fraternidad(es) a ${hijas.length} fase(s) hija(s).`,
+    };
   }
 
   async clonarGestion(idOrigen: number, idDestino: number, modules: string[]) {
@@ -1116,7 +2053,8 @@ export class EvaluacionesService {
           fechaInicioInscripcion: fase.fechaInicioInscripcion,
           fechaFinInscripcion: fase.fechaFinInscripcion,
           plantillaRequisitos: fase.plantillaRequisitos,
-          requisitosInscripcion: fase.requisitosInscripcion,
+          cupoFinalistas: fase.cupoFinalistas,
+          fasePadre: null,
           estaActiva: false,
           gestion: { idGestion: idDestino } as any,
         });
@@ -1434,6 +2372,77 @@ export class EvaluacionesService {
     }
   }
 
+  /** Normaliza enlace padre/cupo en fases EXTERNO. */
+  private async aplicarEnlaceYCupoFase(
+    payload: any,
+    opts: { idGestion: number; idFaseActual?: number; faseActual?: Fase },
+  ) {
+    const tipo = String(payload.tipoConcurso || opts.faseActual?.tipoConcurso || 'EFU');
+    if (tipo !== 'EXTERNO') {
+      payload.fasePadre = null;
+      payload.cupoFinalistas = null;
+      delete payload.idFasePadre;
+      return;
+    }
+
+    if ('cupoFinalistas' in payload) {
+      const raw = payload.cupoFinalistas;
+      if (raw === null || raw === '' || raw === undefined) {
+        payload.cupoFinalistas = null;
+      } else {
+        const n = Number.parseInt(String(raw), 10);
+        if (!Number.isFinite(n) || n < 1) {
+          throw new BadRequestException('El cupo de finalistas debe ser un entero ≥ 1.');
+        }
+        payload.cupoFinalistas = n;
+      }
+    }
+
+    if ('idFasePadre' in payload) {
+      const idPadre = payload.idFasePadre == null || payload.idFasePadre === ''
+        ? null
+        : Number.parseInt(String(payload.idFasePadre), 10);
+      delete payload.idFasePadre;
+
+      if (!idPadre) {
+        payload.fasePadre = null;
+      } else {
+        if (opts.idFaseActual && idPadre === opts.idFaseActual) {
+          throw new BadRequestException('Una fase no puede enlazarse a sí misma.');
+        }
+        const padre = await this.faseRepo.findOne({
+          where: { idFase: idPadre },
+          relations: ['gestion', 'fasePadre'],
+        });
+        if (!padre) throw new NotFoundException('Fase padre no encontrada.');
+        if (padre.tipoConcurso !== 'EXTERNO') {
+          throw new BadRequestException('La fase padre debe ser un concurso externo.');
+        }
+        if (padre.gestion?.idGestion !== opts.idGestion) {
+          throw new BadRequestException('La fase padre debe pertenecer a la misma gestión.');
+        }
+        // Evitar ciclos: caminar ancestros
+        let cursor: Fase | null = padre;
+        const visited = new Set<number>([opts.idFaseActual || 0].filter(Boolean));
+        while (cursor) {
+          if (visited.has(cursor.idFase)) {
+            throw new BadRequestException('El enlace de fases formaría un ciclo.');
+          }
+          visited.add(cursor.idFase);
+          if (!cursor.fasePadre?.idFase) break;
+          cursor = await this.faseRepo.findOne({
+            where: { idFase: cursor.fasePadre.idFase },
+            relations: ['fasePadre'],
+          });
+        }
+        payload.fasePadre = { idFase: idPadre } as Fase;
+        // Hija no abre inscripción propia
+        payload.fechaInicioInscripcion = null;
+        payload.fechaFinInscripcion = null;
+      }
+    }
+  }
+
   async createFase(data: any) {
     const gestion = data.gestionId ? await this.gestionRepo.findOne({ where: { idGestion: data.gestionId } }) : await this.getGestionActiva();
     if (!gestion) throw new NotFoundException('No gestion');
@@ -1467,17 +2476,22 @@ export class EvaluacionesService {
       payload.fechaFinInscripcion = null;
     }
 
+    await this.aplicarEnlaceYCupoFase(payload, { idGestion: gestion.idGestion });
+
     const created = this.faseRepo.create(payload);
     const nuevaFase = Array.isArray(created) ? created[0] : created;
     const f = await this.faseRepo.save(nuevaFase);
     if (juradosIds?.length) {
       await this.syncJuradosFase(f, juradosIds);
     }
-    return f;
+    return this.faseRepo.findOne({ where: { idFase: f.idFase }, relations: ['fasePadre', 'gestion'] });
   }
 
   async updateFase(id: number, data: any) {
-    const f = await this.faseRepo.findOne({ where: { idFase: id } });
+    const f = await this.faseRepo.findOne({
+      where: { idFase: id },
+      relations: ['gestion', 'fasePadre'],
+    });
     if (!f) throw new NotFoundException('Fase no encontrada');
     if (data.urlImagen && f.urlImagen && data.urlImagen !== f.urlImagen) this.eliminarImagenSiExiste(f.urlImagen);
 
@@ -1503,6 +2517,12 @@ export class EvaluacionesService {
       payload.fechaFinInscripcion = null;
     }
 
+    await this.aplicarEnlaceYCupoFase(payload, {
+      idGestion: f.gestion?.idGestion,
+      idFaseActual: f.idFase,
+      faseActual: f,
+    });
+
     Object.assign(f, payload);
     const saved = await this.faseRepo.save(f);
 
@@ -1510,7 +2530,7 @@ export class EvaluacionesService {
       await this.syncJuradosFase(saved, Array.isArray(juradosIds) ? juradosIds : []);
     }
 
-    return saved;
+    return this.faseRepo.findOne({ where: { idFase: saved.idFase }, relations: ['fasePadre', 'gestion'] });
   }
 
   /** Sincroniza qué jurados tienen habilitada una fase (crear/editar fase o modal de asignación). */
@@ -1870,11 +2890,10 @@ export class EvaluacionesService {
       evsEfu.map((e) => actaDesdeEvaluacion(e)).filter((a): a is NonNullable<typeof a> => !!a),
     );
 
-    // Chacha-Warmi: promedio de Chacha + Warmi por fraternidad
+    // Chacha-Warmi: promedio de actas por fraternidad (nota de la pareja)
     const evsChacha = await this.evaluacionRepo
       .createQueryBuilder('e')
-      .leftJoinAndSelect('e.participante', 'p')
-      .leftJoinAndSelect('p.fraternidad', 'pf')
+      .leftJoinAndSelect('e.fraternidad', 'fr')
       .leftJoinAndSelect('e.fase', 'fase')
       .leftJoin('fase.gestion', 'g')
       .where('e.estado = :est', { est: 'COMPLETADO' })
@@ -1884,14 +2903,29 @@ export class EvaluacionesService {
         `(fase.plantilla_requisitos = :plant OR LOWER(fase.nombre) LIKE :nom)`,
         { plant: 'chacha_warmi', nom: '%chacha%' },
       )
+      .andWhere('e.id_fraternidad IS NOT NULL')
       .getMany();
+
+    const partsChacha = await this.participanteRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.fraternidad', 'pf')
+      .leftJoinAndSelect('p.fase', 'fase')
+      .leftJoin('fase.gestion', 'g')
+      .where('g.id_gestion = :idGestion', { idGestion })
+      .andWhere('fase.tipo_concurso = :tipo', { tipo: 'EXTERNO' })
+      .andWhere(
+        `(fase.plantilla_requisitos = :plant OR LOWER(fase.nombre) LIKE :nom)`,
+        { plant: 'chacha_warmi', nom: '%chacha%' },
+      )
+      .getMany();
+
     const chachaPorFrat = new Map<
       number,
       { sum: number; count: number; nombres: string[]; idFase: number | null; nombreFase: string | null }
     >();
     for (const e of evsChacha) {
-      const idFrat = e.participante?.fraternidad?.idFraternidad;
-      if (!idFrat || !e.participante) continue;
+      const idFrat = e.fraternidad?.idFraternidad;
+      if (!idFrat) continue;
       let acc = chachaPorFrat.get(idFrat);
       if (!acc) {
         acc = {
@@ -1903,11 +2937,24 @@ export class EvaluacionesService {
         };
         chachaPorFrat.set(idFrat, acc);
       }
-      const pts = Number(e.puntajeTotal) || 0;
-      acc.sum += pts;
+      acc.sum += Number(e.puntajeTotal) || 0;
       acc.count++;
-      const nom = e.participante.nombre;
-      if (nom && !acc.nombres.includes(nom)) acc.nombres.push(nom);
+    }
+    for (const p of partsChacha) {
+      const idFrat = p.fraternidad?.idFraternidad;
+      if (!idFrat) continue;
+      let acc = chachaPorFrat.get(idFrat);
+      if (!acc) {
+        acc = {
+          sum: 0,
+          count: 0,
+          nombres: [],
+          idFase: p.fase?.idFase ?? null,
+          nombreFase: p.fase?.nombre ?? null,
+        };
+        chachaPorFrat.set(idFrat, acc);
+      }
+      if (p.nombre && !acc.nombres.includes(p.nombre)) acc.nombres.push(p.nombre);
     }
 
     const grupos = frats.map((f) => {

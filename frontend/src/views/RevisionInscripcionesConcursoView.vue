@@ -21,14 +21,25 @@
             Revisa expedientes (fotografía / otros / Chacha-Warmi) con checklist y vista de documentos, igual que las solicitudes de fraternidad.
           </p>
         </div>
-        <select
-          v-model="filtroFase"
-          @change="cargar"
-          class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-primary"
-        >
-          <option value="">Todos los concursos</option>
-          <option v-for="f in fasesExternas" :key="f.idFase" :value="f.idFase">{{ f.nombre }}</option>
-        </select>
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div class="relative flex-1 sm:w-80">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
+            <input
+              v-model="busqueda"
+              type="search"
+              placeholder="Buscar fraternidad, pareja, CI, concurso…"
+              class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-primary"
+            />
+          </div>
+          <select
+            v-model="filtroFase"
+            @change="cargar"
+            class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-primary"
+          >
+            <option value="">Todos los concursos</option>
+            <option v-for="f in fasesExternas" :key="f.idFase" :value="f.idFase">{{ f.nombre }}</option>
+          </select>
+        </div>
       </div>
 
       <div class="flex flex-wrap gap-2 mb-5">
@@ -44,6 +55,22 @@
         >
           {{ tab.label }}
           <span class="ml-1 opacity-80">({{ tab.count }})</span>
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 mb-5">
+        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Ordenar</span>
+        <button
+          v-for="opt in opcionesOrden"
+          :key="opt.id"
+          type="button"
+          @click="setOrden(opt.id)"
+          class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all"
+          :class="ordenCriterio === opt.id
+            ? 'bg-primary text-white border-primary'
+            : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
+        >
+          {{ opt.label }}
         </button>
       </div>
 
@@ -81,6 +108,9 @@
                 </span>
                 <span v-if="esChacha(item)" class="text-amber-700"> · vía delegado</span>
                 <span v-else-if="item.usuario?.ci"> · CI {{ item.usuario.ci }}</span>
+                <span class="block sm:inline sm:ml-1 text-slate-400">
+                  · Enviada {{ formatFechaSolicitud(item.fechaEnvio || item.fechaSolicitud || item.createdAt) }}
+                </span>
               </p>
             </div>
             <span
@@ -311,14 +341,14 @@
                     Aprobar
                   </button>
                   <button
-                    v-if="detalle.estado === 'PENDIENTE' || detalle.estado === 'OBSERVADO'"
+                    v-if="detalle.estado === 'PENDIENTE' || detalle.estado === 'OBSERVADO' || puedeReobservarChacha"
                     type="button"
                     @click="decidir('observar')"
                     :disabled="actualizando || !tieneItemsObservados"
                     class="flex items-center gap-2 px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-500/20 disabled:opacity-50"
                   >
                     <span class="material-symbols-outlined text-sm">edit_note</span>
-                    Observar para corrección
+                    {{ puedeReobservarChacha ? 'Volver a observar' : 'Observar para corrección' }}
                   </button>
                   <button
                     v-if="detalle.estado !== 'RECHAZADO' && detalle.estado !== 'BORRADOR'"
@@ -331,7 +361,11 @@
                     Rechazar
                   </button>
                 </div>
-                <p v-if="!puedeAprobar && detalle.estado !== 'APROBADO'" class="mt-3 text-[10px] text-slate-400 font-medium">
+                <p v-if="puedeReobservarChacha" class="mt-3 text-[10px] text-amber-700 font-medium">
+                  Esta pareja Chacha-Warmi ya está aprobada. Puedes marcar ítems con ✕ y «Volver a observar» para que el delegado corrija.
+                  Se retirará de Concursantes/calificación si aún no hay evaluaciones.
+                </p>
+                <p v-else-if="!puedeAprobar && detalle.estado !== 'APROBADO'" class="mt-3 text-[10px] text-slate-400 font-medium">
                   Para aprobar, marca todos los datos y documentos con ✓. Para observar, marca al menos un ✕ con motivo.
                 </p>
               </section>
@@ -438,12 +472,17 @@ import Swal from 'sweetalert2'
 import api from '../services/api'
 import { getImageUrl } from '../utils/url'
 import { esFaseChachaWarmi } from '../utils/chachaWarmi'
+import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
 
 const loading = ref(true)
 const lista = ref([])
 const fasesExternas = ref([])
 const filtroFase = ref('')
 const filtroEstado = ref('PENDIENTE')
+const busqueda = ref('')
+const ordenCriterio = ref('fechaSolicitud')
+const ordenDir = ref('asc')
+const opcionesOrden = ORDEN_CRITERIOS
 const detalle = ref(null)
 const revisionChecklistDraft = ref({})
 const revisionChecklistGuardado = ref('{}')
@@ -454,6 +493,10 @@ const actualizando = ref(false)
 const guardandoProgreso = ref(false)
 
 const esChacha = (item) => esFaseChachaWarmi(item?.fase)
+
+const puedeReobservarChacha = computed(
+  () => detalle.value?.estado === 'APROBADO' && esChacha(detalle.value),
+)
 
 const badgeEstado = (estado) => ({
   BORRADOR: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -480,9 +523,66 @@ const tabsEstado = computed(() => {
   ]
 })
 
+const setOrden = (id) => {
+  if (ordenCriterio.value === id) {
+    ordenDir.value = ordenDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    ordenCriterio.value = id
+    ordenDir.value = 'asc'
+  }
+}
+
+const nombreInscripcion = (item) => {
+  if (esChacha(item)) {
+    return `${item.datos?.nombreCompleto || 'Pareja'} / ${item.datos?.nombreCompletoPareja || ''}`.trim()
+  }
+  return (
+    item.datos?.nombreCompleto ||
+    `${item.usuario?.nombres || ''} ${item.usuario?.primerApellido || ''}`.trim() ||
+    'Inscripción'
+  )
+}
+
+const instanciaInscripcion = (item) =>
+  item.fraternidad?.nivelRepresentacion ||
+  item.usuario?.fraternidad?.nivelRepresentacion ||
+  item.datos?.instanciaRepresentacion ||
+  ''
+
 const listaFiltrada = computed(() => {
-  if (!filtroEstado.value) return lista.value
-  return lista.value.filter((i) => i.estado === filtroEstado.value)
+  let rows = lista.value
+  if (filtroEstado.value) {
+    rows = rows.filter((i) => i.estado === filtroEstado.value)
+  }
+  const q = busqueda.value.trim().toLowerCase()
+  if (q) {
+    rows = rows.filter((i) => {
+      const frat = (i.fraternidad || i.usuario?.fraternidad)?.nombre || ''
+      const hay = [
+        nombreInscripcion(i),
+        frat,
+        i.fase?.nombre,
+        i.usuario?.ci,
+        i.usuario?.nombres,
+        i.usuario?.primerApellido,
+        i.datos?.nombreCompleto,
+        i.datos?.nombreCompletoPareja,
+        i.datos?.ci,
+        i.datos?.ciPareja,
+        i.estado,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
+    })
+  }
+  return ordenarListado(rows, ordenCriterio.value, ordenDir.value, {
+    fecha: (x) => x.fechaEnvio || x.fechaSolicitud || x.createdAt,
+    nombre: (x) => nombreInscripcion(x),
+    instancia: (x) => instanciaInscripcion(x),
+    id: (x) => x.idInscripcion,
+  })
 })
 
 const requisitos = computed(() => detalle.value?.requisitos || { campos: [], documentos: [] })
@@ -759,11 +859,13 @@ const decidir = async (accion) => {
       return
     }
     const conf = await Swal.fire({
-      title: '¿Observar inscripción?',
-      text: 'Se enviará al inscrito el detalle de los ítems marcados con ✕ para corrección.',
+      title: puedeReobservarChacha.value ? '¿Volver a observar?' : '¿Observar inscripción?',
+      html: puedeReobservarChacha.value
+        ? 'La pareja Chacha-Warmi volverá a estado <strong>OBSERVADO</strong> para que el delegado corrija.<br/>Se retirará de Concursantes/calificación si no hay evaluaciones.'
+        : 'Se enviará al inscrito el detalle de los ítems marcados con ✕ para corrección.',
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Observar',
+      confirmButtonText: puedeReobservarChacha.value ? 'Volver a observar' : 'Observar',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#d97706',
     })

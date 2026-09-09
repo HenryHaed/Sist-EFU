@@ -103,7 +103,11 @@ export class FichaTecnicaService {
     return {
       idFicha: ficha.idFicha,
       idFraternidad: ficha.fraternidad?.idFraternidad,
-      nombreFraternidad: ficha.nombreFraternidad,
+      nombreFraternidad:
+        ficha.fraternidad?.nombre ||
+        ficha.nombreFraternidad ||
+        herencia?.nombreFraternidad ||
+        '',
       categoria: ficha.categoria,
       instanciaRepresentacion:
         ficha.instanciaRepresentacion || herencia?.instanciaRepresentacion || '',
@@ -548,7 +552,16 @@ export class FichaTecnicaService {
       relations: ['fraternidad', 'gestion', 'actualizadoPor'],
     });
     if (!ficha) throw new NotFoundException('No hay ficha técnica. Guarda los datos primero.');
+    if (usuario.fraternidad?.nombre) {
+      ficha.nombreFraternidad = usuario.fraternidad.nombre;
+    }
     if (ficha.estado === EstadoFichaTecnica.GENERADA && ficha.urlPdf) {
+      // Si el PDF quedó invalidado tras un renombre, regenerar
+      const filename = String(ficha.urlPdf).split('/').pop();
+      const filePath = join(process.cwd(), 'uploads', 'Doc_Ficha_Tecnica', filename || '');
+      if (!filename || !fs.existsSync(filePath)) {
+        return this.regenerarYEnviarPdf(ficha, res, usuario);
+      }
       return this.streamPdfFile(ficha, res);
     }
 
@@ -646,11 +659,18 @@ export class FichaTecnicaService {
     this.assertAdmin(user.rol);
     const ficha = await this.fichaRepo.findOne({
       where: { idFicha },
-      relations: ['fraternidad', 'gestion'],
+      relations: ['fraternidad', 'gestion', 'actualizadoPor'],
     });
     if (!ficha) throw new NotFoundException('Ficha no encontrada');
-    if (ficha.estado !== EstadoFichaTecnica.GENERADA || !ficha.urlPdf) {
+    if (ficha.estado !== EstadoFichaTecnica.GENERADA) {
       throw new BadRequestException('Esta ficha aún no ha sido generada por el delegado.');
+    }
+    // Si el nombre canónico cambió o el PDF se invalidó, regenerar
+    if (ficha.fraternidad?.nombre) {
+      ficha.nombreFraternidad = ficha.fraternidad.nombre;
+    }
+    if (!ficha.urlPdf) {
+      return this.regenerarYEnviarPdf(ficha, res);
     }
     return this.streamPdfFile(ficha, res);
   }
@@ -660,12 +680,50 @@ export class FichaTecnicaService {
     const usuario = await this.getDelegadoFraternidad(idUsuario);
     const ficha = await this.fichaRepo.findOne({
       where: { fraternidad: { idFraternidad: usuario.fraternidad.idFraternidad } },
-      relations: ['fraternidad'],
+      relations: ['fraternidad', 'gestion', 'actualizadoPor'],
     });
-    if (!ficha || ficha.estado !== EstadoFichaTecnica.GENERADA || !ficha.urlPdf) {
+    if (!ficha || ficha.estado !== EstadoFichaTecnica.GENERADA) {
       throw new BadRequestException('Aún no hay una ficha generada. Completa y genera el PDF.');
     }
+    if (usuario.fraternidad?.nombre) {
+      ficha.nombreFraternidad = usuario.fraternidad.nombre;
+    }
+    if (!ficha.urlPdf) {
+      return this.regenerarYEnviarPdf(ficha, res, usuario);
+    }
     return this.streamPdfFile(ficha, res);
+  }
+
+  private async regenerarYEnviarPdf(
+    ficha: FichaTecnicaMonografia,
+    res: Response,
+    actualizadoPor?: Usuario,
+  ) {
+    if (ficha.fraternidad?.nombre) {
+      ficha.nombreFraternidad = ficha.fraternidad.nombre;
+    }
+    const gestion =
+      ficha.gestion || (await findGestionActivaOrLatest(this.gestionRepo));
+    const buffer = await this.buildPdfBuffer(ficha, gestion as Gestion);
+    const dir = this.ensureUploadDir();
+    const idFrat = ficha.fraternidad?.idFraternidad || ficha.idFicha;
+    const filename = `ficha-${idFrat}-${Date.now()}.pdf`;
+    const filePath = join(dir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    this.deletePdfIfExists(ficha.urlPdf);
+    ficha.urlPdf = `/uploads/Doc_Ficha_Tecnica/${filename}`;
+    ficha.estado = EstadoFichaTecnica.GENERADA;
+    ficha.fechaGeneracion = new Date();
+    if (actualizadoPor) ficha.actualizadoPor = actualizadoPor;
+    await this.fichaRepo.save(ficha);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="Ficha_Tecnica_${(ficha.nombreFraternidad || 'fraternidad').replace(/[^\w\-]+/g, '_')}.pdf"`,
+    );
+    res.send(buffer);
   }
 
   private streamPdfFile(ficha: FichaTecnicaMonografia, res: Response) {

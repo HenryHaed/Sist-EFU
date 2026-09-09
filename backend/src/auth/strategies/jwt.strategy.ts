@@ -54,6 +54,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       correo: usuario.correo,
       rol: usuario.rol?.nombre || payload.rol,
       primerLogin: usuario.primerLogin,
+      esDecisor: !!usuario.esDecisor,
       fraternidad: usuario.fraternidad ? {
         idFraternidad: usuario.fraternidad.idFraternidad,
         nombre: usuario.fraternidad.nombre,

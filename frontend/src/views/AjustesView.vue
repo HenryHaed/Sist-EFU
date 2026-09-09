@@ -65,6 +65,45 @@
     </div>
 
     <form v-else @submit.prevent="saveSettings" class="space-y-8 animate-in fade-in duration-500">
+
+      <!-- Permiso Decisor (solo admin / superusuario) -->
+      <div
+        v-if="puedeGestionarDecisor"
+        class="bg-white p-6 rounded-2xl border border-amber-200 shadow-sm space-y-4"
+      >
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-amber-600 text-2xl">gavel</span>
+          <div>
+            <h3 class="text-sm font-black uppercase tracking-widest text-slate-800">Permiso Decisor</h3>
+            <p class="text-xs text-slate-500 mt-1 font-medium">
+              Un solo administrador decide empates de cupo y podio en Chacha-Warmi (no puede superar el cupo de finalistas).
+            </p>
+          </div>
+        </div>
+        <p class="text-sm font-bold text-slate-700">
+          Actualmente:
+          <span v-if="decisorInfo">{{ decisorInfo.nombres }} (CI {{ decisorInfo.ci }})</span>
+          <span v-else class="text-slate-400">Nadie</span>
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-if="esAdminSolo && !soyDecisor"
+            type="button"
+            class="px-4 py-2.5 rounded-xl bg-amber-600 text-white text-xs font-black uppercase tracking-widest hover:bg-amber-700"
+            @click="abrirSolicitarDecisor"
+          >
+            Solicitar permiso Decisor
+          </button>
+          <button
+            v-if="soyDecisor"
+            type="button"
+            class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-black uppercase tracking-widest hover:bg-slate-50"
+            @click="renunciarDecisor"
+          >
+            Renunciar a Decisor
+          </button>
+        </div>
+      </div>
       
       <!-- TAB: GENERAL -->
       <div v-if="activeTab === 'general'" class="space-y-6">
@@ -806,6 +845,92 @@ import api from '../services/api'
 import Swal from 'sweetalert2'
 import { getImageUrl } from '../utils/url'
 import { applySiteTitle } from '../utils/siteTitle'
+import { useAuthStore } from '../store/auth'
+
+const authStore = useAuthStore()
+const esAdminSolo = computed(() => authStore.userRole?.toLowerCase() === 'admin')
+const esSuperOrAdmin = computed(() => ['admin', 'superusuario'].includes(String(authStore.userRole || '').toLowerCase()))
+const puedeGestionarDecisor = computed(() => esSuperOrAdmin.value)
+const soyDecisor = computed(() => !!authStore.esDecisor)
+const decisorInfo = ref(null)
+
+const cargarDecisor = async () => {
+  if (!puedeGestionarDecisor.value) return
+  try {
+    const { data } = await api.get('/usuarios/decisor')
+    decisorInfo.value = data
+  } catch {
+    decisorInfo.value = null
+  }
+}
+
+const abrirSolicitarDecisor = async () => {
+  await cargarDecisor()
+  if (decisorInfo.value && decisorInfo.value.idUsuario !== authStore.user?.id) {
+    await Swal.fire({
+      title: 'Permiso ocupado',
+      html: `Actualmente lo tiene <strong>${decisorInfo.value.nombres}</strong>. Debe renunciar o un superusuario debe reasignarlo.`,
+      icon: 'info',
+      confirmButtonColor: '#003399',
+    })
+    return
+  }
+  const { value: formValues } = await Swal.fire({
+    title: 'Solicitar permiso Decisor',
+    html: `
+      <p class="text-sm text-left text-slate-600 mb-3">Serás responsable de resolver empates de Chacha-Warmi. Solo puedes marcar como PASA tantas fraternidades empatadas como plazas libres queden del cupo.</p>
+      <label class="flex items-center gap-2 text-sm font-bold text-slate-800">
+        <input id="swal-decisor-ok" type="checkbox" class="size-4" />
+        Estoy seguro / asumo la responsabilidad
+      </label>
+    `,
+    showCancelButton: true,
+    confirmButtonText: 'Solicitar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#d97706',
+    preConfirm: () => {
+      const ok = document.getElementById('swal-decisor-ok')?.checked
+      if (!ok) {
+        Swal.showValidationMessage('Debes confirmar que estás seguro.')
+        return false
+      }
+      return true
+    },
+  })
+  if (!formValues) return
+  try {
+    const { data } = await api.post('/usuarios/decisor/solicitar')
+    authStore.updateEsDecisor(true)
+    await cargarDecisor()
+    await Swal.fire({ title: 'Listo', text: data?.mensaje || 'Ya eres Decisor.', icon: 'success', confirmButtonColor: '#003399' })
+  } catch (e) {
+    const msg = e?.response?.data?.message
+    const text = typeof msg === 'string' ? msg : (msg?.message || e?.response?.data?.message || 'No se pudo solicitar.')
+    await Swal.fire({ title: 'No disponible', text: text, icon: 'warning', confirmButtonColor: '#003399' })
+    await cargarDecisor()
+  }
+}
+
+const renunciarDecisor = async () => {
+  const conf = await Swal.fire({
+    title: '¿Renunciar a Decisor?',
+    text: 'Otro administrador podrá solicitar el permiso.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Renunciar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#003399',
+  })
+  if (!conf.isConfirmed) return
+  try {
+    await api.post('/usuarios/decisor/renunciar', {})
+    authStore.updateEsDecisor(false)
+    await cargarDecisor()
+    await Swal.fire({ title: 'Renunciado', icon: 'success', confirmButtonColor: '#003399', timer: 1800, showConfirmButton: false })
+  } catch (e) {
+    await Swal.fire({ title: 'Error', text: e?.response?.data?.message || 'No se pudo renunciar.', icon: 'error', confirmButtonColor: '#003399' })
+  }
+}
 
 /** Extrae src de un iframe pegado, o limpia una URL de embed de Google Maps / My Maps. */
 const extractMapEmbedUrl = (raw) => {
@@ -1410,6 +1535,7 @@ onMounted(async () => {
   await cargarGestionesDisponibles()
   await loadGestion(props.gestionId || null)
   if (props.initialTab === 'cronogramas') cargarDatosCronogramas()
+  await cargarDecisor()
   await nextTick()
   scrollActiveTabIntoView()
 })

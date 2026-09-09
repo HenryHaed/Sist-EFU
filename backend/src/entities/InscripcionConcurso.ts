@@ -80,6 +80,13 @@ export class InscripcionConcurso {
   @OneToMany(() => InscripcionConcursoArchivo, (a) => a.inscripcion, { cascade: true })
   archivos: InscripcionConcursoArchivo[];
 
+  /**
+   * Momento en que el concursante/delegado envió la solicitud a revisión (PENDIENTE).
+   * Se fija en el primer envío y no se sobrescribe en reenvíos tras observación.
+   */
+  @Column({ name: 'fecha_envio', type: 'timestamp', nullable: true })
+  fechaEnvio: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

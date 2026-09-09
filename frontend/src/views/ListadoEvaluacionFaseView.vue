@@ -42,14 +42,31 @@
       </div>
 
       <div v-else class="space-y-4">
-        <div class="relative max-w-lg">
-          <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-          <input
-            v-model="busqueda"
-            type="search"
-            placeholder="Buscar fraternidad o categoría..."
-            class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
-          />
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
+          <div class="relative max-w-lg flex-1 min-w-[200px]">
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+            <input
+              v-model="busqueda"
+              type="search"
+              placeholder="Buscar fraternidad o categoría..."
+              class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
+            />
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Ordenar</span>
+            <button
+              v-for="opt in opcionesOrden"
+              :key="opt.id"
+              type="button"
+              @click="setOrden(opt.id)"
+              class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all"
+              :class="ordenCriterio === opt.id
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
 
         <div v-if="fraternidadesFiltradas.length === 0" class="bg-white rounded-3xl border border-slate-200 py-16 text-center text-slate-400">
@@ -67,6 +84,8 @@
             <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-black text-[10px]">
               <tr>
                 <th class="px-6 py-4">Fraternidad</th>
+                <th class="px-6 py-4">Fecha solicitud</th>
+                <th class="px-6 py-4">Instancia</th>
                 <th class="px-6 py-4 text-center">Estado Evaluación</th>
                 <th class="px-6 py-4 text-center">Puntaje</th>
                 <th class="px-6 py-4">Tiempos Registrados</th>
@@ -103,6 +122,13 @@
                       </button>
                     </div>
                   </div>
+                </td>
+
+                <td class="px-6 py-4">
+                  <p class="text-xs font-bold text-slate-600">{{ formatFechaSolicitud(item.fechaSolicitud) }}</p>
+                </td>
+                <td class="px-6 py-4">
+                  <p class="text-xs font-bold text-slate-600">{{ item.instanciaRepresentacion || '—' }}</p>
                 </td>
                 
                 <td class="px-6 py-4 text-center">
@@ -476,6 +502,7 @@ import PdfViewerModal from '../components/PdfViewerModal.vue'
 import ModalResumenCalificacionesAdmin from '../components/ModalResumenCalificacionesAdmin.vue'
 import { getImageUrl } from '../utils/url'
 import { useAuthStore } from '../store/auth'
+import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
 
 const authStore = useAuthStore()
 const esAdmin = computed(() => ['admin', 'superusuario'].includes(authStore.userRole))
@@ -492,16 +519,36 @@ const fase = ref(null)
 const fraternidades = ref([])
 const busqueda = ref('')
 const loading = ref(true)
+const ordenCriterio = ref('fechaSolicitud')
+const ordenDir = ref('asc')
+const opcionesOrden = ORDEN_CRITERIOS
+
+const setOrden = (id) => {
+  if (ordenCriterio.value === id) {
+    ordenDir.value = ordenDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    ordenCriterio.value = id
+    ordenDir.value = 'asc'
+  }
+}
 
 const fraternidadesFiltradas = computed(() => {
   const q = busqueda.value.trim().toLowerCase()
-  if (!q) return fraternidades.value
-  return fraternidades.value.filter((f) => {
-    const haystack = [f.nombre, f.categoria]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-    return haystack.includes(q)
+  let list = fraternidades.value
+  if (q) {
+    list = list.filter((f) => {
+      const haystack = [f.nombre, f.categoria, f.instanciaRepresentacion]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    })
+  }
+  return ordenarListado(list, ordenCriterio.value, ordenDir.value, {
+    fecha: (x) => x.fechaSolicitud,
+    nombre: (x) => x.nombre,
+    instancia: (x) => x.instanciaRepresentacion,
+    id: (x) => x.idFraternidad,
   })
 })
 

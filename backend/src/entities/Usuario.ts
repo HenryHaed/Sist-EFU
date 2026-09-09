@@ -45,6 +45,10 @@ export class Usuario {
     @Column({ name: 'primer_login', default: true })
     primerLogin: boolean;
 
+    /** Permiso único Decisor (solo un admin a la vez). Rompe empates Chacha. */
+    @Column({ name: 'es_decisor', default: false })
+    esDecisor: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

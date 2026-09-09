@@ -14,7 +14,7 @@
           <input
             v-model="busqueda"
             type="search"
-            placeholder="Buscar fraternidad…"
+            placeholder="Buscar fraternidad, categoría, archivo…"
             class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-primary"
           />
         </div>
@@ -215,7 +215,15 @@ const filtradas = computed(() => {
   const q = busqueda.value.trim().toLowerCase()
   if (!q) return items.value
   return items.value.filter((i) => {
-    const hay = [i.nombreFraternidad, i.categoria, i.lista?.nombreOriginal].filter(Boolean).join(' ').toLowerCase()
+    const hay = [
+      i.nombreFraternidad,
+      i.categoria,
+      i.lista?.nombreOriginal,
+      i.tieneArchivo ? 'cargada' : 'pendiente sin archivo',
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
     return hay.includes(q)
   })
 })

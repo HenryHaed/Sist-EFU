@@ -45,7 +45,7 @@
           <input
             v-model="search"
             type="text"
-            placeholder="Buscar fraternidad o delegado..."
+            placeholder="Buscar fraternidad, delegado, CI, celular, categoría…"
             class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
           />
         </div>
@@ -403,13 +403,22 @@ const totalDelegados = computed(() =>
 const filteredFraternidades = computed(() => {
   if (!search.value) return fraternidades.value
   const q = search.value.toLowerCase()
-  return fraternidades.value.filter(f =>
-    f.nombreFraternidad?.toLowerCase().includes(q) ||
-    f.titular?.nombre?.toLowerCase().includes(q) ||
-    f.suplente?.nombre?.toLowerCase().includes(q) ||
-    f.titular?.ci?.toLowerCase().includes(q) ||
-    f.suplente?.ci?.toLowerCase().includes(q)
-  )
+  return fraternidades.value.filter((f) => {
+    const hay = [
+      f.nombreFraternidad,
+      f.categoria,
+      f.titular?.nombre,
+      f.suplente?.nombre,
+      f.titular?.ci,
+      f.suplente?.ci,
+      f.titular?.celular,
+      f.suplente?.celular,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return hay.includes(q)
+  })
 })
 
 const initForm = () => {

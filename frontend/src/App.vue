@@ -46,6 +46,7 @@ onMounted(() => {
   if (authStore.isAuthenticated) {
     authStore.startSessionTimer()
     authStore.touchActivity(true)
+    void authStore.refreshProfile()
   }
   bindActivityListeners()
   window.addEventListener('storage', onStorage)
@@ -62,6 +63,7 @@ watch(
     if (ok) {
       authStore.startSessionTimer()
       authStore.touchActivity(true)
+      void authStore.refreshProfile()
     }
   },
 )

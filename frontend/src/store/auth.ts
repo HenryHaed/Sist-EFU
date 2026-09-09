@@ -13,6 +13,7 @@ interface User {
   nombres: string;
   rol: string;
   primerLogin: boolean;
+  esDecisor?: boolean;
   fraternidad?: {
     idFraternidad: number;
     nombre: string;
@@ -45,6 +46,7 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     userRole: (state) => state.user?.rol || null,
+    esDecisor: (state) => !!state.user?.esDecisor,
     remainingIdleSeconds: () => {
       const last = readTs('lastActivityAt');
       if (!last) return 0;
@@ -194,6 +196,35 @@ export const useAuthStore = defineStore('auth', {
       if (this.user) {
         this.user.primerLogin = val;
         localStorage.setItem('user', JSON.stringify(this.user));
+      }
+    },
+
+    updateEsDecisor(val: boolean) {
+      if (this.user) {
+        this.user.esDecisor = !!val;
+        localStorage.setItem('user', JSON.stringify(this.user));
+      }
+    },
+
+    /** Refresca perfil desde BD (nombre de fraternidad tras renombre, etc.). */
+    async refreshProfile() {
+      if (!this.token) return null;
+      try {
+        const { data } = await api.get('/auth/me');
+        if (!data) return null;
+        const next = {
+          ...(this.user || {}),
+          ...data,
+          id: data.id ?? data.idUsuario ?? this.user?.id,
+          rol: data.rol || this.user?.rol,
+          fraternidad: data.fraternidad ?? null,
+          esDecisor: !!data.esDecisor,
+        };
+        this.user = next as User;
+        localStorage.setItem('user', JSON.stringify(next));
+        return next;
+      } catch {
+        return null;
       }
     },
   },
