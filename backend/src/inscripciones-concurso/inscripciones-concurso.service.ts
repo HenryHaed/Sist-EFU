@@ -1361,7 +1361,7 @@ export class InscripcionesConcursoService {
 
   async revisar(
     idInscripcion: number,
-    accion: 'aprobar' | 'observar' | 'rechazar',
+    accion: 'aprobar' | 'observar' | 'rechazar' | 'pendiente',
     observacion?: string,
     revisionChecklist?: any,
   ) {
@@ -1391,6 +1391,25 @@ export class InscripcionesConcursoService {
         throw new BadRequestException('El checklist de revisión debe ser un objeto.');
       }
       insc.revisionChecklist = revisionChecklist;
+    }
+
+    if (accion === 'pendiente') {
+      const permitidos = [
+        EstadoInscripcionConcurso.OBSERVADO,
+        EstadoInscripcionConcurso.RECHAZADO,
+        EstadoInscripcionConcurso.APROBADO,
+      ];
+      if (!permitidos.includes(insc.estado)) {
+        throw new BadRequestException(
+          'Solo se puede marcar PENDIENTE desde OBSERVADO, RECHAZADO o APROBADO.',
+        );
+      }
+      if (insc.estado === EstadoInscripcionConcurso.APROBADO) {
+        await this.retirarParticipantesSiSinEvaluacion(insc);
+      }
+      insc.estado = EstadoInscripcionConcurso.PENDIENTE;
+      await this.inscRepo.save(insc);
+      return this.getDetalleAdmin(idInscripcion);
     }
 
     if (accion === 'observar') {

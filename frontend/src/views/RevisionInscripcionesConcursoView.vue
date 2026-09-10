@@ -350,14 +350,14 @@
                     Aprobar
                   </button>
                   <button
-                    v-if="detalle.estado === 'PENDIENTE' || detalle.estado === 'OBSERVADO' || puedeReobservarChacha"
+                    v-if="detalle.estado !== 'OBSERVADO' && detalle.estado !== 'RECHAZADO' && detalle.estado !== 'BORRADOR'"
                     type="button"
                     @click="decidir('observar')"
                     :disabled="actualizando || !tieneItemsObservados"
                     class="flex items-center gap-2 px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-500/20 disabled:opacity-50"
                   >
                     <span class="material-symbols-outlined text-sm">edit_note</span>
-                    {{ puedeReobservarChacha ? 'Volver a observar' : 'Observar para corrección' }}
+                    {{ detalle.estado === 'APROBADO' ? 'Volver a observar' : 'Observar para corrección' }}
                   </button>
                   <button
                     v-if="detalle.estado !== 'RECHAZADO' && detalle.estado !== 'BORRADOR'"
@@ -369,10 +369,20 @@
                     <span class="material-symbols-outlined text-sm">cancel</span>
                     Rechazar
                   </button>
+                  <button
+                    v-if="!['PENDIENTE', 'BORRADOR'].includes(detalle.estado)"
+                    type="button"
+                    @click="decidir('pendiente')"
+                    :disabled="actualizando"
+                    class="flex items-center gap-2 px-5 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-xs uppercase tracking-widest disabled:opacity-50"
+                  >
+                    <span class="material-symbols-outlined text-sm">history</span>
+                    Marcar Pendiente
+                  </button>
                 </div>
-                <p v-if="puedeReobservarChacha" class="mt-3 text-[10px] text-amber-700 font-medium">
-                  Esta pareja Chacha-Warmi ya está aprobada. Puedes marcar ítems con ✕ y «Volver a observar» para que el delegado corrija.
-                  Se retirará de Concursantes/calificación si aún no hay evaluaciones.
+                <p v-if="detalle.estado === 'APROBADO'" class="mt-3 text-[10px] text-amber-700 font-medium">
+                  Esta inscripción ya está aprobada. Puedes «Volver a observar» (con ítems ✕) o «Marcar Pendiente».
+                  Si no hay evaluaciones, se retirará de Concursantes/calificación.
                 </p>
                 <p v-else-if="!puedeAprobar && detalle.estado !== 'APROBADO'" class="mt-3 text-[10px] text-slate-400 font-medium">
                   Para aprobar, marca todos los datos y documentos con ✓. Para observar, marca al menos un ✕ con motivo.
@@ -595,8 +605,8 @@ const descargandoPdfChacha = ref(false)
 
 const esChacha = (item) => esFaseChachaWarmi(item?.fase)
 
-const puedeReobservarChacha = computed(
-  () => detalle.value?.estado === 'APROBADO' && esChacha(detalle.value),
+const puedeReobservar = computed(
+  () => detalle.value?.estado === 'APROBADO',
 )
 
 const badgeEstado = (estado) => ({
@@ -960,15 +970,29 @@ const decidir = async (accion) => {
       return
     }
     const conf = await Swal.fire({
-      title: puedeReobservarChacha.value ? '¿Volver a observar?' : '¿Observar inscripción?',
-      html: puedeReobservarChacha.value
-        ? 'La pareja Chacha-Warmi volverá a estado <strong>OBSERVADO</strong> para que el delegado corrija.<br/>Se retirará de Concursantes/calificación si no hay evaluaciones.'
+      title: puedeReobservar.value ? '¿Volver a observar?' : '¿Observar inscripción?',
+      html: puedeReobservar.value
+        ? 'La inscripción volverá a estado <strong>OBSERVADO</strong> para corrección.<br/>Se retirará de Concursantes/calificación si no hay evaluaciones.'
         : 'Se enviará al inscrito el detalle de los ítems marcados con ✕ para corrección.',
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: puedeReobservarChacha.value ? 'Volver a observar' : 'Observar',
+      confirmButtonText: puedeReobservar.value ? 'Volver a observar' : 'Observar',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#d97706',
+    })
+    if (!conf.isConfirmed) return
+  } else if (accion === 'pendiente') {
+    const conf = await Swal.fire({
+      title: '¿Marcar como pendiente?',
+      html:
+        detalle.value.estado === 'APROBADO'
+          ? 'La inscripción volverá a <strong>PENDIENTE</strong>.<br/>Se retirará de Concursantes/calificación si no hay evaluaciones.'
+          : 'La inscripción volverá al estado <strong>PENDIENTE</strong> para nueva revisión.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Marcar Pendiente',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#475569',
     })
     if (!conf.isConfirmed) return
   } else {
@@ -995,9 +1019,15 @@ const decidir = async (accion) => {
     })
     aplicarDetalle(data)
     await cargar()
+    const titulos = {
+      aprobar: 'Aprobada',
+      observar: 'Observada',
+      rechazar: 'Rechazada',
+      pendiente: 'Pendiente',
+    }
     Swal.fire({
       icon: 'success',
-      title: accion === 'aprobar' ? 'Aprobada' : accion === 'observar' ? 'Observada' : 'Rechazada',
+      title: titulos[accion] || 'Actualizada',
       toast: true,
       position: 'top-end',
       timer: 2200,

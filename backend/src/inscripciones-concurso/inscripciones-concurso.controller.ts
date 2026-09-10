@@ -178,7 +178,7 @@ export class InscripcionesConcursoController {
     @Param('id', ParseIntPipe) id: number,
     @Body()
     body: {
-      accion: 'aprobar' | 'observar' | 'rechazar';
+      accion: 'aprobar' | 'observar' | 'rechazar' | 'pendiente';
       observacion?: string;
       revisionChecklist?: any;
     },
