@@ -613,6 +613,9 @@ const esFiltroChachaActivo = computed(() => {
 
 const onPlantillaExternaChange = () => {
   filtros.value.idFase = null
+  if (filtros.value.plantillaRequisitos === 'chacha_warmi') {
+    filtros.value.ordenarPor = 'nombreFraternidad'
+  }
 }
 
 const filtrosAbiertos = ref(true)
@@ -793,6 +796,7 @@ const opcionesOrden = computed(() => {
       { value: 'nombreFraternidad', label: 'Fraternidad' },
       { value: 'concurso', label: 'Concurso' },
       { value: 'tipo', label: 'Tipo / Rol' },
+      { value: 'fechaSolicitud', label: 'Fecha de solicitud' },
     ]
   }
   const base = [
@@ -800,12 +804,29 @@ const opcionesOrden = computed(() => {
     { value: 'tipoDanza', label: 'Tipo de danza' },
     { value: 'facultad', label: 'Facultad' },
     { value: 'categoria', label: 'Categoría' },
+    { value: 'fechaSolicitud', label: 'Fecha de solicitud' },
   ]
   if (filtros.value.tipoReporte === 'calificaciones') {
-    base.push({ value: 'puntajeFinal', label: 'Puntaje final' }, { value: 'puesto', label: 'Puesto' })
+    // Calificaciones: sin fecha de solicitud de inscripción
+    return [
+      { value: 'nombreFraternidad', label: 'Nombre fraternidad' },
+      { value: 'tipoDanza', label: 'Tipo de danza' },
+      { value: 'facultad', label: 'Facultad' },
+      { value: 'categoria', label: 'Categoría' },
+      { value: 'puntajeFinal', label: 'Puntaje final' },
+      { value: 'puesto', label: 'Puesto' },
+    ]
   }
   if (filtros.value.tipoReporte === 'disciplina') {
-    base.push({ value: 'fechaHora', label: 'Fecha' }, { value: 'tipoLabel', label: 'Tipo de incidencia' }, { value: 'valorImpacto', label: 'Impacto' })
+    return [
+      { value: 'nombreFraternidad', label: 'Nombre fraternidad' },
+      { value: 'tipoDanza', label: 'Tipo de danza' },
+      { value: 'facultad', label: 'Facultad' },
+      { value: 'categoria', label: 'Categoría' },
+      { value: 'fechaHora', label: 'Fecha' },
+      { value: 'tipoLabel', label: 'Tipo de incidencia' },
+      { value: 'valorImpacto', label: 'Impacto' },
+    ]
   }
   return base
 })
@@ -819,7 +840,7 @@ const formatCell = (row, key) => {
   const val = row[key]
   if (val === null || val === undefined || val === '') return '—'
   if (key === 'promedioJurado' || key === 'promedioFinal' || key === 'puntajeFinal') return Number(val).toFixed(2)
-  if ((key === 'fechaHoraCalificacion' || key === 'fechaHora') && val) {
+  if ((key === 'fechaHoraCalificacion' || key === 'fechaHora' || key === 'fechaSolicitud') && val) {
     return new Date(val).toLocaleString('es-BO')
   }
   if ((key === 'cupo' || key === 'esExcedente') && row.estadoInscripcion && row.estadoInscripcion !== 'INSCRITA') {
@@ -863,7 +884,7 @@ const seleccionarTipo = (id) => {
     filtros.value.ordenarPor = 'fechaHora'
     filtros.value.orden = 'DESC'
   } else if (id === 'concursantes_externos') {
-    filtros.value.ordenarPor = 'nombre'
+    filtros.value.ordenarPor = 'nombreFraternidad'
     filtros.value.orden = 'ASC'
     filtros.value.plantillaRequisitos = 'todos'
     filtros.value.idFase = null

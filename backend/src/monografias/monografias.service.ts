@@ -49,12 +49,17 @@ export class MonografiasService {
   }
 
   private toResponse(monografia: Monografia) {
+    const serie = this.serieDesdeUrl(monografia.urlArchivo, monografia.fraternidad?.idFraternidad);
+    const nombreFrat = monografia.fraternidad?.nombre || 'Fraternidad';
+    const nombreDescarga = `${this.sanitizeFilenamePart(nombreFrat)}_${serie}.pdf`;
     return {
       idMonografia: monografia.idMonografia,
       idFraternidad: monografia.fraternidad?.idFraternidad,
       nombreFraternidad: monografia.fraternidad?.nombre,
       urlArchivo: monografia.urlArchivo,
       nombreArchivo: monografia.nombreArchivo,
+      nombreDescarga,
+      serieDisco: serie,
       fechaSubida: monografia.fechaSubida,
       subidoPor: monografia.subidoPor
         ? {
@@ -64,6 +69,45 @@ export class MonografiasService {
           }
         : null,
     };
+  }
+
+  private serieDesdeUrl(urlArchivo?: string, idFraternidad?: number): string {
+    const base = String(urlArchivo || '')
+      .split(/[/\\]/)
+      .pop() || '';
+    const stem = base.replace(/\.pdf$/i, '');
+    if (stem) return stem;
+    return `monografia-${idFraternidad || '0'}`;
+  }
+
+  private sanitizeFilenamePart(name: string): string {
+    return String(name || 'Fraternidad')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\-]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 80) || 'Fraternidad';
+  }
+
+  /** Descarga con Content-Disposition: Fraternidad_monografia-{id}-{ts}.pdf */
+  async streamDescarga(idMonografia: number): Promise<{
+    filePath: string;
+    downloadName: string;
+  }> {
+    const mono = await this.monografiaRepo.findOne({
+      where: { idMonografia },
+      relations: ['fraternidad'],
+    });
+    if (!mono) throw new NotFoundException('Monografía no encontrada.');
+    const filename = String(mono.urlArchivo || '').split('/').pop();
+    if (!filename) throw new NotFoundException('Archivo no disponible.');
+    const filePath = join(process.cwd(), 'uploads', 'Doc_Monografia', filename);
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('El archivo no está en el servidor.');
+    }
+    const resp = this.toResponse(mono);
+    return { filePath, downloadName: resp.nombreDescarga };
   }
 
   async getMiMonografia(user: { idUsuario: number; rol: string; fraternidad?: { idFraternidad: number } | null }) {

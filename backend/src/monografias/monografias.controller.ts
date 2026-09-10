@@ -7,6 +7,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Request,
+  Res,
   ParseIntPipe,
   BadRequestException,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import * as fs from 'fs';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MonografiasService } from './monografias.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -48,6 +50,19 @@ export class MonografiasController {
   })
   listadoFraternidades(@Request() req: any) {
     return this.monografiasService.listadoFraternidadesConMonografia(req.user);
+  }
+
+  @Get(':idMonografia/download')
+  @Roles('superusuario', 'admin', 'veedor', 'jurado')
+  @ApiOperation({ summary: 'Descargar monografía como Fraternidad_serie.pdf' })
+  async download(
+    @Param('idMonografia', ParseIntPipe) idMonografia: number,
+    @Res() res: Response,
+  ) {
+    const { filePath, downloadName } = await this.monografiasService.streamDescarga(idMonografia);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+    return res.sendFile(filePath);
   }
 
   @Get('fraternidad/:idFraternidad')

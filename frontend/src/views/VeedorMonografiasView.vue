@@ -103,16 +103,15 @@
                 <span class="material-symbols-outlined text-[16px]">visibility</span>
                 Ver PDF
               </button>
-              <a
-                :href="getImageUrl(item.monografia.urlArchivo)"
-                :download="item.monografia.nombreArchivo || `monografia-${item.idFraternidad}.pdf`"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-secondary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-colors"
+              <button
+                type="button"
+                @click="descargarMonografia(item)"
+                :disabled="descargandoId === item.monografia.idMonografia"
+                class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-secondary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-colors disabled:opacity-50"
               >
                 <span class="material-symbols-outlined text-[16px]">download</span>
-                Descargar
-              </a>
+                {{ descargandoId === item.monografia.idMonografia ? 'Descargando…' : 'Descargar' }}
+              </button>
             </template>
             <div
               v-else
@@ -145,6 +144,7 @@ const loading = ref(false)
 const listado = ref([])
 const busqueda = ref('')
 const filtroEstado = ref('')
+const descargandoId = ref(null)
 const visor = ref({ abierto: false, url: '', titulo: '' })
 
 const conMono = computed(() => listado.value.filter((x) => x.tieneMonografia).length)
@@ -200,6 +200,50 @@ const abrirVisor = (item) => {
     abierto: true,
     url: getImageUrl(item.monografia.urlArchivo),
     titulo: `Monografía — ${item.nombre}`,
+  }
+}
+
+const nombreDescargaMonografia = (item) => {
+  if (item.monografia?.nombreDescarga) return item.monografia.nombreDescarga
+  const serie =
+    String(item.monografia?.urlArchivo || '')
+      .split('/')
+      .pop()
+      ?.replace(/\.pdf$/i, '') || `monografia-${item.idFraternidad}`
+  const frat = String(item.nombre || 'Fraternidad')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+  return `${frat}_${serie}.pdf`
+}
+
+const descargarMonografia = async (item) => {
+  const id = item.monografia?.idMonografia
+  if (!id) return
+  descargandoId.value = id
+  try {
+    const { data } = await api.get(`/monografias/${id}/download`, { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nombreDescargaMonografia(item)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    // Fallback: enlace directo
+    const a = document.createElement('a')
+    a.href = getImageUrl(item.monografia.urlArchivo)
+    a.download = nombreDescargaMonografia(item)
+    a.target = '_blank'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    descargandoId.value = null
   }
 }
 

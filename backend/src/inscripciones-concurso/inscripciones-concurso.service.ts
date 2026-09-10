@@ -32,6 +32,7 @@ import {
   asegurarDocumentosChachaWarmi,
 } from '../common/requisitos-concurso';
 import { estadoVentanaInscripcionFase } from '../common/cronograma-actividad';
+import { trimMp3ToMaxSeconds, PISTA_MP3_MAX_SEGUNDOS } from '../common/audio-trim';
 
 @Injectable()
 export class InscripcionesConcursoService {
@@ -996,6 +997,23 @@ export class InscripcionesConcursoService {
       );
     }
     this.validarMime(docReq, file);
+
+    // Pista Chacha-Warmi: recortar a máximo 1 minuto desde el inicio
+    if (claveDocumento === 'pista_mp3' && file?.path) {
+      try {
+        await trimMp3ToMaxSeconds(file.path, PISTA_MP3_MAX_SEGUNDOS);
+      } catch (e: any) {
+        try {
+          if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        } catch {
+          /* ignore */
+        }
+        throw new BadRequestException(
+          e?.message ||
+            'No se pudo procesar el audio. Sube un MP3 válido; el sistema lo recorta a 1 minuto como máximo.',
+        );
+      }
+    }
 
     const existentes = (insc.archivos || []).filter((a) => a.claveDocumento === claveDocumento);
     if (existentes.length >= (docReq.maxArchivos || 1)) {

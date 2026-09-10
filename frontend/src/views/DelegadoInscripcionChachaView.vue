@@ -302,6 +302,13 @@
                   {{ (doc.mime || []).join(', ') }} · máx {{ doc.maxArchivos || 1 }} archivo(s)
                   <span v-if="doc.maxMb"> · hasta {{ doc.maxMb }} MB</span>
                 </p>
+                <p
+                  v-if="doc.clave === 'pista_mp3'"
+                  class="text-[10px] text-amber-700 font-bold mt-1 leading-relaxed"
+                >
+                  El sistema recorta automáticamente el audio a máximo 1 minuto desde el inicio
+                  (evita archivos largos o pesados).
+                </p>
 
                 <div class="mt-3 space-y-2">
                   <div

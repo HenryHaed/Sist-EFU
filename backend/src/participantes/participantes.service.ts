@@ -257,7 +257,7 @@ export class ParticipantesService {
 
   /**
    * ZIP con todas las pistas MP3 de inscripciones Chacha-Warmi de la fase.
-   * Nombre: Audio_[Fraternidad].mp3
+   * Nombre interno: {Fraternidad}_{serieDisco}.mp3 (serie = insc-timestamp-rand)
    */
   async buildAudiosZipChacha(idFase: number): Promise<{ buffer: Buffer; filename: string; count: number }> {
     const fase = await this.faseRepo.findOne({ where: { idFase } });
@@ -289,11 +289,12 @@ export class ParticipantesService {
         const diskPath = path.join(process.cwd(), 'uploads', 'Doc_Inscripcion_Concurso', filename);
         if (!fs.existsSync(diskPath)) continue;
 
-        let base = `Audio_${sanitizeZipFilePart(nombreFrat)}.mp3`;
+        const serie = filename.replace(/\.[^.]+$/, '') || `insc-${insc.idInscripcion}`;
+        let base = `${sanitizeZipFilePart(nombreFrat)}_${sanitizeZipFilePart(serie)}.mp3`;
         const times = (usedNames.get(base) || 0) + 1;
         usedNames.set(base, times);
         if (times > 1) {
-          base = `Audio_${sanitizeZipFilePart(nombreFrat)}_${times}.mp3`;
+          base = `${sanitizeZipFilePart(nombreFrat)}_${sanitizeZipFilePart(serie)}_${times}.mp3`;
         }
 
         entries.push({ name: base, data: fs.readFileSync(diskPath) });

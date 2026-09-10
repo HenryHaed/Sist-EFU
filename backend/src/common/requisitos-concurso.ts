@@ -81,7 +81,7 @@ export const CATALOGO_DOCUMENTOS: DocumentoRequisito[] = [
   { clave: 'ci_warmi_pdf', etiqueta: 'CI del Warmi (PDF)', mime: ['application/pdf'], obligatorio: true, maxArchivos: 1, maxMb: 10 },
   { clave: 'matricula_warmi_pdf', etiqueta: 'Matrícula o boleta del Warmi (PDF)', mime: ['application/pdf'], obligatorio: true, maxArchivos: 1, maxMb: 10 },
   { clave: 'foto_postal_jpeg', etiqueta: 'Fotografía tamaño postal 10×15 cm cuerpo entero con traje (JPEG)', mime: ['image/jpeg', 'image/jpg'], obligatorio: false, maxArchivos: 1, maxMb: 15 },
-  { clave: 'pista_mp3', etiqueta: 'Pista musical MP3 (máx. 40 segundos)', mime: ['audio/mpeg', 'audio/mp3'], obligatorio: false, maxArchivos: 1, maxMb: 10 },
+  { clave: 'pista_mp3', etiqueta: 'Pista musical MP3 (máx. 1 minuto)', mime: ['audio/mpeg', 'audio/mp3'], obligatorio: false, maxArchivos: 1, maxMb: 10 },
 ];
 
 const marcar = (claves: string[], catalogo: { clave: string }[]) =>

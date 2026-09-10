@@ -266,6 +266,7 @@ export class ReportesService implements OnModuleInit {
       cupo: f.esExcedente ? 'EXCEDENTE' : 'Dentro de cupo',
       estadoInscripcion: 'INSCRITA',
       estadoLabel: 'Inscrita',
+      fechaSolicitud: null as string | Date | null,
     };
   }
 
@@ -301,6 +302,7 @@ export class ReportesService implements OnModuleInit {
           : estado === EstadoSolicitud.OBSERVADO
             ? 'Observada'
             : String(estado),
+      fechaSolicitud: s.createdAt || null,
     };
   }
 
@@ -361,6 +363,7 @@ export class ReportesService implements OnModuleInit {
       facultad: 'facultad.nombre',
       categoria: 'categoria.nombre',
       gestion: 'gestion.anio',
+      fechaSolicitud: 's.created_at',
     };
     qb.orderBy(sortMap[ordenarPor] || 'COALESCE(fraternidadCreada.nombre, s.nombre_fraternidad)', orden as 'ASC' | 'DESC');
 
@@ -382,6 +385,7 @@ export class ReportesService implements OnModuleInit {
     ) {
       const fraternidades = await this.buildFraternidadQuery(dto).getMany();
       rows = rows.concat(fraternidades.map((f) => this.mapFraternidadRow(f)));
+      await this.adjuntarFechaSolicitudFraternidades(rows);
     }
 
     if (alcance === AlcanceListadoFraternidades.PENDIENTES) {
@@ -405,6 +409,11 @@ export class ReportesService implements OnModuleInit {
     const orden = dto.orden === 'DESC' ? -1 : 1;
     const key = dto.ordenarPor || 'nombreFraternidad';
     rows.sort((a, b) => {
+      if (key === 'fechaSolicitud') {
+        const ta = a.fechaSolicitud ? new Date(a.fechaSolicitud as any).getTime() : 0;
+        const tb = b.fechaSolicitud ? new Date(b.fechaSolicitud as any).getTime() : 0;
+        return (ta - tb) * orden;
+      }
       const av = String((a as any)[key] ?? a.nombreFraternidad ?? '').toLowerCase();
       const bv = String((b as any)[key] ?? b.nombreFraternidad ?? '').toLowerCase();
       return av.localeCompare(bv, 'es') * orden;
@@ -427,6 +436,36 @@ export class ReportesService implements OnModuleInit {
       gestion,
       data,
     };
+  }
+
+  /** Fecha de la solicitud aprobada más reciente por fraternidad inscrita. */
+  private async adjuntarFechaSolicitudFraternidades(
+    rows: Array<{ idFraternidad?: number | null; fechaSolicitud?: string | Date | null }>,
+  ) {
+    const ids = [
+      ...new Set(rows.map((r) => r.idFraternidad).filter((id): id is number => !!id)),
+    ];
+    if (!ids.length) return;
+    const sols = await this.solicitudRepo.find({
+      where: {
+        fraternidadCreada: { idFraternidad: In(ids) },
+        estado: EstadoSolicitud.APROBADO,
+      },
+      relations: ['fraternidadCreada'],
+      order: { createdAt: 'ASC' },
+    });
+    const porFrat = new Map<number, Date>();
+    for (const s of sols) {
+      const id = s.fraternidadCreada?.idFraternidad;
+      if (!id) continue;
+      // Primera (más antigua) = fecha original de solicitud
+      if (!porFrat.has(id) && s.createdAt) porFrat.set(id, s.createdAt);
+    }
+    for (const row of rows) {
+      if (row.idFraternidad && porFrat.has(row.idFraternidad)) {
+        row.fechaSolicitud = porFrat.get(row.idFraternidad) || null;
+      }
+    }
   }
 
   async consultar(dto: ConsultarReporteDto) {
@@ -478,7 +517,10 @@ export class ReportesService implements OnModuleInit {
           order: { updatedAt: 'DESC' },
         });
         if (!solicitud) continue;
-        const base = this.mapFraternidadRow(f);
+        const base = {
+          ...this.mapFraternidadRow(f),
+          fechaSolicitud: solicitud.createdAt || null,
+        };
         let miembros = buildMiembrosDirectiva(solicitud);
         if (prefijoValido) {
           // Una fila por fraternidad del cargo elegido (aunque esté vacío)
@@ -502,6 +544,22 @@ export class ReportesService implements OnModuleInit {
           }
         }
       }
+      const ordenDir = dto.orden === 'DESC' ? -1 : 1;
+      const keyDir = dto.ordenarPor || 'nombreFraternidad';
+      rows.sort((a, b) => {
+        if (keyDir === 'fechaSolicitud') {
+          const ta = a.fechaSolicitud ? new Date(a.fechaSolicitud).getTime() : 0;
+          const tb = b.fechaSolicitud ? new Date(b.fechaSolicitud).getTime() : 0;
+          const cmp = (ta - tb) * ordenDir;
+          if (cmp !== 0) return cmp;
+          return String(a.nombreFraternidad || '').localeCompare(String(b.nombreFraternidad || ''), 'es');
+        }
+        const av = String(a[keyDir] ?? a.nombreFraternidad ?? '').toLowerCase();
+        const bv = String(b[keyDir] ?? b.nombreFraternidad ?? '').toLowerCase();
+        const cmp = av.localeCompare(bv, 'es') * ordenDir;
+        if (cmp !== 0) return cmp;
+        return String(a.cargo || '').localeCompare(String(b.cargo || ''), 'es');
+      });
       const total = rows.length;
       return {
         tipoReporte: dto.tipoReporte,
@@ -1010,16 +1068,24 @@ export class ReportesService implements OnModuleInit {
 
     const ordenarPor = dto.ordenarPor || 'nombre';
     const orden = dto.orden === 'DESC' ? 'DESC' : 'ASC';
-    const orderMap: Record<string, string> = {
-      nombre: 'p.nombre',
-      nombreFraternidad: 'frat.nombre',
-      tipo: 'p.tipo',
-      concurso: 'fase.nombre',
-      tipoDanza: 'fratTipoDanza.nombre',
-      categoria: 'fratCategoria.nombre',
-      facultad: 'fratFacultad.nombre',
-    };
-    qb.orderBy(orderMap[ordenarPor] || 'p.nombre', orden);
+    // Chacha: priorizar fraternidad (+ tipo) en SQL para no separar la pareja
+    if (
+      dto.plantillaRequisitos === PlantillaConcursoExterno.CHACHA_WARMI ||
+      ordenarPor === 'nombreFraternidad'
+    ) {
+      qb.orderBy('frat.nombre', orden).addOrderBy('p.tipo', 'ASC').addOrderBy('p.nombre', 'ASC');
+    } else {
+      const orderMap: Record<string, string> = {
+        nombre: 'p.nombre',
+        nombreFraternidad: 'frat.nombre',
+        tipo: 'p.tipo',
+        concurso: 'fase.nombre',
+        tipoDanza: 'fratTipoDanza.nombre',
+        categoria: 'fratCategoria.nombre',
+        facultad: 'fratFacultad.nombre',
+      };
+      qb.orderBy(orderMap[ordenarPor] || 'p.nombre', orden);
+    }
 
     const participantes = await qb.getMany();
 
@@ -1042,6 +1108,13 @@ export class ReportesService implements OnModuleInit {
         inscPorParticipante.set(insc.participantePareja.idParticipante, insc);
       }
     }
+
+    const rankTipoPareja = (tipo: string) => {
+      const t = String(tipo || '').toLowerCase();
+      if (t.includes('chacha')) return 0;
+      if (t.includes('warmi') || t.includes('pareja')) return 1;
+      return 2;
+    };
 
     const rows = participantes.map((p) => {
       const insc = inscPorParticipante.get(p.idParticipante);
@@ -1069,6 +1142,8 @@ export class ReportesService implements OnModuleInit {
 
       return {
         idParticipante: p.idParticipante,
+        idInscripcion: insc?.idInscripcion ?? null,
+        idFraternidad: p.fraternidad?.idFraternidad || insc?.fraternidad?.idFraternidad || null,
         nombre: p.nombre,
         tipo: p.tipo || 'Participante',
         nombreFraternidad,
@@ -1088,6 +1163,7 @@ export class ReportesService implements OnModuleInit {
           p.institucionExterna || p.fraternidad?.institucionExterna?.nombre || '—',
         estadoInscripcion: insc?.estado || '—',
         gestionAnio: p.gestion?.anio || p.fase?.gestion?.anio || null,
+        fechaSolicitud: insc?.fechaEnvio || insc?.createdAt || null,
       };
     });
 
@@ -1099,8 +1175,51 @@ export class ReportesService implements OnModuleInit {
     const esReporteChacha =
       dto.plantillaRequisitos === PlantillaConcursoExterno.CHACHA_WARMI ||
       (dto.idFase
-        ? rows.every((r) => r.esChacha)
+        ? rows.length > 0 && rows.every((r) => r.esChacha)
         : rows.length > 0 && rows.every((r) => r.esChacha));
+
+    const tsFecha = (v: any) => (v ? new Date(v).getTime() : 0);
+    const desc = orden === 'DESC';
+
+    // Chacha-Warmi: mantener cada pareja junta
+    if (esReporteChacha && rows.length > 1) {
+      rows.sort((a, b) => {
+        if (ordenarPor === 'fechaSolicitud') {
+          const fechaCmp = (tsFecha(a.fechaSolicitud) - tsFecha(b.fechaSolicitud)) * (desc ? -1 : 1);
+          if (fechaCmp !== 0) return fechaCmp;
+        } else {
+          const concursoCmp = String(a.concurso || '').localeCompare(String(b.concurso || ''), 'es');
+          if (concursoCmp !== 0) return concursoCmp;
+
+          const fratCmp = String(a.nombreFraternidad || '').localeCompare(
+            String(b.nombreFraternidad || ''),
+            'es',
+          );
+          if (fratCmp !== 0) return desc ? -fratCmp : fratCmp;
+        }
+
+        const idA = a.idInscripcion ?? a.idFraternidad ?? a.idParticipante;
+        const idB = b.idInscripcion ?? b.idFraternidad ?? b.idParticipante;
+        if (idA !== idB) {
+          if (ordenarPor === 'fechaSolicitud') {
+            // misma fecha: agrupar por inscripción
+            return Number(idA) - Number(idB);
+          }
+          return Number(idA) - Number(idB);
+        }
+
+        const tipoCmp = rankTipoPareja(a.tipo) - rankTipoPareja(b.tipo);
+        if (tipoCmp !== 0) return tipoCmp;
+
+        return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+      });
+    } else if (ordenarPor === 'fechaSolicitud' && rows.length > 1) {
+      rows.sort((a, b) => {
+        const cmp = (tsFecha(a.fechaSolicitud) - tsFecha(b.fechaSolicitud)) * (desc ? -1 : 1);
+        if (cmp !== 0) return cmp;
+        return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+      });
+    }
 
     return {
       tipoReporte: dto.tipoReporte,
