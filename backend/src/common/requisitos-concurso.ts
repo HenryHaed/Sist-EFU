@@ -22,7 +22,7 @@ export type RequisitosInscripcion = {
   documentos: DocumentoRequisito[];
 };
 
-/** Catálogo completo de campos disponibles (checkboxes en UI). */
+/** Catálogo base (fotografía / otros). Chacha-Warmi aplica sufijos vía helpers. */
 export const CATALOGO_CAMPOS: CampoRequisito[] = [
   { clave: 'nombreCompleto', etiqueta: 'Nombre completo', tipo: 'text', obligatorio: true },
   { clave: 'ci', etiqueta: 'Cédula de Identidad', tipo: 'text', obligatorio: true },
@@ -37,6 +37,36 @@ export const CATALOGO_CAMPOS: CampoRequisito[] = [
   { clave: 'celularPareja', etiqueta: 'Celular (Warmi)', tipo: 'tel', obligatorio: false },
   { clave: 'correoPareja', etiqueta: 'Correo (Warmi)', tipo: 'email', obligatorio: false },
 ];
+
+/** Etiquetas con sufijo (Chacha) — solo plantilla chacha_warmi. */
+export const ETIQUETAS_CHACHA: Record<string, string> = {
+  nombreCompleto: 'Nombre completo (Chacha)',
+  ci: 'CI del Chacha',
+  facultadCarrera: 'Facultad y Carrera (Chacha)',
+  celular: 'Celular (Chacha)',
+  correo: 'Correo (Chacha)',
+};
+
+/** Aplica sufijos Chacha en campos del titular (Warmi ya vienen etiquetados). */
+export function aplicarEtiquetasChachaWarmi(req: RequisitosInscripcion): RequisitosInscripcion {
+  return {
+    campos: (req.campos || []).map((c) => ({
+      ...c,
+      etiqueta: ETIQUETAS_CHACHA[c.clave] || c.etiqueta,
+    })),
+    documentos: (req.documentos || []).map((d) => ({ ...d })),
+  };
+}
+
+/** Catálogo de campos para UI según plantilla seleccionada. */
+export function catalogoCamposParaPlantilla(plantilla?: string): CampoRequisito[] {
+  const id = String(plantilla || '').toLowerCase();
+  if (id !== 'chacha_warmi') return CATALOGO_CAMPOS.map((c) => ({ ...c }));
+  return CATALOGO_CAMPOS.map((c) => ({
+    ...c,
+    etiqueta: ETIQUETAS_CHACHA[c.clave] || c.etiqueta,
+  }));
+}
 
 /** Catálogo completo de documentos disponibles (checkboxes en UI). */
 export const CATALOGO_DOCUMENTOS: DocumentoRequisito[] = [
@@ -84,37 +114,39 @@ export const PLANTILLAS_REQUISITOS: Record<PlantillaRequisitos, RequisitosInscri
     ['ci_pdf', 'matricula_pdf', 'fotos_jpeg', 'carta_inscripcion_pdf'],
     ['facultadCarrera', 'estamento', 'descripcionConceptual', 'fotos_jpeg', 'carta_inscripcion_pdf'],
   ),
-  chacha_warmi: buildFromClaves(
-    [
-      'nombreCompleto',
-      'ci',
-      'facultadCarrera',
-      'celular',
-      'correo',
-      'nombreCompletoPareja',
-      'ciPareja',
-      'facultadCarreraPareja',
-      'celularPareja',
-      'correoPareja',
-    ],
-    [
-      'ci_chacha_pdf',
-      'matricula_chacha_pdf',
-      'ci_warmi_pdf',
-      'matricula_warmi_pdf',
-      'foto_postal_jpeg',
-      'pista_mp3',
-    ],
-    [
-      'nombreCompletoPareja',
-      'ciPareja',
-      'ci_chacha_pdf',
-      'matricula_chacha_pdf',
-      'ci_warmi_pdf',
-      'matricula_warmi_pdf',
-      'foto_postal_jpeg',
-      'pista_mp3',
-    ],
+  chacha_warmi: aplicarEtiquetasChachaWarmi(
+    buildFromClaves(
+      [
+        'nombreCompleto',
+        'ci',
+        'facultadCarrera',
+        'celular',
+        'correo',
+        'nombreCompletoPareja',
+        'ciPareja',
+        'facultadCarreraPareja',
+        'celularPareja',
+        'correoPareja',
+      ],
+      [
+        'ci_chacha_pdf',
+        'matricula_chacha_pdf',
+        'ci_warmi_pdf',
+        'matricula_warmi_pdf',
+        'foto_postal_jpeg',
+        'pista_mp3',
+      ],
+      [
+        'nombreCompletoPareja',
+        'ciPareja',
+        'ci_chacha_pdf',
+        'matricula_chacha_pdf',
+        'ci_warmi_pdf',
+        'matricula_warmi_pdf',
+        'foto_postal_jpeg',
+        'pista_mp3',
+      ],
+    ),
   ),
   generico: buildFromClaves(
     ['nombreCompleto', 'ci', 'facultadCarrera', 'celular', 'correo'],
@@ -192,90 +224,92 @@ export function asegurarDocumentosChachaWarmi(req: RequisitosInscripcion): Requi
   const claves = new Set((req.documentos || []).map((d) => d.clave));
   const yaActualizado = DOCS_CHACHA_NUEVOS.every((c) => claves.has(c));
   if (yaActualizado) {
-    return {
+    return aplicarEtiquetasChachaWarmi({
       campos: req.campos?.length ? req.campos : plantilla.campos,
       documentos: req.documentos,
-    };
+    });
   }
 
-  const keep = (req.documentos || []).filter(
-    (d) => !DOCS_CHACHA_LEGACY.has(d.clave) && !(DOCS_CHACHA_NUEVOS as readonly string[]).includes(d.clave),
-  );
-  const byClave = new Map<string, DocumentoRequisito>();
-  for (const d of plantilla.documentos) {
-    if ((DOCS_CHACHA_NUEVOS as readonly string[]).includes(d.clave) || d.clave === 'foto_postal_jpeg' || d.clave === 'pista_mp3') {
-      byClave.set(d.clave, { ...d });
+  const docsSinLegado = (req.documentos || []).filter((d) => !DOCS_CHACHA_LEGACY.has(d.clave));
+  const porClave = new Map(docsSinLegado.map((d) => [d.clave, d]));
+  for (const clave of DOCS_CHACHA_NUEVOS) {
+    if (!porClave.has(clave)) {
+      const base = CATALOGO_DOCUMENTOS.find((d) => d.clave === clave);
+      if (base) porClave.set(clave, { ...base });
     }
   }
-  for (const d of keep) {
-    byClave.set(d.clave, d);
-  }
 
-  return {
+  return aplicarEtiquetasChachaWarmi({
     campos: req.campos?.length ? req.campos : plantilla.campos,
-    documentos: Array.from(byClave.values()),
-  };
+    documentos: Array.from(porClave.values()),
+  });
 }
 
 export function normalizarRequisitos(raw: any): RequisitosInscripcion {
   const camposIn = Array.isArray(raw?.campos) ? raw.campos : [];
   const docsIn = Array.isArray(raw?.documentos) ? raw.documentos : [];
 
-  const campos: CampoRequisito[] = camposIn
+  const campos = camposIn
     .map((c: any) => {
       const base = CATALOGO_CAMPOS.find((x) => x.clave === c.clave);
       if (!base) return null;
       return {
         ...base,
-        obligatorio: c.obligatorio !== undefined ? !!c.obligatorio : base.obligatorio,
         etiqueta: c.etiqueta || base.etiqueta,
-      };
+        obligatorio: c.obligatorio !== undefined ? !!c.obligatorio : base.obligatorio,
+      } as CampoRequisito;
     })
-    .filter(Boolean);
+    .filter(Boolean) as CampoRequisito[];
 
-  const documentos: DocumentoRequisito[] = docsIn
+  const documentos = docsIn
     .map((d: any) => {
       const base = CATALOGO_DOCUMENTOS.find((x) => x.clave === d.clave);
       if (!base) return null;
       return {
         ...base,
-        obligatorio: d.obligatorio !== undefined ? !!d.obligatorio : base.obligatorio,
         etiqueta: d.etiqueta || base.etiqueta,
+        obligatorio: d.obligatorio !== undefined ? !!d.obligatorio : base.obligatorio,
         maxArchivos: d.maxArchivos || base.maxArchivos,
-      };
+        maxMb: d.maxMb || base.maxMb,
+      } as DocumentoRequisito;
     })
-    .filter(Boolean);
+    .filter(Boolean) as DocumentoRequisito[];
 
   return { campos, documentos };
 }
 
 export function requisitosDesdePlantilla(plantilla?: string): RequisitosInscripcion {
-  const key = (plantilla || 'generico') as PlantillaRequisitos;
-  return structuredClone(PLANTILLAS_REQUISITOS[key] || PLANTILLAS_REQUISITOS.generico);
+  const id = (String(plantilla || 'generico').toLowerCase() as PlantillaRequisitos);
+  const base = PLANTILLAS_REQUISITOS[id] || PLANTILLAS_REQUISITOS.generico;
+  return {
+    campos: base.campos.map((c) => ({ ...c })),
+    documentos: base.documentos.map((d) => ({ ...d })),
+  };
 }
 
 export function buildRequisitosFromSeleccion(
-  plantilla: string | undefined,
-  clavesCampos: string[] | undefined,
-  clavesDocs: string[] | undefined,
+  plantilla: string,
+  clavesCampos?: string[],
+  clavesDocumentos?: string[],
 ): RequisitosInscripcion {
-  if (Array.isArray(clavesCampos) || Array.isArray(clavesDocs)) {
+  if (Array.isArray(clavesCampos) || Array.isArray(clavesDocumentos)) {
     const plantillaBase = requisitosDesdePlantilla(plantilla);
     const setCampos = new Set(clavesCampos || plantillaBase.campos.map((c) => c.clave));
-    const setDocs = new Set(clavesDocs || plantillaBase.documentos.map((d) => d.clave));
-    const obligCampos = new Map(plantillaBase.campos.map((c) => [c.clave, c.obligatorio]));
-    const obligDocs = new Map(plantillaBase.documentos.map((d) => [d.clave, d.obligatorio]));
-
-    return {
-      campos: CATALOGO_CAMPOS.filter((c) => setCampos.has(c.clave)).map((c) => ({
-        ...c,
-        obligatorio: obligCampos.has(c.clave) ? !!obligCampos.get(c.clave) : c.obligatorio,
-      })),
-      documentos: CATALOGO_DOCUMENTOS.filter((d) => setDocs.has(d.clave)).map((d) => ({
-        ...d,
-        obligatorio: obligDocs.has(d.clave) ? !!obligDocs.get(d.clave) : d.obligatorio,
-      })),
+    const setDocs = new Set(clavesDocumentos || plantillaBase.documentos.map((d) => d.clave));
+    let result: RequisitosInscripcion = {
+      campos: CATALOGO_CAMPOS.filter((c) => setCampos.has(c.clave)).map((c) => {
+        const fromPlantilla = plantillaBase.campos.find((x) => x.clave === c.clave);
+        return { ...c, obligatorio: fromPlantilla?.obligatorio ?? c.obligatorio };
+      }),
+      documentos: CATALOGO_DOCUMENTOS.filter((d) => setDocs.has(d.clave)).map((d) => {
+        const fromPlantilla = plantillaBase.documentos.find((x) => x.clave === d.clave);
+        return { ...d, obligatorio: fromPlantilla?.obligatorio ?? d.obligatorio };
+      }),
     };
+    if (esPlantillaChachaWarmi(plantilla)) {
+      result = aplicarEtiquetasChachaWarmi(result);
+    }
+    return result;
   }
   return requisitosDesdePlantilla(plantilla);
 }

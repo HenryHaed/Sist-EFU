@@ -17,7 +17,7 @@ import { Incidencia } from '../entities/Incidencia';
 import { Infraccion } from '../entities/Infraccion';
 import { Usuario } from '../entities/Usuario';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
-import { InscripcionConcurso } from '../entities/InscripcionConcurso';
+import { InscripcionConcurso, EstadoInscripcionConcurso } from '../entities/InscripcionConcurso';
 import { DesempateFase, TipoDesempate, EstadoDesempate } from '../entities/DesempateFase';
 import { DesempateCandidato, DecisionDesempate } from '../entities/DesempateCandidato';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
@@ -25,7 +25,13 @@ import { ensureCategoriasDefault } from '../common/categorias-default';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 import { recalcularExcedentesGestion } from '../common/cupo-fraternidades';
 import { compareFechaAsc, compareTextoEs } from '../common/orden-por-fecha';
-import { esFaseChachaWarmi } from '../common/requisitos-concurso';
+import {
+  esFaseChachaWarmi,
+  esPlantillaChachaWarmi,
+  aplicarEtiquetasChachaWarmi,
+  CATALOGO_CAMPOS,
+  CATALOGO_DOCUMENTOS,
+} from '../common/requisitos-concurso';
 import {
   actaDesdeEvaluacion,
   calcularScoresEfu,
@@ -2588,6 +2594,7 @@ export class EvaluacionesService {
     this.normalizarFechasFase(payload);
 
     const esHija = !!(f.fasePadre?.idFase) || payload.heredaFinalistas === true;
+    const requisitosAntes = this.clavesRequisitosFase(f.requisitosInscripcion);
 
     if ((payload.tipoConcurso || f.tipoConcurso) === 'EXTERNO') {
       const { buildRequisitosFromSeleccion, normalizarRequisitos } = await import('../common/requisitos-concurso');
@@ -2596,9 +2603,12 @@ export class EvaluacionesService {
         payload.fechaInicioInscripcion = null;
         payload.fechaFinInscripcion = null;
         payload.cupoFinalistas = null;
-        // No permitir que una hija se desvincule sola vía update; el padre controla el enlace
       } else if (payload.requisitosInscripcion) {
         payload.requisitosInscripcion = normalizarRequisitos(payload.requisitosInscripcion);
+        const plantilla = payload.plantillaRequisitos || f.plantillaRequisitos;
+        if (esPlantillaChachaWarmi(plantilla) || esFaseChachaWarmi({ nombre: payload.nombre || f.nombre, plantillaRequisitos: plantilla })) {
+          payload.requisitosInscripcion = aplicarEtiquetasChachaWarmi(payload.requisitosInscripcion);
+        }
       } else if (clavesCampos || clavesDocumentos || payload.plantillaRequisitos) {
         payload.requisitosInscripcion = buildRequisitosFromSeleccion(
           payload.plantillaRequisitos || f.plantillaRequisitos || 'generico',
@@ -2628,12 +2638,91 @@ export class EvaluacionesService {
       await this.syncJuradosFase(saved, Array.isArray(juradosIds) ? juradosIds : []);
     }
 
-    // Solo el padre (no hija) sincroniza su fase hija
     if (!esHija && !saved.fasePadre?.idFase) {
       await this.sincronizarFaseHija(saved.idFase, idFaseHija, f.gestion?.idGestion);
     }
 
-    return this.faseRepo.findOne({ where: { idFase: saved.idFase }, relations: ['fasePadre', 'gestion'] });
+    let syncRequisitos: {
+      agregados: string[];
+      quitados: string[];
+      reinscripcionesAfectadas: number;
+    } | null = null;
+
+    if (
+      !esHija &&
+      (saved.tipoConcurso || f.tipoConcurso) === 'EXTERNO' &&
+      payload.requisitosInscripcion
+    ) {
+      syncRequisitos = await this.sincronizarInscripcionesTrasCambioRequisitos(
+        saved.idFase,
+        requisitosAntes,
+        this.clavesRequisitosFase(saved.requisitosInscripcion),
+      );
+    }
+
+    const faseOut = await this.faseRepo.findOne({
+      where: { idFase: saved.idFase },
+      relations: ['fasePadre', 'gestion'],
+    });
+    return { ...faseOut, syncRequisitos };
+  }
+
+  private clavesRequisitosFase(req: any): { campos: string[]; documentos: string[] } {
+    return {
+      campos: (req?.campos || []).map((c: any) => c.clave).filter(Boolean),
+      documentos: (req?.documentos || []).map((d: any) => d.clave).filter(Boolean),
+    };
+  }
+
+  private etiquetaClaveRequisito(clave: string): string {
+    const campo = CATALOGO_CAMPOS.find((c) => c.clave === clave);
+    if (campo) return campo.etiqueta;
+    const doc = CATALOGO_DOCUMENTOS.find((d) => d.clave === clave);
+    if (doc) return doc.etiqueta;
+    return clave;
+  }
+
+  /**
+   * Si se agregan requisitos, reinscribe (OBSERVADO) a quienes ya enviaron
+   * para que completen lo nuevo. Lo quitado solo se oculta (no se borra).
+   */
+  private async sincronizarInscripcionesTrasCambioRequisitos(
+    idFase: number,
+    antes: { campos: string[]; documentos: string[] },
+    despues: { campos: string[]; documentos: string[] },
+  ) {
+    const setAntes = new Set([...antes.campos, ...antes.documentos]);
+    const setDespues = new Set([...despues.campos, ...despues.documentos]);
+    const agregados = [...setDespues].filter((k) => !setAntes.has(k));
+    const quitados = [...setAntes].filter((k) => !setDespues.has(k));
+
+    let reinscripcionesAfectadas = 0;
+    if (agregados.length) {
+      const labels = agregados.map((k) => this.etiquetaClaveRequisito(k)).join(', ');
+      const mensaje =
+        `Se actualizaron los requisitos de inscripción. Debe completar o adjuntar: ${labels}. ` +
+        `Corrija su expediente y vuelva a enviar.`;
+
+      const inscs = await this.inscConcursoRepo.find({
+        where: {
+          fase: { idFase },
+          estado: In([
+            EstadoInscripcionConcurso.PENDIENTE,
+            EstadoInscripcionConcurso.APROBADO,
+            EstadoInscripcionConcurso.OBSERVADO,
+          ]),
+        },
+      });
+
+      for (const insc of inscs) {
+        insc.estado = EstadoInscripcionConcurso.OBSERVADO;
+        insc.observacionAdmin = mensaje;
+        await this.inscConcursoRepo.save(insc);
+        reinscripcionesAfectadas += 1;
+      }
+    }
+
+    return { agregados, quitados, reinscripcionesAfectadas };
   }
 
   /** Sincroniza qué jurados tienen habilitada una fase (crear/editar fase o modal de asignación). */

@@ -137,4 +137,12 @@ export class ConsultarReporteDto {
   @IsOptional()
   @IsEnum(PlantillaConcursoExterno)
   plantillaRequisitos?: PlantillaConcursoExterno;
+
+  /**
+   * Prefijo de cargo de directiva (presi, vice, secGen, …).
+   * Si se omite o es `todos`, incluye todos los cargos con datos.
+   */
+  @IsOptional()
+  @IsString()
+  cargoDirectiva?: string;
 }

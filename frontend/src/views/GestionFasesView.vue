@@ -474,7 +474,7 @@
                   <p class="text-[9px] text-slate-400 font-medium mb-2">Marca los que deben aparecer en el formulario de inscripción.</p>
                   <div class="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto pr-1 bg-white rounded-xl border border-slate-100 p-2">
                     <label
-                      v-for="c in catalogoCampos"
+                      v-for="c in catalogoCamposVisibles"
                       :key="c.clave"
                       class="flex items-start gap-2.5 rounded-lg p-2.5 cursor-pointer transition-colors"
                       :class="form.clavesCampos.includes(c.clave) ? 'bg-primary/5 border border-primary/20' : 'hover:bg-slate-50 border border-transparent'"
@@ -806,6 +806,26 @@ const plantillasMeta = ref([])
 const catalogoCampos = ref([])
 const catalogoDocumentos = ref([])
 const plantillasPorId = ref({})
+const etiquetasChacha = ref({
+  nombreCompleto: 'Nombre completo (Chacha)',
+  ci: 'CI del Chacha',
+  facultadCarrera: 'Facultad y Carrera (Chacha)',
+  celular: 'Celular (Chacha)',
+  correo: 'Correo (Chacha)',
+})
+/** Snapshot de requisitos al abrir el modal (para detectar cambios). */
+const requisitosSnapshot = ref({ campos: [], documentos: [] })
+
+const catalogoCamposVisibles = computed(() => {
+  const esChacha =
+    form.value.plantillaRequisitos === 'chacha_warmi' ||
+    esFaseChachaWarmi({ nombre: form.value.nombre, plantillaRequisitos: form.value.plantillaRequisitos })
+  if (!esChacha) return catalogoCampos.value
+  return (catalogoCampos.value || []).map((c) => ({
+    ...c,
+    etiqueta: etiquetasChacha.value[c.clave] || c.etiqueta,
+  }))
+})
 
 const cargarPlantillas = async () => {
   try {
@@ -814,6 +834,9 @@ const cargarPlantillas = async () => {
     catalogoCampos.value = data.catalogoCampos || []
     catalogoDocumentos.value = data.catalogoDocumentos || []
     plantillasPorId.value = data.porPlantilla || {}
+    if (data.etiquetasChacha && typeof data.etiquetasChacha === 'object') {
+      etiquetasChacha.value = { ...etiquetasChacha.value, ...data.etiquetasChacha }
+    }
   } catch (e) {
     console.error('Error cargando plantillas', e)
   }
@@ -1054,11 +1077,72 @@ const abrirModal = (item = null) => {
       heredaFinalistas: false,
     }
   }
-  
+
+  requisitosSnapshot.value = {
+    campos: [...(form.value.clavesCampos || [])],
+    documentos: [...(form.value.clavesDocumentos || [])],
+  }
+
   archivoImagen.value = null
   archivoPreview.value = null
   modalOpen.value = true
   if (!plantillasMeta.value.length) cargarPlantillas()
+}
+
+const etiquetaClaveLocal = (clave) => {
+  const fromChacha = etiquetasChacha.value[clave]
+  if (fromChacha) return fromChacha
+  const campo = (catalogoCamposVisibles.value || []).find((c) => c.clave === clave)
+  if (campo) return campo.etiqueta
+  const doc = (catalogoDocumentos.value || []).find((d) => d.clave === clave)
+  if (doc) return doc.etiqueta
+  return clave
+}
+
+const diffRequisitosVsSnapshot = () => {
+  const antesC = new Set(requisitosSnapshot.value.campos || [])
+  const antesD = new Set(requisitosSnapshot.value.documentos || [])
+  const despC = new Set(form.value.clavesCampos || [])
+  const despD = new Set(form.value.clavesDocumentos || [])
+  const agregados = [
+    ...[...despC].filter((k) => !antesC.has(k)),
+    ...[...despD].filter((k) => !antesD.has(k)),
+  ]
+  const quitados = [
+    ...[...antesC].filter((k) => !despC.has(k)),
+    ...[...antesD].filter((k) => !despD.has(k)),
+  ]
+  return { agregados, quitados }
+}
+
+const confirmarCambioRequisitos = async () => {
+  if (!editandoId.value || form.value.tipoConcurso !== 'EXTERNO' || esFaseHijaForm.value) {
+    return true
+  }
+  const { agregados, quitados } = diffRequisitosVsSnapshot()
+  if (!agregados.length && !quitados.length) return true
+
+  const lista = (arr) => arr.map((k) => `• ${etiquetaClaveLocal(k)}`).join('<br/>')
+  let html = ''
+  if (agregados.length) {
+    html += `<p class="text-left mb-2"><b>Se agregan</b> (las fraternidades / inscritos que ya enviaron pasarán a <b>Observado</b> para completar):</p><p class="text-left text-sm mb-3">${lista(agregados)}</p>`
+  }
+  if (quitados.length) {
+    html += `<p class="text-left mb-2"><b>Se quitan</b> (dejarán de pedirse y verse; lo ya enviado <b>no se borra</b>, solo se oculta):</p><p class="text-left text-sm">${lista(quitados)}</p>`
+  }
+
+  const conf = await Swal.fire({
+    title: '¿Actualizar requisitos de inscripción?',
+    html,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sí, guardar cambios',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#003399',
+    heightAuto: false,
+    target: document.body,
+  })
+  return conf.isConfirmed
 }
 
 const guardar = async () => {
@@ -1076,7 +1160,6 @@ const guardar = async () => {
     if (!form.value.clavesCampos?.length && !form.value.clavesDocumentos?.length) {
       return notify.error('Error', 'Selecciona al menos un campo o documento a solicitar en el concurso externo.')
     }
-    // Si el nombre indica Chacha-Warmi y no eligieron plantilla, forzar la correcta (inscripción por delegado).
     if (
       esFaseChachaWarmi({ nombre: form.value.nombre, plantillaRequisitos: form.value.plantillaRequisitos }) &&
       form.value.plantillaRequisitos !== 'chacha_warmi'
@@ -1100,6 +1183,8 @@ const guardar = async () => {
       return notify.error('Error Lógico', 'La fecha fin de inscripción debe ser posterior o igual a la de inicio.')
     }
   }
+
+  if (!(await confirmarCambioRequisitos())) return
 
   try {
     const payloadInfo = {
@@ -1146,15 +1231,34 @@ const guardar = async () => {
       formData.append('imagen', archivoImagen.value)
     }
 
+    let sync = null
     if (editandoId.value) {
-      await api.put(`/evaluaciones/fases/${editandoId.value}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const { data } = await api.put(`/evaluaciones/fases/${editandoId.value}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      sync = data?.syncRequisitos || null
     } else {
       await api.post('/evaluaciones/fases', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
     }
     
     modalOpen.value = false
 
-    notify.success('¡Guardado!', 'Fase guardada correctamente.')
+    if (sync && (sync.agregados?.length || sync.quitados?.length || sync.reinscripcionesAfectadas)) {
+      const partes = []
+      if (sync.agregados?.length) partes.push(`Agregados: ${sync.agregados.length}`)
+      if (sync.quitados?.length) partes.push(`Quitados (ocultos): ${sync.quitados.length}`)
+      if (sync.reinscripcionesAfectadas) {
+        partes.push(`${sync.reinscripcionesAfectadas} inscripción(es) pasaron a Observado para completar lo nuevo`)
+      }
+      await Swal.fire({
+        title: 'Fase actualizada',
+        html: `<p class="text-left">${partes.join('<br/>')}</p>`,
+        icon: 'success',
+        confirmButtonColor: '#003399',
+        heightAuto: false,
+        target: document.body,
+      })
+    } else {
+      notify.success('¡Guardado!', 'Fase guardada correctamente.')
+    }
     cargarFases()
   } catch (e) {
     const msg = e?.response?.data?.message || 'No se pudo guardar la fase.'

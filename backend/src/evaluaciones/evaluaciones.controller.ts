@@ -410,12 +410,14 @@ export class EvaluacionesController {
       PLANTILLAS_REQUISITOS,
       CATALOGO_CAMPOS,
       CATALOGO_DOCUMENTOS,
+      ETIQUETAS_CHACHA,
     } = require('../common/requisitos-concurso');
     return {
       plantillas: PLANTILLAS_META,
       porPlantilla: PLANTILLAS_REQUISITOS,
       catalogoCampos: CATALOGO_CAMPOS,
       catalogoDocumentos: CATALOGO_DOCUMENTOS,
+      etiquetasChacha: ETIQUETAS_CHACHA,
     };
   }
 

@@ -203,6 +203,39 @@
           <p class="text-[11px] text-slate-500 mt-2">{{ incidenciaDescripcion }}</p>
         </div>
 
+        <!-- Cargos de directiva (reporte selectivo) -->
+        <div v-if="filtros.tipoReporte === 'directiva'" class="sm:col-span-2 lg:col-span-3">
+          <label class="label-xs mb-2 block">Generar por cargo</label>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              @click="seleccionarCargoDirectiva('todos')"
+              class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all"
+              :class="filtros.cargoDirectiva === 'todos'
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40'"
+            >
+              Todos los cargos
+            </button>
+            <button
+              v-for="cargo in cargosDirectiva"
+              :key="cargo.prefix"
+              type="button"
+              @click="seleccionarCargoDirectiva(cargo.prefix)"
+              class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all"
+              :class="filtros.cargoDirectiva === cargo.prefix
+                ? 'bg-secondary text-white border-secondary'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-secondary/40'"
+            >
+              {{ cargo.labelCorto || cargo.label }}
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2">
+            Elige un cargo para un reporte selectivo (fraternidad, categoría, integrante y CI).
+            Luego Buscar y descarga PDF o Excel.
+          </p>
+        </div>
+
         <div>
           <label class="label-xs">Ordenar por</label>
           <select v-model="filtros.ordenarPor" class="form-input !py-2 !text-sm">
@@ -239,6 +272,16 @@
           <span v-if="generandoPdf" class="material-symbols-outlined animate-spin text-lg">progress_activity</span>
           <span v-else class="material-symbols-outlined text-lg">picture_as_pdf</span>
           Descargar PDF
+        </button>
+        <button
+          type="button"
+          @click="descargarExcel"
+          :disabled="generandoExcel || !resultado"
+          class="px-6 py-3 bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-800 disabled:opacity-50 transition-all flex items-center gap-2"
+        >
+          <span v-if="generandoExcel" class="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+          <span v-else class="material-symbols-outlined text-lg">table_view</span>
+          Descargar Excel
         </button>
       </div>
     </div>
@@ -422,6 +465,7 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '../services/api'
 import { notify } from '../utils/notify'
+import { PERSONAS_DIRECTIVA } from '../utils/personaDirectiva'
 
 const INSTANCIAS_CENTRALES = ['UMSA', 'FEDSIDUMSA', 'STUMSA']
 /** Valor sentinela: incluir todos sin filtrar por ese criterio */
@@ -429,9 +473,25 @@ const TODOS = '__TODOS__'
 
 const esValorFiltroActivo = (val) => val !== null && val !== '' && val !== TODOS
 
+const cargosDirectiva = PERSONAS_DIRECTIVA.map((p) => ({
+  ...p,
+  labelCorto: ({
+    presi: 'Presidentes',
+    vice: 'Vicepresidentes',
+    secGen: 'Sec. General',
+    secHaci: 'Sec. Hacienda',
+    secActas: 'Sec. Actas',
+    secPrensa: 'Sec. Prensa',
+    vocal: 'Vocales',
+    delCogob: 'Del. Co-Gobierno',
+    delTitular: 'Del. Titular',
+    delSuplente: 'Del. Suplente',
+  })[p.prefix] || p.label,
+}))
+
 const tiposReporte = [
   { id: 'fraternidades', label: 'Fraternidades', icon: 'groups', desc: 'Listado con tipo de danza, categoría e instancia.' },
-  { id: 'directiva', label: 'Directiva', icon: 'badge', desc: 'Integrantes por cargo de cada fraternidad.' },
+  { id: 'directiva', label: 'Directiva', icon: 'badge', desc: 'Por cargo: presidentes, vice, secretarios, vocales, delegados… PDF y Excel.' },
   { id: 'calificaciones', label: 'Calificaciones', icon: 'leaderboard', desc: 'Matriz jurados × fases EFU, Promedio Final justo y Chacha-Warmi.' },
   { id: 'disciplina', label: 'Disciplina', icon: 'gavel', desc: 'Todos los casos: banderas amarillas/rojas y sanciones por tipo.' },
   { id: 'concursantes_externos', label: 'Concursantes externos', icon: 'emoji_events', desc: 'Chacha-Warmi, fotografía u otros concursos externos de la gestión.' },
@@ -460,6 +520,7 @@ const filtros = ref({
   tipoReporte: 'fraternidades',
   alcanceListado: 'inscritas',
   tipoIncidencia: 'todos',
+  cargoDirectiva: 'todos',
   idGestion: null,
   idTipoDanza: null,
   idFacultad: null,
@@ -557,6 +618,7 @@ const onPlantillaExternaChange = () => {
 const filtrosAbiertos = ref(true)
 const loading = ref(false)
 const generandoPdf = ref(false)
+const generandoExcel = ref(false)
 const error = ref('')
 const resultado = ref(null)
 
@@ -599,11 +661,10 @@ const columnasPorTipo = {
   ],
   directiva: [
     { key: 'nombreFraternidad', label: 'Fraternidad' },
-    { key: 'tipoDanza', label: 'Danza' },
+    { key: 'categoria', label: 'Categoría' },
     { key: 'cargo', label: 'Cargo' },
-    { key: 'nombreIntegrante', label: 'Nombre' },
+    { key: 'nombreIntegrante', label: 'Directiva' },
     { key: 'ci', label: 'CI' },
-    { key: 'celular', label: 'Celular' },
   ],
   calificaciones: [
     { key: 'puesto', label: 'Puesto' },
@@ -654,6 +715,19 @@ const columnas = computed(() => {
     return variante === 'chacha_warmi'
       ? columnasPorTipo.concursantes_externos_chacha
       : columnasPorTipo.concursantes_externos
+  }
+  if (filtros.value.tipoReporte === 'directiva') {
+    const cargoUnico = filtros.value.cargoDirectiva && filtros.value.cargoDirectiva !== 'todos'
+    const cargoMeta = cargosDirectiva.find((c) => c.prefix === filtros.value.cargoDirectiva)
+    if (cargoUnico) {
+      return [
+        { key: 'nombreFraternidad', label: 'Fraternidad' },
+        { key: 'categoria', label: 'Categoría' },
+        { key: 'nombreIntegrante', label: `Directiva (${cargoMeta?.label || 'Cargo'})` },
+        { key: 'ci', label: 'CI' },
+      ]
+    }
+    return columnasPorTipo.directiva
   }
   const base = columnasPorTipo[filtros.value.tipoReporte] || columnasPorTipo.fraternidades
   if (filtros.value.tipoReporte !== 'fraternidades') return base
@@ -774,6 +848,12 @@ const seleccionarAlcance = (id) => {
   error.value = ''
 }
 
+const seleccionarCargoDirectiva = (prefix) => {
+  filtros.value.cargoDirectiva = prefix
+  resultado.value = null
+  error.value = ''
+}
+
 const seleccionarTipo = (id) => {
   filtros.value.tipoReporte = id
   if (id === 'calificaciones') {
@@ -801,6 +881,9 @@ const seleccionarTipo = (id) => {
   if (id !== 'concursantes_externos') {
     filtros.value.idFase = null
     filtros.value.plantillaRequisitos = 'todos'
+  }
+  if (id !== 'directiva') {
+    filtros.value.cargoDirectiva = 'todos'
   }
   resultado.value = null
   error.value = ''
@@ -832,6 +915,11 @@ const buildPayload = (page) => {
     delete p.plantillaRequisitos
   } else if (!p.plantillaRequisitos || p.plantillaRequisitos === 'todos') {
     delete p.plantillaRequisitos
+  }
+  if (p.tipoReporte !== 'directiva') {
+    delete p.cargoDirectiva
+  } else if (!p.cargoDirectiva || p.cargoDirectiva === 'todos') {
+    delete p.cargoDirectiva
   }
   Object.keys(p).forEach((k) => {
     if (p[k] === null || p[k] === '' || p[k] === TODOS) delete p[k]
@@ -893,7 +981,10 @@ const descargarPdf = async () => {
     const url = URL.createObjectURL(data)
     const link = document.createElement('a')
     link.href = url
-    link.download = `Reporte_${filtros.value.tipoReporte}_${Date.now()}.pdf`
+    const cargo = filtros.value.tipoReporte === 'directiva' && filtros.value.cargoDirectiva !== 'todos'
+      ? `_${filtros.value.cargoDirectiva}`
+      : ''
+    link.download = `Reporte_${filtros.value.tipoReporte}${cargo}_${Date.now()}.pdf`
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -903,6 +994,34 @@ const descargarPdf = async () => {
     notify.error('Error', 'No se pudo generar el PDF.')
   } finally {
     generandoPdf.value = false
+  }
+}
+
+const descargarExcel = async () => {
+  if (filtros.value.tipoReporte === 'calificaciones' && !esValorFiltroActivo(filtros.value.idGestion)) {
+    notify.warning('Gestión requerida', 'Selecciona una gestión específica para el Excel de calificaciones.')
+    return
+  }
+
+  generandoExcel.value = true
+  try {
+    const { data } = await api.post('/reportes/consultar/excel', buildPayload(1), { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    const link = document.createElement('a')
+    link.href = url
+    const cargo = filtros.value.tipoReporte === 'directiva' && filtros.value.cargoDirectiva !== 'todos'
+      ? `_${filtros.value.cargoDirectiva}`
+      : ''
+    link.download = `Reporte_${filtros.value.tipoReporte}${cargo}_${Date.now()}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    notify.success('Excel generado', 'El reporte se descargó correctamente.')
+  } catch {
+    notify.error('Error', 'No se pudo generar el Excel.')
+  } finally {
+    generandoExcel.value = false
   }
 }
 

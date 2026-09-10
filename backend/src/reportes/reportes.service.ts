@@ -15,7 +15,7 @@ import { Carrera } from '../entities/Carrera';
 import { Categoria } from '../entities/Categoria';
 import { SolicitudInscripcion, EstadoSolicitud } from '../entities/SolicitudInscripcion';
 import { ensureTiposDanzaDefault } from '../common/tipos-danza-default';
-import { buildMiembrosDirectiva } from '../common/personas-directiva';
+import { buildMiembrosDirectiva, PERSONAS_DIRECTIVA } from '../common/personas-directiva';
 import {
   ConsultarReporteDto,
   TipoReporte,
@@ -457,6 +457,17 @@ export class ReportesService implements OnModuleInit {
     const fraternidades = await this.buildFraternidadQuery(dto).getMany();
 
     if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
+      const cargoFiltro = String(dto.cargoDirectiva || 'todos').trim();
+      const prefijoValido =
+        cargoFiltro !== 'todos'
+          ? PERSONAS_DIRECTIVA.find((p) => p.prefix === cargoFiltro)
+          : null;
+      if (cargoFiltro !== 'todos' && !prefijoValido) {
+        throw new BadRequestException(
+          `Cargo de directiva inválido. Usa: ${PERSONAS_DIRECTIVA.map((p) => p.prefix).join(', ')} o todos.`,
+        );
+      }
+
       const rows: any[] = [];
       for (const f of fraternidades) {
         const solicitud = await this.solicitudRepo.findOne({
@@ -468,15 +479,27 @@ export class ReportesService implements OnModuleInit {
         });
         if (!solicitud) continue;
         const base = this.mapFraternidadRow(f);
-        const miembros = buildMiembrosDirectiva(solicitud);
-        for (const m of miembros) {
+        let miembros = buildMiembrosDirectiva(solicitud);
+        if (prefijoValido) {
+          // Una fila por fraternidad del cargo elegido (aunque esté vacío)
+          const m = miembros.find((x) => x.prefix === prefijoValido.prefix);
           rows.push({
             ...base,
-            cargo: m.cargo,
-            nombreIntegrante: m.nombre,
-            ci: m.ci,
-            celular: m.celular || '—',
+            cargo: prefijoValido.label,
+            cargoPrefix: prefijoValido.prefix,
+            nombreIntegrante: m?.nombre || '—',
+            ci: m?.ci && m.ci !== '—' ? m.ci : '—',
           });
+        } else {
+          for (const m of miembros) {
+            rows.push({
+              ...base,
+              cargo: m.cargo,
+              cargoPrefix: m.prefix,
+              nombreIntegrante: m.nombre || '—',
+              ci: m.ci || '—',
+            });
+          }
         }
       }
       const total = rows.length;
@@ -486,6 +509,8 @@ export class ReportesService implements OnModuleInit {
         page,
         limit,
         filtros: dto,
+        cargoDirectiva: prefijoValido?.prefix || 'todos',
+        cargoDirectivaLabel: prefijoValido?.label || 'Todos los cargos',
         data: rows.slice(skip, skip + limit),
       };
     }
@@ -1118,6 +1143,13 @@ export class ReportesService implements OnModuleInit {
       concursantes_externos: 'REPORTE DE CONCURSANTES EXTERNOS',
     };
 
+    if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
+      const cargoLabel = (resultado as any).cargoDirectivaLabel;
+      if (cargoLabel && (resultado as any).cargoDirectiva !== 'todos') {
+        titulos.directiva = `REPORTE DE DIRECTIVA — ${String(cargoLabel).toUpperCase()}`;
+      }
+    }
+
     const alcanceLabel: Record<string, string> = {
       inscritas: 'Inscritas',
       pendientes: 'Pendientes',
@@ -1375,17 +1407,31 @@ export class ReportesService implements OnModuleInit {
       const dataRows = rows.map((row, i) => colDefs.map((c) => c.cell(row, i)));
       renderTable(headers, widths, dataRows);
     } else if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
-      const headers = ['N°', 'Fraternidad', 'Tipo de danza', 'Cargo', 'Nombre completo', 'CI', 'Celular'];
-      const widths = [28, 130, 95, 100, 180, 70, 80];
-      const dataRows = rows.map((row, i) => [
-        String(i + 1),
-        row.nombreFraternidad || '—',
-        row.tipoDanza || '—',
-        row.cargo || '—',
-        row.nombreIntegrante || '—',
-        row.ci || '—',
-        row.celular || '—',
-      ]);
+      const cargoUnico = (resultado as any).cargoDirectiva && (resultado as any).cargoDirectiva !== 'todos';
+      const headers = cargoUnico
+        ? ['N°', 'Fraternidad', 'Categoría', `Directiva (${(resultado as any).cargoDirectivaLabel})`, 'CI']
+        : ['N°', 'Fraternidad', 'Categoría', 'Cargo', 'Nombre completo', 'CI'];
+      const widths = cargoUnico
+        ? [28, 160, 110, 220, 90]
+        : [28, 140, 100, 110, 180, 80];
+      const dataRows = rows.map((row, i) =>
+        cargoUnico
+          ? [
+              String(i + 1),
+              row.nombreFraternidad || '—',
+              row.categoria || '—',
+              row.nombreIntegrante || '—',
+              row.ci || '—',
+            ]
+          : [
+              String(i + 1),
+              row.nombreFraternidad || '—',
+              row.categoria || '—',
+              row.cargo || '—',
+              row.nombreIntegrante || '—',
+              row.ci || '—',
+            ],
+      );
       renderTable(headers, widths, dataRows);
     } else if (dto.tipoReporte === TipoReporte.DISCIPLINA) {
       const headers = ['N°', 'Fraternidad', 'Tipo', 'Detalle', 'Impacto', 'Fecha', 'Gestión'];
@@ -1689,5 +1735,100 @@ export class ReportesService implements OnModuleInit {
     }
 
     doc.end();
+  }
+
+  /** Excel (.xlsx) de la misma consulta (hasta 5000 filas). */
+  async generarExcelConsulta(dto: ConsultarReporteDto, res: Response) {
+    const resultado = await this.consultar({ ...dto, page: 1, limit: 500 });
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Entrada Universitaria EFU';
+    workbook.created = new Date();
+
+    const sheetName =
+      dto.tipoReporte === TipoReporte.DIRECTIVA
+        ? (resultado as any).cargoDirectiva !== 'todos'
+          ? String((resultado as any).cargoDirectivaLabel || 'Directiva').slice(0, 28)
+          : 'Directiva'
+        : String(dto.tipoReporte).slice(0, 28);
+    const sheet = workbook.addWorksheet(sheetName || 'Reporte');
+    const rows = resultado.data || [];
+
+    if (dto.tipoReporte === TipoReporte.DIRECTIVA) {
+      const cargoUnico = (resultado as any).cargoDirectiva && (resultado as any).cargoDirectiva !== 'todos';
+      const cargoLabel = (resultado as any).cargoDirectivaLabel || 'Cargo';
+      if (cargoUnico) {
+        sheet.columns = [
+          { header: 'N°', key: 'n', width: 6 },
+          { header: 'Fraternidad', key: 'fraternidad', width: 36 },
+          { header: 'Categoría', key: 'categoria', width: 18 },
+          { header: `Directiva (${cargoLabel})`, key: 'nombre', width: 40 },
+          { header: 'CI', key: 'ci', width: 16 },
+        ];
+        rows.forEach((row: any, i: number) => {
+          sheet.addRow({
+            n: i + 1,
+            fraternidad: row.nombreFraternidad || '—',
+            categoria: row.categoria || '—',
+            nombre: row.nombreIntegrante || '—',
+            ci: row.ci || '—',
+          });
+        });
+      } else {
+        sheet.columns = [
+          { header: 'N°', key: 'n', width: 6 },
+          { header: 'Fraternidad', key: 'fraternidad', width: 32 },
+          { header: 'Categoría', key: 'categoria', width: 16 },
+          { header: 'Cargo', key: 'cargo', width: 22 },
+          { header: 'Nombre completo', key: 'nombre', width: 36 },
+          { header: 'CI', key: 'ci', width: 16 },
+        ];
+        rows.forEach((row: any, i: number) => {
+          sheet.addRow({
+            n: i + 1,
+            fraternidad: row.nombreFraternidad || '—',
+            categoria: row.categoria || '—',
+            cargo: row.cargo || '—',
+            nombre: row.nombreIntegrante || '—',
+            ci: row.ci || '—',
+          });
+        });
+      }
+    } else {
+      // Genérico: exportar claves de la primera fila
+      const sample = rows[0] || {};
+      const keys = Object.keys(sample).filter((k) => typeof sample[k] !== 'object');
+      sheet.columns = [
+        { header: 'N°', key: '__n', width: 6 },
+        ...keys.map((k) => ({ header: k, key: k, width: 18 })),
+      ];
+      rows.forEach((row: any, i: number) => {
+        const out: any = { __n: i + 1 };
+        for (const k of keys) out[k] = row[k] == null || row[k] === '' ? '—' : String(row[k]);
+        sheet.addRow(out);
+      });
+    }
+
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF003399' },
+    };
+    headerRow.alignment = { vertical: 'middle', wrapText: true };
+
+    const cargoSuffix =
+      dto.tipoReporte === TipoReporte.DIRECTIVA && (resultado as any).cargoDirectiva !== 'todos'
+        ? `_${(resultado as any).cargoDirectiva}`
+        : '';
+    const filename = `Reporte_${dto.tipoReporte}${cargoSuffix}_${Date.now()}.xlsx`;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    await workbook.xlsx.write(res);
+    res.end();
   }
 }

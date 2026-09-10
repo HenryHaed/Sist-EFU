@@ -35,4 +35,10 @@ export class ReportesController {
   async consultarPdf(@Body() dto: ConsultarReporteDto, @Res() res: Response) {
     return this.reportesService.generarPdfConsulta(dto, res);
   }
+
+  @Post('consultar/excel')
+  @Roles('superusuario', 'admin')
+  async consultarExcel(@Body() dto: ConsultarReporteDto, @Res() res: Response) {
+    return this.reportesService.generarExcelConsulta(dto, res);
+  }
 }
