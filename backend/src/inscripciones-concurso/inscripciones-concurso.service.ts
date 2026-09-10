@@ -1116,6 +1116,198 @@ export class InscripcionesConcursoService {
     return rows;
   }
 
+  /**
+   * Listado Chacha-Warmi ordenado por fecha de solicitud (primero quien envió primero).
+   * Excluye borradores (aún no enviados).
+   */
+  async listadoChachaPorFecha(idFase?: number) {
+    const rows = await this.obtenerInscripcionesChachaOrdenadas(idFase);
+    return {
+      total: rows.length,
+      idFase: idFase || null,
+      data: rows.map((insc, i) => this.mapFilaChachaPorFecha(insc, i + 1)),
+    };
+  }
+
+  async generarPdfListadoChachaPorFecha(idFase: number | undefined, res: import('express').Response) {
+    const rows = await this.obtenerInscripcionesChachaOrdenadas(idFase);
+    const PDFDocument = require('pdfkit');
+    const { drawPdfInstitutionalHeader, PDF_UMSA_BLUE } = await import('../common/pdf-layout');
+
+    const doc = new PDFDocument({
+      margin: 36,
+      size: 'A4',
+      layout: 'landscape',
+      bufferPages: true,
+    });
+    const pageW = 841.89;
+    const pageH = 595.28;
+    const margin = 36;
+    const contentW = pageW - margin * 2;
+
+    const faseNombre =
+      (idFase && rows[0]?.fase?.nombre) ||
+      rows[0]?.fase?.nombre ||
+      'Chacha-Warmi';
+    const gestionAnio = rows[0]?.gestion?.anio;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=Listado_Chacha_por_fecha_${Date.now()}.pdf`,
+    );
+    doc.pipe(res);
+
+    const header = drawPdfInstitutionalHeader(
+      doc,
+      'LISTADO DE INSCRIPCIONES CHACHA-WARMI',
+      `Por fecha de solicitud (primero → último)${gestionAnio ? ` · Gestión ${gestionAnio}` : ''} · ${faseNombre}`,
+      { pageWidth: pageW, margin, compact: true },
+    );
+    let y = header.contentStartY;
+
+    doc
+      .fontSize(8)
+      .fillColor('#64748b')
+      .font('Helvetica')
+      .text(
+        `${rows.length} pareja(s). Orden: quien envió primero aparece primero.`,
+        margin,
+        y,
+        { width: contentW },
+      );
+    y += 16;
+
+    const headers = ['N°', 'Fecha solicitud', 'Fraternidad', 'Chacha', 'Warmi'];
+    const widths = [28, 110, 200, 200, 200];
+    const rowH = 18;
+
+    const drawHeader = () => {
+      let x = margin;
+      doc.rect(margin, y, contentW, rowH).fill(PDF_UMSA_BLUE);
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8);
+      headers.forEach((h, i) => {
+        doc.text(h, x + 3, y + 5, { width: widths[i] - 6, lineBreak: false });
+        x += widths[i];
+      });
+      y += rowH;
+    };
+
+    drawHeader();
+
+    for (let i = 0; i < rows.length; i++) {
+      const fila = this.mapFilaChachaPorFecha(rows[i], i + 1);
+      if (y + rowH > pageH - margin - 28) {
+        doc.addPage();
+        const h2 = drawPdfInstitutionalHeader(
+          doc,
+          'LISTADO DE INSCRIPCIONES CHACHA-WARMI',
+          'Continuación · por fecha de solicitud',
+          { pageWidth: pageW, margin, compact: true },
+        );
+        y = h2.contentStartY + 4;
+        drawHeader();
+      }
+
+      const bg = i % 2 === 0 ? '#f8fafc' : '#ffffff';
+      doc.rect(margin, y, contentW, rowH).fill(bg);
+      doc.fillColor('#0f172a').font('Helvetica').fontSize(7.5);
+      let x = margin;
+      const cells = [
+        String(fila.nro),
+        fila.fechaSolicitudLabel,
+        fila.nombreFraternidad,
+        fila.nombreChacha,
+        fila.nombreWarmi,
+      ];
+      cells.forEach((c, ci) => {
+        doc.text(String(c || '—'), x + 3, y + 5, {
+          width: widths[ci] - 6,
+          lineBreak: false,
+          ellipsis: true,
+        });
+        x += widths[ci];
+      });
+      y += rowH;
+    }
+
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
+      doc
+        .fontSize(7)
+        .fillColor('#94a3b8')
+        .font('Helvetica')
+        .text(`Página ${i + 1} de ${range.count}`, margin, pageH - margin - 12, {
+          width: contentW,
+          align: 'center',
+          lineBreak: false,
+        });
+    }
+    doc.end();
+  }
+
+  private async obtenerInscripcionesChachaOrdenadas(idFase?: number) {
+    const where: any = {};
+    if (idFase) where.fase = { idFase };
+    const all = await this.inscRepo.find({
+      where,
+      relations: [
+        'usuario',
+        'usuario.fraternidad',
+        'fraternidad',
+        'fraternidad.tipoDanza',
+        'fraternidad.categoria',
+        'fase',
+        'gestion',
+      ],
+      order: { idInscripcion: 'ASC' },
+    });
+
+    const chacha = all.filter((insc) => {
+      if (!esFaseChachaWarmi(insc.fase)) return false;
+      if (insc.estado === EstadoInscripcionConcurso.BORRADOR) return false;
+      return true;
+    });
+
+    chacha.sort((a, b) => {
+      const fa = a.fechaEnvio || a.createdAt;
+      const fb = b.fechaEnvio || b.createdAt;
+      const ta = fa ? new Date(fa).getTime() : Number.POSITIVE_INFINITY;
+      const tb = fb ? new Date(fb).getTime() : Number.POSITIVE_INFINITY;
+      if (ta !== tb) return ta - tb;
+      return a.idInscripcion - b.idInscripcion;
+    });
+    return chacha;
+  }
+
+  private mapFilaChachaPorFecha(insc: InscripcionConcurso, nro: number) {
+    const datos = (insc.datos || {}) as Record<string, any>;
+    const frat = insc.fraternidad || insc.usuario?.fraternidad;
+    const fecha = insc.fechaEnvio || insc.createdAt;
+    return {
+      nro,
+      idInscripcion: insc.idInscripcion,
+      estado: insc.estado,
+      fechaSolicitud: fecha || null,
+      fechaSolicitudLabel: fecha
+        ? new Date(fecha).toLocaleString('es-BO', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '—',
+      nombreFraternidad: frat?.nombre || '—',
+      tipoDanza: (frat as any)?.tipoDanza?.nombre || null,
+      categoria: (frat as any)?.categoria?.nombre || null,
+      nombreChacha: String(datos.nombreCompleto || insc.participante?.nombre || '—').trim() || '—',
+      nombreWarmi: String(datos.nombreCompletoPareja || insc.participantePareja?.nombre || '—').trim() || '—',
+      concurso: insc.fase?.nombre || '—',
+    };
+  }
+
   async getDetalleAdmin(idInscripcion: number) {
     const insc = await this.inscRepo.findOne({
       where: { idInscripcion },

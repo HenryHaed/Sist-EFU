@@ -39,6 +39,15 @@
             <option value="">Todos los concursos</option>
             <option v-for="f in fasesExternas" :key="f.idFase" :value="f.idFase">{{ f.nombre }}</option>
           </select>
+          <button
+            type="button"
+            @click="abrirModalListadoChacha"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-amber-200 text-amber-800 hover:bg-amber-50 rounded-xl text-xs font-black uppercase tracking-widest shrink-0"
+            title="Listado Chacha Warmi por fecha de solicitud"
+          >
+            <span class="material-symbols-outlined text-[18px]">format_list_numbered</span>
+            Listado Chacha Warmi
+          </button>
         </div>
       </div>
 
@@ -463,6 +472,93 @@
         </div>
       </div>
     </transition>
+
+    <!-- ===== MODAL LISTADO CHACHA POR FECHA ===== -->
+    <teleport to="body">
+      <transition name="slide-right">
+        <div
+          v-if="modalListadoChacha"
+          class="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6"
+        >
+          <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="cerrarModalListadoChacha"></div>
+          <div
+            class="relative w-full max-w-5xl max-h-[90vh] bg-white rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden"
+          >
+            <div class="shrink-0 px-5 sm:px-6 py-4 border-b border-slate-100 flex items-start justify-between gap-4 bg-amber-50/80">
+              <div class="min-w-0">
+                <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">Chacha-Warmi</p>
+                <h3 class="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-tight">
+                  Listado por fecha de solicitud
+                </h3>
+                <p class="text-xs text-slate-500 font-medium mt-1">
+                  Primero quien envió primero · solo fraternidad y pareja concursante
+                  <span v-if="filtroFase"> · filtrado por el concurso seleccionado</span>
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  @click="descargarPdfListadoChacha"
+                  :disabled="loadingListadoChacha || !listadoChacha.length || descargandoPdfChacha"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+                >
+                  <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                  {{ descargandoPdfChacha ? 'Generando…' : 'Descargar PDF' }}
+                </button>
+                <button
+                  type="button"
+                  @click="cerrarModalListadoChacha"
+                  class="size-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center justify-center"
+                >
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex-1 overflow-auto custom-scrollbar p-4 sm:p-5">
+              <div v-if="loadingListadoChacha" class="py-16 text-center text-slate-400">
+                <span class="material-symbols-outlined animate-spin text-4xl">progress_activity</span>
+              </div>
+              <div v-else-if="!listadoChacha.length" class="py-16 text-center text-slate-400">
+                <span class="material-symbols-outlined text-5xl mb-2 opacity-30">inbox</span>
+                <p class="font-bold text-sm">No hay solicitudes Chacha-Warmi enviadas.</p>
+              </div>
+              <div v-else class="overflow-x-auto rounded-2xl border border-slate-200">
+                <table class="w-full text-left text-sm">
+                  <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 w-12">N°</th>
+                      <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 whitespace-nowrap">Fecha solicitud</th>
+                      <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Fraternidad</th>
+                      <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Chacha</th>
+                      <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Warmi</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    <tr
+                      v-for="fila in listadoChacha"
+                      :key="fila.idInscripcion"
+                      class="hover:bg-slate-50/80"
+                    >
+                      <td class="px-3 py-2.5 font-black text-primary tabular-nums">{{ fila.nro }}</td>
+                      <td class="px-3 py-2.5 text-xs text-slate-600 whitespace-nowrap font-medium">
+                        {{ fila.fechaSolicitudLabel }}
+                      </td>
+                      <td class="px-3 py-2.5 font-bold text-slate-800">{{ fila.nombreFraternidad }}</td>
+                      <td class="px-3 py-2.5 text-slate-700">{{ fila.nombreChacha }}</td>
+                      <td class="px-3 py-2.5 text-slate-700">{{ fila.nombreWarmi }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-if="listadoChacha.length" class="mt-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                {{ listadoChacha.length }} pareja(s)
+              </p>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </teleport>
   </div>
 </template>
 
@@ -491,6 +587,11 @@ const seccionActiva = ref('sec-datos')
 const panelScroll = ref(null)
 const actualizando = ref(false)
 const guardandoProgreso = ref(false)
+
+const modalListadoChacha = ref(false)
+const listadoChacha = ref([])
+const loadingListadoChacha = ref(false)
+const descargandoPdfChacha = ref(false)
 
 const esChacha = (item) => esFaseChachaWarmi(item?.fase)
 
@@ -930,6 +1031,47 @@ const cargar = async () => {
     Swal.fire('Error', e.response?.data?.message || 'No se pudieron cargar las inscripciones', 'error')
   } finally {
     loading.value = false
+  }
+}
+
+const abrirModalListadoChacha = async () => {
+  modalListadoChacha.value = true
+  loadingListadoChacha.value = true
+  listadoChacha.value = []
+  try {
+    const params = filtroFase.value ? `?idFase=${filtroFase.value}` : ''
+    const { data } = await api.get(`/inscripciones-concurso/chacha-warmi/listado-por-fecha${params}`)
+    listadoChacha.value = data?.data || []
+  } catch (e) {
+    Swal.fire('Error', e.response?.data?.message || 'No se pudo cargar el listado Chacha-Warmi', 'error')
+    modalListadoChacha.value = false
+  } finally {
+    loadingListadoChacha.value = false
+  }
+}
+
+const cerrarModalListadoChacha = () => {
+  modalListadoChacha.value = false
+}
+
+const descargarPdfListadoChacha = async () => {
+  descargandoPdfChacha.value = true
+  try {
+    const params = filtroFase.value ? `?idFase=${filtroFase.value}` : ''
+    const { data } = await api.get(
+      `/inscripciones-concurso/chacha-warmi/listado-por-fecha/pdf${params}`,
+      { responseType: 'blob' },
+    )
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Listado_Chacha_por_fecha_${Date.now()}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    Swal.fire('Error', e.response?.data?.message || 'No se pudo descargar el PDF', 'error')
+  } finally {
+    descargandoPdfChacha.value = false
   }
 }
 

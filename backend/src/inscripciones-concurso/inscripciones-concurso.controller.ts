@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Res,
   UseGuards,
   Request,
   ParseIntPipe,
@@ -14,6 +15,7 @@ import {
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -135,6 +137,24 @@ export class InscripcionesConcursoController {
   @Roles('superusuario', 'admin')
   listar(@Query('idFase') idFase?: string) {
     return this.service.listarAdmin(idFase ? parseInt(idFase, 10) : undefined);
+  }
+
+  @Get('chacha-warmi/listado-por-fecha')
+  @Roles('superusuario', 'admin')
+  listadoChachaPorFecha(@Query('idFase') idFase?: string) {
+    return this.service.listadoChachaPorFecha(idFase ? parseInt(idFase, 10) : undefined);
+  }
+
+  @Get('chacha-warmi/listado-por-fecha/pdf')
+  @Roles('superusuario', 'admin')
+  async pdfListadoChachaPorFecha(
+    @Query('idFase') idFase: string | undefined,
+    @Res() res: Response,
+  ) {
+    return this.service.generarPdfListadoChachaPorFecha(
+      idFase ? parseInt(idFase, 10) : undefined,
+      res,
+    );
   }
 
   @Get(':id')
