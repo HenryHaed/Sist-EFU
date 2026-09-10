@@ -1,11 +1,23 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execFileSync } from 'child_process';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegStatic from 'ffmpeg-static';
+
+// CommonJS: default import rompe en runtime (fluent_ffmpeg_1.default is not a function)
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const ffmpeg = require('fluent-ffmpeg') as typeof import('fluent-ffmpeg');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const ffmpegStaticRaw = require('ffmpeg-static') as string | { default?: string } | null;
 
 /** Máximo de duración de la pista Chacha-Warmi (desde el inicio). */
 export const PISTA_MP3_MAX_SEGUNDOS = 60;
+
+function ffmpegStaticPath(): string | null {
+  if (typeof ffmpegStaticRaw === 'string') return ffmpegStaticRaw;
+  if (ffmpegStaticRaw && typeof (ffmpegStaticRaw as any).default === 'string') {
+    return (ffmpegStaticRaw as any).default;
+  }
+  return null;
+}
 
 /**
  * Resuelve la ruta al binario ffmpeg:
@@ -13,13 +25,12 @@ export const PISTA_MP3_MAX_SEGUNDOS = 60;
  * 2) `ffmpeg` del sistema (PATH), p.ej. apt install ffmpeg
  */
 export function resolveFfmpegBinary(): string | null {
-  const fromPkg = typeof ffmpegStatic === 'string' ? ffmpegStatic : null;
+  const fromPkg = ffmpegStaticPath();
   if (fromPkg && fs.existsSync(fromPkg)) {
     try {
       fs.accessSync(fromPkg, fs.constants.X_OK);
       return fromPkg;
     } catch {
-      // existe pero sin permiso de ejecución: aún puede servir vía node spawn en algunos OS
       return fromPkg;
     }
   }
@@ -78,7 +89,7 @@ export async function trimMp3ToMaxSeconds(
       .audioBitrate('128k')
       .outputOptions(['-y'])
       .on('end', () => resolve())
-      .on('error', (err) => reject(err))
+      .on('error', (err: Error) => reject(err))
       .save(tmpOut);
   });
 
