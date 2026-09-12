@@ -792,7 +792,11 @@ export class EvaluacionesService {
           };
         });
 
-        return { fase: { ...faseInfo, modoCalificacion: 'fraternidad' }, sujetos };
+        return this.empaquetarListadoCalificacionesAdmin(
+          { ...faseInfo, modoCalificacion: 'fraternidad' },
+          sujetos,
+          'fraternidad',
+        );
       }
 
       const participantes = await this.participanteRepo.find({
@@ -831,7 +835,7 @@ export class EvaluacionesService {
         };
       });
 
-      return { fase: faseInfo, sujetos };
+      return this.empaquetarListadoCalificacionesAdmin(faseInfo, sujetos, 'participante');
     }
 
     const idGestionFase = fase.gestion?.idGestion || (await this.getGestionActiva())?.idGestion;
@@ -873,7 +877,183 @@ export class EvaluacionesService {
       };
     });
 
-    return { fase: faseInfo, sujetos };
+    return this.empaquetarListadoCalificacionesAdmin(faseInfo, sujetos, 'fraternidad');
+  }
+
+  /**
+   * Empaqueta listado admin: ranking por promedio (solo actas COMPLETADO / N jurados que sellaron).
+   */
+  private empaquetarListadoCalificacionesAdmin(
+    fase: Record<string, any>,
+    sujetos: any[],
+    tipoSujeto: 'fraternidad' | 'participante',
+  ) {
+    const calificados = sujetos
+      .filter((s) => s.promedioSellado != null && Number(s.cantidadCompletadas) > 0)
+      .slice()
+      .sort((a, b) => {
+        const pa = Number(a.promedioSellado) || 0;
+        const pb = Number(b.promedioSellado) || 0;
+        if (pb !== pa) return pb - pa;
+        return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+      })
+      .map((s, i) => ({
+        ...s,
+        puesto: i + 1,
+        puntajeFinal: s.promedioSellado,
+      }));
+
+    return {
+      fase,
+      tipoSujeto,
+      formula:
+        'Puntaje final = suma(notas selladas de jurados) / N jurados que calificaron a ese sujeto',
+      sujetos,
+      ranking: calificados,
+      resumen: {
+        totalSujetos: sujetos.length,
+        conNota: calificados.length,
+        sinNota: sujetos.length - calificados.length,
+      },
+    };
+  }
+
+  /** PDF: sujetos ya calificados (con actas COMPLETADO) y su puntaje final promediado. */
+  async generarPdfListadoCalificacionesAdmin(idFase: number, res: any) {
+    const data = await this.getListadoCalificacionesAdmin(idFase);
+    const PDFDocument = require('pdfkit');
+    const { drawPdfInstitutionalHeader, PDF_UMSA_BLUE } = await import('../common/pdf-layout');
+
+    const ranking = data.ranking || [];
+    const esParticipante = data.tipoSujeto === 'participante';
+    const faseNombre = data.fase?.nombre || 'Fase';
+    const gestionAnio = (await this.getGestionActiva())?.anio;
+
+    const doc = new PDFDocument({
+      margin: 40,
+      size: 'A4',
+      layout: 'portrait',
+      bufferPages: true,
+    });
+    const pageW = 595.28;
+    const pageH = 841.89;
+    const margin = 40;
+    const contentW = pageW - margin * 2;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=Puntajes_fase_${idFase}_${Date.now()}.pdf`,
+    );
+    doc.pipe(res);
+
+    const header = drawPdfInstitutionalHeader(
+      doc,
+      'PUNTAJES PROMEDIADOS POR FASE',
+      `${faseNombre}${gestionAnio ? ` · Gestión ${gestionAnio}` : ''} · solo sujetos con actas selladas`,
+      { pageWidth: pageW, margin, compact: true },
+    );
+    let y = header.contentStartY;
+
+    doc
+      .fontSize(8)
+      .fillColor('#64748b')
+      .font('Helvetica')
+      .text(
+        `Fórmula: suma(notas selladas) ÷ N jurados que calificaron. ${ranking.length} sujeto(s) con nota.`,
+        margin,
+        y,
+        { width: contentW },
+      );
+    y += 16;
+
+    const headers = esParticipante
+      ? ['N°', 'Participante', 'Fraternidad', 'Jurados', 'Puntaje final']
+      : ['N°', 'Fraternidad', 'Detalle', 'Jurados', 'Puntaje final'];
+    const widths = esParticipante ? [28, 180, 150, 55, 70] : [28, 200, 140, 55, 70];
+    const rowH = 18;
+
+    const drawHeader = () => {
+      let x = margin;
+      doc.rect(margin, y, contentW, rowH).fill(PDF_UMSA_BLUE);
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8);
+      headers.forEach((h, i) => {
+        doc.text(h, x + 3, y + 5, { width: widths[i] - 6, lineBreak: false });
+        x += widths[i];
+      });
+      y += rowH;
+    };
+
+    drawHeader();
+
+    if (!ranking.length) {
+      doc
+        .fillColor('#64748b')
+        .font('Helvetica')
+        .fontSize(9)
+        .text('Aún no hay sujetos con actas selladas en esta fase.', margin, y + 8, {
+          width: contentW,
+        });
+    }
+
+    for (let i = 0; i < ranking.length; i++) {
+      const row = ranking[i];
+      if (y + rowH > pageH - margin - 28) {
+        doc.addPage();
+        const h2 = drawPdfInstitutionalHeader(
+          doc,
+          'PUNTAJES PROMEDIADOS POR FASE',
+          `Continuación · ${faseNombre}`,
+          { pageWidth: pageW, margin, compact: true },
+        );
+        y = h2.contentStartY + 4;
+        drawHeader();
+      }
+
+      const bg = i % 2 === 0 ? '#f8fafc' : '#ffffff';
+      doc.rect(margin, y, contentW, rowH).fill(bg);
+      doc.fillColor('#0f172a').font('Helvetica').fontSize(7.5);
+      let x = margin;
+      const detalle = esParticipante
+        ? row.fraternidad || row.tipoParticipante || '—'
+        : row.categoria ||
+          (Array.isArray(row.nombresPareja) && row.nombresPareja.length
+            ? row.nombresPareja.join(' / ')
+            : '—');
+      const cells = [
+        String(row.puesto),
+        String(row.nombre || '—'),
+        String(detalle),
+        String(row.cantidadCompletadas ?? 0),
+        String(row.puntajeFinal ?? row.promedioSellado ?? '—'),
+      ];
+      cells.forEach((c, ci) => {
+        const align = ci === 0 || ci === 3 || ci === 4 ? 'center' : 'left';
+        doc.font(ci === 4 ? 'Helvetica-Bold' : 'Helvetica').text(c, x + 3, y + 5, {
+          width: widths[ci] - 6,
+          lineBreak: false,
+          ellipsis: true,
+          align,
+        });
+        x += widths[ci];
+      });
+      y += rowH;
+    }
+
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
+      doc
+        .fontSize(7)
+        .fillColor('#94a3b8')
+        .font('Helvetica')
+        .text(`Página ${i + 1} de ${range.count}`, margin, pageH - margin - 12, {
+          width: contentW,
+          align: 'center',
+          lineBreak: false,
+        });
+    }
+    doc.end();
   }
 
   /**

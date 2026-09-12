@@ -140,6 +140,15 @@ export class EvaluacionesController {
     return this.evaluacionesService.getListadoCalificacionesAdmin(idFase);
   }
 
+  @Get('fase/:idFase/listado-calificaciones-admin/pdf')
+  @Roles('superusuario', 'admin')
+  pdfListadoCalificacionesAdmin(
+    @Param('idFase', ParseIntPipe) idFase: number,
+    @Res() res: any,
+  ) {
+    return this.evaluacionesService.generarPdfListadoCalificacionesAdmin(idFase, res);
+  }
+
   @Post('fase/:idFase/cerrar-actas')
   @Roles('superusuario', 'admin')
   cerrarActasAdmin(
