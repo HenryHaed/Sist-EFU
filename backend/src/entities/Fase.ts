@@ -68,6 +68,14 @@ export class Fase {
     @Column({ name: 'cupo_finalistas', type: 'int', nullable: true })
     cupoFinalistas: number | null;
 
+    /**
+     * Si es true (configurado en la fase padre / copiado a la hija):
+     * la nota final de ganadores = nota fase padre + nota fase hija.
+     * Default false: no altera concursos ya cerrados / ganadores existentes.
+     */
+    @Column({ name: 'suma_nota_padre_hija', type: 'boolean', default: false })
+    sumaNotaPadreHija: boolean;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 

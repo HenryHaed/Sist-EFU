@@ -188,7 +188,6 @@
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">Primer ap.</th>
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">Segundo ap.</th>
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">CI</th>
-                    <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">Correo</th>
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">Celular</th>
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">RU</th>
                   </tr>
@@ -205,7 +204,6 @@
                     <td class="px-3 py-2.5 align-middle">{{ m.primerApellido || m.apellidoPaterno }}</td>
                     <td class="px-3 py-2.5 align-middle">{{ m.segundoApellido || m.apellidoMaterno || '—' }}</td>
                     <td class="px-3 py-2.5 font-mono text-xs align-middle">{{ m.ci }}</td>
-                    <td class="px-3 py-2.5 text-xs text-slate-600 align-middle truncate max-w-[140px]" :title="m.correo || ''">{{ m.correo || '—' }}</td>
                     <td class="px-3 py-2.5 font-mono text-xs align-middle">{{ m.celular || '—' }}</td>
                     <td class="px-3 py-2.5 font-mono text-xs align-middle">{{ m.registroUniversitario || '—' }}</td>
                   </tr>
@@ -316,7 +314,6 @@ const miembrosFiltrados = computed(() => {
       m.primerApellido || m.apellidoPaterno,
       m.segundoApellido || m.apellidoMaterno,
       m.ci,
-      m.correo,
       m.celular,
       m.registroUniversitario,
     ]

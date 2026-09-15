@@ -50,8 +50,15 @@
         <!-- LISTA DE FRATERNIDADES / PARTICIPANTES -->
         <template v-else-if="vista === 'lista'">
           <p class="text-[11px] text-slate-600 font-medium mb-3 leading-relaxed">
-            <strong>Puntaje final</strong> = suma de notas selladas ÷ cantidad de jurados que calificaron a ese
-            {{ etiquetaSujetoLower }}. Cada sujeto se promedia solo con quienes lo calificaron.
+            <template v-if="listado?.fase?.sumaNotaPadreHija">
+              <strong>Puntaje final</strong> = nota de la fase padre + nota de esta fase hija
+              <span v-if="listado?.fase?.fasePadreNombre"> (padre: {{ listado.fase.fasePadreNombre }})</span>.
+              Cada fase se promedia con las actas selladas de sus jurados.
+            </template>
+            <template v-else>
+              <strong>Puntaje final</strong> = suma de notas selladas ÷ cantidad de jurados que calificaron a ese
+              {{ etiquetaSujetoLower }}. Cada sujeto se promedia solo con quienes lo calificaron.
+            </template>
           </p>
 
           <div v-if="sujetos.length" class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
@@ -119,7 +126,18 @@
                 <tr>
                   <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 w-12">N°</th>
                   <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">{{ etiquetaSujeto }}</th>
-                  <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Jurados</th>
+                  <th
+                    v-if="listado?.fase?.sumaNotaPadreHija"
+                    class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right"
+                  >Padre</th>
+                  <th
+                    v-if="listado?.fase?.sumaNotaPadreHija"
+                    class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right"
+                  >Hija</th>
+                  <th
+                    v-if="!listado?.fase?.sumaNotaPadreHija"
+                    class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center"
+                  >Jurados</th>
                   <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Puntaje final</th>
                   <th class="px-3 py-2.5 w-8"></th>
                 </tr>
@@ -140,7 +158,22 @@
                       {{ subtituloSujeto(s) }}
                     </p>
                   </td>
-                  <td class="px-3 py-2.5 text-center text-xs font-bold text-slate-600">
+                  <td
+                    v-if="listado?.fase?.sumaNotaPadreHija"
+                    class="px-3 py-2.5 text-right text-xs font-bold text-slate-600 tabular-nums"
+                  >
+                    {{ s.notaPadre != null ? s.notaPadre : '—' }}
+                  </td>
+                  <td
+                    v-if="listado?.fase?.sumaNotaPadreHija"
+                    class="px-3 py-2.5 text-right text-xs font-bold text-slate-600 tabular-nums"
+                  >
+                    {{ s.notaHija != null ? s.notaHija : (s.promedioFaseActual != null ? s.promedioFaseActual : '—') }}
+                  </td>
+                  <td
+                    v-if="!listado?.fase?.sumaNotaPadreHija"
+                    class="px-3 py-2.5 text-center text-xs font-bold text-slate-600"
+                  >
                     {{ s.cantidadCompletadas || 0 }}
                     <span v-if="s.cantidadPendientes" class="text-amber-600">(+{{ s.cantidadPendientes }})</span>
                   </td>

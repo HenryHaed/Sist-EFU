@@ -309,6 +309,10 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     ALTER TABLE fases
     ADD COLUMN IF NOT EXISTS cupo_finalistas INTEGER NULL
   `);
+  await runPatch(dataSource, 'fases.suma_nota_padre_hija', `
+    ALTER TABLE fases
+    ADD COLUMN IF NOT EXISTS suma_nota_padre_hija BOOLEAN NOT NULL DEFAULT false
+  `);
   await runPatch(dataSource, 'idx fases.id_fase_padre', `
     CREATE INDEX IF NOT EXISTS idx_fases_fase_padre ON fases(id_fase_padre)
   `);

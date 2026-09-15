@@ -98,7 +98,7 @@
               type="button"
               class="w-full py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="promoviendoId === fase.idFase || !estadoPorFase[fase.idFase]?.puedePromover"
-              @click.stop="promoverFinalistas(fase)"
+              @click.stop="abrirModalPromocion(fase)"
             >
               <span class="material-symbols-outlined text-[18px]">upgrade</span>
               {{ promoviendoId === fase.idFase
@@ -195,12 +195,108 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Modal promoción / herencia a fase hija -->
+    <v-dialog v-model="modalPromocion" max-width="720" persistent scrollable>
+      <v-card class="rounded-2xl overflow-hidden flex flex-col" style="max-height: 90vh">
+        <v-card-title class="bg-slate-900 text-white px-4 sm:px-5 py-4 flex items-start justify-between gap-3 shrink-0">
+          <div class="min-w-0">
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Chacha Warmi · Herencia</p>
+            <h3 class="font-black text-base sm:text-lg italic uppercase leading-tight">
+              Quienes ingresan a la fase hija
+            </h3>
+            <p class="text-slate-400 text-[11px] mt-1 truncate">
+              {{ fasePromocion?.nombre || 'Fase padre' }}
+              <span v-if="nombreFaseHija(fasePromocion)"> → {{ nombreFaseHija(fasePromocion) }}</span>
+            </p>
+          </div>
+          <button type="button" class="text-white/70 hover:text-white shrink-0" @click="cerrarModalPromocion">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </v-card-title>
+
+        <v-card-text class="px-4 sm:px-5 py-4 space-y-4 flex-1 overflow-y-auto">
+          <div class="rounded-xl border border-blue-100 bg-blue-50 p-3.5 text-xs text-blue-900 font-medium leading-relaxed">
+            Estas fraternidades están confirmadas para heredar a
+            <strong>{{ nombreFaseHija(fasePromocion) || 'la fase hija' }}</strong>
+            (cupo {{ estadoPromocion?.fase?.cupoFinalistas ?? fasePromocion?.cupoFinalistas ?? '—' }}).
+            Puede descargar el reporte PDF con sus datos y la nota obtenida en la fase padre.
+          </div>
+
+          <div v-if="!(estadoPromocion?.finalistasConfirmados || []).length" class="py-10 text-center text-slate-400">
+            <span class="material-symbols-outlined text-4xl mb-2 opacity-40">group_off</span>
+            <p class="text-sm font-bold">No hay clasificados confirmados aún.</p>
+          </div>
+
+          <div v-else class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left text-sm min-w-[560px]">
+              <thead class="bg-slate-800 text-white">
+                <tr>
+                  <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider w-12">N°</th>
+                  <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider">Fraternidad</th>
+                  <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider">Pareja</th>
+                  <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider text-right">Nota</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(f, i) in estadoPromocion.finalistasConfirmados"
+                  :key="f.idFraternidad || i"
+                  class="border-b border-slate-100"
+                  :class="i % 2 === 0 ? 'bg-white' : 'bg-slate-50'"
+                >
+                  <td class="px-3 py-2.5 text-[10px] font-bold text-slate-400">{{ i + 1 }}</td>
+                  <td class="px-3 py-2.5 font-bold text-slate-800">{{ f.nombre }}</td>
+                  <td class="px-3 py-2.5 text-xs text-slate-600">
+                    {{ (f.nombresPareja || []).length ? f.nombresPareja.join(' / ') : '—' }}
+                  </td>
+                  <td class="px-3 py-2.5 text-right font-black text-primary tabular-nums">
+                    {{ f.nota != null ? Number(f.nota).toFixed(2) : '—' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="px-4 sm:px-5 py-4 border-t border-slate-100 flex flex-col sm:flex-row gap-2 shrink-0">
+          <button
+            type="button"
+            class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50"
+            @click="cerrarModalPromocion"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-primary/30 bg-primary/5 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 flex items-center justify-center gap-2 disabled:opacity-50"
+            :disabled="descargandoPdfPromocion || !(estadoPromocion?.finalistasConfirmados || []).length"
+            @click="descargarPdfPromocion"
+          >
+            <span class="material-symbols-outlined text-[16px]" :class="{ 'animate-spin': descargandoPdfPromocion }">
+              {{ descargandoPdfPromocion ? 'sync' : 'picture_as_pdf' }}
+            </span>
+            {{ descargandoPdfPromocion ? 'Generando…' : 'Descargar reporte PDF' }}
+          </button>
+          <button
+            type="button"
+            class="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-secondary text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-800 flex items-center justify-center gap-2 disabled:opacity-50"
+            :disabled="promoviendoId === fasePromocion?.idFase || !estadoPromocion?.puedePromover"
+            @click="confirmarPromocion"
+          >
+            <span class="material-symbols-outlined text-[16px]" :class="{ 'animate-spin': promoviendoId === fasePromocion?.idFase }">
+              {{ promoviendoId === fasePromocion?.idFase ? 'sync' : 'upgrade' }}
+            </span>
+            {{ promoviendoId === fasePromocion?.idFase ? 'Promoviendo…' : 'Confirmar y promover' }}
+          </button>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import Swal from 'sweetalert2'
 import api from '../services/api'
 import { getImageUrl } from '../utils/url'
 import { esFaseChachaWarmi } from '../utils/chachaWarmi'
@@ -239,6 +335,16 @@ const decisionesCorte = ref({})
 const ordenesPodio = ref({})
 const guardandoDesempate = ref(false)
 
+const modalPromocion = ref(false)
+const fasePromocion = ref(null)
+const descargandoPdfPromocion = ref(false)
+
+const estadoPromocion = computed(() => {
+  const id = fasePromocion.value?.idFase
+  if (!id) return null
+  return estadoPorFase.value[id] || null
+})
+
 const esChacha = (fase) => esFaseChachaWarmi(fase)
 
 const pasaCount = computed(() =>
@@ -263,6 +369,7 @@ const desempateValido = computed(() => {
 })
 
 const nombreFaseHija = (fase) => {
+  if (!fase?.idFase) return null
   const est = estadoPorFase.value[fase.idFase]
   return est?.fasesHijas?.[0]?.nombre || null
 }
@@ -401,7 +508,7 @@ const guardarDesempate = async () => {
   }
 }
 
-const promoverFinalistas = async (fase) => {
+const abrirModalPromocion = async (fase) => {
   const est = estadoPorFase.value[fase.idFase]
   if (!est?.puedePromover) {
     notify.error(
@@ -412,21 +519,56 @@ const promoverFinalistas = async (fase) => {
     )
     return
   }
-  const lista = (est.finalistasConfirmados || [])
-    .map((f, i) => `${i + 1}. ${f.nombre} (${f.nota ?? '—'})`)
-    .join('<br/>')
-  const hija = nombreFaseHija(fase) || 'fase hija'
-  const conf = await Swal.fire({
-    title: '¿Promover finalistas?',
-    html: `Se copiarán <strong>${est.finalistasConfirmados?.length || 0}</strong> fraternidad(es) (cupo ${fase.cupoFinalistas}) a <em>${hija}</em>.<br/><br/>${lista}`,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Sí, promover',
-    cancelButtonText: 'Cancelar',
-    confirmButtonColor: '#004a99',
-  })
-  if (!conf.isConfirmed) return
+  await cargarEstadoFase(fase)
+  fasePromocion.value = fase
+  modalPromocion.value = true
+}
 
+const cerrarModalPromocion = () => {
+  modalPromocion.value = false
+  fasePromocion.value = null
+}
+
+const descargarPdfPromocion = async () => {
+  const fase = fasePromocion.value
+  if (!fase?.idFase) return
+  descargandoPdfPromocion.value = true
+  try {
+    const { data } = await api.get(`/evaluaciones/fases/${fase.idFase}/finalistas-promocion/pdf`, {
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    const hija = (nombreFaseHija(fase) || 'fase_hija').replace(/\s+/g, '_')
+    a.download = `Heredan_${hija}_${Date.now()}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    let msg = 'No se pudo generar el reporte PDF.'
+    const blob = e?.response?.data
+    if (blob instanceof Blob) {
+      try {
+        const text = await blob.text()
+        const json = JSON.parse(text)
+        msg = json.message || msg
+      } catch {
+        /* ignore */
+      }
+    } else if (e?.response?.data?.message) {
+      msg = e.response.data.message
+    }
+    notify.error('Error', msg)
+  } finally {
+    descargandoPdfPromocion.value = false
+  }
+}
+
+const confirmarPromocion = async () => {
+  const fase = fasePromocion.value
+  if (!fase?.idFase) return
   promoviendoId.value = fase.idFase
   try {
     const { data } = await api.post(`/evaluaciones/fases/${fase.idFase}/promover-finalistas`)
@@ -434,6 +576,7 @@ const promoverFinalistas = async (fase) => {
       'Finalistas promovidos',
       data?.mensaje || `Se promovieron ${data?.promovidos || 0} fraternidad(es).`,
     )
+    cerrarModalPromocion()
     await cargarEstadoFase(fase)
   } catch (e) {
     notify.error('Error', e?.response?.data?.message || 'No se pudieron promover los finalistas.')

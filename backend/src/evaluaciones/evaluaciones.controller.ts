@@ -298,6 +298,12 @@ export class EvaluacionesController {
     return this.evaluacionesService.getEstadoPromocion(idFase);
   }
 
+  @Get('fases/:idFase/finalistas-promocion/pdf')
+  @Roles('superusuario', 'admin')
+  pdfFinalistasPromocion(@Param('idFase', ParseIntPipe) idFase: number, @Res() res: any) {
+    return this.evaluacionesService.generarPdfFinalistasPromocion(idFase, res);
+  }
+
   @Put('desempates/:idDesempate/resolver')
   @Roles('superusuario', 'admin')
   resolverDesempate(

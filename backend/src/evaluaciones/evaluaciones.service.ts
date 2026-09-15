@@ -151,6 +151,7 @@ export class EvaluacionesService {
           plantillaRequisitos: f.plantillaRequisitos || null,
           requisitosInscripcion: f.requisitosInscripcion || null,
           cupoFinalistas: f.cupoFinalistas ?? null,
+          sumaNotaPadreHija: !!f.sumaNotaPadreHija,
           idFasePadre: f.fasePadre?.idFase ?? (f as any).idFasePadre ?? null,
           fasePadreNombre: f.fasePadre?.nombre ?? null,
           idFaseHija: hija?.idFase ?? null,
@@ -788,14 +789,56 @@ export class EvaluacionesService {
             cantidadCompletadas: selladas.length,
             cantidadPendientes: evs.filter((e) => e.estado !== 'COMPLETADO').length,
             promedioSellado: promedio,
+            notaHija: promedio,
+            notaPadre: null as number | null,
             todasSelladas: evs.length > 0 && evs.every((e) => e.estado === 'COMPLETADO'),
           };
         });
 
+        const faseConPadre = await this.faseRepo.findOne({
+          where: { idFase },
+          relations: ['fasePadre', 'gestion'],
+        });
+        const modo = await this.resolverModoSumaPadreHija(faseConPadre || fase);
+        let sujetosFinal = sujetos;
+        let formulaExtra = '';
+        if (modo.activa && modo.idFasePadre) {
+          const rankingPadre = await this.rankingChachaPorFraternidad(modo.idFasePadre);
+          const notaPadreMap = new Map<number, number | null>();
+          for (const p of rankingPadre) notaPadreMap.set(p.idFraternidad, p.nota);
+          sujetosFinal = sujetos.map((s) => {
+            const notaPadre = notaPadreMap.has(s.idFraternidad)
+              ? notaPadreMap.get(s.idFraternidad)!
+              : null;
+            const notaHija = s.promedioSellado;
+            const tieneAlguna = notaHija != null || notaPadre != null;
+            const notaFinal = tieneAlguna
+              ? round2((Number(notaPadre) || 0) + (Number(notaHija) || 0))
+              : null;
+            return {
+              ...s,
+              notaPadre,
+              notaHija,
+              // promedioSellado = nota final para ranking/podio cuando el modo está activo
+              promedioSellado: notaFinal,
+              promedioFaseActual: notaHija,
+            };
+          });
+          formulaExtra =
+            ` · Modo suma: nota final = nota fase padre (${modo.nombrePadre || 'padre'}) + nota fase hija (${fase.nombre})`;
+        }
+
         return this.empaquetarListadoCalificacionesAdmin(
-          { ...faseInfo, modoCalificacion: 'fraternidad' },
-          sujetos,
+          {
+            ...faseInfo,
+            modoCalificacion: 'fraternidad',
+            sumaNotaPadreHija: modo.activa,
+            idFasePadre: modo.idFasePadre,
+            fasePadreNombre: modo.nombrePadre,
+          },
+          sujetosFinal,
           'fraternidad',
+          formulaExtra,
         );
       }
 
@@ -887,9 +930,10 @@ export class EvaluacionesService {
     fase: Record<string, any>,
     sujetos: any[],
     tipoSujeto: 'fraternidad' | 'participante',
+    formulaExtra = '',
   ) {
     const calificados = sujetos
-      .filter((s) => s.promedioSellado != null && Number(s.cantidadCompletadas) > 0)
+      .filter((s) => s.promedioSellado != null && (Number(s.cantidadCompletadas) > 0 || s.notaPadre != null))
       .slice()
       .sort((a, b) => {
         const pa = Number(a.promedioSellado) || 0;
@@ -903,11 +947,14 @@ export class EvaluacionesService {
         puntajeFinal: s.promedioSellado,
       }));
 
+    const formulaBase = fase.sumaNotaPadreHija
+      ? 'Puntaje final = (promedio actas fase padre) + (promedio actas fase hija)'
+      : 'Puntaje final = suma(notas selladas de jurados) / N jurados que calificaron a ese sujeto';
+
     return {
       fase,
       tipoSujeto,
-      formula:
-        'Puntaje final = suma(notas selladas de jurados) / N jurados que calificaron a ese sujeto',
+      formula: formulaBase + formulaExtra,
       sujetos,
       ranking: calificados,
       resumen: {
@@ -960,7 +1007,9 @@ export class EvaluacionesService {
       .fillColor('#64748b')
       .font('Helvetica')
       .text(
-        `Fórmula: suma(notas selladas) ÷ N jurados que calificaron. ${ranking.length} sujeto(s) con nota.`,
+        data.fase?.sumaNotaPadreHija
+          ? `Fórmula: nota padre + nota hija. ${ranking.length} sujeto(s). ${data.formula || ''}`
+          : `Fórmula: suma(notas selladas) ÷ N jurados que calificaron. ${ranking.length} sujeto(s) con nota.`,
         margin,
         y,
         { width: contentW },
@@ -969,8 +1018,14 @@ export class EvaluacionesService {
 
     const headers = esParticipante
       ? ['N°', 'Participante', 'Fraternidad', 'Jurados', 'Puntaje final']
-      : ['N°', 'Fraternidad', 'Detalle', 'Jurados', 'Puntaje final'];
-    const widths = esParticipante ? [28, 180, 150, 55, 70] : [28, 200, 140, 55, 70];
+      : data.fase?.sumaNotaPadreHija
+        ? ['N°', 'Fraternidad', 'Pareja', 'Padre', 'Hija', 'Final']
+        : ['N°', 'Fraternidad', 'Detalle', 'Jurados', 'Puntaje final'];
+    const widths = esParticipante
+      ? [28, 180, 150, 55, 70]
+      : data.fase?.sumaNotaPadreHija
+        ? [28, 170, 140, 50, 50, 55]
+        : [28, 200, 140, 55, 70];
     const rowH = 18;
 
     const drawHeader = () => {
@@ -1020,16 +1075,40 @@ export class EvaluacionesService {
           (Array.isArray(row.nombresPareja) && row.nombresPareja.length
             ? row.nombresPareja.join(' / ')
             : '—');
-      const cells = [
-        String(row.puesto),
-        String(row.nombre || '—'),
-        String(detalle),
-        String(row.cantidadCompletadas ?? 0),
-        String(row.puntajeFinal ?? row.promedioSellado ?? '—'),
-      ];
+      const cells = esParticipante
+        ? [
+            String(row.puesto),
+            String(row.nombre || '—'),
+            String(detalle),
+            String(row.cantidadCompletadas ?? 0),
+            String(row.puntajeFinal ?? row.promedioSellado ?? '—'),
+          ]
+        : data.fase?.sumaNotaPadreHija
+          ? [
+              String(row.puesto),
+              String(row.nombre || '—'),
+              String(detalle),
+              row.notaPadre != null ? String(row.notaPadre) : '—',
+              row.notaHija != null
+                ? String(row.notaHija)
+                : row.promedioFaseActual != null
+                  ? String(row.promedioFaseActual)
+                  : '—',
+              String(row.puntajeFinal ?? row.promedioSellado ?? '—'),
+            ]
+          : [
+              String(row.puesto),
+              String(row.nombre || '—'),
+              String(detalle),
+              String(row.cantidadCompletadas ?? 0),
+              String(row.puntajeFinal ?? row.promedioSellado ?? '—'),
+            ];
       cells.forEach((c, ci) => {
-        const align = ci === 0 || ci === 3 || ci === 4 ? 'center' : 'left';
-        doc.font(ci === 4 ? 'Helvetica-Bold' : 'Helvetica').text(c, x + 3, y + 5, {
+        const align =
+          ci === 0 || (!esParticipante && data.fase?.sumaNotaPadreHija && ci >= 3) || ci === cells.length - 1
+            ? 'center'
+            : 'left';
+        doc.font(ci === cells.length - 1 ? 'Helvetica-Bold' : 'Helvetica').text(c, x + 3, y + 5, {
           width: widths[ci] - 6,
           lineBreak: false,
           ellipsis: true,
@@ -1616,6 +1695,95 @@ export class EvaluacionesService {
     return rows;
   }
 
+  /**
+   * ¿Esta fase (hija) usa nota final = padre + hija?
+   * Solo si el flag está activo (default false → no altera concursos ya cerrados).
+   */
+  private async resolverModoSumaPadreHija(fase: Fase): Promise<{
+    activa: boolean;
+    idFasePadre: number | null;
+    nombrePadre: string | null;
+  }> {
+    const idPadre = fase.fasePadre?.idFase ?? (fase as any).idFasePadre ?? null;
+    if (!idPadre) {
+      return { activa: false, idFasePadre: null, nombrePadre: null };
+    }
+    let padre = fase.fasePadre?.nombre
+      ? fase.fasePadre
+      : await this.faseRepo.findOne({ where: { idFase: idPadre } });
+    if (!padre) {
+      return { activa: false, idFasePadre: idPadre, nombrePadre: null };
+    }
+    const activa = !!(fase.sumaNotaPadreHija || padre.sumaNotaPadreHija);
+    return {
+      activa,
+      idFasePadre: idPadre,
+      nombrePadre: padre.nombre || null,
+    };
+  }
+
+  /**
+   * Ranking Chacha de una fase. Si es hija con sumaNotaPadreHija,
+   * `nota` / ranking usan notaPadre + notaHija (sin modificar actas guardadas).
+   */
+  private async rankingChachaPorFraternidadConModo(fase: Fase) {
+    const base = await this.rankingChachaPorFraternidad(fase.idFase);
+    const modo = await this.resolverModoSumaPadreHija(fase);
+    if (!modo.activa || !modo.idFasePadre) {
+      return {
+        ranking: base.map((r) => ({
+          ...r,
+          notaHija: r.nota,
+          notaPadre: null as number | null,
+          notaFinal: r.nota,
+        })),
+        modoSumaPadreHija: false,
+        idFasePadre: modo.idFasePadre,
+        nombrePadre: modo.nombrePadre,
+      };
+    }
+
+    const rankingPadre = await this.rankingChachaPorFraternidad(modo.idFasePadre);
+    const notaPadreMap = new Map<number, number | null>();
+    for (const p of rankingPadre) {
+      notaPadreMap.set(p.idFraternidad, p.nota);
+    }
+
+    const ranking = base
+      .map((r) => {
+        const notaHija = r.nota;
+        const notaPadre = notaPadreMap.has(r.idFraternidad)
+          ? notaPadreMap.get(r.idFraternidad)!
+          : null;
+        const tieneAlguna = notaHija != null || notaPadre != null;
+        const notaFinal = tieneAlguna
+          ? round2((Number(notaPadre) || 0) + (Number(notaHija) || 0))
+          : null;
+        return {
+          ...r,
+          notaHija,
+          notaPadre,
+          notaFinal,
+          nota: notaFinal,
+        };
+      })
+      .sort((a, b) => {
+        const na = a.notaFinal == null ? -1 : a.notaFinal;
+        const nb = b.notaFinal == null ? -1 : b.notaFinal;
+        if (nb !== na) return nb - na;
+        const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
+        if (byFecha !== 0) return byFecha;
+        return a.idFraternidad - b.idFraternidad;
+      });
+
+    return {
+      ranking,
+      modoSumaPadreHija: true,
+      idFasePadre: modo.idFasePadre,
+      nombrePadre: modo.nombrePadre,
+    };
+  }
+
   /** Análisis de corte Top N sin desempate automático por fecha. */
   private analizarCorteCupo(
     ranking: Array<{ idFraternidad: number; nombre: string; nombresPareja: string[]; nota: number | null }>,
@@ -2103,6 +2271,157 @@ export class EvaluacionesService {
       .map((p, idx) => ({ ...p, posicion: idx + 1 }));
 
     return { fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: fase.tipoConcurso }, finalistas };
+  }
+
+  /**
+   * PDF: fraternidades confirmadas que heredarán a la(s) fase(s) hija(s) (Chacha Warmi).
+   * Incluye posición, fraternidad, pareja Chacha/Warmi y nota obtenida en la fase padre.
+   */
+  async generarPdfFinalistasPromocion(idFase: number, res: any) {
+    const fase = await this.faseRepo.findOne({
+      where: { idFase },
+      relations: ['gestion'],
+    });
+    if (!fase) throw new NotFoundException('Fase no encontrada');
+    if (!esFaseChachaWarmi(fase)) {
+      throw new BadRequestException('Solo aplica a fases Chacha-Warmi.');
+    }
+
+    const estado = await this.getEstadoPromocion(idFase);
+    const finalistas = (estado.finalistasConfirmados || []).map((r: any, idx: number) => ({
+      posicion: idx + 1,
+      nombre: r.nombre || '—',
+      nombresPareja: Array.isArray(r.nombresPareja) ? r.nombresPareja : [],
+      nota: r.nota != null ? Number(r.nota) : null,
+    }));
+    const hijasNombres = (estado.fasesHijas || []).map((h: any) => h.nombre).filter(Boolean);
+    const faseNombre = fase.nombre || 'Fase';
+    const hijaLabel = hijasNombres.length ? hijasNombres.join(', ') : 'fase hija';
+    const gestionAnio = fase.gestion?.anio || (await this.getGestionActiva())?.anio;
+    const cupo = estado.fase?.cupoFinalistas ?? fase.cupoFinalistas ?? '—';
+
+    const PDFDocument = require('pdfkit');
+    const { drawPdfInstitutionalHeader, PDF_UMSA_BLUE } = await import('../common/pdf-layout');
+
+    const doc = new PDFDocument({
+      margin: 40,
+      size: 'A4',
+      layout: 'landscape',
+      bufferPages: true,
+    });
+    const pageW = 841.89;
+    const pageH = 595.28;
+    const margin = 40;
+    const contentW = pageW - margin * 2;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=Heredan_fase_hija_${idFase}_${Date.now()}.pdf`,
+    );
+    doc.pipe(res);
+
+    const titulo = 'CLASIFICADOS QUE HEREDAN A LA FASE HIJA';
+    const subtitulo = `${faseNombre} → ${hijaLabel}${gestionAnio ? ` · Gestión ${gestionAnio}` : ''} · Cupo ${cupo}`;
+
+    const header = drawPdfInstitutionalHeader(doc, titulo, subtitulo, {
+      pageWidth: pageW,
+      margin,
+      compact: true,
+    });
+    let y = header.contentStartY;
+
+    doc
+      .fontSize(8)
+      .fillColor('#64748b')
+      .font('Helvetica')
+      .text(
+        `Listado de fraternidades confirmadas para ingresar a la fase hija. Nota = promedio de actas selladas en la fase padre. ${finalistas.length} clasificado(s).`,
+        margin,
+        y,
+        { width: contentW },
+      );
+    y += 16;
+
+    const headers = ['N°', 'Fraternidad', 'Pareja (Chacha / Warmi)', 'Nota'];
+    const widths = [36, 260, 360, 70];
+    const rowH = 20;
+
+    const drawHeader = () => {
+      let x = margin;
+      doc.rect(margin, y, contentW, rowH).fill(PDF_UMSA_BLUE);
+      doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8);
+      headers.forEach((h, i) => {
+        doc.text(h, x + 3, y + 6, { width: widths[i] - 6, lineBreak: false });
+        x += widths[i];
+      });
+      y += rowH;
+    };
+
+    drawHeader();
+
+    if (!finalistas.length) {
+      doc
+        .fillColor('#64748b')
+        .font('Helvetica')
+        .fontSize(9)
+        .text(
+          'Aún no hay clasificados confirmados para heredar (revise cupo, calificaciones o desempates pendientes).',
+          margin,
+          y + 10,
+          { width: contentW },
+        );
+    }
+
+    for (let i = 0; i < finalistas.length; i++) {
+      const row = finalistas[i];
+      if (y + rowH > pageH - margin - 28) {
+        doc.addPage();
+        const h2 = drawPdfInstitutionalHeader(doc, titulo, `Continuación · ${faseNombre} → ${hijaLabel}`, {
+          pageWidth: pageW,
+          margin,
+          compact: true,
+        });
+        y = h2.contentStartY + 4;
+        drawHeader();
+      }
+
+      const bg = i % 2 === 0 ? '#f8fafc' : '#ffffff';
+      doc.rect(margin, y, contentW, rowH).fill(bg);
+      doc.fillColor('#0f172a').font('Helvetica').fontSize(8);
+      let x = margin;
+      const pareja =
+        row.nombresPareja.length > 0 ? row.nombresPareja.join(' / ') : '—';
+      const notaStr =
+        row.nota != null && Number.isFinite(row.nota) ? Number(row.nota).toFixed(2) : '—';
+      const cells = [String(row.posicion), String(row.nombre), pareja, notaStr];
+      cells.forEach((c, ci) => {
+        const align = ci === 0 || ci === 3 ? 'center' : 'left';
+        doc.font(ci === 3 ? 'Helvetica-Bold' : 'Helvetica').text(c, x + 3, y + 6, {
+          width: widths[ci] - 6,
+          lineBreak: false,
+          ellipsis: true,
+          align,
+        });
+        x += widths[ci];
+      });
+      y += rowH;
+    }
+
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
+      doc
+        .fontSize(7)
+        .fillColor('#94a3b8')
+        .font('Helvetica')
+        .text(`Página ${i + 1} de ${range.count} · Generado ${new Date().toLocaleString('es-BO')}`, margin, pageH - margin - 12, {
+          width: contentW,
+          align: 'center',
+          lineBreak: false,
+        });
+    }
+    doc.end();
   }
 
   /**
@@ -2622,8 +2941,17 @@ export class EvaluacionesService {
     if (tipo !== 'EXTERNO') {
       payload.fasePadre = null;
       payload.cupoFinalistas = null;
+      payload.sumaNotaPadreHija = false;
       (payload as any).__idFaseHija = undefined;
       return;
+    }
+
+    if ('sumaNotaPadreHija' in payload) {
+      payload.sumaNotaPadreHija =
+        payload.sumaNotaPadreHija === true ||
+        payload.sumaNotaPadreHija === 'true' ||
+        payload.sumaNotaPadreHija === 1 ||
+        payload.sumaNotaPadreHija === '1';
     }
 
     // Si esta fase ya es hija, no configura cupo ni elige otra hija
@@ -2632,6 +2960,8 @@ export class EvaluacionesService {
       payload.cupoFinalistas = null;
       payload.fechaInicioInscripcion = null;
       payload.fechaFinInscripcion = null;
+      // El modo suma se hereda del padre; no se edita en la hija
+      delete payload.sumaNotaPadreHija;
       if (!payload.requisitosInscripcion) {
         payload.requisitosInscripcion = { campos: [], documentos: [] };
       }
@@ -2725,10 +3055,24 @@ export class EvaluacionesService {
     hija.fechaInicioInscripcion = null;
     hija.fechaFinInscripcion = null;
     hija.cupoFinalistas = null;
+    const padreCfg = await this.faseRepo.findOne({ where: { idFase: idPadre } });
+    hija.sumaNotaPadreHija = !!padreCfg?.sumaNotaPadreHija;
     if (!hija.requisitosInscripcion) {
       hija.requisitosInscripcion = { campos: [], documentos: [] };
     }
     await this.faseRepo.save(hija);
+  }
+
+  /** Propaga el flag de suma padre+hija a las fases hijas (sin tocar actas ni notas). */
+  private async sincronizarSumaNotaEnHijas(idPadre: number, sumaNotaPadreHija: boolean) {
+    const hijas = await this.faseRepo.find({
+      where: { fasePadre: { idFase: idPadre } },
+    });
+    for (const h of hijas) {
+      if (!!h.sumaNotaPadreHija === !!sumaNotaPadreHija) continue;
+      h.sumaNotaPadreHija = !!sumaNotaPadreHija;
+      await this.faseRepo.save(h);
+    }
   }
 
   async createFase(data: any) {
@@ -2780,6 +3124,9 @@ export class EvaluacionesService {
       await this.syncJuradosFase(f, juradosIds);
     }
     await this.sincronizarFaseHija(f.idFase, idFaseHija, gestion.idGestion);
+    if (!(f as any).fasePadre) {
+      await this.sincronizarSumaNotaEnHijas(f.idFase, !!f.sumaNotaPadreHija);
+    }
     return this.faseRepo.findOne({ where: { idFase: f.idFase }, relations: ['fasePadre', 'gestion'] });
   }
 
@@ -2842,6 +3189,7 @@ export class EvaluacionesService {
 
     if (!esHija && !saved.fasePadre?.idFase) {
       await this.sincronizarFaseHija(saved.idFase, idFaseHija, f.gestion?.idGestion);
+      await this.sincronizarSumaNotaEnHijas(saved.idFase, !!saved.sumaNotaPadreHija);
     }
 
     let syncRequisitos: {

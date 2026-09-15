@@ -37,7 +37,6 @@ export const NOMINA_HEADERS = [
   'Primer Apellido',
   'Segundo Apellido',
   'CI',
-  'Correo electrónico',
   'Número de celular',
   'Registro Universitario',
 ] as const;
@@ -142,16 +141,6 @@ export class ListasNominaService {
     return /^\d{4,15}$/.test(ci);
   }
 
-  private normalizeCorreo(v: string): string | null {
-    const t = String(v || '').trim().toLowerCase();
-    return t || null;
-  }
-
-  private isCorreoOk(correo: string | null): boolean {
-    if (!correo) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo);
-  }
-
   private normalizeCelular(v: string): string | null {
     const digits = String(v || '').replace(/[^\d]/g, '');
     return digits || null;
@@ -244,7 +233,6 @@ export class ListasNominaService {
       primerApellido: m.apellidoPaterno,
       segundoApellido: m.apellidoMaterno,
       ci: m.ci,
-      correo: m.correo,
       celular: m.celular,
       registroUniversitario: m.registroUniversitario,
       tipoDanza: m.tipoDanza,
@@ -379,7 +367,6 @@ export class ListasNominaService {
       { key: 'ap1', width: 16 },
       { key: 'ap2', width: 16 },
       { key: 'ci', width: 12 },
-      { key: 'correo', width: 26 },
       { key: 'celular', width: 14 },
       { key: 'ru', width: 16 },
     ];
@@ -414,7 +401,7 @@ export class ListasNominaService {
     ws.mergeCells(`A5:${lastCol}5`);
     ws.getCell('A5').value = miembrosExistentes.length
       ? `ID: ${plantillaId}  ·  ${miembrosExistentes.length} registro(s) prellenado(s)  ·  Agregue filas nuevas de forma CONTINUA (sin dejar filas en blanco)  ·  CI solo números`
-      : `ID: ${plantillaId}  ·  Complete filas de forma CONTINUA (sin saltos)  ·  CI SOLO NÚMEROS  ·  Obligatorios: Nombre, Primer Apellido, CI, Correo, Celular, RU  ·  Opcional: Segundo Apellido`;
+      : `ID: ${plantillaId}  ·  Complete filas de forma CONTINUA (sin saltos)  ·  CI SOLO NÚMEROS  ·  Obligatorios: Nombre, Primer Apellido, CI, Celular, RU  ·  Opcional: Segundo Apellido`;
     ws.getCell('A5').font = { italic: true, size: 8, color: { argb: 'FF64748B' } };
 
     NOMINA_HEADERS.forEach((h, i) => {
@@ -446,7 +433,6 @@ export class ListasNominaService {
             m.apellidoPaterno,
             m.apellidoMaterno || '',
             m.ci,
-            m.correo || '',
             m.celular || '',
             m.registroUniversitario || '',
           ]
@@ -485,7 +471,7 @@ export class ListasNominaService {
         errorTitle: 'CI inválido',
         error: 'El CI debe contener solo números.',
       });
-      validations.add(`F${DATA_START}:F${dataEnd}`, {
+      validations.add(`E${DATA_START}:E${dataEnd}`, {
         type: 'whole',
         operator: 'greaterThanOrEqual',
         formulae: [0],
@@ -536,7 +522,7 @@ export class ListasNominaService {
       '2) Registre a cada fraterno en una fila, de arriba hacia abajo, SIN dejar filas en blanco',
       '   entre registros. Ejemplo incorrecto: llenar 25 filas, saltar 3 vacías y continuar.',
       '   Ejemplo correcto: fila 1, 2, 3, 4… en secuencia continua.',
-      '3) Campos OBLIGATORIOS en cada fila: Nombre, Primer Apellido, CI, Correo electrónico,',
+      '3) Campos OBLIGATORIOS en cada fila: Nombre, Primer Apellido, CI,',
       '   Número de celular y Registro Universitario.',
       '4) Campo OPCIONAL: únicamente el Segundo Apellido.',
       '5) El CI debe contener SOLO números (sin letras ni símbolos).',
@@ -607,14 +593,6 @@ export class ListasNominaService {
       apellidoPaterno: ['primer apellido', 'apellido paterno', 'ap paterno', 'apellido_paterno'],
       apellidoMaterno: ['segundo apellido', 'apellido materno', 'ap materno', 'apellido_materno'],
       ci: ['ci', 'carnet', 'cedula', 'cédula', 'documento'],
-      correo: [
-        'correo electronico',
-        'correo electrónico',
-        'correo',
-        'email',
-        'e-mail',
-        'mail',
-      ],
       celular: [
         'numero de celular',
         'número de celular',
@@ -714,7 +692,6 @@ export class ListasNominaService {
       apellidoPaterno: string;
       apellidoMaterno: string | null;
       ci: string;
-      correo: string | null;
       celular: string | null;
       registroUniversitario: string | null;
       tipoDanza: string | null;
@@ -744,7 +721,6 @@ export class ListasNominaService {
       const apellidoMaterno = get('apellidoMaterno') || null;
       const ciRaw = get('ci');
       const ci = this.normalizeCi(ciRaw);
-      const correo = this.normalizeCorreo(get('correo'));
       const celular = this.normalizeCelular(get('celular'));
       const registroUniversitario = get('registroUniversitario').trim() || null;
 
@@ -753,7 +729,6 @@ export class ListasNominaService {
         !apellidoPaterno &&
         !ci &&
         !apellidoMaterno &&
-        !correo &&
         !celular &&
         !registroUniversitario;
 
@@ -780,9 +755,9 @@ export class ListasNominaService {
         );
         continue;
       }
-      if (!correo || !celular || !registroUniversitario) {
+      if (!celular || !registroUniversitario) {
         errores.push(
-          `Fila ${rowNumber}: el Correo electrónico, el Número de celular y el Registro Universitario son obligatorios.`,
+          `Fila ${rowNumber}: el Número de celular y el Registro Universitario son obligatorios.`,
         );
         continue;
       }
@@ -790,10 +765,6 @@ export class ListasNominaService {
         errores.push(
           `Fila ${rowNumber}: el CI debe contener únicamente números (sin letras ni símbolos). Valor: "${ciRaw}".`,
         );
-        continue;
-      }
-      if (!this.isCorreoOk(correo)) {
-        errores.push(`Fila ${rowNumber}: el correo electrónico no es válido (${correo}).`);
         continue;
       }
       if (!this.isCelularOk(celular)) {
@@ -818,7 +789,6 @@ export class ListasNominaService {
         apellidoPaterno,
         apellidoMaterno,
         ci,
-        correo,
         celular,
         registroUniversitario,
         tipoDanza: tipoDanzaFrat,
@@ -844,7 +814,7 @@ export class ListasNominaService {
     }
     if (!rows.length) {
       throw new BadRequestException(
-        'No hay filas de fraternos. Complete Nombre, Primer Apellido, CI, Correo electrónico, Número de celular y Registro Universitario de forma continua.',
+        'No hay filas de fraternos. Complete Nombre, Primer Apellido, CI, Número de celular y Registro Universitario de forma continua.',
       );
     }
     return rows;
@@ -944,7 +914,7 @@ export class ListasNominaService {
           apellidoPaterno: r.apellidoPaterno,
           apellidoMaterno: r.apellidoMaterno,
           ci: r.ci,
-          correo: r.correo,
+          correo: null,
           celular: r.celular,
           registroUniversitario: r.registroUniversitario,
           tipoDanza: r.tipoDanza,

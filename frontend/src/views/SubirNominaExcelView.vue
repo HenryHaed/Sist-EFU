@@ -195,7 +195,6 @@
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Primer ap.</th>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Segundo ap.</th>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">CI</th>
-                <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Correo</th>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Celular</th>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">RU</th>
               </tr>
@@ -207,7 +206,6 @@
                 <td class="px-3 py-2 text-slate-700 whitespace-nowrap">{{ m.primerApellido || m.apellidoPaterno }}</td>
                 <td class="px-3 py-2 text-slate-600 whitespace-nowrap">{{ m.segundoApellido || m.apellidoMaterno || '—' }}</td>
                 <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ m.ci }}</td>
-                <td class="px-3 py-2 text-xs text-slate-600 max-w-[140px] truncate" :title="m.correo || ''">{{ m.correo || '—' }}</td>
                 <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ m.celular || '—' }}</td>
                 <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ m.registroUniversitario || '—' }}</td>
               </tr>
@@ -269,7 +267,6 @@
                   En cada fila complete obligatoriamente:
                   <strong>Nombre</strong>, <strong>Primer Apellido</strong>,
                   <strong>CI</strong> (únicamente números),
-                  <strong>Correo electrónico</strong>,
                   <strong>Número de celular</strong> y
                   <strong>Registro Universitario</strong>.
                 </li>

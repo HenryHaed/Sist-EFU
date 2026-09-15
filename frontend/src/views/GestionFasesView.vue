@@ -99,6 +99,9 @@
                   </div>
                 </div>
                 <span class="font-bold text-primary italic">{{ fase.nombre }}</span>
+                <p v-if="fase.sumaNotaPadreHija" class="text-[9px] font-black uppercase tracking-widest text-emerald-700 mt-0.5">
+                  Nota final = padre + hija
+                </p>
                 <p v-if="fase.cupoFinalistas" class="text-[9px] font-black uppercase tracking-widest text-amber-700 mt-0.5">
                   Cupo finalistas: {{ fase.cupoFinalistas }}
                 </p>
@@ -607,6 +610,21 @@
                     La fase padre elige a su hija. Solo puede seleccionarse una; hereda los N finalistas promovidos (sin inscripción propia).
                   </p>
                 </div>
+                <div class="sm:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5">
+                  <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" v-model="form.sumaNotaPadreHija" class="mt-0.5 size-4 accent-emerald-700" />
+                    <span>
+                      <span class="block text-[10px] font-black uppercase tracking-widest text-emerald-800">
+                        Nota final = fase padre + fase hija
+                      </span>
+                      <span class="block text-[11px] text-slate-600 font-medium leading-relaxed mt-1">
+                        Actívelo solo en concursos nuevos. La nota del ganador (y del podio) en la fase hija será
+                        la suma de lo obtenido en la fase padre más lo de la hija.
+                        <strong>No altera ganadores ni notas de concursos ya cerrados</strong> (por defecto está desactivado).
+                      </span>
+                    </span>
+                  </label>
+                </div>
               </div>
 
               <div v-if="!esFaseHijaForm">
@@ -780,6 +798,7 @@ const form = ref({
   idFasePadre: null,
   fasePadreNombre: '',
   heredaFinalistas: false,
+  sumaNotaPadreHija: false,
 })
 
 /** Fase hija: ya enlazada por el padre, o marcada para heredar finalistas. */
@@ -1053,6 +1072,7 @@ const abrirModal = (item = null) => {
       idFasePadre: item.idFasePadre ?? null,
       fasePadreNombre: item.fasePadreNombre || '',
       heredaFinalistas: esHija,
+      sumaNotaPadreHija: !!item.sumaNotaPadreHija,
     }
     if (!esHija && form.value.tipoConcurso === 'EXTERNO' && !form.value.clavesCampos.length && !form.value.clavesDocumentos.length) {
       aplicarPlantilla(form.value.plantillaRequisitos)
@@ -1074,7 +1094,7 @@ const abrirModal = (item = null) => {
       estaActiva: true, urlImagen: '', juradosIds: [],
       plantillaRequisitos: 'generico', clavesCampos: [], clavesDocumentos: [],
       cupoFinalistas: null, idFaseHija: null, idFasePadre: null, fasePadreNombre: '',
-      heredaFinalistas: false,
+      heredaFinalistas: false, sumaNotaPadreHija: false,
     }
   }
 
@@ -1202,6 +1222,7 @@ const guardar = async () => {
       delete payloadInfo.cupoFinalistas
       delete payloadInfo.idFaseHija
       delete payloadInfo.heredaFinalistas
+      delete payloadInfo.sumaNotaPadreHija
     } else if (esHija) {
       payloadInfo.heredaFinalistas = true
       payloadInfo.clavesCampos = []
@@ -1210,9 +1231,11 @@ const guardar = async () => {
       payloadInfo.fechaFinInscripcion = null
       payloadInfo.cupoFinalistas = null
       delete payloadInfo.idFaseHija
+      delete payloadInfo.sumaNotaPadreHija
       if (!payloadInfo.plantillaRequisitos) payloadInfo.plantillaRequisitos = 'chacha_warmi'
     } else {
       payloadInfo.heredaFinalistas = false
+      payloadInfo.sumaNotaPadreHija = !!payloadInfo.sumaNotaPadreHija
       if (payloadInfo.cupoFinalistas === '' || Number.isNaN(Number(payloadInfo.cupoFinalistas))) {
         payloadInfo.cupoFinalistas = null
       }
