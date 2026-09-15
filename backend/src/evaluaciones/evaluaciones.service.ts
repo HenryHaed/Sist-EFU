@@ -2397,6 +2397,8 @@ export class EvaluacionesService {
       'modoMantenimiento', 'mostrarRanking', 'mostrarHistorico',
       'mostrarRankingEstadisticas', 'mostrarRankingConcursosExternos', 'rankingConcursosOcultos',
       'permiteInscripcionPublica',
+      'nominaExcelInicio',
+      'nominaExcelFin',
       'limiteFraternidadesPorDanza',
       'landingFraternidades',
     ] as const;
@@ -2405,6 +2407,26 @@ export class EvaluacionesService {
       if (data[key] !== undefined) {
         (payload as any)[key] = data[key];
       }
+    }
+
+    if (payload.nominaExcelInicio !== undefined) {
+      payload.nominaExcelInicio = data.nominaExcelInicio
+        ? new Date(data.nominaExcelInicio)
+        : null;
+    }
+    if (payload.nominaExcelFin !== undefined) {
+      payload.nominaExcelFin = data.nominaExcelFin
+        ? new Date(data.nominaExcelFin)
+        : null;
+    }
+    if (
+      payload.nominaExcelInicio &&
+      payload.nominaExcelFin &&
+      payload.nominaExcelInicio > payload.nominaExcelFin
+    ) {
+      throw new BadRequestException(
+        'La fecha de inicio de nómina Excel no puede ser posterior a la de fin.',
+      );
     }
 
     if (payload.limiteFraternidadesPorDanza !== undefined) {

@@ -73,6 +73,13 @@ export class Gestion {
     @Column({ name: 'permite_inscripcion_publica', default: false })
     permiteInscripcionPublica: boolean;
 
+    /** Ventana para que delegados suban la nómina Excel (inclusive). */
+    @Column({ name: 'nomina_excel_inicio', type: 'timestamp', nullable: true })
+    nominaExcelInicio: Date | null;
+
+    @Column({ name: 'nomina_excel_fin', type: 'timestamp', nullable: true })
+    nominaExcelFin: Date | null;
+
     /** Máximo de fraternidades por tipo de danza (las que exceden se marcan como excedentes). */
     @Column({ name: 'limite_fraternidades_por_danza', type: 'int', default: 6 })
     limiteFraternidadesPorDanza: number;

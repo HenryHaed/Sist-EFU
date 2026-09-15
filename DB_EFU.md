@@ -30,7 +30,7 @@ Documentación generada a partir de las **entidades TypeORM** en `backend/src/en
 - Al **aprobar** una solicitud se crea o reutiliza la fraternidad oficial y se vincula al delegado.
 - **Directorio de delegados:** solo delegado **titular** y **suplente** (datos en `solicitudes_inscripcion`).
 - **Monografía:** cada fraternidad sube **un único PDF** vía su delegado (`uploads/Doc_Monografia/`). Admin/jurado/superusuario la consultan al calificar; el rol **`veedor`** (solo lectura) lista fraternidades y ve/descarga la monografía real subida. Si no hay fila en `monografias`, se informa que aún no subieron.
-- **Nómina Excel:** cada fraternidad+gestión tiene **un único** `.xlsx`/`.xls` (`listas_nomina_fraternidad`, carpeta `uploads/Doc_Nomina_Excel/`). Lo sube el **delegado**; admin/superusuario listan, previsualizan (tabla in-app vía exceljs) y descargan/eliminan.
+- **Nómina Excel:** cada fraternidad+gestión tiene **un único** `.xlsx` (`listas_nomina_fraternidad` + filas en `miembros_nomina`). El **delegado** descarga plantilla prellenada (fraternidad + tipo de danza de su fraternidad), completa Nombre / Apellidos / CI y sube; se importan fraternos a BD **sin crear usuarios**. Admin lista, ve registro estructurado, preview Excel y descarga/elimina.
 - **DELETE físico:** las eliminaciones en organización (facultad/carrera/institución) borran filas de la BD (hard delete); no hay soft-delete. Las facultades eliminan carreras en cascada (`ON DELETE CASCADE`).
 - **Asistencia:** basta con que asista titular o suplente; si ninguno asiste → incidencia de −10 pts en disciplina.
 - **Infracciones dinámicas:** catálogo por gestión en `infracciones` (CRUD admin). Al aplicar bandera/sanción se usa `id_infraccion` o presets (Amarilla/Roja/…); el **puntaje final EFU** suma `valor_impacto` real de la BD (`max(0, Promedio Final + Σ sanciones)`). No reescribir valores históricos al seed de presets.
@@ -275,22 +275,42 @@ Nómina Excel única por **fraternidad + gestión**, subida por el delegado. Arc
 | `created_at` | TIMESTAMP | NOT NULL | Primera subida |
 | `updated_at` | TIMESTAMP | NOT NULL | Última actualización / reemplazo |
 
-**Unique:** `(id_fraternidad, id_gestion)` — un solo Excel vigente; al re-subir se reemplaza el archivo en disco y se actualiza la fila (sin historial).
+**Unique:** `(id_fraternidad, id_gestion)` — un solo Excel vigente; al re-subir se reemplaza el archivo y las filas de `miembros_nomina`.
+
+### `miembros_nomina`
+
+Fraternos importados desde el Excel. **No son usuarios** del sistema.
+
+| Columna | Tipo | Restricciones | Descripción |
+|---------|------|---------------|-------------|
+| `id_miembro` | SERIAL | PK | Identificador |
+| `id_lista` | INTEGER | FK → `listas_nomina_fraternidad`, CASCADE | Nómina |
+| `id_fraternidad` | INTEGER | FK → `fraternidades`, CASCADE | Fraternidad |
+| `id_gestion` | INTEGER | FK → `gestiones`, CASCADE | Gestión |
+| `nombres` | VARCHAR(150) | NOT NULL | Nombre(s) |
+| `apellido_paterno` | VARCHAR(100) | NOT NULL | Apellido paterno |
+| `apellido_materno` | VARCHAR(100) | NULL | Apellido materno |
+| `ci` | VARCHAR(30) | NOT NULL | Carnet |
+| `tipo_danza` | VARCHAR(120) | NULL | Snapshot del tipo de danza |
+| `created_at` | TIMESTAMP | NOT NULL | Importación |
+
+**Unique:** `(id_gestion, id_fraternidad, ci)`. Plantilla: Nombre | Apellido paterno | Apellido materno | CI | Fraternidad | Tipo de danza (últimas dos **prellenadas**).
 
 **API** (`/api/v1/listas-nomina`):
 
 | Método | Ruta | Roles | Uso |
 |--------|------|-------|-----|
 | `GET` | `/listas-nomina/mi` | delegado | Estado de su nómina |
-| `POST` | `/listas-nomina/mi` | delegado | Subir/reemplazar `.xlsx`/`.xls` (máx. 15 MB) |
-| `DELETE` | `/listas-nomina/mi` | delegado | Eliminar su nómina |
-| `GET` | `/listas-nomina/mi/archivo` | delegado | Descargar |
-| `GET` | `/listas-nomina` | admin, superusuario | Listado por fraternidad (gestión activa) |
-| `GET` | `/listas-nomina/:id/preview` | admin, superusuario | Primera hoja → headers/rows (exceljs, ≤2000 filas; `.xls` solo descarga) |
+| `GET` | `/listas-nomina/mi/plantilla` | delegado | Plantilla .xlsx prellenada |
+| `GET` | `/listas-nomina/mi/miembros` | delegado | Fraternos importados |
+| `POST` | `/listas-nomina/mi` | delegado | Subir .xlsx e importar filas |
+| `DELETE` | `/listas-nomina/mi` | delegado | Eliminar nómina + miembros |
+| `GET` | `/listas-nomina/mi/archivo` | delegado | Descargar Excel |
+| `GET` | `/listas-nomina` | admin, superusuario | Listado (+ # miembros) |
+| `GET` | `/listas-nomina/:id/miembros` | admin, superusuario | Registro estructurado |
+| `GET` | `/listas-nomina/:id/preview` | admin, superusuario | Preview hoja Excel |
 | `GET` | `/listas-nomina/:id/archivo` | admin, superusuario | Descargar |
 | `DELETE` | `/listas-nomina/:id` | admin, superusuario | Eliminar |
-
-**Nota:** no se persisten filas de integrantes en BD; el visor admin parsea el archivo al abrir.
 
 ---
 

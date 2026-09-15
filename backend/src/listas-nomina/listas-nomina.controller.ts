@@ -37,6 +37,30 @@ export class ListasNominaController {
     return this.service.getMi(req.user.idUsuario);
   }
 
+  @Get('mi/plantilla')
+  @Roles('delegado')
+  @ApiOperation({
+    summary:
+      'Descargar plantilla Excel prellenada con fraternidad y tipo de danza del delegado',
+  })
+  async plantillaMi(@Request() req: any, @Res() res: Response) {
+    const { buffer, filename } = await this.service.generarPlantillaMi(req.user.idUsuario);
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+      'Content-Length': buffer.length,
+    });
+    res.send(buffer);
+  }
+
+  @Get('mi/miembros')
+  @Roles('delegado')
+  @ApiOperation({ summary: 'Listado de fraternos importados de la nómina del delegado' })
+  getMiembrosMi(@Request() req: any) {
+    return this.service.getMiembrosMi(req.user.idUsuario);
+  }
+
   @Post('mi')
   @Roles('delegado')
   @UseInterceptors(
@@ -48,14 +72,8 @@ export class ListasNominaController {
           cb(null, path);
         },
         filename: (req: any, file, cb) => {
-          const idFraternidad = req.user?.fraternidad?.idFraternidad;
-          if (!idFraternidad) {
-            return cb(
-              new BadRequestException('No tienes una fraternidad asignada.') as any,
-              '',
-            );
-          }
-          cb(null, ListasNominaService.buildFilename(idFraternidad, file.originalname));
+          const idFrat = req.user?.idFraternidad || req.user?.fraternidad?.idFraternidad || 0;
+          cb(null, ListasNominaService.buildFilename(Number(idFrat) || 0, file.originalname));
         },
       }),
       fileFilter: (req, file, cb) => {
@@ -71,7 +89,7 @@ export class ListasNominaController {
     }),
   )
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Subir o reemplazar la nómina Excel (un archivo por fraternidad)' })
+  @ApiOperation({ summary: 'Subir Excel, importar fraternos a BD (sin crear usuarios)' })
   uploadMi(@UploadedFile() file: Express.Multer.File, @Request() req: any) {
     return this.service.uploadMi(req.user.idUsuario, file);
   }
@@ -100,6 +118,13 @@ export class ListasNominaController {
   @ApiOperation({ summary: 'Listado de nóminas por fraternidad (gestión activa)' })
   listar() {
     return this.service.listarAdmin();
+  }
+
+  @Get(':id/miembros')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Fraternos registrados de una nómina' })
+  getMiembrosAdmin(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getMiembrosAdmin(id);
   }
 
   @Get(':id/preview')

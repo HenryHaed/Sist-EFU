@@ -702,9 +702,8 @@
             <div class="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-6 flex items-start gap-3">
               <span class="material-symbols-outlined text-primary shrink-0">info</span>
               <p class="text-xs text-blue-900 font-medium leading-relaxed">
-                Define las fechas de inscripción por categoría, y también los periodos para que los delegados
-                suban monografías y generen fichas técnicas. Fuera de esas fechas el sistema bloquea la acción
-                con el mensaje de cronograma.
+                Define las fechas de inscripción por categoría, los periodos de monografías y fichas técnicas,
+                y el periodo de subida de nómina Excel. Fuera de esas fechas el sistema bloquea la acción.
               </p>
             </div>
 
@@ -755,6 +754,51 @@
                   <span v-if="savingCronoActividad === act.tipo" class="material-symbols-outlined animate-spin text-xs">sync</span>
                   <span v-else class="material-symbols-outlined text-xs">save</span>
                   {{ savingCronoActividad === act.tipo ? 'Guardando' : 'Guardar este cronograma' }}
+                </button>
+              </div>
+
+              <!-- Periodo nómina Excel -->
+              <div class="rounded-2xl border-2 border-emerald-100 bg-emerald-50/40 p-5 lg:col-span-2">
+                <div class="flex items-start gap-3 mb-4">
+                  <span class="size-10 rounded-xl flex items-center justify-center text-white shrink-0 bg-emerald-600">
+                    <span class="material-symbols-outlined">table</span>
+                  </span>
+                  <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Delegados</p>
+                    <p class="text-sm font-black text-slate-800 uppercase tracking-tight">Periodo de subida de nómina Excel</p>
+                    <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Fuera de este rango los delegados no pueden descargar la plantilla ni subir el Excel.
+                      La re-subida solo agrega fraternos nuevos (nunca borra los ya registrados).
+                    </p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
+                  <div>
+                    <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 px-1">Apertura</label>
+                    <input
+                      type="datetime-local"
+                      v-model="gestion.nominaExcelInicio"
+                      class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-sm text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 px-1">Cierre</label>
+                    <input
+                      type="datetime-local"
+                      v-model="gestion.nominaExcelFin"
+                      class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-sm text-slate-700"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  @click="guardarPeriodoNominaExcel"
+                  :disabled="savingNominaExcel || !gestion.idGestion"
+                  class="mt-4 w-full sm:w-auto sm:min-w-[240px] px-4 py-2.5 bg-primary hover:bg-blue-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  <span v-if="savingNominaExcel" class="material-symbols-outlined animate-spin text-xs">sync</span>
+                  <span v-else class="material-symbols-outlined text-xs">save</span>
+                  {{ savingNominaExcel ? 'Guardando' : 'Guardar periodo nómina' }}
                 </button>
               </div>
             </div>
@@ -1033,6 +1077,8 @@ const gestion = ref({
   mostrarRankingConcursosExternos: true,
   rankingConcursosOcultos: [],
   permiteInscripcionPublica: false,
+  nominaExcelInicio: '',
+  nominaExcelFin: '',
   limiteFraternidadesPorDanza: 6,
   landingFraternidades: DEFAULT_LANDING_FRATERNIDADES(),
 })
@@ -1116,6 +1162,8 @@ const loadGestion = async (idGestion = null) => {
       data.rankingConcursosOcultos = Array.isArray(data.rankingConcursosOcultos)
         ? data.rankingConcursosOcultos.map((id) => Number(id)).filter((id) => Number.isFinite(id))
         : []
+      data.nominaExcelInicio = formatDatetimeLocal(data.nominaExcelInicio)
+      data.nominaExcelFin = formatDatetimeLocal(data.nominaExcelFin)
       gestion.value = data
       selectedGestionId.value = data.idGestion
       applySiteTitle(data.nombreSitio)
@@ -1188,6 +1236,8 @@ const saveSettings = async () => {
       urlBanner: toStoredAssetPath(gestion.value.urlBanner),
       urlImagenLogin: toStoredAssetPath(gestion.value.urlImagenLogin),
       urlMapaUbicacion: extractMapEmbedUrl(gestion.value.urlMapaUbicacion).slice(0, 500) || null,
+      nominaExcelInicio: gestion.value.nominaExcelInicio || null,
+      nominaExcelFin: gestion.value.nominaExcelFin || null,
       landingFraternidades: (gestion.value.landingFraternidades || []).map((card) => ({
         titulo: card.titulo || '',
         subtitulo: card.subtitulo || '',
@@ -1363,6 +1413,7 @@ const loadingCronos = ref(false)
 const savingCrono = ref(null)
 const savingCronoActividad = ref(null)
 const savingAllCronos = ref(false)
+const savingNominaExcel = ref(false)
 
 const formatDatetimeLocal = (dateStr) => {
   if (!dateStr) return ''
@@ -1456,6 +1507,46 @@ const guardarCronogramaActividad = async (tipo) => {
     Swal.fire('Error', e.response?.data?.message || 'No se pudo guardar el cronograma.', 'error')
   } finally {
     savingCronoActividad.value = null
+  }
+}
+
+const guardarPeriodoNominaExcel = async () => {
+  const form = {
+    fechaInicio: gestion.value.nominaExcelInicio,
+    fechaFin: gestion.value.nominaExcelFin,
+  }
+  if (!validarFechasCronograma(form)) return
+  if (!gestion.value.idGestion) return
+
+  savingNominaExcel.value = true
+  try {
+    const formData = new FormData()
+    formData.append(
+      'data',
+      JSON.stringify({
+        nominaExcelInicio: gestion.value.nominaExcelInicio || null,
+        nominaExcelFin: gestion.value.nominaExcelFin || null,
+      }),
+    )
+    await api.put(`/evaluaciones/gestiones/${gestion.value.idGestion}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    Swal.fire({
+      icon: 'success',
+      title: 'Periodo de nómina guardado',
+      toast: true,
+      position: 'top-end',
+      timer: 2500,
+      showConfirmButton: false,
+    })
+  } catch (e) {
+    Swal.fire(
+      'Error',
+      e.response?.data?.message || 'No se pudo guardar el periodo de nómina Excel.',
+      'error',
+    )
+  } finally {
+    savingNominaExcel.value = false
   }
 }
 
