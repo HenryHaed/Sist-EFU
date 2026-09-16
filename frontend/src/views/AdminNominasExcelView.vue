@@ -172,7 +172,7 @@
               <input
                 v-model="busquedaMiembros"
                 type="search"
-                placeholder="Buscar por nombre o CI…"
+                placeholder="Buscar por nombre, CI o tipo…"
                 class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary"
               />
             </div>
@@ -188,6 +188,7 @@
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">Primer ap.</th>
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">Segundo ap.</th>
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">CI</th>
+                    <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">Tipo</th>
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">Celular</th>
                     <th class="px-3 py-2.5 text-[9px] font-black uppercase tracking-wider sticky top-0 bg-slate-800 z-[1]">RU</th>
                   </tr>
@@ -204,6 +205,7 @@
                     <td class="px-3 py-2.5 align-middle">{{ m.primerApellido || m.apellidoPaterno }}</td>
                     <td class="px-3 py-2.5 align-middle">{{ m.segundoApellido || m.apellidoMaterno || '—' }}</td>
                     <td class="px-3 py-2.5 font-mono text-xs align-middle">{{ m.ci }}</td>
+                    <td class="px-3 py-2.5 text-xs align-middle whitespace-nowrap">{{ m.tipoPersonaLabel || m.tipoPersona || '—' }}</td>
                     <td class="px-3 py-2.5 font-mono text-xs align-middle">{{ m.celular || '—' }}</td>
                     <td class="px-3 py-2.5 font-mono text-xs align-middle">{{ m.registroUniversitario || '—' }}</td>
                   </tr>
@@ -314,6 +316,8 @@ const miembrosFiltrados = computed(() => {
       m.primerApellido || m.apellidoPaterno,
       m.segundoApellido || m.apellidoMaterno,
       m.ci,
+      m.tipoPersona,
+      m.tipoPersonaLabel,
       m.celular,
       m.registroUniversitario,
     ]

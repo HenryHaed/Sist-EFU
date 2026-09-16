@@ -187,7 +187,7 @@
           <h3 class="font-black text-slate-800 uppercase text-sm">{{ miembros.length }} fraterno(s)</h3>
         </div>
         <div class="overflow-x-auto -mx-0">
-          <table class="w-full text-left text-sm min-w-[720px]">
+          <table class="w-full text-left text-sm min-w-[820px]">
             <thead class="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">#</th>
@@ -195,6 +195,7 @@
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Primer ap.</th>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Segundo ap.</th>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">CI</th>
+                <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Tipo</th>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Celular</th>
                 <th class="px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">RU</th>
               </tr>
@@ -206,6 +207,7 @@
                 <td class="px-3 py-2 text-slate-700 whitespace-nowrap">{{ m.primerApellido || m.apellidoPaterno }}</td>
                 <td class="px-3 py-2 text-slate-600 whitespace-nowrap">{{ m.segundoApellido || m.apellidoMaterno || '—' }}</td>
                 <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ m.ci }}</td>
+                <td class="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">{{ m.tipoPersonaLabel || m.tipoPersona || '—' }}</td>
                 <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ m.celular || '—' }}</td>
                 <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ m.registroUniversitario || '—' }}</td>
               </tr>
@@ -227,65 +229,74 @@
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px]" />
 
         <div
-          class="relative w-full sm:max-w-xl max-h-[92vh] sm:max-h-[88vh] bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          class="relative w-full sm:max-w-2xl max-h-[94vh] sm:max-h-[90vh] bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         >
-          <div class="bg-slate-900 text-white px-4 sm:px-5 py-4 shrink-0">
+          <div class="bg-slate-900 text-white px-5 sm:px-7 py-5 sm:py-6 shrink-0">
             <div class="flex items-start gap-3">
-              <span class="material-symbols-outlined text-secondary text-2xl shrink-0">menu_book</span>
+              <span class="material-symbols-outlined text-secondary text-3xl shrink-0">menu_book</span>
               <div class="min-w-0">
-                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Nómina Excel</p>
-                <h3 id="nomina-instrucciones-title" class="text-base sm:text-lg font-black italic uppercase leading-tight">
+                <p class="text-xs font-black uppercase tracking-widest text-slate-400">Nómina Excel</p>
+                <h3 id="nomina-instrucciones-title" class="text-xl sm:text-2xl font-black italic uppercase leading-tight mt-0.5">
                   Guía de uso de la planilla
                 </h3>
-                <p class="text-slate-400 text-[11px] mt-1">Lea con atención antes de continuar</p>
+                <p class="text-slate-400 text-sm mt-1.5">Lea con atención antes de continuar</p>
               </div>
             </div>
           </div>
 
-          <div class="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4 space-y-4 text-sm">
-            <section class="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
-              <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">¿Qué es esta planilla?</p>
-              <p class="text-xs sm:text-[13px] text-slate-700 font-medium leading-relaxed">
-                Es el documento oficial para registrar a los fraternos de su fraternidad.
+          <div class="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-7 py-5 sm:py-6 space-y-5 text-base">
+            <section class="rounded-xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
+              <p class="text-xs font-black uppercase tracking-widest text-slate-500 mb-2.5">¿Qué es esta planilla?</p>
+              <p class="text-[15px] sm:text-base text-slate-700 font-medium leading-relaxed">
+                Es el documento oficial para registrar a las personas de su fraternidad
+                (estudiantes, docentes, administrativos o externos).
                 Los datos se cargan al sistema <strong>sin crear usuarios</strong>: solo sirven como control de quiénes participan.
                 La fraternidad y el tipo de danza aparecen en la cabecera del Excel; no deben escribirse en cada fila.
               </p>
             </section>
 
             <section>
-              <p class="text-[10px] font-black uppercase tracking-widest text-primary mb-2">Procedimiento paso a paso</p>
-              <ol class="space-y-2.5 text-xs sm:text-[13px] text-slate-700 font-medium leading-relaxed list-decimal list-outside pl-4">
+              <p class="text-xs font-black uppercase tracking-widest text-primary mb-3">Procedimiento paso a paso</p>
+              <ol class="space-y-3 text-[15px] sm:text-base text-slate-700 font-medium leading-relaxed list-decimal list-outside pl-5">
                 <li>
                   <strong>Descargue la plantilla oficial</strong> desde este módulo.
                   Si extravía el archivo, descargue uno nuevo (también es válido).
                 </li>
                 <li>
-                  Abra el archivo en Excel y complete <strong>una fila por fraterno</strong>,
+                  Abra el archivo en Excel y complete <strong>una fila por persona</strong>,
                   de arriba hacia abajo, <strong>sin dejar filas en blanco entre registros</strong>.
                 </li>
                 <li>
                   En cada fila complete obligatoriamente:
                   <strong>Nombre</strong>, <strong>Primer Apellido</strong>,
                   <strong>CI</strong> (únicamente números),
-                  <strong>Número de celular</strong> y
-                  <strong>Registro Universitario</strong>.
+                  <strong>Tipo de Persona</strong> (lista desplegable) y
+                  <strong>Número de celular</strong>.
                 </li>
                 <li>
-                  El <strong>Segundo Apellido</strong> es el único campo opcional.
+                  En la columna <strong>Tipo de Persona</strong> use la lista desplegable y elija solo uno de estos valores:
+                  <strong>Estudiante</strong>, <strong>Docente</strong>, <strong>Administrativo</strong> o <strong>Externo</strong>.
+                </li>
+                <li>
+                  El <strong>Registro Universitario (RU)</strong> es <strong>obligatorio únicamente si el tipo es Estudiante</strong>.
+                  Si el tipo es Docente, Administrativo o Externo, puede dejar el RU vacío.
+                </li>
+                <li>
+                  El <strong>Segundo Apellido</strong> es opcional.
                 </li>
                 <li>
                   Guarde el archivo y cárguelo aquí dentro del <strong>periodo habilitado</strong> por la administración.
                 </li>
                 <li>
                   Si ya cargó datos antes, la nueva descarga vendrá <strong>prellenada</strong>.
-                  Agregue solo fraternos nuevos en las filas siguientes, también de forma continua.
+                  Agregue solo personas nuevas en las filas siguientes, también de forma continua.
                 </li>
               </ol>
             </section>
 
-            <section class="rounded-xl border border-amber-100 bg-amber-50/90 p-3.5">
-              <p class="text-[10px] font-black uppercase tracking-widest text-amber-800 mb-2">Regla de filas continuas</p>
-              <p class="text-xs sm:text-[13px] text-amber-950/90 font-medium leading-relaxed">
+            <section class="rounded-xl border border-amber-100 bg-amber-50/90 p-4 sm:p-5">
+              <p class="text-xs font-black uppercase tracking-widest text-amber-800 mb-2.5">Regla de filas continuas</p>
+              <p class="text-[15px] sm:text-base text-amber-950/90 font-medium leading-relaxed">
                 Debe llenar las filas en secuencia (1, 2, 3, 4…).
                 <strong>No está permitido</strong> completar, por ejemplo, las primeras 25 filas,
                 dejar 3 vacías y continuar después: el sistema rechazará la planilla.
@@ -293,11 +304,13 @@
               </p>
             </section>
 
-            <section class="rounded-xl border border-red-100 bg-red-50/80 p-3.5">
-              <p class="text-[10px] font-black uppercase tracking-widest text-red-700 mb-2">Restricciones (la carga será rechazada si…)</p>
-              <ul class="space-y-2 text-xs sm:text-[13px] text-red-900/90 font-medium leading-relaxed list-disc list-outside pl-4">
+            <section class="rounded-xl border border-red-100 bg-red-50/80 p-4 sm:p-5">
+              <p class="text-xs font-black uppercase tracking-widest text-red-700 mb-2.5">Restricciones (la carga será rechazada si…)</p>
+              <ul class="space-y-2.5 text-[15px] sm:text-base text-red-900/90 font-medium leading-relaxed list-disc list-outside pl-5">
                 <li>El <strong>CI</strong> contiene letras o símbolos (debe ser solo números).</li>
-                <li>Falta algún campo obligatorio o hay filas vacías intercaladas.</li>
+                <li>Falta el <strong>Tipo de Persona</strong> o no coincide con la lista desplegable.</li>
+                <li>El tipo es <strong>Estudiante</strong> y falta el Registro Universitario.</li>
+                <li>Falta algún otro campo obligatorio o hay filas vacías intercaladas.</li>
                 <li>Se utiliza otro Excel o se altera el identificador de la planilla.</li>
                 <li>Se insertan columnas o filas fuera de las preparadas.</li>
                 <li>Se vuelve a subir el mismo contenido sin ningún CI nuevo.</li>
@@ -305,24 +318,24 @@
               </ul>
             </section>
 
-            <section class="rounded-xl border border-emerald-100 bg-emerald-50/80 p-3.5">
-              <p class="text-[10px] font-black uppercase tracking-widest text-emerald-800 mb-2">Protección de la información</p>
-              <p class="text-xs sm:text-[13px] text-emerald-950/90 font-medium leading-relaxed">
+            <section class="rounded-xl border border-emerald-100 bg-emerald-50/80 p-4 sm:p-5">
+              <p class="text-xs font-black uppercase tracking-widest text-emerald-800 mb-2.5">Protección de la información</p>
+              <p class="text-[15px] sm:text-base text-emerald-950/90 font-medium leading-relaxed">
                 Una planilla vacía o con menos datos <strong>no elimina</strong> lo ya registrado.
-                Al reenviar, el sistema únicamente <strong>agrega</strong> fraternos con CI que aún no existan en la base de datos.
+                Al reenviar, el sistema únicamente <strong>agrega</strong> personas con CI que aún no existan en la base de datos.
               </p>
             </section>
           </div>
 
-          <div class="shrink-0 border-t border-slate-100 p-4 sm:p-5 bg-white safe-bottom">
+          <div class="shrink-0 border-t border-slate-100 p-5 sm:p-6 bg-white safe-bottom">
             <div v-if="segundosRestantes > 0" class="mb-3">
-              <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div
                   class="h-full bg-secondary transition-all duration-1000 ease-linear"
                   :style="{ width: `${((5 - segundosRestantes) / 5) * 100}%` }"
                 />
               </div>
-              <p class="text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-2">
+              <p class="text-center text-xs font-bold uppercase tracking-widest text-slate-400 mt-2.5">
                 Espera {{ segundosRestantes }}s para continuar
               </p>
             </div>
@@ -330,12 +343,12 @@
               type="button"
               @click="cerrarModalInstrucciones"
               :disabled="segundosRestantes > 0"
-              class="w-full px-4 py-3.5 rounded-xl font-black uppercase text-[11px] tracking-widest transition-all flex items-center justify-center gap-2"
+              class="w-full px-4 py-4 rounded-xl font-black uppercase text-sm tracking-widest transition-all flex items-center justify-center gap-2"
               :class="segundosRestantes > 0
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-primary text-white hover:bg-blue-900 shadow-lg shadow-primary/20'"
             >
-              <span class="material-symbols-outlined text-[18px]">
+              <span class="material-symbols-outlined text-[22px]">
                 {{ segundosRestantes > 0 ? 'timer' : 'check_circle' }}
               </span>
               {{ segundosRestantes > 0 ? `Entendido (${segundosRestantes})` : 'Entendido' }}

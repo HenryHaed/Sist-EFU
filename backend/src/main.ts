@@ -313,6 +313,15 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     ALTER TABLE fases
     ADD COLUMN IF NOT EXISTS suma_nota_padre_hija BOOLEAN NOT NULL DEFAULT false
   `);
+  await runPatch(dataSource, 'miembros_nomina.tipo_persona', `
+    ALTER TABLE miembros_nomina
+    ADD COLUMN IF NOT EXISTS tipo_persona VARCHAR(20) NOT NULL DEFAULT 'ESTUDIANTE'
+  `);
+  await runPatch(dataSource, 'miembros_nomina.tipo_persona backfill', `
+    UPDATE miembros_nomina
+    SET tipo_persona = 'ESTUDIANTE'
+    WHERE tipo_persona IS NULL OR TRIM(tipo_persona) = ''
+  `);
   await runPatch(dataSource, 'idx fases.id_fase_padre', `
     CREATE INDEX IF NOT EXISTS idx_fases_fase_padre ON fases(id_fase_padre)
   `);

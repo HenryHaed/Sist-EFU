@@ -47,6 +47,13 @@ export class MiembroNomina {
   @Column({ name: 'ci', length: 30 })
   ci: string;
 
+  /**
+   * Categoría de la persona en la nómina.
+   * ESTUDIANTE | DOCENTE | ADMINISTRATIVO | EXTERNO
+   */
+  @Column({ name: 'tipo_persona', length: 20, default: 'ESTUDIANTE' })
+  tipoPersona: string;
+
   @Column({ name: 'correo', length: 180, nullable: true })
   correo: string | null;
 

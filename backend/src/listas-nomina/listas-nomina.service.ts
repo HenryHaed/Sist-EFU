@@ -37,11 +37,36 @@ export const NOMINA_HEADERS = [
   'Primer Apellido',
   'Segundo Apellido',
   'CI',
+  'Tipo de Persona',
   'Número de celular',
   'Registro Universitario',
 ] as const;
 
 const COL_COUNT = NOMINA_HEADERS.length;
+
+/** Valores mostrados en el Excel (lista desplegable). */
+export const TIPOS_PERSONA_LABELS = [
+  'Estudiante',
+  'Docente',
+  'Administrativo',
+  'Externo',
+] as const;
+
+export type TipoPersonaNomina = 'ESTUDIANTE' | 'DOCENTE' | 'ADMINISTRATIVO' | 'EXTERNO';
+
+const TIPO_PERSONA_MAP: Record<string, TipoPersonaNomina> = {
+  estudiante: 'ESTUDIANTE',
+  docente: 'DOCENTE',
+  administrativo: 'ADMINISTRATIVO',
+  externo: 'EXTERNO',
+};
+
+const TIPO_PERSONA_LABEL: Record<TipoPersonaNomina, string> = {
+  ESTUDIANTE: 'Estudiante',
+  DOCENTE: 'Docente',
+  ADMINISTRATIVO: 'Administrativo',
+  EXTERNO: 'Externo',
+};
 
 @Injectable()
 export class ListasNominaService {
@@ -156,6 +181,16 @@ export class ListasNominaService {
     return ru.length >= 3 && ru.length <= 40;
   }
 
+  private normalizeTipoPersona(raw: string): TipoPersonaNomina | null {
+    const n = this.normalizeHeader(raw);
+    return TIPO_PERSONA_MAP[n] || null;
+  }
+
+  private labelTipoPersona(tipo: string | null | undefined): string {
+    const t = String(tipo || '').toUpperCase() as TipoPersonaNomina;
+    return TIPO_PERSONA_LABEL[t] || tipo || '—';
+  }
+
   private assertVentanaNomina(gestion: Gestion) {
     const inicio = gestion.nominaExcelInicio ? new Date(gestion.nominaExcelInicio) : null;
     const fin = gestion.nominaExcelFin ? new Date(gestion.nominaExcelFin) : null;
@@ -233,6 +268,8 @@ export class ListasNominaService {
       primerApellido: m.apellidoPaterno,
       segundoApellido: m.apellidoMaterno,
       ci: m.ci,
+      tipoPersona: m.tipoPersona || 'ESTUDIANTE',
+      tipoPersonaLabel: this.labelTipoPersona(m.tipoPersona),
       celular: m.celular,
       registroUniversitario: m.registroUniversitario,
       tipoDanza: m.tipoDanza,
@@ -346,7 +383,7 @@ export class ListasNominaService {
 
     const meta = wb.addWorksheet(META_SHEET);
     meta.state = 'veryHidden';
-    meta.getCell('A1').value = 'EFU_NOMINA_V3';
+    meta.getCell('A1').value = 'EFU_NOMINA_V4';
     meta.getCell('A2').value = frat.idFraternidad;
     meta.getCell('A3').value = gestion.idGestion;
     meta.getCell('A4').value = plantillaId;
@@ -367,6 +404,7 @@ export class ListasNominaService {
       { key: 'ap1', width: 16 },
       { key: 'ap2', width: 16 },
       { key: 'ci', width: 12 },
+      { key: 'tipoPersona', width: 16 },
       { key: 'celular', width: 14 },
       { key: 'ru', width: 16 },
     ];
@@ -400,8 +438,8 @@ export class ListasNominaService {
 
     ws.mergeCells(`A5:${lastCol}5`);
     ws.getCell('A5').value = miembrosExistentes.length
-      ? `ID: ${plantillaId}  ·  ${miembrosExistentes.length} registro(s) prellenado(s)  ·  Agregue filas nuevas de forma CONTINUA (sin dejar filas en blanco)  ·  CI solo números`
-      : `ID: ${plantillaId}  ·  Complete filas de forma CONTINUA (sin saltos)  ·  CI SOLO NÚMEROS  ·  Obligatorios: Nombre, Primer Apellido, CI, Celular, RU  ·  Opcional: Segundo Apellido`;
+      ? `ID: ${plantillaId}  ·  ${miembrosExistentes.length} registro(s) prellenado(s)  ·  Filas CONTINUAS  ·  CI solo números  ·  RU obligatorio SOLO si Tipo = Estudiante`
+      : `ID: ${plantillaId}  ·  Filas CONTINUAS  ·  CI SOLO NÚMEROS  ·  Obligatorios: Nombre, Primer Apellido, CI, Tipo de Persona, Celular  ·  RU solo si Estudiante  ·  Opcional: Segundo Apellido`;
     ws.getCell('A5').font = { italic: true, size: 8, color: { argb: 'FF64748B' } };
 
     NOMINA_HEADERS.forEach((h, i) => {
@@ -433,6 +471,7 @@ export class ListasNominaService {
             m.apellidoPaterno,
             m.apellidoMaterno || '',
             m.ci,
+            this.labelTipoPersona(m.tipoPersona),
             m.celular || '',
             m.registroUniversitario || '',
           ]
@@ -472,6 +511,17 @@ export class ListasNominaService {
         error: 'El CI debe contener solo números.',
       });
       validations.add(`E${DATA_START}:E${dataEnd}`, {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`"${TIPOS_PERSONA_LABELS.join(',')}"`],
+        showErrorMessage: true,
+        showInputMessage: true,
+        promptTitle: 'Tipo de Persona',
+        prompt: 'Elija: Estudiante, Docente, Administrativo o Externo.',
+        errorTitle: 'Tipo inválido',
+        error: 'Seleccione un valor de la lista desplegable.',
+      });
+      validations.add(`F${DATA_START}:F${dataEnd}`, {
         type: 'whole',
         operator: 'greaterThanOrEqual',
         formulae: [0],
@@ -519,16 +569,19 @@ export class ListasNominaService {
       '══════════════════════════════════════════════════════════════════════',
       '',
       '1) Utilice únicamente esta planilla oficial descargada desde el sistema.',
-      '2) Registre a cada fraterno en una fila, de arriba hacia abajo, SIN dejar filas en blanco',
+      '2) Registre a cada persona en una fila, de arriba hacia abajo, SIN dejar filas en blanco',
       '   entre registros. Ejemplo incorrecto: llenar 25 filas, saltar 3 vacías y continuar.',
       '   Ejemplo correcto: fila 1, 2, 3, 4… en secuencia continua.',
-      '3) Campos OBLIGATORIOS en cada fila: Nombre, Primer Apellido, CI,',
-      '   Número de celular y Registro Universitario.',
-      '4) Campo OPCIONAL: únicamente el Segundo Apellido.',
-      '5) El CI debe contener SOLO números (sin letras ni símbolos).',
-      '6) El número de celular debe contener SOLO dígitos.',
-      '7) No inserte columnas ni filas nuevas; use las filas ya preparadas en la hoja.',
-      '8) Guarde el archivo y cárguelo en el sistema dentro del periodo habilitado.',
+      '3) Campos OBLIGATORIOS en cada fila: Nombre, Primer Apellido, CI, Tipo de Persona',
+      '   y Número de celular.',
+      '4) Tipo de Persona: use la LISTA DESPLEGABLE (Estudiante, Docente, Administrativo, Externo).',
+      '5) Registro Universitario: OBLIGATORIO solo si Tipo de Persona = Estudiante.',
+      '   Si el tipo es Docente, Administrativo o Externo, puede dejar RU vacío.',
+      '6) Campo OPCIONAL siempre: Segundo Apellido.',
+      '7) El CI debe contener SOLO números (sin letras ni símbolos).',
+      '8) El número de celular debe contener SOLO dígitos.',
+      '9) No inserte columnas ni filas nuevas; use las filas ya preparadas en la hoja.',
+      '10) Guarde el archivo y cárguelo en el sistema dentro del periodo habilitado.',
       '',
       '══════════════════════════════════════════════════════════════════════',
       'REGLAS DE CARGA Y SEGURIDAD DE DATOS',
@@ -577,7 +630,7 @@ export class ListasNominaService {
     const meta = workbook.getWorksheet(META_SHEET);
     if (!meta) return null;
     const ver = this.cellText(meta.getCell('A1').value);
-    if (ver !== 'EFU_NOMINA_V2' && ver !== 'EFU_NOMINA_V3') return null;
+    if (ver !== 'EFU_NOMINA_V2' && ver !== 'EFU_NOMINA_V3' && ver !== 'EFU_NOMINA_V4') return null;
     const idFraternidad = Number(meta.getCell('A2').value);
     const idGestion = Number(meta.getCell('A3').value);
     const plantillaId = this.cellText(meta.getCell('A4').value);
@@ -593,6 +646,13 @@ export class ListasNominaService {
       apellidoPaterno: ['primer apellido', 'apellido paterno', 'ap paterno', 'apellido_paterno'],
       apellidoMaterno: ['segundo apellido', 'apellido materno', 'ap materno', 'apellido_materno'],
       ci: ['ci', 'carnet', 'cedula', 'cédula', 'documento'],
+      tipoPersona: [
+        'tipo de persona',
+        'tipo persona',
+        'tipo',
+        'categoria persona',
+        'categoría persona',
+      ],
       celular: [
         'numero de celular',
         'número de celular',
@@ -685,6 +745,11 @@ export class ListasNominaService {
         `No se encontraron los encabezados. Use la plantilla oficial (${NOMINA_HEADERS.join(', ')}).`,
       );
     }
+    if (header.mapIdx.tipoPersona == null) {
+      throw new BadRequestException(
+        'La planilla no incluye la columna «Tipo de Persona». Descargue de nuevo la plantilla oficial actualizada.',
+      );
+    }
 
     const tipoDanzaFrat = frat.tipoDanza?.nombre || null;
     const rows: Array<{
@@ -692,6 +757,7 @@ export class ListasNominaService {
       apellidoPaterno: string;
       apellidoMaterno: string | null;
       ci: string;
+      tipoPersona: TipoPersonaNomina;
       celular: string | null;
       registroUniversitario: string | null;
       tipoDanza: string | null;
@@ -721,16 +787,18 @@ export class ListasNominaService {
       const apellidoMaterno = get('apellidoMaterno') || null;
       const ciRaw = get('ci');
       const ci = this.normalizeCi(ciRaw);
+      const tipoPersonaRaw = get('tipoPersona');
       const celular = this.normalizeCelular(get('celular'));
-      const registroUniversitario = get('registroUniversitario').trim() || null;
+      const registroUniversitarioRaw = get('registroUniversitario').trim() || null;
 
       const filaVacia =
         !nombres &&
         !apellidoPaterno &&
         !ci &&
         !apellidoMaterno &&
+        !tipoPersonaRaw &&
         !celular &&
-        !registroUniversitario;
+        !registroUniversitarioRaw;
 
       if (filaVacia) {
         if (filasConDatos.length > 0) {
@@ -755,10 +823,18 @@ export class ListasNominaService {
         );
         continue;
       }
-      if (!celular || !registroUniversitario) {
+
+      const tipoPersona = this.normalizeTipoPersona(tipoPersonaRaw);
+      if (!tipoPersona) {
         errores.push(
-          `Fila ${rowNumber}: el Número de celular y el Registro Universitario son obligatorios.`,
+          `Fila ${rowNumber}: Tipo de Persona obligatorio. Use la lista: Estudiante, Docente, Administrativo o Externo.` +
+            (tipoPersonaRaw ? ` Valor: "${tipoPersonaRaw}".` : ''),
         );
+        continue;
+      }
+
+      if (!celular) {
+        errores.push(`Fila ${rowNumber}: el Número de celular es obligatorio.`);
         continue;
       }
       if (!this.isCiSoloNumeros(ci)) {
@@ -773,10 +849,21 @@ export class ListasNominaService {
         );
         continue;
       }
-      if (!this.isRegistroUniversitarioOk(registroUniversitario)) {
-        errores.push(`Fila ${rowNumber}: el Registro Universitario es inválido o está vacío.`);
-        continue;
+
+      let registroUniversitario: string | null = null;
+      if (tipoPersona === 'ESTUDIANTE') {
+        if (!registroUniversitarioRaw || !this.isRegistroUniversitarioOk(registroUniversitarioRaw)) {
+          errores.push(
+            `Fila ${rowNumber}: el Registro Universitario es obligatorio e inválido cuando Tipo de Persona = Estudiante.`,
+          );
+          continue;
+        }
+        registroUniversitario = registroUniversitarioRaw;
+      } else {
+        // Docente / Administrativo / Externo: RU opcional; se guarda null si viene vacío
+        registroUniversitario = null;
       }
+
       if (cisVistos.has(ci)) {
         errores.push(`Fila ${rowNumber}: el CI ${ci} está duplicado en la planilla.`);
         continue;
@@ -789,6 +876,7 @@ export class ListasNominaService {
         apellidoPaterno,
         apellidoMaterno,
         ci,
+        tipoPersona,
         celular,
         registroUniversitario,
         tipoDanza: tipoDanzaFrat,
@@ -814,7 +902,7 @@ export class ListasNominaService {
     }
     if (!rows.length) {
       throw new BadRequestException(
-        'No hay filas de fraternos. Complete Nombre, Primer Apellido, CI, Número de celular y Registro Universitario de forma continua.',
+        'No hay filas de fraternos. Complete Nombre, Primer Apellido, CI, Tipo de Persona y Número de celular de forma continua.',
       );
     }
     return rows;
@@ -914,6 +1002,7 @@ export class ListasNominaService {
           apellidoPaterno: r.apellidoPaterno,
           apellidoMaterno: r.apellidoMaterno,
           ci: r.ci,
+          tipoPersona: r.tipoPersona,
           correo: null,
           celular: r.celular,
           registroUniversitario: r.registroUniversitario,

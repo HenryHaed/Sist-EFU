@@ -30,7 +30,7 @@ Documentación generada a partir de las **entidades TypeORM** en `backend/src/en
 - Al **aprobar** una solicitud se crea o reutiliza la fraternidad oficial y se vincula al delegado.
 - **Directorio de delegados:** solo delegado **titular** y **suplente** (datos en `solicitudes_inscripcion`).
 - **Monografía:** cada fraternidad sube **un único PDF** vía su delegado (`uploads/Doc_Monografia/`). Admin/jurado/superusuario la consultan al calificar; el rol **`veedor`** (solo lectura) lista fraternidades y ve/descarga la monografía real subida. Si no hay fila en `monografias`, se informa que aún no subieron.
-- **Nómina Excel:** cada fraternidad+gestión tiene **un único** `.xlsx` (`listas_nomina_fraternidad` + filas en `miembros_nomina`). El **delegado** descarga plantilla prellenada (fraternidad + tipo de danza de su fraternidad), completa Nombre / Apellidos / CI y sube; se importan fraternos a BD **sin crear usuarios**. Admin lista, ve registro estructurado, preview Excel y descarga/elimina.
+- **Nómina Excel:** cada fraternidad+gestión tiene **un único** `.xlsx` (`listas_nomina_fraternidad` + filas en `miembros_nomina`). El **delegado** descarga plantilla prellenada (fraternidad + tipo de danza de su fraternidad), completa Nombre / Apellidos / CI / **Tipo de Persona** / Celular / RU (RU solo obligatorio si Estudiante) y sube; se importan personas a BD **sin crear usuarios**. Admin lista, ve registro estructurado, preview Excel y descarga/elimina.
 - **DELETE físico:** las eliminaciones en organización (facultad/carrera/institución) borran filas de la BD (hard delete); no hay soft-delete. Las facultades eliminan carreras en cascada (`ON DELETE CASCADE`).
 - **Asistencia:** basta con que asista titular o suplente; si ninguno asiste → incidencia de −10 pts en disciplina.
 - **Infracciones dinámicas:** catálogo por gestión en `infracciones` (CRUD admin). Al aplicar bandera/sanción se usa `id_infraccion` o presets (Amarilla/Roja/…); el **puntaje final EFU** suma `valor_impacto` real de la BD (`max(0, Promedio Final + Σ sanciones)`). No reescribir valores históricos al seed de presets.
@@ -275,11 +275,11 @@ Nómina Excel única por **fraternidad + gestión**, subida por el delegado. Arc
 | `created_at` | TIMESTAMP | NOT NULL | Primera subida |
 | `updated_at` | TIMESTAMP | NOT NULL | Última actualización / reemplazo |
 
-**Unique:** `(id_fraternidad, id_gestion)` — un solo Excel vigente; al re-subir se reemplaza el archivo y las filas de `miembros_nomina`.
+**Unique:** `(id_fraternidad, id_gestion)` — un solo Excel vigente; al re-subir se actualiza el archivo y **solo se agregan** CIs nuevos en `miembros_nomina` (no se borran filas previas).
 
 ### `miembros_nomina`
 
-Fraternos importados desde el Excel. **No son usuarios** del sistema.
+Personas importadas desde el Excel. **No son usuarios** del sistema.
 
 | Columna | Tipo | Restricciones | Descripción |
 |---------|------|---------------|-------------|
@@ -288,13 +288,19 @@ Fraternos importados desde el Excel. **No son usuarios** del sistema.
 | `id_fraternidad` | INTEGER | FK → `fraternidades`, CASCADE | Fraternidad |
 | `id_gestion` | INTEGER | FK → `gestiones`, CASCADE | Gestión |
 | `nombres` | VARCHAR(150) | NOT NULL | Nombre(s) |
-| `apellido_paterno` | VARCHAR(100) | NOT NULL | Apellido paterno |
-| `apellido_materno` | VARCHAR(100) | NULL | Apellido materno |
-| `ci` | VARCHAR(30) | NOT NULL | Carnet |
-| `tipo_danza` | VARCHAR(120) | NULL | Snapshot del tipo de danza |
+| `apellido_paterno` | VARCHAR(100) | NOT NULL | Primer apellido |
+| `apellido_materno` | VARCHAR(100) | NULL | Segundo apellido |
+| `ci` | VARCHAR(30) | NOT NULL | Carnet (solo números) |
+| `tipo_persona` | VARCHAR(20) | NOT NULL, default `ESTUDIANTE` | `ESTUDIANTE` \| `DOCENTE` \| `ADMINISTRATIVO` \| `EXTERNO` |
+| `correo` | VARCHAR(180) | NULL | Reservado (no se usa en plantilla actual) |
+| `celular` | VARCHAR(30) | NULL | Número de celular |
+| `registro_universitario` | VARCHAR(40) | NULL | RU; **obligatorio solo si** `tipo_persona = ESTUDIANTE` |
+| `tipo_danza` | VARCHAR(120) | NULL | Snapshot del tipo de danza de la fraternidad |
 | `created_at` | TIMESTAMP | NOT NULL | Importación |
 
-**Unique:** `(id_gestion, id_fraternidad, ci)`. Plantilla: Nombre | Apellido paterno | Apellido materno | CI | Fraternidad | Tipo de danza (últimas dos **prellenadas**).
+**Unique:** `(id_gestion, id_fraternidad, ci)`.
+
+**Plantilla Excel (V4):** Nombre | Primer Apellido | Segundo Apellido | CI | **Tipo de Persona** (lista desplegable) | Número de celular | Registro Universitario. Fraternidad y tipo de danza van en la cabecera (no como columnas editables).
 
 **API** (`/api/v1/listas-nomina`):
 
