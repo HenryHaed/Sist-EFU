@@ -22,8 +22,8 @@ import { findGestionActivaOrLatest } from '../common/gestion.utils';
 const UPLOAD_DIR = 'Doc_Nomina_Excel';
 const MAX_PREVIEW_ROWS = 2000;
 const MAX_MIEMBROS = 2000;
-/** Filas editables precreadas (no se permiten insertar filas nuevas en la hoja protegida). */
-const PLANTILLA_FILAS_VACIAS = 80;
+/** Filas vacías con formato (zebra). La validación/desplegable cubre hasta MAX_MIEMBROS. */
+const PLANTILLA_FILAS_VACIAS = 120;
 const SHEET_PASSWORD = 'EFU-NOMINA-UMSA';
 const META_SHEET = '_EFU_META';
 const UMSA_BLUE = 'FF003399';
@@ -438,8 +438,8 @@ export class ListasNominaService {
 
     ws.mergeCells(`A5:${lastCol}5`);
     ws.getCell('A5').value = miembrosExistentes.length
-      ? `ID: ${plantillaId}  ·  ${miembrosExistentes.length} registro(s) prellenado(s)  ·  Filas CONTINUAS  ·  CI solo números  ·  RU obligatorio SOLO si Tipo = Estudiante`
-      : `ID: ${plantillaId}  ·  Filas CONTINUAS  ·  CI SOLO NÚMEROS  ·  Obligatorios: Nombre, Primer Apellido, CI, Tipo de Persona, Celular  ·  RU solo si Estudiante  ·  Opcional: Segundo Apellido`;
+      ? `ID: ${plantillaId}  ·  ${miembrosExistentes.length} registro(s) prellenado(s)  ·  Filas CONTINUAS  ·  Puede copiar/pegar «Tipo de Persona» o usar más filas (hasta ${MAX_MIEMBROS})  ·  RU solo si Estudiante`
+      : `ID: ${plantillaId}  ·  Filas CONTINUAS  ·  Lista desplegable o copie «Tipo de Persona» a N filas  ·  Hasta ${MAX_MIEMBROS} personas  ·  RU solo si Estudiante`;
     ws.getCell('A5').font = { italic: true, size: 8, color: { argb: 'FF64748B' } };
 
     NOMINA_HEADERS.forEach((h, i) => {
@@ -460,6 +460,8 @@ export class ListasNominaService {
     const filasVaciasExtra = PLANTILLA_FILAS_VACIAS;
     const totalFilasDatos = Math.max(miembrosExistentes.length + filasVaciasExtra, filasVaciasExtra);
     const dataEnd = DATA_START + totalFilasDatos - 1;
+    /** Rango usable real: desplegable y celdas editables hasta el tope de importación. */
+    const validationEnd = DATA_START + MAX_MIEMBROS - 1;
 
     for (let r = DATA_START; r <= dataEnd; r++) {
       const idx = r - DATA_START;
@@ -496,9 +498,16 @@ export class ListasNominaService {
       }
     }
 
+    // Más filas sin formato pesado: desbloqueadas + misma lista desplegable (copiar/pegar Tipo funciona)
+    for (let r = dataEnd + 1; r <= validationEnd; r++) {
+      for (let c = 1; c <= COL_COUNT; c++) {
+        ws.getCell(r, c).protection = { locked: false };
+      }
+    }
+
     const validations = (ws as any).dataValidations;
     if (validations?.add) {
-      validations.add(`D${DATA_START}:D${dataEnd}`, {
+      validations.add(`D${DATA_START}:D${validationEnd}`, {
         type: 'whole',
         operator: 'greaterThanOrEqual',
         formulae: [0],
@@ -510,18 +519,18 @@ export class ListasNominaService {
         errorTitle: 'CI inválido',
         error: 'El CI debe contener solo números.',
       });
-      validations.add(`E${DATA_START}:E${dataEnd}`, {
+      validations.add(`E${DATA_START}:E${validationEnd}`, {
         type: 'list',
         allowBlank: true,
         formulae: [`"${TIPOS_PERSONA_LABELS.join(',')}"`],
         showErrorMessage: true,
         showInputMessage: true,
         promptTitle: 'Tipo de Persona',
-        prompt: 'Elija: Estudiante, Docente, Administrativo o Externo.',
+        prompt: 'Elija de la lista o copie/pegue el valor en más filas.',
         errorTitle: 'Tipo inválido',
-        error: 'Seleccione un valor de la lista desplegable.',
+        error: 'Seleccione un valor de la lista: Estudiante, Docente, Administrativo o Externo.',
       });
-      validations.add(`F${DATA_START}:F${dataEnd}`, {
+      validations.add(`F${DATA_START}:F${validationEnd}`, {
         type: 'whole',
         operator: 'greaterThanOrEqual',
         formulae: [0],
@@ -547,7 +556,7 @@ export class ListasNominaService {
       formatColumns: false,
       formatRows: false,
       insertColumns: false,
-      insertRows: false,
+      insertRows: true,
       deleteColumns: false,
       deleteRows: false,
       sort: false,
@@ -575,12 +584,14 @@ export class ListasNominaService {
       '3) Campos OBLIGATORIOS en cada fila: Nombre, Primer Apellido, CI, Tipo de Persona',
       '   y Número de celular.',
       '4) Tipo de Persona: use la LISTA DESPLEGABLE (Estudiante, Docente, Administrativo, Externo).',
+      '   También puede COPIAR y PEGAR el valor de esa columna en tantas filas como necesite.',
+      '   Hay espacio para hasta ' + String(MAX_MIEMBROS) + ' personas; puede insertar filas adicionales si hace falta.',
       '5) Registro Universitario: OBLIGATORIO solo si Tipo de Persona = Estudiante.',
       '   Si el tipo es Docente, Administrativo o Externo, puede dejar RU vacío.',
       '6) Campo OPCIONAL siempre: Segundo Apellido.',
       '7) El CI debe contener SOLO números (sin letras ni símbolos).',
       '8) El número de celular debe contener SOLO dígitos.',
-      '9) No inserte columnas ni filas nuevas; use las filas ya preparadas en la hoja.',
+      '9) No inserte columnas nuevas ni altere la cabecera. Las filas de datos sí pueden ampliarse.',
       '10) Guarde el archivo y cárguelo en el sistema dentro del periodo habilitado.',
       '',
       '══════════════════════════════════════════════════════════════════════',

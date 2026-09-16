@@ -274,8 +274,10 @@
                   <strong>Número de celular</strong>.
                 </li>
                 <li>
-                  En la columna <strong>Tipo de Persona</strong> use la lista desplegable y elija solo uno de estos valores:
-                  <strong>Estudiante</strong>, <strong>Docente</strong>, <strong>Administrativo</strong> o <strong>Externo</strong>.
+                  En la columna <strong>Tipo de Persona</strong> use la lista desplegable
+                  (<strong>Estudiante</strong>, <strong>Docente</strong>, <strong>Administrativo</strong> o <strong>Externo</strong>).
+                  También puede <strong>copiar y pegar</strong> ese valor en tantas filas como necesite;
+                  la planilla admite hasta 2000 personas.
                 </li>
                 <li>
                   El <strong>Registro Universitario (RU)</strong> es <strong>obligatorio únicamente si el tipo es Estudiante</strong>.
@@ -308,11 +310,11 @@
               <p class="text-xs font-black uppercase tracking-widest text-red-700 mb-2.5">Restricciones (la carga será rechazada si…)</p>
               <ul class="space-y-2.5 text-[15px] sm:text-base text-red-900/90 font-medium leading-relaxed list-disc list-outside pl-5">
                 <li>El <strong>CI</strong> contiene letras o símbolos (debe ser solo números).</li>
-                <li>Falta el <strong>Tipo de Persona</strong> o no coincide con la lista desplegable.</li>
+                <li>Falta el <strong>Tipo de Persona</strong> o no coincide con la lista (Estudiante, Docente, Administrativo, Externo).</li>
                 <li>El tipo es <strong>Estudiante</strong> y falta el Registro Universitario.</li>
                 <li>Falta algún otro campo obligatorio o hay filas vacías intercaladas.</li>
                 <li>Se utiliza otro Excel o se altera el identificador de la planilla.</li>
-                <li>Se insertan columnas o filas fuera de las preparadas.</li>
+                <li>Se insertan columnas o se altera la cabecera (sí puede ampliar filas de datos).</li>
                 <li>Se vuelve a subir el mismo contenido sin ningún CI nuevo.</li>
                 <li>Se intenta cargar fuera del periodo definido en el cronograma.</li>
               </ul>
