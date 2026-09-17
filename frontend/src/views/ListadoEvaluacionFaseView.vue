@@ -1,49 +1,77 @@
 <template>
   <div class="relative min-h-full flex flex-col bg-slate-50">
-    <div class="dashboard-sticky-header flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-      <div class="flex items-center gap-4">
-        <button
-          data-tutorial="volver"
-          @click="$emit('volver')"
-          class="size-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-colors"
-        >
-          <span class="material-symbols-outlined">arrow_back</span>
-        </button>
-        <div>
-          <h2 class="text-[1.35rem] sm:text-xl font-black text-primary uppercase italic tracking-tighter">{{ fase?.nombre || 'Cargando...' }}</h2>
-          <p class="text-sm sm:text-xs text-slate-500 font-medium mt-0.5">Listado oficial de fraternidades habilitadas</p>
+    <div class="dashboard-sticky-header shadow-sm space-y-3">
+      <div class="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <button
+            data-tutorial="volver"
+            @click="$emit('volver')"
+            class="size-10 shrink-0 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-colors"
+          >
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="min-w-0">
+            <h2 class="text-[1.2rem] sm:text-xl font-black text-primary uppercase italic tracking-tighter truncate">{{ fase?.nombre || 'Cargando...' }}</h2>
+            <p class="text-sm sm:text-xs text-slate-500 font-medium mt-0.5 truncate">Listado oficial de fraternidades habilitadas</p>
+          </div>
+        </div>
+
+        <div class="flex flex-row flex-wrap items-center gap-2 lg:gap-2.5 shrink-0">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors"
+            @click="abrirTutorial"
+          >
+            <span class="material-symbols-outlined text-[18px]">school</span>
+            <span class="hidden xs:inline sm:inline">Tutorial</span>
+          </button>
+          <button
+            v-if="esAdmin"
+            type="button"
+            @click="abrirPanelAdmin()"
+            class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 font-black text-[10px] uppercase tracking-widest transition-colors"
+          >
+            <span class="material-symbols-outlined text-[18px]">monitoring</span>
+            <span class="hidden md:inline">Admin</span>
+          </button>
+          <div
+            data-tutorial="tiempo"
+            class="inline-flex items-center gap-2 px-3 py-2 border rounded-xl"
+            :class="urgenciaStatus.bgClass"
+          >
+            <span class="material-symbols-outlined animate-pulse text-[18px]" :class="urgenciaStatus.textClass">schedule</span>
+            <div class="leading-tight">
+              <p class="text-[9px] font-black uppercase tracking-widest text-slate-500">Tiempo fase</p>
+              <p class="text-xs sm:text-sm font-black whitespace-nowrap" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
+            </div>
+          </div>
         </div>
       </div>
-      
-      <!-- Contador + panel admin -->
-      <div class="flex flex-col xs:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-        <button
-          type="button"
-          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-black text-xs sm:text-[10px] uppercase tracking-widest transition-colors w-full sm:w-auto"
-          @click="abrirTutorial"
-        >
-          <span class="material-symbols-outlined text-[20px] sm:text-[18px]">school</span>
-          Ver tutorial
-        </button>
-        <button
-          v-if="esAdmin"
-          type="button"
-          @click="abrirPanelAdmin()"
-          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 font-black text-xs sm:text-[10px] uppercase tracking-widest transition-colors w-full sm:w-auto"
-        >
-          <span class="material-symbols-outlined text-[18px]">monitoring</span>
-          Calificaciones admin
-        </button>
-        <div 
-          data-tutorial="tiempo"
-          class="flex items-center gap-3 px-4 py-2.5 border rounded-xl w-full sm:w-auto"
-          :class="urgenciaStatus.bgClass"
-        >
-          <span class="material-symbols-outlined animate-pulse" :class="urgenciaStatus.textClass">schedule</span>
-          <div>
-            <p class="text-xs sm:text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo Restante de Fase</p>
-            <p class="text-base sm:text-sm font-black" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
-          </div>
+
+      <div v-if="!loading" class="flex flex-col md:flex-row md:items-center gap-2.5 md:gap-3 pt-1 border-t border-slate-100">
+        <div class="relative flex-1 min-w-0" data-tutorial="buscar">
+          <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
+          <input
+            v-model="busqueda"
+            type="search"
+            placeholder="Buscar fraternidad o categoría..."
+            class="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
+          />
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 md:gap-2 shrink-0">
+          <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-0.5">Ordenar</span>
+          <button
+            v-for="opt in opcionesOrden"
+            :key="opt.id"
+            type="button"
+            @click="setOrden(opt.id)"
+            class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all"
+            :class="ordenCriterio === opt.id
+              ? 'bg-primary text-white border-primary'
+              : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
+          >
+            {{ opt.label }}
+          </button>
         </div>
       </div>
     </div>
@@ -57,33 +85,6 @@
       </div>
 
       <div v-else class="space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
-          <div class="relative max-w-lg flex-1 min-w-[200px]" data-tutorial="buscar">
-            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-            <input
-              v-model="busqueda"
-              type="search"
-              placeholder="Buscar fraternidad o categoría..."
-              class="w-full pl-12 pr-4 py-3.5 sm:py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-base sm:text-sm"
-            />
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-xs sm:text-[10px] font-black uppercase tracking-widest text-slate-400">Ordenar</span>
-            <button
-              v-for="opt in opcionesOrden"
-              :key="opt.id"
-              type="button"
-              @click="setOrden(opt.id)"
-              class="px-3 py-2.5 sm:py-2 rounded-xl text-xs sm:text-[10px] font-black uppercase tracking-widest border transition-all"
-              :class="ordenCriterio === opt.id
-                ? 'bg-primary text-white border-primary'
-                : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
-            >
-              {{ opt.label }}
-            </button>
-          </div>
-        </div>
-
         <div v-if="fraternidadesFiltradas.length === 0" class="bg-white rounded-3xl border border-slate-200 py-16 text-center text-slate-400">
           <span class="material-symbols-outlined text-5xl mb-3">search_off</span>
           <p class="text-base sm:text-sm font-medium">
@@ -646,7 +647,14 @@ const fraternidadesFiltradas = computed(() => {
 const estaCalificado = (item) => item?.estadoEvaluacion === 'COMPLETADO'
 
 const fraternidadesPendientes = computed(() =>
-  fraternidadesFiltradas.value.filter((f) => !estaCalificado(f)),
+  fraternidadesFiltradas.value
+    .filter((f) => !estaCalificado(f))
+    .slice()
+    .sort((a, b) => {
+      // En progreso primero, luego no calificados
+      const rank = (x) => (x.estadoEvaluacion === 'EN_PROGRESO' ? 0 : 1)
+      return rank(a) - rank(b)
+    }),
 )
 const fraternidadesCalificadas = computed(() =>
   fraternidadesFiltradas.value.filter((f) => estaCalificado(f)),
@@ -827,40 +835,70 @@ const urgenciaStatus = computed(() => {
   return { bgClass: 'bg-emerald-50 border-emerald-200', textClass: 'text-emerald-700' }
 })
 
+const urgenteIcon = (fFin) => {
+  if (!fFin) return 'info'
+  const dias = Math.floor(Math.max(0, fFin.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  return dias <= 1 ? 'warning' : 'info'
+}
+
 const lanzarModalBienvenida = (faseInfo) => {
-  // Solo lanzamos si "no ha sido vista" en sesion actual. Usar sessionStorage
   const key = `fase_bienvenida_${faseInfo.idFase}`
-  if (!sessionStorage.getItem(key)) {
-    const parseSafeDate = (d, isEnd = true) => {
-      if (!d) return null
-      const datePart = typeof d === 'string' ? d.split('T')[0].split(' ')[0] : ''
-      if (!datePart) return new Date(d)
-      const parts = datePart.split('-')
-      if (parts.length === 3) {
-        const year = parseInt(parts[0], 10)
-        const month = parseInt(parts[1], 10) - 1
-        const day = parseInt(parts[2], 10)
-        if (isEnd) return new Date(year, month, day, 23, 59, 59, 999)
-        return new Date(year, month, day, 0, 0, 0, 0)
-      }
-      return new Date(d)
+  if (sessionStorage.getItem(key)) return
+
+  const parseSafeDate = (d, isEnd = true) => {
+    if (!d) return null
+    const datePart = typeof d === 'string' ? d.split('T')[0].split(' ')[0] : ''
+    if (!datePart) return new Date(d)
+    const parts = datePart.split('-')
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10)
+      const month = parseInt(parts[1], 10) - 1
+      const day = parseInt(parts[2], 10)
+      if (isEnd) return new Date(year, month, day, 23, 59, 59, 999)
+      return new Date(year, month, day, 0, 0, 0, 0)
     }
-    const fInicio = parseSafeDate(props.faseSeleccionada.fechaInicio, false)
-    const fFin = parseSafeDate(props.faseSeleccionada.fechaFin, true)
-    
-    const inicioFmt = fInicio ? fInicio.toLocaleDateString() : 'Pendiente'
-    const finFmt = fFin ? fFin.toLocaleDateString() : 'Pendiente'
-    
-    Swal.fire({
-      icon: 'info',
-      title: `Bienvenido a la Evaluación`,
-      html: `Tienes desde el <b>${inicioFmt}</b> hasta el <b>${finFmt}</b> para completar la calificación.<br><br>Una vez finalizado este periodo, el acceso será restringido.`,
-      confirmButtonColor: '#003399',
-      confirmButtonText: 'Entendido'
-    }).then(() => {
-      sessionStorage.setItem(key, 'true')
-    })
+    return new Date(d)
   }
+  const fInicio = parseSafeDate(props.faseSeleccionada.fechaInicio, false)
+  const fFin = parseSafeDate(props.faseSeleccionada.fechaFin, true)
+
+  const inicioFmt = fInicio
+    ? fInicio.toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' })
+    : 'Pendiente'
+  const finFmt = fFin
+    ? fFin.toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' })
+    : 'Pendiente'
+
+  let restanteHtml = ''
+  if (fFin) {
+    const ms = Math.max(0, fFin.getTime() - Date.now())
+    const dias = Math.floor(ms / (1000 * 60 * 60 * 24))
+    const horas = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const min = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))
+    const urgente = dias <= 1
+    restanteHtml = `
+      <div style="margin-top:14px;padding:12px 14px;border-radius:12px;border:1px solid ${urgente ? '#fecaca' : '#bbf7d0'};background:${urgente ? '#fef2f2' : '#ecfdf5'};text-align:left">
+        <p style="margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:${urgente ? '#b91c1c' : '#047857'}">Tiempo restante para calificar</p>
+        <p style="margin:0;font-size:18px;font-weight:900;color:${urgente ? '#991b1b' : '#065f46'}">${dias} días · ${horas} hrs · ${min} min</p>
+      </div>`
+  }
+
+  Swal.fire({
+    icon: urgenteIcon(fFin),
+    title: 'Tiempo para calificar',
+    html: `
+      <p style="margin:0 0 8px;color:#475569;font-size:14px;line-height:1.45">
+        Fase <b>${faseInfo.nombre || ''}</b><br>
+        Del <b>${inicioFmt}</b> al <b>${finFmt}</b>.
+      </p>
+      <p style="margin:0;color:#64748b;font-size:13px">Cuando termine el plazo, el acceso para calificar se restringe.</p>
+      ${restanteHtml}
+    `,
+    confirmButtonColor: '#003399',
+    confirmButtonText: 'Entendido',
+  }).then(() => {
+    sessionStorage.setItem(key, 'true')
+  })
 }
 
 const formatearHora = (fechaString) => {
