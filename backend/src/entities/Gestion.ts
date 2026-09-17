@@ -45,8 +45,23 @@ export class Gestion {
     @Column({ name: 'url_imagen_login', length: 500, nullable: true })
     urlImagenLogin: string;
 
-    @Column({ name: 'url_mapa_ubicacion', length: 500, nullable: true })
+    @Column({ name: 'url_mapa_ubicacion', type: 'text', nullable: true })
     urlMapaUbicacion: string;
+
+    /** Imagen de portada del recorrido en el landing (click abre el mapa Google). */
+    @Column({ name: 'url_imagen_mapa', length: 500, nullable: true })
+    urlImagenMapa: string | null;
+
+    /** Subtítulo de la sección Recorrido oficial en el landing. */
+    @Column({ name: 'recorrido_subtitulo', length: 255, nullable: true })
+    recorridoSubtitulo: string | null;
+
+    /** Puntos del recorrido (ubicación / por dónde pasa) editables en Ajustes. */
+    @Column({ name: 'recorrido_puntos', type: 'jsonb', nullable: true })
+    recorridoPuntos: Array<{
+        titulo: string;
+        desc?: string;
+    }> | null;
 
     @Column({ name: 'modo_mantenimiento', default: false })
     modoMantenimiento: boolean;

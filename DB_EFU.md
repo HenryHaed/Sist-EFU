@@ -151,7 +151,10 @@ Configuración central de cada año EFU.
 | `url_banner` | VARCHAR(500) | NULL | Banner |
 | `url_logo` | VARCHAR(500) | NULL | Logo |
 | `url_imagen_login` | VARCHAR(500) | NULL | Imagen login |
-| `url_mapa_ubicacion` | VARCHAR(500) | NULL | URL embed del mapa de recorrido (Google My Maps) en el landing |
+| `url_mapa_ubicacion` | TEXT | NULL | URL embed del mapa (Google Maps / My Maps iframe `src`) en el landing |
+| `url_imagen_mapa` | VARCHAR(500) | NULL | Imagen de portada del recorrido; click abre el modal del mapa |
+| `recorrido_subtitulo` | VARCHAR(255) | NULL | Subtítulo de la sección Recorrido oficial |
+| `recorrido_puntos` | JSONB | NULL | Puntos de ubicación/recorrido `[{ titulo, desc }]` editables en Ajustes |
 | `modo_mantenimiento` | BOOLEAN | DEFAULT false | Sitio en mantenimiento |
 | `mostrar_ranking` | BOOLEAN | DEFAULT true | Mostrar ranking público |
 | `mostrar_historico` | BOOLEAN | DEFAULT false | Mostrar archivo histórico en landing |
@@ -296,6 +299,7 @@ Personas importadas desde el Excel. **No son usuarios** del sistema.
 | `celular` | VARCHAR(30) | NULL | Número de celular |
 | `registro_universitario` | VARCHAR(40) | NULL | RU; **obligatorio solo si** `tipo_persona = ESTUDIANTE` |
 | `tipo_danza` | VARCHAR(120) | NULL | Snapshot del tipo de danza de la fraternidad |
+| `asegurado` | BOOLEAN | NOT NULL, default `false` | Seguro otorgado solo por **admin/superusuario** |
 | `created_at` | TIMESTAMP | NOT NULL | Importación |
 
 **Unique:** `(id_gestion, id_fraternidad, ci)`.
@@ -722,7 +726,10 @@ CREATE TABLE IF NOT EXISTS gestiones (
     url_banner                  VARCHAR(500),
     url_logo                    VARCHAR(500),
     url_imagen_login            VARCHAR(500),
-    url_mapa_ubicacion          VARCHAR(500),
+    url_mapa_ubicacion          TEXT,
+    url_imagen_mapa             VARCHAR(500),
+    recorrido_subtitulo         VARCHAR(255),
+    recorrido_puntos            JSONB,
     modo_mantenimiento          BOOLEAN NOT NULL DEFAULT FALSE,
     mostrar_ranking             BOOLEAN NOT NULL DEFAULT TRUE,
     permite_inscripcion_publica BOOLEAN NOT NULL DEFAULT FALSE,

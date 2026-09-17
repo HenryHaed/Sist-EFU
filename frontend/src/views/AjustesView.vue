@@ -292,14 +292,15 @@
             Mapa del recorrido (Landing)
           </label>
           <p class="text-[10px] text-slate-400 font-medium leading-relaxed">
-            Pega la <b>URL de embed</b> de Google My Maps o el <b>código iframe</b> completo
-            (Google Maps → Compartir → Insertar mapa). Se usa en la sección Recorrido oficial del landing.
+            Acepta la <b>URL de embed</b> o el <b>código iframe</b> completo de Google Maps / My Maps
+            (Compartir → Insertar un mapa → copiar HTML). El sistema extrae el <code>src</code> automáticamente.
+            No uses el enlace normal de “Abrir en Maps”; debe ser embed (<code>/maps/embed</code> o <code>/maps/d/embed</code>).
           </p>
           <textarea
             v-model="gestion.urlMapaUbicacion"
             rows="4"
             class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-mono text-xs text-slate-700 transition-all resize-y"
-            placeholder="https://www.google.com/maps/d/embed?mid=... o <iframe src=&quot;...&quot;></iframe>"
+            placeholder='<iframe src="https://www.google.com/maps/embed?pb=..." ...></iframe>  o  https://www.google.com/maps/d/embed?mid=...'
             @blur="normalizarMapaEmbed"
           ></textarea>
           <div class="flex flex-wrap items-center gap-3">
@@ -320,10 +321,13 @@
             <p v-if="mapaEmbedUrlPreview" class="text-[10px] text-emerald-700 font-bold truncate max-w-full">
               URL lista: {{ mapaEmbedUrlPreview }}
             </p>
+            <p v-else-if="gestion.urlMapaUbicacion" class="text-[10px] text-amber-700 font-bold">
+              No se detectó una URL de embed válida. Pega el iframe o una URL con /maps/embed.
+            </p>
           </div>
           <div
             v-if="mapaEmbedUrlPreview"
-            class="rounded-xl overflow-hidden border border-slate-200 bg-slate-900 h-48"
+            class="rounded-xl overflow-hidden border border-slate-200 bg-slate-900 h-56"
           >
             <iframe
               :src="mapaEmbedUrlPreview"
@@ -333,8 +337,99 @@
               loading="lazy"
               referrerpolicy="no-referrer-when-downgrade"
               allowfullscreen
+              title="Vista previa mapa recorrido"
             ></iframe>
           </div>
+
+          <div class="pt-4 border-t border-slate-100 space-y-2">
+            <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest">
+              Imagen de portada del mapa (Landing)
+            </label>
+            <p class="text-[10px] text-slate-400 font-medium leading-relaxed">
+              Esta imagen se muestra en la sección Recorrido. Al hacer clic se abre el modal con Google Maps.
+            </p>
+            <div class="w-full h-40 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center relative overflow-hidden group">
+              <img
+                v-if="previews.mapaImg || gestion.urlImagenMapa"
+                :src="previews.mapaImg || gestion.urlImagenMapa"
+                class="size-full object-cover"
+                alt="Portada mapa"
+              />
+              <div v-else class="text-center px-4">
+                <span class="material-symbols-outlined text-4xl text-slate-300">map</span>
+                <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">Sin imagen (se usa la por defecto)</p>
+              </div>
+              <label class="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer">
+                <span class="material-symbols-outlined mb-1">upload</span>
+                <span class="text-[10px] font-black uppercase">Subir imagen</span>
+                <input type="file" class="hidden" accept="image/*" @change="handleFile($event, 'mapaImg')" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Puntos del recorrido / ubicación (landing) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <label class="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+              Ubicación y recorrido (Landing)
+            </label>
+            <p class="text-[10px] text-slate-400 font-medium leading-relaxed">
+              Textos de la sección «Recorrido oficial»: subtítulo y puntos (partida, palcos, final, etc.).
+              Se muestran en el landing junto al mapa.
+            </p>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Subtítulo</label>
+            <input
+              v-model="gestion.recorridoSubtitulo"
+              type="text"
+              maxlength="255"
+              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20"
+              placeholder="Sigue la ruta de la entrada universitaria"
+            />
+          </div>
+          <div class="space-y-3">
+            <div
+              v-for="(punto, idx) in gestion.recorridoPuntos"
+              :key="'rp-' + idx"
+              class="p-4 rounded-xl border border-slate-100 bg-slate-50/80 space-y-2"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-[10px] font-black uppercase tracking-widest text-primary">Punto {{ idx + 1 }}</p>
+                <button
+                  type="button"
+                  class="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-800"
+                  :disabled="gestion.recorridoPuntos.length <= 1"
+                  @click="quitarPuntoRecorrido(idx)"
+                >
+                  Quitar
+                </button>
+              </div>
+              <input
+                v-model="punto.titulo"
+                type="text"
+                maxlength="120"
+                class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-primary"
+                placeholder="Ej. Partida: Plaza Bolivia"
+              />
+              <textarea
+                v-model="punto.desc"
+                rows="2"
+                maxlength="500"
+                class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-primary resize-y"
+                placeholder="Descripción / por dónde pasa…"
+              ></textarea>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+            :disabled="(gestion.recorridoPuntos || []).length >= 12"
+            @click="agregarPuntoRecorrido"
+          >
+            + Agregar punto
+          </button>
         </div>
 
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -978,19 +1073,65 @@ const renunciarDecisor = async () => {
 
 /** Extrae src de un iframe pegado, o limpia una URL de embed de Google Maps / My Maps. */
 const extractMapEmbedUrl = (raw) => {
-  const text = String(raw || '').trim()
+  let text = String(raw || '').trim()
   if (!text) return ''
+  text = text
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/gi, "'")
+
   const iframeSrc = text.match(/src\s*=\s*["']([^"']+)["']/i)
-  if (iframeSrc?.[1]) return iframeSrc[1].trim()
-  // Si pegaron solo la URL
-  if (/^https?:\/\//i.test(text)) {
-    return text.split(/\s/)[0].trim()
+  let url = (iframeSrc?.[1] || text).trim()
+  if (!url) return ''
+
+  // Si pegaron solo la URL (posible con espacios/saltos)
+  if (/^https?:\/\//i.test(url)) {
+    url = url.split(/\s/)[0].trim()
+  } else if (!iframeSrc) {
+    return ''
   }
-  return text.slice(0, 500)
+
+  // My Maps viewer → embed
+  if (url.includes('maps/d/viewer') && /[?&]mid=/.test(url)) {
+    const mid = url.match(/[?&]mid=([^&]+)/i)?.[1]
+    if (mid) {
+      url = `https://www.google.com/maps/d/embed?mid=${decodeURIComponent(mid)}&ehbc=2E312F`
+    }
+  }
+
+  // Aceptar embeds conocidos de Google Maps
+  const ok =
+    /google\.[^/]+\/maps\/embed/i.test(url) ||
+    /google\.[^/]+\/maps\/d\/embed/i.test(url) ||
+    /maps\/embed/i.test(url) ||
+    /maps\/d\/embed/i.test(url)
+
+  if (!ok && /^https?:\/\//i.test(url)) {
+    // URL genérica: aún permitir si viene de iframe (Google a veces usa otros hosts)
+    if (!iframeSrc) return ''
+  }
+
+  return url.slice(0, 2000)
 }
 
 const MAPA_RECORRIDO_DEFAULT =
   'https://www.google.com/maps/d/embed?mid=1-YtosxPGnmPvgFZ2NelW2cREgouvfb4&ehbc=2E312F&noprof=1'
+
+const DEFAULT_RECORRIDO_PUNTOS = () => ([
+  { titulo: 'Partida: Plaza Bolivia', desc: 'Capitán Ravelo — Punto de inicio y concentración.' },
+  { titulo: 'Palco: Av. Camacho', desc: 'Centro del recorrido y punto de mayor concurrencia.' },
+  { titulo: 'Final: Simón Bolívar', desc: 'Desconcentración frente al Estadio.' },
+])
+
+const normalizeRecorridoPuntos = (raw) => {
+  const list = Array.isArray(raw) ? raw : []
+  if (!list.length) return DEFAULT_RECORRIDO_PUNTOS()
+  return list.slice(0, 12).map((item) => ({
+    titulo: item?.titulo || '',
+    desc: item?.desc || item?.descripcion || '',
+  }))
+}
 
 const props = defineProps({
   gestionId: { type: Number, default: null },
@@ -1070,6 +1211,9 @@ const gestion = ref({
   urlBanner: '',
   urlImagenLogin: '',
   urlMapaUbicacion: '',
+  urlImagenMapa: '',
+  recorridoSubtitulo: 'Sigue la ruta de la entrada universitaria',
+  recorridoPuntos: DEFAULT_RECORRIDO_PUNTOS(),
   modoMantenimiento: false,
   mostrarRanking: true,
   mostrarHistorico: false,
@@ -1087,6 +1231,7 @@ const files = ref({
   logo: null,
   banner: null,
   loginImg: null,
+  mapaImg: null,
   ...emptyLandingFiles(),
 })
 
@@ -1094,17 +1239,34 @@ const mapaEmbedUrlPreview = computed(() => extractMapEmbedUrl(gestion.value.urlM
 
 const normalizarMapaEmbed = () => {
   const url = extractMapEmbedUrl(gestion.value.urlMapaUbicacion)
-  if (url) gestion.value.urlMapaUbicacion = url.slice(0, 500)
+  if (url) gestion.value.urlMapaUbicacion = url.slice(0, 2000)
 }
 
 const usarMapaPorDefecto = () => {
   gestion.value.urlMapaUbicacion = MAPA_RECORRIDO_DEFAULT
 }
 
+const agregarPuntoRecorrido = () => {
+  if (!Array.isArray(gestion.value.recorridoPuntos)) {
+    gestion.value.recorridoPuntos = DEFAULT_RECORRIDO_PUNTOS()
+  }
+  if (gestion.value.recorridoPuntos.length >= 12) return
+  gestion.value.recorridoPuntos.push({ titulo: '', desc: '' })
+  hasChanges.value = true
+}
+
+const quitarPuntoRecorrido = (idx) => {
+  if (!Array.isArray(gestion.value.recorridoPuntos)) return
+  if (gestion.value.recorridoPuntos.length <= 1) return
+  gestion.value.recorridoPuntos.splice(idx, 1)
+  hasChanges.value = true
+}
+
 const previews = ref({
   logo: null,
   banner: null,
   loginImg: null,
+  mapaImg: null,
   ...emptyLandingPreviews(),
 })
 
@@ -1154,7 +1316,11 @@ const loadGestion = async (idGestion = null) => {
       data.urlLogo = getImageUrl(data.urlLogo)
       data.urlBanner = getImageUrl(data.urlBanner)
       data.urlImagenLogin = getImageUrl(data.urlImagenLogin)
+      data.urlImagenMapa = getImageUrl(data.urlImagenMapa)
       data.landingFraternidades = normalizeLandingFraternidades(data.landingFraternidades)
+      data.recorridoSubtitulo =
+        data.recorridoSubtitulo || 'Sigue la ruta de la entrada universitaria'
+      data.recorridoPuntos = normalizeRecorridoPuntos(data.recorridoPuntos)
       data.mostrarRanking = data.mostrarRanking !== false
       data.mostrarHistorico = data.mostrarHistorico === true
       data.mostrarRankingEstadisticas = data.mostrarRankingEstadisticas !== false
@@ -1189,8 +1355,8 @@ const cargarGestionesDisponibles = async () => {
 
 const cambiarGestion = async () => {
   if (!selectedGestionId.value) return
-  files.value = { logo: null, banner: null, loginImg: null, ...emptyLandingFiles() }
-  previews.value = { logo: null, banner: null, loginImg: null, ...emptyLandingPreviews() }
+  files.value = { logo: null, banner: null, loginImg: null, mapaImg: null, ...emptyLandingFiles() }
+  previews.value = { logo: null, banner: null, loginImg: null, mapaImg: null, ...emptyLandingPreviews() }
   await loadGestion(selectedGestionId.value)
   if (activeTab.value === 'documentos') cargarDocumentos()
   if (activeTab.value === 'cronogramas') cargarDatosCronogramas()
@@ -1211,8 +1377,8 @@ const handleLandingFratFile = (event, index) => {
 
 const resetChanges = () => {
   loadGestion(selectedGestionId.value || props.gestionId || null)
-  files.value = { logo: null, banner: null, loginImg: null, ...emptyLandingFiles() }
-  previews.value = { logo: null, banner: null, loginImg: null, ...emptyLandingPreviews() }
+  files.value = { logo: null, banner: null, loginImg: null, mapaImg: null, ...emptyLandingFiles() }
+  previews.value = { logo: null, banner: null, loginImg: null, mapaImg: null, ...emptyLandingPreviews() }
 }
 
 const saveSettings = async () => {
@@ -1235,7 +1401,15 @@ const saveSettings = async () => {
       urlLogo: toStoredAssetPath(gestion.value.urlLogo),
       urlBanner: toStoredAssetPath(gestion.value.urlBanner),
       urlImagenLogin: toStoredAssetPath(gestion.value.urlImagenLogin),
-      urlMapaUbicacion: extractMapEmbedUrl(gestion.value.urlMapaUbicacion).slice(0, 500) || null,
+      urlImagenMapa: toStoredAssetPath(gestion.value.urlImagenMapa),
+      urlMapaUbicacion: extractMapEmbedUrl(gestion.value.urlMapaUbicacion).slice(0, 2000) || null,
+      recorridoSubtitulo: (gestion.value.recorridoSubtitulo || '').trim().slice(0, 255) || null,
+      recorridoPuntos: (gestion.value.recorridoPuntos || [])
+        .map((p) => ({
+          titulo: (p.titulo || '').trim().slice(0, 120),
+          desc: (p.desc || '').trim().slice(0, 500),
+        }))
+        .filter((p) => p.titulo),
       nominaExcelInicio: gestion.value.nominaExcelInicio || null,
       nominaExcelFin: gestion.value.nominaExcelFin || null,
       landingFraternidades: (gestion.value.landingFraternidades || []).map((card) => ({
@@ -1253,6 +1427,7 @@ const saveSettings = async () => {
     if (files.value.logo) formData.append('logo', files.value.logo)
     if (files.value.banner) formData.append('banner', files.value.banner)
     if (files.value.loginImg) formData.append('loginImg', files.value.loginImg)
+    if (files.value.mapaImg) formData.append('mapaImg', files.value.mapaImg)
     if (files.value.landingFrat0) formData.append('landingFrat0', files.value.landingFrat0)
     if (files.value.landingFrat1) formData.append('landingFrat1', files.value.landingFrat1)
     if (files.value.landingFrat2) formData.append('landingFrat2', files.value.landingFrat2)
@@ -1269,8 +1444,8 @@ const saveSettings = async () => {
     })
     Toast.fire({ icon: 'success', title: 'Ajustes guardados correctamente' })
     
-    files.value = { logo: null, banner: null, loginImg: null, ...emptyLandingFiles() }
-    previews.value = { logo: null, banner: null, loginImg: null, ...emptyLandingPreviews() }
+    files.value = { logo: null, banner: null, loginImg: null, mapaImg: null, ...emptyLandingFiles() }
+    previews.value = { logo: null, banner: null, loginImg: null, mapaImg: null, ...emptyLandingPreviews() }
     await loadGestion(gestion.value.idGestion)
   } catch (err) {
     console.error('Error saving:', err)

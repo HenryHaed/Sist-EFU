@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Request,
   Res,
@@ -125,6 +127,19 @@ export class ListasNominaController {
   @ApiOperation({ summary: 'Fraternos registrados de una nómina' })
   getMiembrosAdmin(@Param('id', ParseIntPipe) id: number) {
     return this.service.getMiembrosAdmin(id);
+  }
+
+  @Patch('miembros/:idMiembro/asegurado')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Otorgar o retirar seguro de un fraterno (solo admin)' })
+  setAsegurado(
+    @Param('idMiembro', ParseIntPipe) idMiembro: number,
+    @Body() body: { asegurado?: boolean },
+  ) {
+    if (typeof body?.asegurado !== 'boolean') {
+      throw new BadRequestException('El campo asegurado (boolean) es obligatorio.');
+    }
+    return this.service.setAseguradoMiembro(idMiembro, body.asegurado);
   }
 
   @Get(':id/preview')

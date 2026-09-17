@@ -4,7 +4,11 @@
     <!-- Wizard Header (replaces standard header) -->
     <div class="sticky top-0 z-40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 px-4 sm:px-6 py-3 sm:py-4 bg-white/95 backdrop-blur-md shadow-sm">
       <div class="flex items-center gap-3 min-w-0">
-        <button @click="$emit('volver')" class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-50 text-slate-500 hover:bg-slate-200 transition-colors border border-slate-200">
+        <button
+          data-tutorial="volver"
+          @click="$emit('volver')"
+          class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-50 text-slate-500 hover:bg-slate-200 transition-colors border border-slate-200"
+        >
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
         <div class="flex flex-col">
@@ -24,6 +28,14 @@
       </div>
       
       <div class="flex items-center gap-3 mt-4 sm:mt-0 flex-wrap justify-end">
+        <button
+          type="button"
+          class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors"
+          @click="abrirTutorial"
+        >
+          <span class="material-symbols-outlined text-[16px]">school</span>
+          Ver tutorial
+        </button>
         <div class="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg border border-slate-200" :class="urgenciaStatus.textClass">
           <span class="material-symbols-outlined animate-pulse text-sm">schedule</span>
           <span class="text-xs font-black">{{ countdownText }}</span>
@@ -43,6 +55,8 @@
       </div>
     </div>
 
+    <TutorialCalificarModal v-model="tutorialAbierto" :variant="tutorialVariant" />
+
     <!-- Main Content -->
     <main class="flex-1 flex flex-col items-center p-4 sm:p-6 md:p-8 w-full max-w-6xl mx-auto min-w-0">
       
@@ -54,22 +68,14 @@
 
       <template v-else-if="criterios.length > 0">
         <!-- Progress section -->
-        <div class="w-full max-w-5xl mb-8">
-          <div class="flex justify-between items-end mb-3">
-            <div>
-              <span class="text-primary font-bold text-[10px] uppercase tracking-widest">Progreso de Calificación</span>
-              <h3 class="text-2xl font-black text-slate-900 italic tracking-tighter uppercase">Paso {{ criterioActualIndex + 1 }}: {{ criterioActual.nombre }}</h3>
-            </div>
-            <div class="text-right">
-              <span class="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Criterio {{ criterioActualIndex + 1 }} de {{ totalCriterios }}</span>
-              <p class="text-primary font-black text-xl">{{ porcentajeProgreso }}%</p>
-            </div>
-          </div>
-          <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200 relative">
-            <div class="bg-primary h-full transition-all duration-300 relative" :style="{ width: porcentajeProgreso + '%' }">
-              <div class="absolute right-0 top-0 h-full w-1 bg-secondary"></div>
-            </div>
-          </div>
+        <div class="w-full max-w-5xl mb-4 lg:mb-6">
+          <h3 class="text-2xl sm:text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-tight">
+            Paso {{ criterioActualIndex + 1 }}: Evalúa {{ criterioActual.nombre }}
+          </h3>
+          <p class="text-slate-500 text-sm sm:text-sm font-medium mt-1.5">
+            Máximo {{ Number(criterioActual.puntajeMaximo) }} pts
+            <span class="text-slate-400"> · paso {{ criterioActualIndex + 1 }} de {{ totalCriterios }}</span>
+          </p>
         </div>
 
         <!-- Layout Grid -->
@@ -77,8 +83,8 @@
           
           <!-- LEFT CARD (Active Criterion) -->
           <div class="lg:col-span-8 flex flex-col glass-panel rounded-2xl overflow-hidden border-t-4 border-t-primary bg-white shadow-xl">
-            <!-- Criterion Image -->
-            <div class="aspect-video relative w-full overflow-hidden bg-slate-100">
+            <!-- Criterion Image (solo desktop) -->
+            <div class="hidden lg:block aspect-video relative w-full overflow-hidden bg-slate-100">
               <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent z-10 pointer-events-none"></div>
               
               <!-- Badge status -->
@@ -92,7 +98,6 @@
                 Máximo: {{ Number(criterioActual.puntajeMaximo) }} pts
               </div>
 
-              <!-- Imagen con fallback a textura andina si no hay -->
               <img 
                 v-if="criterioActual.urlImagen" 
                 :src="getImageUrl(criterioActual.urlImagen)" 
@@ -104,36 +109,40 @@
               </div>
             </div>
             
-            <div class="p-6 md:p-10 flex-1 flex flex-col bg-white">
-              <div class="mb-8">
-                <div class="flex items-center gap-2 mb-3">
+            <div class="p-4 sm:p-6 md:p-10 flex-1 flex flex-col bg-white">
+              <!-- Título/desc: en móvil más breve y después del puntaje -->
+              <div class="mb-4 lg:mb-8 order-2 lg:order-1">
+                <div class="hidden lg:flex items-center gap-2 mb-3">
                   <span class="size-2 rounded-full bg-secondary shrink-0"></span>
                   <h4 class="text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-tight">
-                    Evaluación de {{ criterioActual.nombre }}
+                    Evalúa {{ criterioActual.nombre }}
                   </h4>
                 </div>
-                <p class="text-slate-600 text-sm leading-relaxed font-medium">
+                <p class="text-slate-600 text-sm sm:text-sm leading-relaxed font-medium line-clamp-4 lg:line-clamp-none">
                   {{ criterioActual.descripcion || 'Asigne el puntaje correspondiente de acuerdo a los criterios observados durante el desarrollo del recorrido.' }}
                 </p>
               </div>
 
-              <div class="mt-auto space-y-8">
-                <!-- Score Control -->
-                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                  <div class="flex justify-between items-center mb-6">
-                    <label class="text-slate-800 font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                      <span class="material-symbols-outlined text-primary text-xl">analytics</span>
-                      Puntaje del Criterio
+              <div class="mt-0 lg:mt-auto space-y-6 lg:space-y-8 order-1 lg:order-2">
+                <!-- Score Control (primero en móvil) -->
+                <div class="bg-slate-50 p-4 sm:p-6 rounded-2xl border border-slate-200" data-tutorial="puntaje">
+                  <div class="flex justify-between items-center mb-4 sm:mb-6 gap-3">
+                    <label class="text-slate-800 font-black text-sm sm:text-sm uppercase tracking-widest flex items-center gap-2">
+                      <span class="material-symbols-outlined text-primary text-2xl sm:text-xl">analytics</span>
+                      Puntaje
                     </label>
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2 sm:gap-3">
                       <input 
+                        ref="puntajeInputRef"
                         type="number" 
+                        inputmode="decimal"
+                        enterkeyhint="done"
                         v-model.number="formValues[criterioActual.idCriterio]" 
                         min="0" 
                         :max="Number(criterioActual.puntajeMaximo)"
                         @input="validarPuntaje(criterioActual)"
                         @blur="validarPuntaje(criterioActual)"
-                        class="w-24 px-3 py-2 bg-white border-2 border-slate-300 text-primary font-black text-2xl text-center rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
+                        class="w-28 sm:w-24 px-3 py-3 sm:py-2 bg-white border-2 border-slate-300 text-primary font-black text-3xl sm:text-2xl text-center rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
                         :disabled="estadoOriginal === 'COMPLETADO'"
                       />
                       <span class="text-slate-400 font-bold text-sm">/ {{ Number(criterioActual.puntajeMaximo) }}</span>
@@ -156,35 +165,38 @@
                 </div>
 
                 <!-- Navigation Controls -->
-                <div class="flex items-center justify-between gap-4 pt-4 border-t border-slate-100">
-                  <!-- Prev -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-100">
                   <button 
+                    data-tutorial="anterior"
                     @click="pasoAnterior" 
                     :disabled="criterioActualIndex === 0"
-                    class="flex items-center gap-2 px-6 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all border-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                    class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 rounded-xl font-black uppercase text-xs sm:text-[10px] tracking-widest transition-all border-2 disabled:opacity-30 disabled:cursor-not-allowed"
                     :class="criterioActualIndex === 0 ? 'bg-slate-50 border-slate-100 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 shadow-sm'"
                   >
                     <span class="material-symbols-outlined text-lg">arrow_back</span>
-                    <span class="hidden sm:inline">Anterior</span>
+                    Anterior
                   </button>
 
-                  <div class="flex gap-3 flex-1 justify-end">
-                    <!-- Save draft -->
+                  <div class="flex flex-col xs:flex-row gap-2 sm:gap-3 flex-1 sm:justify-end min-w-0 w-full sm:w-auto">
                     <button 
                       v-if="estadoOriginal !== 'COMPLETADO'"
+                      data-tutorial="guardar"
                       @click="guardar(false)" 
                       :disabled="saving || tiempoRestante <= 0"
-                      class="flex items-center gap-2 px-6 py-4 rounded-xl bg-white border-2 border-primary text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary/5 transition-all shadow-sm"
+                      class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 rounded-xl bg-white border-2 border-primary text-primary font-black uppercase text-xs sm:text-[10px] tracking-widest hover:bg-primary/5 transition-all shadow-sm disabled:opacity-50"
                     >
-                      <span class="material-symbols-outlined text-lg" :class="{'animate-spin': saving}">sync</span>
-                      <span class="hidden sm:inline">{{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Guardar' }}</span>
+                      <span
+                        class="material-symbols-outlined text-lg"
+                        :class="{ 'animate-spin': saving }"
+                      >{{ saving ? 'sync' : 'save' }}</span>
+                      <span>{{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Guardar evaluación' }}</span>
                     </button>
 
-                    <!-- Next or Finish -->
                     <button 
                       v-if="criterioActualIndex < totalCriterios - 1"
+                      data-tutorial="siguiente"
                       @click="pasoSiguiente"
-                      class="flex-1 max-w-[220px] flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-primary text-white font-black uppercase text-[10px] tracking-widest hover:bg-blue-900 transition-all glow-blue shadow-lg shadow-primary/30 border-b-4 border-blue-900 active:border-b-0 active:translate-y-1"
+                      class="w-full sm:w-auto sm:flex-1 sm:max-w-[220px] flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 rounded-xl bg-primary text-white font-black uppercase text-xs sm:text-[10px] tracking-widest hover:bg-blue-900 transition-all glow-blue shadow-lg shadow-primary/30 border-b-4 border-blue-900 active:border-b-0 active:translate-y-1"
                     >
                       Siguiente 
                       <span class="material-symbols-outlined text-lg">arrow_forward</span>
@@ -192,12 +204,13 @@
 
                     <button 
                       v-else-if="estadoOriginal !== 'COMPLETADO'"
+                      data-tutorial="finalizar"
                       @click="abrirResumenModal"
                       :disabled="tiempoRestante <= 0"
-                      class="flex-1 max-w-[220px] flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-secondary text-white font-black uppercase text-[10px] tracking-widest hover:bg-red-800 transition-all shadow-lg shadow-secondary/30 border-b-4 border-red-900 active:border-b-0 active:translate-y-1 disabled:bg-slate-200 disabled:text-slate-400 disabled:border-transparent"
+                      class="w-full sm:w-auto sm:flex-1 sm:max-w-[280px] flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 rounded-xl bg-secondary text-white font-black uppercase text-xs sm:text-[10px] tracking-widest hover:bg-red-800 transition-all shadow-lg shadow-secondary/30 border-b-4 border-red-900 active:border-b-0 active:translate-y-1 disabled:bg-slate-200 disabled:text-slate-400 disabled:border-transparent"
                     >
                       <span class="material-symbols-outlined text-lg">{{ tiempoRestante <= 0 ? 'lock' : 'verified' }}</span>
-                      {{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Sellar Acta' }}
+                      {{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Finalizar evaluación' }}
                     </button>
                   </div>
                 </div>
@@ -205,8 +218,8 @@
             </div>
           </div>
 
-          <!-- RIGHT SIDEBAR (Preview & Summary) -->
-          <div class="lg:col-span-4 flex flex-col gap-6">
+          <!-- RIGHT SIDEBAR (solo desktop) -->
+          <div class="hidden lg:flex lg:col-span-4 flex-col gap-6">
             
             <!-- Summary Global -->
             <div class="bg-slate-900 text-white border border-slate-800 rounded-2xl p-8 flex flex-col justify-center items-center text-center shadow-2xl shadow-slate-900/20 relative overflow-hidden">
@@ -245,7 +258,6 @@
               
               <div class="aspect-[21/9] rounded-xl overflow-hidden border border-slate-200 relative bg-slate-50">
                 <div class="absolute inset-0 bg-primary/10 group-hover:bg-transparent transition-colors z-10"></div>
-                <!-- Mini Imagen Próximo -->
                 <img 
                   v-if="criterioSiguiente.urlImagen"
                   :src="getImageUrl(criterioSiguiente.urlImagen)" 
@@ -263,7 +275,6 @@
               <p class="text-xs font-medium mt-1 text-emerald-600/80">Estás en el paso final.</p>
             </div>
 
-            <!-- Tareas Recientes / Observaciones (Opcional visualmente) -->
             <div class="glass-panel rounded-2xl bg-white border-2 border-slate-100 p-5 mt-auto">
                 <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-3 flex items-center gap-1">
                   <span class="material-symbols-outlined text-[14px]">info</span> Criterios Evaluados
@@ -300,12 +311,11 @@
       <v-card class="rounded-3xl border-4 border-secondary overflow-hidden">
         <v-card-title class="bg-secondary text-white pa-6 text-center flex flex-col items-center shrink-0">
           <span class="material-symbols-outlined text-5xl mb-2 opacity-90">verified_user</span>
-          <h3 class="text-2xl font-black italic uppercase tracking-tighter shadow-sm">Confirmar Acta</h3>
-          <p class="text-xs text-white/80 font-medium tracking-wide mt-1 uppercase">Revisión Final de Calificaciones</p>
+          <h3 class="text-2xl font-black italic uppercase tracking-tighter shadow-sm">Confirmar finalización</h3>
+          <p class="text-xs text-white/80 font-medium tracking-wide mt-1 uppercase">Revisión final de calificaciones</p>
         </v-card-title>
         
         <v-card-text class="pa-0 bg-slate-50 flex-grow-1 overflow-y-auto" style="max-height: 60vh;">
-          <!-- Total grande -->
           <div class="bg-white border-b border-slate-200 p-8 text-center flex flex-col items-center">
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje Total Calculado</p>
             <div class="flex items-end justify-center gap-1">
@@ -314,7 +324,6 @@
             </div>
           </div>
 
-          <!-- Desglose -->
           <div class="p-6">
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Desglose por Criterio</p>
             <div class="space-y-2">
@@ -331,21 +340,65 @@
           </div>
           
           <div class="px-6 pb-6 text-center">
-             <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold p-3 rounded-xl flex items-center gap-2">
-               <span class="material-symbols-outlined text-amber-500">warning</span>
-               Al "Sellar", el acta se cierra y ya no podrás modificar estas calificaciones.
+             <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold p-3 rounded-xl flex items-center gap-2 text-left">
+               <span class="material-symbols-outlined text-amber-500 shrink-0">warning</span>
+               Al finalizar y cerrar la evaluación ya no podrás modificar estas calificaciones.
              </div>
           </div>
         </v-card-text>
 
-        <v-card-actions class="pa-6 bg-white border-t border-slate-200 flex gap-4">
-          <button @click="modalResumen = false" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors border-2 border-transparent hover:border-slate-200">
+        <v-card-actions class="pa-6 bg-white border-t border-slate-200 flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <button @click="modalResumen = false" class="w-full sm:flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors border-2 border-transparent hover:border-slate-200">
             Revisar
           </button>
-          <button @click="confirmarSello" :disabled="saving" class="flex-1 bg-secondary text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-lg shadow-secondary/30 hover:bg-red-800 transition-colors">
+          <button @click="confirmarSello" :disabled="saving" class="w-full sm:flex-1 bg-secondary text-white font-black py-3 px-3 rounded-xl uppercase tracking-widest text-[10px] sm:text-xs flex items-center justify-center gap-2 shadow-lg shadow-secondary/30 hover:bg-red-800 transition-colors">
              <span v-if="saving" class="material-symbols-outlined animate-spin text-sm">sync</span>
              <span v-else class="material-symbols-outlined text-sm">lock</span>
-             Sellar Definitivo
+             Finalizar y cerrar evaluación
+          </button>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- MODAL POST-CIERRE -->
+    <v-dialog v-model="modalPostCierre" max-width="480px" persistent>
+      <v-card class="rounded-3xl border-4 border-emerald-500 overflow-hidden">
+        <v-card-title class="bg-emerald-600 text-white pa-6 text-center flex flex-col items-center">
+          <span class="material-symbols-outlined text-5xl mb-2 opacity-90">check_circle</span>
+          <h3 class="text-xl sm:text-2xl font-black italic uppercase tracking-tighter">Evaluación finalizada</h3>
+        </v-card-title>
+        <v-card-text class="pa-6 bg-white text-center space-y-3">
+          <p class="text-slate-700 text-sm font-medium leading-relaxed">
+            La calificación quedó cerrada correctamente.
+          </p>
+          <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 text-left space-y-1.5">
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Fase en la que calificaste</p>
+            <p class="text-base font-black text-primary uppercase italic">{{ faseSeleccionada?.nombre || '—' }}</p>
+            <p v-if="participanteNombre || fraternidad" class="text-xs text-slate-600 font-medium">
+              {{ participanteNombre || fraternidad?.nombre }}
+              <span v-if="participanteNombre && fraternidad"> · {{ fraternidad.nombre }}</span>
+            </p>
+            <p class="text-xs text-slate-500 font-bold pt-1">
+              Puntaje: {{ puntajeCalculado }} / {{ puntajePosible }}
+            </p>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-6 pt-0 bg-white flex flex-col gap-3">
+          <button
+            type="button"
+            @click="irDestinoPostCierre('estadisticas')"
+            class="w-full py-3.5 rounded-xl bg-primary text-white font-black uppercase text-[11px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:bg-blue-900"
+          >
+            <span class="material-symbols-outlined text-[18px]">analytics</span>
+            Ir a estadísticas
+          </button>
+          <button
+            type="button"
+            @click="irDestinoPostCierre('listado')"
+            class="w-full py-3.5 rounded-xl bg-white border-2 border-slate-200 text-slate-700 font-black uppercase text-[11px] tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50"
+          >
+            <span class="material-symbols-outlined text-[18px]">groups</span>
+            Volver a calificar otra fraternidad
           </button>
         </v-card-actions>
       </v-card>
@@ -362,13 +415,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { notify } from '../utils/notify'
-import Swal from 'sweetalert2'
 import api from '../services/api'
 
 import { getImageUrl } from '../utils/url'
 import PdfViewerModal from '../components/PdfViewerModal.vue'
+import TutorialCalificarModal from '../components/TutorialCalificarModal.vue'
+import { TUTORIAL_VARIANT, hasSeenTutorial } from '../utils/tutorialCalificar'
 
 const props = defineProps({
   faseSeleccionada: {
@@ -395,11 +449,23 @@ const props = defineProps({
 })
 const emit = defineEmits(['volver', 'finalizar'])
 
+const esExterno = computed(() =>
+  props.participanteId != null || !!props.participanteNombre,
+)
+const tutorialVariant = computed(() =>
+  esExterno.value ? TUTORIAL_VARIANT.WIZARD_EXTERNO : TUTORIAL_VARIANT.WIZARD_EFU,
+)
+const tutorialAbierto = ref(false)
+function abrirTutorial() {
+  tutorialAbierto.value = true
+}
+
 const loading = ref(true)
 const saving = ref(false)
 const criterios = ref([])
 const formValues = ref({}) 
 const estadoOriginal = ref('PENDIENTE')
+const puntajeInputRef = ref(null)
 
 // Wizard State
 const criterioActualIndex = ref(0)
@@ -419,8 +485,24 @@ const criteriosLlenados = computed(() => {
   }).length
 })
 
-// Modal Resumen
+// Modales
 const modalResumen = ref(false)
+const modalPostCierre = ref(false)
+const promedioFinalizado = ref(0)
+
+const enfocarPuntajeMovil = async () => {
+  if (estadoOriginal.value === 'COMPLETADO') return
+  if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) return
+  await nextTick()
+  const el = puntajeInputRef.value
+  if (el && typeof el.focus === 'function') {
+    try {
+      el.focus({ preventScroll: false })
+    } catch {
+      el.focus()
+    }
+  }
+}
 
 // Cronómetro
 // Monografía (fase MONOGRAFIA)
@@ -500,6 +582,7 @@ const cargarDatos = async () => {
     emit('volver')
   } finally {
     loading.value = false
+    enfocarPuntajeMovil()
   }
 }
 
@@ -518,7 +601,6 @@ const validarPuntaje = (criterio) => {
 }
 
 const pasoSiguiente = () => {
-  // Opcional: auto-guardar borrador al pasar
   if (criterioActualIndex.value < totalCriterios.value - 1) {
     criterioActualIndex.value++
   }
@@ -528,6 +610,10 @@ const pasoAnterior = () => {
     criterioActualIndex.value--
   }
 }
+
+watch(criterioActualIndex, () => {
+  enfocarPuntajeMovil()
+})
 
 const abrirResumenModal = () => {
   const sinLlenar = criterios.value.some(c => {
@@ -553,7 +639,11 @@ const abrirResumenModal = () => {
 
 const confirmarSello = async () => {
   await guardar(true)
-  modalResumen.value = false
+}
+
+const irDestinoPostCierre = (destino) => {
+  modalPostCierre.value = false
+  emit('finalizar', { promedio: promedioFinalizado.value, destino })
 }
 
 // Stats & Guardado
@@ -582,9 +672,11 @@ const guardar = async (finalizar = false) => {
     })
 
     if (finalizar) {
-      notify.success('Acta Cerrada', 'La calificación se oficializó correctamente.')
+      notify.success('Evaluación finalizada', 'La calificación se oficializó correctamente.')
       estadoOriginal.value = 'COMPLETADO'
-      emit('finalizar', { promedio: puntajeCalculado.value })
+      promedioFinalizado.value = puntajeCalculado.value
+      modalResumen.value = false
+      modalPostCierre.value = true
     } else {
       notify.success('Progreso Guardado', 'Los cambios se almacenaron como borrador.')
       estadoOriginal.value = 'EN_PROGRESO'
@@ -620,7 +712,15 @@ const urgenciaStatus = computed(() => {
   return { textClass: 'text-primary bg-blue-50' }
 })
 
-onMounted(() => cargarDatos())
+onMounted(() => {
+  cargarDatos()
+})
+
+watch(loading, (isLoading) => {
+  if (!isLoading && !hasSeenTutorial(tutorialVariant.value)) {
+    tutorialAbierto.value = true
+  }
+})
 onUnmounted(() => { if (timerInterval) clearInterval(timerInterval) })
 </script>
 

@@ -1111,9 +1111,21 @@ const iniciarWizardConcurso = ({ idParticipante, participanteNombre, participant
   vistaActual.value = 'wizard_concurso'
 }
 
-const manejarFinalizacion = (resultados) => {
-  console.log('Resultados finales:', resultados)
-  notify.success('Acta Sellada con Éxito', `Calificaciones guardadas. Promedio: ${resultados.promedio.toFixed(1)}/100`)
+const manejarFinalizacion = (resultados = {}) => {
+  const destino = resultados?.destino || 'estadisticas'
+  const vieneDeConcurso = vistaActual.value === 'wizard_concurso'
+
+  if (destino === 'listado') {
+    if (vieneDeConcurso) {
+      activeParticipanteId.value = null
+      activeParticipanteNombre.value = null
+      activeParticipanteTipo.value = null
+      setVista('listado_competidores')
+    } else {
+      setVista('listado_fase')
+    }
+    return
+  }
   setVista('estadisticas')
 }
 

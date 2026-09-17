@@ -2,38 +2,53 @@
   <div class="relative min-h-full flex flex-col bg-slate-50">
     <div class="dashboard-sticky-header flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
       <div class="flex items-center gap-4">
-        <button @click="$emit('volver')" class="size-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-colors">
+        <button
+          data-tutorial="volver"
+          @click="$emit('volver')"
+          class="size-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-colors"
+        >
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
         <div>
-          <h2 class="text-xl font-black text-primary uppercase italic tracking-tighter">{{ fase?.nombre || 'Cargando...' }}</h2>
-          <p class="text-xs text-slate-500 font-medium">Listado oficial de fraternidades habilitadas</p>
+          <h2 class="text-[1.35rem] sm:text-xl font-black text-primary uppercase italic tracking-tighter">{{ fase?.nombre || 'Cargando...' }}</h2>
+          <p class="text-sm sm:text-xs text-slate-500 font-medium mt-0.5">Listado oficial de fraternidades habilitadas</p>
         </div>
       </div>
       
       <!-- Contador + panel admin -->
       <div class="flex flex-col xs:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
         <button
+          type="button"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-black text-xs sm:text-[10px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+          @click="abrirTutorial"
+        >
+          <span class="material-symbols-outlined text-[20px] sm:text-[18px]">school</span>
+          Ver tutorial
+        </button>
+        <button
           v-if="esAdmin"
           type="button"
           @click="abrirPanelAdmin()"
-          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 font-black text-[10px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 font-black text-xs sm:text-[10px] uppercase tracking-widest transition-colors w-full sm:w-auto"
         >
           <span class="material-symbols-outlined text-[18px]">monitoring</span>
           Calificaciones admin
         </button>
         <div 
+          data-tutorial="tiempo"
           class="flex items-center gap-3 px-4 py-2.5 border rounded-xl w-full sm:w-auto"
           :class="urgenciaStatus.bgClass"
         >
           <span class="material-symbols-outlined animate-pulse" :class="urgenciaStatus.textClass">schedule</span>
           <div>
-            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo Restante de Fase</p>
-            <p class="text-sm font-black" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
+            <p class="text-xs sm:text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo Restante de Fase</p>
+            <p class="text-base sm:text-sm font-black" :class="urgenciaStatus.textClass">{{ countdownText }}</p>
           </div>
         </div>
       </div>
     </div>
+
+    <TutorialCalificarModal v-model="tutorialAbierto" :variant="tutorialVariant" />
 
     <!-- MAIN LISTING -->
     <div class="flex-1 dashboard-page max-w-7xl">
@@ -43,23 +58,23 @@
 
       <div v-else class="space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
-          <div class="relative max-w-lg flex-1 min-w-[200px]">
+          <div class="relative max-w-lg flex-1 min-w-[200px]" data-tutorial="buscar">
             <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
             <input
               v-model="busqueda"
               type="search"
               placeholder="Buscar fraternidad o categoría..."
-              class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
+              class="w-full pl-12 pr-4 py-3.5 sm:py-3 bg-white border border-slate-200 rounded-2xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-base sm:text-sm"
             />
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Ordenar</span>
+            <span class="text-xs sm:text-[10px] font-black uppercase tracking-widest text-slate-400">Ordenar</span>
             <button
               v-for="opt in opcionesOrden"
               :key="opt.id"
               type="button"
               @click="setOrden(opt.id)"
-              class="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all"
+              class="px-3 py-2.5 sm:py-2 rounded-xl text-xs sm:text-[10px] font-black uppercase tracking-widest border transition-all"
               :class="ordenCriterio === opt.id
                 ? 'bg-primary text-white border-primary'
                 : 'bg-white text-slate-500 border-slate-200 hover:border-primary/40'"
@@ -71,284 +86,352 @@
 
         <div v-if="fraternidadesFiltradas.length === 0" class="bg-white rounded-3xl border border-slate-200 py-16 text-center text-slate-400">
           <span class="material-symbols-outlined text-5xl mb-3">search_off</span>
-          <p class="text-sm font-medium">
+          <p class="text-base sm:text-sm font-medium">
             {{ busqueda.trim() ? `Ninguna fraternidad coincide con “${busqueda}”.` : 'No hay fraternidades habilitadas en esta fase.' }}
           </p>
         </div>
 
-      <div v-else class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
-        
-        <!-- Vista Desktop (Tabla) -->
-        <div class="hidden md:block overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-black text-[10px]">
-              <tr>
-                <th class="px-6 py-4">Fraternidad</th>
-                <th class="px-6 py-4">Fecha solicitud</th>
-                <th class="px-6 py-4">Instancia</th>
-                <th class="px-6 py-4 text-center">Estado Evaluación</th>
-                <th class="px-6 py-4 text-center">Puntaje</th>
-                <th class="px-6 py-4">Tiempos Registrados</th>
-                <th class="px-6 py-4 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr
-                v-for="item in fraternidadesFiltradas"
-                :key="item.idFraternidad"
-                class="transition-colors"
-                :class="tieneSancionGrave(item) ? 'bg-red-50/80 hover:bg-red-50' : 'hover:bg-slate-50'"
-              >
-                <td class="px-6 py-4">
-                  <p class="font-bold" :class="tieneSancionGrave(item) ? 'text-red-800' : 'text-primary'">{{ item.nombre }}</p>
-                  <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
-                  
-                  <!-- LISTADO DE PENALIZACIONES (Solo en Disciplina) -->
-                  <div v-if="item.penalizaciones && item.penalizaciones.length > 0" class="mt-2 flex flex-wrap gap-1.5">
-                    <div v-for="p in item.penalizaciones" :key="p.idIncidencia" 
-                      class="inline-flex items-center gap-1.5 rounded-lg font-black uppercase tracking-wide"
-                      :class="esSancionGrave(p)
-                        ? 'bg-red-700 text-white border border-red-900 px-2.5 py-1 text-[10px] shadow-sm shadow-red-200'
-                        : 'bg-red-50 border border-red-200 text-[10px] text-red-800 px-2 py-1'"
-                    >
-                      <span class="material-symbols-outlined text-[14px]">{{ esSancionGrave(p) ? 'gavel' : 'warning' }}</span>
-                      {{ etiquetaPenalizacion(p) }}
-                      <button v-if="authStore.userRole === 'admin' || authStore.userRole === 'superusuario'"
-                        @click="removerPenalizacion(item, p.idIncidencia)"
-                        class="ml-0.5 hover:text-white/80"
-                        title="Remover (Solo Admin)"
+      <div v-else class="space-y-6">
+        <!-- ========== PENDIENTES ========== -->
+        <section class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
+          <div class="px-4 sm:px-6 py-3.5 sm:py-3 bg-amber-50 border-b border-amber-100 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-amber-700 text-[22px]">pending_actions</span>
+              <h3 class="text-base sm:text-sm font-black text-amber-900 uppercase tracking-wide truncate">Pendientes de calificar</h3>
+            </div>
+            <span class="shrink-0 px-2.5 py-1 rounded-lg bg-amber-200/80 text-amber-950 text-sm sm:text-xs font-black">{{ fraternidadesPendientes.length }}</span>
+          </div>
+
+          <div v-if="fraternidadesPendientes.length === 0" class="px-6 py-10 text-center text-slate-400 text-base sm:text-sm font-medium">
+            No hay fraternidades pendientes. ¡Todo calificado!
+          </div>
+
+          <!-- Desktop pendientes -->
+          <div v-else class="hidden md:block overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-black text-[10px]">
+                <tr>
+                  <th class="px-6 py-4">Fraternidad</th>
+                  <th class="px-6 py-4">Fecha solicitud</th>
+                  <th class="px-6 py-4">Instancia</th>
+                  <th class="px-6 py-4 text-center">Estado</th>
+                  <th class="px-6 py-4 text-center">Puntaje</th>
+                  <th class="px-6 py-4">Tiempos</th>
+                  <th class="px-6 py-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr
+                  v-for="item in fraternidadesPendientes"
+                  :key="'p-' + item.idFraternidad"
+                  class="transition-colors"
+                  :class="tieneSancionGrave(item) ? 'bg-red-50/80 hover:bg-red-50' : 'hover:bg-slate-50'"
+                >
+                  <td class="px-6 py-4">
+                    <p class="font-bold" :class="tieneSancionGrave(item) ? 'text-red-800' : 'text-primary'">{{ item.nombre }}</p>
+                    <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
+                    <div v-if="item.penalizaciones && item.penalizaciones.length > 0" class="mt-2 flex flex-wrap gap-1.5">
+                      <div v-for="p in item.penalizaciones" :key="p.idIncidencia"
+                        class="inline-flex items-center gap-1.5 rounded-lg font-black uppercase tracking-wide"
+                        :class="esSancionGrave(p)
+                          ? 'bg-red-700 text-white border border-red-900 px-2.5 py-1 text-[10px] shadow-sm shadow-red-200'
+                          : 'bg-red-50 border border-red-200 text-[10px] text-red-800 px-2 py-1'"
                       >
-                        <span class="material-symbols-outlined text-[14px]">close</span>
-                      </button>
+                        <span class="material-symbols-outlined text-[14px]">{{ esSancionGrave(p) ? 'gavel' : 'warning' }}</span>
+                        {{ etiquetaPenalizacion(p) }}
+                        <button v-if="authStore.userRole === 'admin' || authStore.userRole === 'superusuario'"
+                          @click="removerPenalizacion(item, p.idIncidencia)"
+                          class="ml-0.5 hover:text-white/80"
+                          title="Remover (Solo Admin)"
+                        >
+                          <span class="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </td>
-
-                <td class="px-6 py-4">
-                  <p class="text-xs font-bold text-slate-600">{{ formatFechaSolicitud(item.fechaSolicitud) }}</p>
-                </td>
-                <td class="px-6 py-4">
-                  <p class="text-xs font-bold text-slate-600">{{ item.instanciaRepresentacion || '—' }}</p>
-                </td>
-                
-                <td class="px-6 py-4 text-center">
-                  <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
-                    :class="{
-                      'bg-slate-100 text-slate-600': item.estadoEvaluacion === 'PENDIENTE',
-                      'bg-amber-100 text-amber-700': item.estadoEvaluacion === 'EN_PROGRESO',
-                      'bg-emerald-100 text-emerald-700': item.estadoEvaluacion === 'COMPLETADO'
-                    }"
-                  >
-                    <span class="material-symbols-outlined text-[14px]">
-                      {{ item.estadoEvaluacion === 'PENDIENTE' ? 'hourglass_empty' : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'sync' : 'check_circle') }}
-                    </span>
-                    {{ item.estadoEvaluacion.replace('_', ' ') }}
-                  </div>
-                </td>
-
-                <td class="px-6 py-4 text-center">
-                  <div class="text-lg font-black text-primary">
-                    {{ item.puntajeActual || 0 }} <span class="text-[10px] text-slate-400">pts</span>
-                  </div>
-                </td>
-
-                <td class="px-6 py-4">
-                  <div v-if="item.fechaApertura" class="text-xs text-slate-500 flex flex-col gap-1">
-                    <p><span class="font-bold">Inició:</span> {{ formatearHora(item.fechaApertura) }}</p>
-                    <p v-if="item.fechaCierre"><span class="font-bold">Finalizó:</span> {{ formatearHora(item.fechaCierre) }}</p>
-                  </div>
-                  <p v-else class="text-xs text-slate-400 italic">No iniciada</p>
-                </td>
-
-                <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap">
-                  <!-- Botones PDF (Solo si existe un PDF) -->
-                  <template v-if="item.urlPdf">
-                    <button 
-                      @click="verPdf(item.urlPdf, item.nombre)"
-                      title="Ver PDF Embebido"
-                      class="inline-flex size-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                  </td>
+                  <td class="px-6 py-4">
+                    <p class="text-xs font-bold text-slate-600">{{ formatFechaSolicitud(item.fechaSolicitud) }}</p>
+                  </td>
+                  <td class="px-6 py-4">
+                    <p class="text-xs font-bold text-slate-600">{{ item.instanciaRepresentacion || '—' }}</p>
+                  </td>
+                  <td class="px-6 py-4 text-center">
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide border pointer-events-none"
+                      :class="item.estadoEvaluacion === 'EN_PROGRESO'
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : 'bg-orange-100 text-orange-800 border-orange-200'"
                     >
-                      <span class="material-symbols-outlined text-[20px]">visibility</span>
+                      <span class="material-symbols-outlined text-[14px]">
+                        {{ item.estadoEvaluacion === 'EN_PROGRESO' ? 'sync' : 'radio_button_unchecked' }}
+                      </span>
+                      {{ item.estadoEvaluacion === 'EN_PROGRESO' ? 'En progreso' : 'No calificado' }}
                     </button>
-                    <a 
-                      :href="getImageUrl(item.urlPdf)" target="_blank" download
-                      title="Descargar PDF"
-                      class="inline-flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-                    >
-                      <span class="material-symbols-outlined text-[20px]">download</span>
-                    </a>
-                  </template>
-
-                  <!-- Botón resumen admin -->
-                  <button
-                    v-if="esAdmin"
-                    type="button"
-                    @click="abrirPanelAdmin(item.idFraternidad)"
-                    title="Ver calificaciones de todos los jurados y admins"
-                    class="inline-flex size-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors"
-                  >
-                    <span class="material-symbols-outlined text-[20px]">monitoring</span>
-                  </button>
-
-                  <!-- Botón Principal de Calificar -->
-                  <button 
-                    @click="iniciarEvaluacion(item)"
-                    :disabled="item.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-colors"
-                    :class="(item.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0)
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                      : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md' : 'bg-primary hover:bg-blue-900 text-white shadow-md')"
-                  >
-                    {{ (item.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0) ? (tiempoRestante <= 0 ? 'Fase Cerrada' : 'Nota Sellada') : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'Continuar Eval.' : 'Iniciar Eval.') }}
-                    <span v-if="item.estadoEvaluacion !== 'COMPLETADO' && tiempoRestante > 0" class="material-symbols-outlined text-[16px]">
-                      {{ item.estadoEvaluacion === 'EN_PROGRESO' ? 'play_arrow' : 'edit_document' }}
-                    </span>
-                    <span v-else class="material-symbols-outlined text-[16px]">lock</span>
-                  </button>
-
-                  <!-- BOTONES DE DISCIPLINA (Solo si es fase de disciplina) -->
-                  <template v-if="fase?.nombre?.toLowerCase().includes('disciplina')">
-                    <button 
-                      @click="aplicarPenalizacion(item, 'AMARILLA')"
-                      title="Bandera Amarilla (-1 pto)"
-                      class="inline-flex size-9 items-center justify-center rounded-lg bg-yellow-400 text-white hover:brightness-110 shadow-sm"
-                    >
-                      <span class="material-symbols-outlined text-[20px]">flag</span>
+                  </td>
+                  <td class="px-6 py-4 text-center">
+                    <div class="text-lg font-black text-primary">
+                      {{ item.puntajeActual || 0 }} <span class="text-[10px] text-slate-400">pts</span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div v-if="item.fechaApertura" class="text-xs text-slate-500 flex flex-col gap-1">
+                      <p><span class="font-bold">Inició:</span> {{ formatearHora(item.fechaApertura) }}</p>
+                      <p v-if="item.fechaCierre"><span class="font-bold">Finalizó:</span> {{ formatearHora(item.fechaCierre) }}</p>
+                    </div>
+                    <p v-else class="text-xs text-slate-400 italic">No iniciada</p>
+                  </td>
+                  <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                    <template v-if="item.urlPdf">
+                      <button @click="verPdf(item.urlPdf, item.nombre)" title="Ver PDF Embebido" class="inline-flex size-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">visibility</span>
+                      </button>
+                      <a :href="getImageUrl(item.urlPdf)" target="_blank" download title="Descargar PDF" class="inline-flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">download</span>
+                      </a>
+                    </template>
+                    <button v-if="esAdmin" type="button" @click="abrirPanelAdmin(item.idFraternidad)" title="Ver calificaciones" class="inline-flex size-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors">
+                      <span class="material-symbols-outlined text-[20px]">monitoring</span>
                     </button>
-                    <button 
-                      @click="aplicarPenalizacion(item, 'ROJA')"
-                      title="Bandera Roja (-2 ptos)"
-                      class="inline-flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:brightness-110 shadow-sm"
+                    <button
+                      @click="iniciarEvaluacion(item)"
+                      :disabled="tiempoRestante <= 0"
+                      :data-tutorial="item.idFraternidad === primerPendienteId ? 'calificar' : undefined"
+                      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-colors"
+                      :class="tiempoRestante <= 0
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md' : 'bg-primary hover:bg-blue-900 text-white shadow-md')"
                     >
-                      <span class="material-symbols-outlined text-[20px]">flag</span>
+                      {{ tiempoRestante <= 0 ? 'Fase Cerrada' : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'Continuar Eval.' : 'Iniciar Eval.') }}
+                      <span v-if="tiempoRestante > 0" class="material-symbols-outlined text-[16px]">{{ item.estadoEvaluacion === 'EN_PROGRESO' ? 'play_arrow' : 'edit_document' }}</span>
+                      <span v-else class="material-symbols-outlined text-[16px]">lock</span>
                     </button>
-                    <button 
-                      @click="abrirSanciones(item)"
-                      title="Sanciones Graves"
-                      class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 shadow-sm shadow-red-200 transition-all"
-                    >
-                      <span class="material-symbols-outlined text-[18px]">gavel</span>
-                      <span class="text-[10px] font-black uppercase tracking-widest">Sanciones</span>
-                    </button>
-                  </template>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                    <template v-if="fase?.nombre?.toLowerCase().includes('disciplina')">
+                      <button @click="aplicarPenalizacion(item, 'AMARILLA')" title="Bandera Amarilla (-1 pto)" class="inline-flex size-9 items-center justify-center rounded-lg bg-yellow-400 text-white hover:brightness-110 shadow-sm">
+                        <span class="material-symbols-outlined text-[20px]">flag</span>
+                      </button>
+                      <button @click="aplicarPenalizacion(item, 'ROJA')" title="Bandera Roja (-2 ptos)" class="inline-flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:brightness-110 shadow-sm">
+                        <span class="material-symbols-outlined text-[20px]">flag</span>
+                      </button>
+                      <button @click="abrirSanciones(item)" title="Sanciones Graves" class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 shadow-sm shadow-red-200 transition-all">
+                        <span class="material-symbols-outlined text-[18px]">gavel</span>
+                        <span class="text-[10px] font-black uppercase tracking-widest">Sanciones</span>
+                      </button>
+                    </template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <!-- Vista Mobile (Tarjetas) -->
-        <div class="md:hidden p-4 space-y-4">
-          <div
-            v-for="item in fraternidadesFiltradas"
-            :key="item.idFraternidad + '_mobile'"
-            class="rounded-2xl p-4 shadow-sm flex flex-col gap-4 relative overflow-hidden"
-            :class="tieneSancionGrave(item)
-              ? 'bg-red-50 border-2 border-red-600'
-              : 'bg-slate-50 border border-slate-200'"
-          >
-            <!-- Indicador lateral estado -->
-            <div class="absolute left-0 top-0 bottom-0 w-1.5"
-                 :class="tieneSancionGrave(item) ? 'bg-red-700' : {
-                   'bg-slate-300': item.estadoEvaluacion === 'PENDIENTE',
-                   'bg-amber-500': item.estadoEvaluacion === 'EN_PROGRESO',
-                   'bg-emerald-500': item.estadoEvaluacion === 'COMPLETADO'
-                 }"
-            ></div>
-
-            <div class="flex justify-between items-start pl-2">
-              <div>
-                <p class="font-black text-base" :class="tieneSancionGrave(item) ? 'text-red-800' : 'text-primary'">{{ item.nombre }}</p>
-                <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
+          <!-- Mobile pendientes -->
+          <div v-if="fraternidadesPendientes.length" class="md:hidden p-4 space-y-4">
+            <div
+              v-for="item in fraternidadesPendientes"
+              :key="'pm-' + item.idFraternidad"
+              class="rounded-2xl p-4 shadow-sm flex flex-col gap-4 relative overflow-hidden"
+              :class="tieneSancionGrave(item) ? 'bg-red-50 border-2 border-red-600' : 'bg-slate-50 border border-slate-200'"
+            >
+              <div class="absolute left-0 top-0 bottom-0 w-1.5" :class="tieneSancionGrave(item) ? 'bg-red-700' : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-500' : 'bg-orange-400')" />
+              <div class="flex justify-between items-start pl-2 gap-3">
+                <div class="min-w-0">
+                  <p class="font-black text-lg leading-tight" :class="tieneSancionGrave(item) ? 'text-red-800' : 'text-primary'">{{ item.nombre }}</p>
+                  <p class="text-sm text-slate-500 mt-0.5">{{ item.categoria || 'Sin categoría' }}</p>
+                </div>
+                <div class="text-right shrink-0">
+                  <p class="text-2xl font-black leading-none" :class="tieneSancionGrave(item) ? 'text-red-700' : 'text-primary'">{{ item.puntajeActual || 0 }}</p>
+                  <p class="text-xs text-slate-400 font-bold uppercase mt-0.5">pts</p>
+                </div>
               </div>
-              <div class="text-right">
-                <p class="text-xl font-black" :class="tieneSancionGrave(item) ? 'text-red-700' : 'text-primary'">{{ item.puntajeActual || 0 }}</p>
-                <p class="text-[10px] text-slate-400 font-bold uppercase">pts</p>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-2 pl-2">
-              <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"
-                :class="{
-                  'bg-white text-slate-600 border border-slate-200': item.estadoEvaluacion === 'PENDIENTE',
-                  'bg-amber-100 text-amber-700 border border-amber-200': item.estadoEvaluacion === 'EN_PROGRESO',
-                  'bg-emerald-100 text-emerald-700 border border-emerald-200': item.estadoEvaluacion === 'COMPLETADO'
-                }"
-              >
-                <span class="material-symbols-outlined text-[14px]">
-                  {{ item.estadoEvaluacion === 'PENDIENTE' ? 'hourglass_empty' : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'sync' : 'check_circle') }}
-                </span>
-                {{ item.estadoEvaluacion.replace('_', ' ') }}
-              </div>
-              <div
-                v-for="p in (item.penalizaciones || [])"
-                :key="p.idIncidencia + '_m'"
-                class="inline-flex items-center gap-1 rounded-lg font-black uppercase"
-                :class="esSancionGrave(p)
-                  ? 'bg-red-700 text-white px-2.5 py-1 text-[10px]'
-                  : 'bg-red-100 text-red-800 border border-red-200 px-2 py-1 text-[10px]'"
-              >
-                <span class="material-symbols-outlined text-[14px]">{{ esSancionGrave(p) ? 'gavel' : 'warning' }}</span>
-                {{ etiquetaPenalizacion(p) }}
-              </div>
-            </div>
-            
-            <!-- ACCIONES DISCIPLINA MOBILE -->
-            <div v-if="fase?.nombre?.toLowerCase().includes('disciplina')" class="flex items-center gap-2 pl-2">
-              <button @click="aplicarPenalizacion(item, 'AMARILLA')" class="flex-1 py-2 rounded-xl bg-yellow-400 text-white flex items-center justify-center shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">flag</span>
-              </button>
-              <button @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">flag</span>
-              </button>
-              <button @click="abrirSanciones(item)" class="flex-[2] py-2 rounded-xl bg-red-700 text-white flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-sm shadow-red-200">
-                <span class="material-symbols-outlined text-[18px]">gavel</span>
-                Sanciones
-              </button>
-            </div>
-
-            <div v-if="item.fechaApertura" class="text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-100 pl-2">
-              <div class="flex justify-between"><span class="font-bold">Inició:</span> <span>{{ formatearHora(item.fechaApertura) }}</span></div>
-              <div class="flex justify-between mt-1" v-if="item.fechaCierre"><span class="font-bold">Finalizó:</span> <span>{{ formatearHora(item.fechaCierre) }}</span></div>
-            </div>
-
-            <div class="flex items-center gap-2 pt-2 border-t border-slate-200 mt-2 pl-2">
-              <!-- Botones PDF Mobile -->
-              <template v-if="item.urlPdf">
-                <button @click="verPdf(item.urlPdf, item.nombre)" class="flex-1 inline-flex items-center justify-center gap-1 py-2.5 rounded-xl bg-indigo-50 text-indigo-600 font-bold text-xs border border-indigo-100 hover:bg-indigo-100">
-                  <span class="material-symbols-outlined text-[16px]">visibility</span>
+              <div class="flex flex-wrap gap-2 pl-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide border pointer-events-none"
+                  :class="item.estadoEvaluacion === 'EN_PROGRESO'
+                    ? 'bg-amber-100 text-amber-800 border-amber-200'
+                    : 'bg-orange-100 text-orange-800 border-orange-200'"
+                >
+                  <span class="material-symbols-outlined text-[16px]">
+                    {{ item.estadoEvaluacion === 'EN_PROGRESO' ? 'sync' : 'radio_button_unchecked' }}
+                  </span>
+                  {{ item.estadoEvaluacion === 'EN_PROGRESO' ? 'En progreso' : 'No calificado' }}
                 </button>
-              </template>
-
-              <button
-                v-if="esAdmin"
-                type="button"
-                @click="abrirPanelAdmin(item.idFraternidad)"
-                class="flex-1 inline-flex items-center justify-center gap-1 py-2.5 rounded-xl bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200"
-                title="Ver calificaciones"
-              >
-                <span class="material-symbols-outlined text-[16px]">monitoring</span>
-              </button>
-              
-              <!-- Evaluar Mobile -->
-              <button 
-                @click="iniciarEvaluacion(item)"
-                :disabled="item.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0"
-                class="flex-[3] inline-flex justify-center items-center gap-2 py-2.5 rounded-xl font-bold text-xs transition-all uppercase tracking-widest"
-                :class="(item.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0)
-                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' 
-                  : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-500 text-white shadow-md' : 'bg-primary text-white shadow-md shadow-primary/20')"
-              >
-                {{ (item.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0) ? 'Cerrada' : 'Evaluar' }}
-                <span v-if="item.estadoEvaluacion !== 'COMPLETADO' && tiempoRestante > 0" class="material-symbols-outlined text-[16px]">
-                  {{ item.estadoEvaluacion === 'EN_PROGRESO' ? 'play_arrow' : 'edit_document' }}
-                </span>
-                <span v-else class="material-symbols-outlined text-[16px]">lock</span>
-              </button>
+                <div
+                  v-for="p in (item.penalizaciones || [])"
+                  :key="p.idIncidencia + '_m'"
+                  class="inline-flex items-center gap-1 rounded-lg font-black uppercase"
+                  :class="esSancionGrave(p) ? 'bg-red-700 text-white px-2.5 py-1 text-xs' : 'bg-red-100 text-red-800 border border-red-200 px-2 py-1 text-xs'"
+                >
+                  <span class="material-symbols-outlined text-[14px]">{{ esSancionGrave(p) ? 'gavel' : 'warning' }}</span>
+                  {{ etiquetaPenalizacion(p) }}
+                </div>
+              </div>
+              <div v-if="fase?.nombre?.toLowerCase().includes('disciplina')" class="flex items-center gap-2 pl-2">
+                <button @click="aplicarPenalizacion(item, 'AMARILLA')" class="flex-1 py-2.5 rounded-xl bg-yellow-400 text-white flex items-center justify-center shadow-sm">
+                  <span class="material-symbols-outlined text-[20px]">flag</span>
+                </button>
+                <button @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
+                  <span class="material-symbols-outlined text-[20px]">flag</span>
+                </button>
+                <button @click="abrirSanciones(item)" class="flex-[2] py-2.5 rounded-xl bg-red-700 text-white flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest shadow-sm shadow-red-200">
+                  <span class="material-symbols-outlined text-[18px]">gavel</span>
+                  Sanciones
+                </button>
+              </div>
+              <div v-if="item.fechaApertura" class="text-xs text-slate-500 bg-white p-2.5 rounded-lg border border-slate-100 pl-2">
+                <div class="flex justify-between"><span class="font-bold">Inició:</span> <span>{{ formatearHora(item.fechaApertura) }}</span></div>
+                <div class="flex justify-between mt-1" v-if="item.fechaCierre"><span class="font-bold">Finalizó:</span> <span>{{ formatearHora(item.fechaCierre) }}</span></div>
+              </div>
+              <div class="flex items-center gap-2 pt-2 border-t border-slate-200 mt-1 pl-2">
+                <template v-if="item.urlPdf">
+                  <button @click="verPdf(item.urlPdf, item.nombre)" class="flex-1 inline-flex items-center justify-center gap-1 py-3 rounded-xl bg-indigo-50 text-indigo-600 font-bold text-sm border border-indigo-100 hover:bg-indigo-100">
+                    <span class="material-symbols-outlined text-[18px]">visibility</span>
+                  </button>
+                </template>
+                <button v-if="esAdmin" type="button" @click="abrirPanelAdmin(item.idFraternidad)" class="flex-1 inline-flex items-center justify-center gap-1 py-3 rounded-xl bg-amber-50 text-amber-700 font-bold text-sm border border-amber-200" title="Ver calificaciones">
+                  <span class="material-symbols-outlined text-[18px]">monitoring</span>
+                </button>
+                <button
+                  @click="iniciarEvaluacion(item)"
+                  :disabled="tiempoRestante <= 0"
+                  :data-tutorial="item.idFraternidad === primerPendienteId ? 'calificar' : undefined"
+                  class="flex-[3] inline-flex justify-center items-center gap-2 py-3 rounded-xl font-black text-sm transition-all uppercase tracking-wide"
+                  :class="tiempoRestante <= 0
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                    : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-500 text-white shadow-md' : 'bg-primary text-white shadow-md shadow-primary/20')"
+                >
+                  {{ tiempoRestante <= 0 ? 'Cerrada' : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'Continuar' : 'Evaluar') }}
+                  <span class="material-symbols-outlined text-[18px]">{{ tiempoRestante <= 0 ? 'lock' : (item.estadoEvaluacion === 'EN_PROGRESO' ? 'play_arrow' : 'edit_document') }}</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
+        <!-- ========== CALIFICADAS ========== -->
+        <section v-if="fraternidadesCalificadas.length" class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
+          <div class="px-4 sm:px-6 py-3.5 sm:py-3 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-emerald-700 text-[22px]">verified</span>
+              <h3 class="text-base sm:text-sm font-black text-emerald-900 uppercase tracking-wide truncate">Ya calificadas</h3>
+            </div>
+            <span class="shrink-0 px-2.5 py-1 rounded-lg bg-emerald-200/80 text-emerald-950 text-sm sm:text-xs font-black">{{ fraternidadesCalificadas.length }}</span>
+          </div>
+
+          <div class="hidden md:block overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-black text-[10px]">
+                <tr>
+                  <th class="px-6 py-4">Fraternidad</th>
+                  <th class="px-6 py-4">Fecha solicitud</th>
+                  <th class="px-6 py-4">Instancia</th>
+                  <th class="px-6 py-4 text-center">Estado</th>
+                  <th class="px-6 py-4 text-center">Puntaje</th>
+                  <th class="px-6 py-4">Tiempos</th>
+                  <th class="px-6 py-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr
+                  v-for="item in fraternidadesCalificadas"
+                  :key="'c-' + item.idFraternidad"
+                  class="transition-colors opacity-90"
+                  :class="tieneSancionGrave(item) ? 'bg-red-50/80 hover:bg-red-50' : 'hover:bg-slate-50'"
+                >
+                  <td class="px-6 py-4">
+                    <p class="font-bold" :class="tieneSancionGrave(item) ? 'text-red-800' : 'text-primary'">{{ item.nombre }}</p>
+                    <p class="text-xs text-slate-500">{{ item.categoria || 'Sin categoría' }}</p>
+                    <div v-if="item.penalizaciones && item.penalizaciones.length > 0" class="mt-2 flex flex-wrap gap-1.5">
+                      <div v-for="p in item.penalizaciones" :key="p.idIncidencia"
+                        class="inline-flex items-center gap-1.5 rounded-lg font-black uppercase tracking-wide"
+                        :class="esSancionGrave(p)
+                          ? 'bg-red-700 text-white border border-red-900 px-2.5 py-1 text-[10px]'
+                          : 'bg-red-50 border border-red-200 text-[10px] text-red-800 px-2 py-1'"
+                      >
+                        <span class="material-symbols-outlined text-[14px]">{{ esSancionGrave(p) ? 'gavel' : 'warning' }}</span>
+                        {{ etiquetaPenalizacion(p) }}
+                        <button v-if="authStore.userRole === 'admin' || authStore.userRole === 'superusuario'" @click="removerPenalizacion(item, p.idIncidencia)" class="ml-0.5" title="Remover">
+                          <span class="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4"><p class="text-xs font-bold text-slate-600">{{ formatFechaSolicitud(item.fechaSolicitud) }}</p></td>
+                  <td class="px-6 py-4"><p class="text-xs font-bold text-slate-600">{{ item.instanciaRepresentacion || '—' }}</p></td>
+                  <td class="px-6 py-4 text-center">
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                      Calificado
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 text-center">
+                    <div class="text-lg font-black text-primary">{{ item.puntajeActual || 0 }} <span class="text-[10px] text-slate-400">pts</span></div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div v-if="item.fechaApertura" class="text-xs text-slate-500 flex flex-col gap-1">
+                      <p><span class="font-bold">Inició:</span> {{ formatearHora(item.fechaApertura) }}</p>
+                      <p v-if="item.fechaCierre"><span class="font-bold">Finalizó:</span> {{ formatearHora(item.fechaCierre) }}</p>
+                    </div>
+                    <p v-else class="text-xs text-slate-400 italic">—</p>
+                  </td>
+                  <td class="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                    <template v-if="item.urlPdf">
+                      <button @click="verPdf(item.urlPdf, item.nombre)" class="inline-flex size-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100"><span class="material-symbols-outlined text-[20px]">visibility</span></button>
+                    </template>
+                    <button v-if="esAdmin" type="button" @click="abrirPanelAdmin(item.idFraternidad)" class="inline-flex size-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700 border border-amber-200"><span class="material-symbols-outlined text-[20px]">monitoring</span></button>
+                    <button disabled class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs bg-slate-100 text-slate-400 cursor-not-allowed">
+                      Nota Sellada
+                      <span class="material-symbols-outlined text-[16px]">lock</span>
+                    </button>
+                    <template v-if="fase?.nombre?.toLowerCase().includes('disciplina')">
+                      <button @click="aplicarPenalizacion(item, 'AMARILLA')" class="inline-flex size-9 items-center justify-center rounded-lg bg-yellow-400 text-white"><span class="material-symbols-outlined text-[20px]">flag</span></button>
+                      <button @click="aplicarPenalizacion(item, 'ROJA')" class="inline-flex size-9 items-center justify-center rounded-lg bg-red-600 text-white"><span class="material-symbols-outlined text-[20px]">flag</span></button>
+                      <button @click="abrirSanciones(item)" class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-red-700 text-white"><span class="material-symbols-outlined text-[18px]">gavel</span><span class="text-[10px] font-black uppercase">Sanciones</span></button>
+                    </template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="md:hidden p-4 space-y-4">
+            <div
+              v-for="item in fraternidadesCalificadas"
+              :key="'cm-' + item.idFraternidad"
+              class="rounded-2xl p-4 shadow-sm flex flex-col gap-4 relative overflow-hidden opacity-95"
+              :class="tieneSancionGrave(item) ? 'bg-red-50 border-2 border-red-600' : 'bg-slate-50 border border-slate-200'"
+            >
+              <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />
+              <div class="flex justify-between items-start pl-2 gap-3">
+                <div class="min-w-0">
+                  <p class="font-black text-lg leading-tight" :class="tieneSancionGrave(item) ? 'text-red-800' : 'text-primary'">{{ item.nombre }}</p>
+                  <p class="text-sm text-slate-500 mt-0.5">{{ item.categoria || 'Sin categoría' }}</p>
+                </div>
+                <div class="text-right shrink-0">
+                  <p class="text-2xl font-black leading-none text-primary">{{ item.puntajeActual || 0 }}</p>
+                  <p class="text-xs text-slate-400 font-bold uppercase mt-0.5">pts</p>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 pl-2">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide bg-emerald-100 text-emerald-700 border border-emerald-200">
+                  <span class="material-symbols-outlined text-[16px]">check_circle</span>
+                  Calificado
+                </div>
+              </div>
+              <div v-if="fase?.nombre?.toLowerCase().includes('disciplina')" class="flex items-center gap-2 pl-2">
+                <button @click="aplicarPenalizacion(item, 'AMARILLA')" class="flex-1 py-2.5 rounded-xl bg-yellow-400 text-white flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">flag</span></button>
+                <button @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">flag</span></button>
+                <button @click="abrirSanciones(item)" class="flex-[2] py-2.5 rounded-xl bg-red-700 text-white flex items-center justify-center gap-2 font-black text-xs uppercase"><span class="material-symbols-outlined text-[18px]">gavel</span>Sanciones</button>
+              </div>
+              <div class="flex items-center gap-2 pt-2 border-t border-slate-200 pl-2">
+                <button v-if="esAdmin" type="button" @click="abrirPanelAdmin(item.idFraternidad)" class="flex-1 inline-flex items-center justify-center py-3 rounded-xl bg-amber-50 text-amber-700 border border-amber-200"><span class="material-symbols-outlined text-[18px]">monitoring</span></button>
+                <button disabled class="flex-[3] inline-flex justify-center items-center gap-2 py-3 rounded-xl font-black text-sm uppercase bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
+                  Sellada <span class="material-symbols-outlined text-[18px]">lock</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
       </div>
     </div>
@@ -495,14 +578,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Swal from 'sweetalert2'
 import api from '../services/api'
 import PdfViewerModal from '../components/PdfViewerModal.vue'
 import ModalResumenCalificacionesAdmin from '../components/ModalResumenCalificacionesAdmin.vue'
+import TutorialCalificarModal from '../components/TutorialCalificarModal.vue'
 import { getImageUrl } from '../utils/url'
 import { useAuthStore } from '../store/auth'
 import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
+import { TUTORIAL_VARIANT, hasSeenTutorial } from '../utils/tutorialCalificar'
 
 const authStore = useAuthStore()
 const esAdmin = computed(() => ['admin', 'superusuario'].includes(authStore.userRole))
@@ -514,6 +599,12 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['volver', 'evaluar-fraternidad'])
+
+const tutorialVariant = TUTORIAL_VARIANT.LISTADO_EFU
+const tutorialAbierto = ref(false)
+function abrirTutorial() {
+  tutorialAbierto.value = true
+}
 
 const fase = ref(null)
 const fraternidades = ref([])
@@ -551,6 +642,19 @@ const fraternidadesFiltradas = computed(() => {
     id: (x) => x.idFraternidad,
   })
 })
+
+const estaCalificado = (item) => item?.estadoEvaluacion === 'COMPLETADO'
+
+const fraternidadesPendientes = computed(() =>
+  fraternidadesFiltradas.value.filter((f) => !estaCalificado(f)),
+)
+const fraternidadesCalificadas = computed(() =>
+  fraternidadesFiltradas.value.filter((f) => estaCalificado(f)),
+)
+
+const primerPendienteId = computed(
+  () => fraternidadesPendientes.value[0]?.idFraternidad ?? fraternidadesFiltradas.value[0]?.idFraternidad,
+)
 
 // Temporizador Regresivo Global
 const tiempoRestante = ref(0)
@@ -614,6 +718,14 @@ const iconoInfraccion = (s) => {
 }
 
 const cargarInfracciones = async () => {
+  // Solo fase disciplina / roles con acceso al catálogo; evita 403 ruidoso en calificar normal
+  const rol = String(authStore.userRole || '').toLowerCase()
+  const puedeCatalogo = ['admin', 'superusuario', 'controladorhcu', 'jurado'].includes(rol)
+  const esDisciplina = String(props.faseSeleccionada?.nombre || '').toLowerCase().includes('disciplina')
+  if (!puedeCatalogo || (!esDisciplina && !['admin', 'superusuario', 'controladorhcu'].includes(rol))) {
+    sancionesCatalogo.value = []
+    return
+  }
   try {
     const { data } = await api.get('/evaluaciones/infracciones')
     const items = data.items || []
@@ -622,7 +734,9 @@ const cargarInfracciones = async () => {
       (i) => i.codigoPreset !== 'AMARILLA' && i.codigoPreset !== 'ROJA',
     )
   } catch (e) {
-    console.error('No se pudo cargar catálogo de infracciones', e)
+    if (e.response?.status !== 403) {
+      console.error('No se pudo cargar catálogo de infracciones', e)
+    }
     sancionesCatalogo.value = []
   }
 }
@@ -858,6 +972,12 @@ const removerPenalizacion = async (fraternidad, idIncidencia) => {
 onMounted(() => {
   cargarFaseData()
   cargarInfracciones()
+})
+
+watch(loading, (isLoading) => {
+  if (!isLoading && !hasSeenTutorial(tutorialVariant)) {
+    tutorialAbierto.value = true
+  }
 })
 
 onUnmounted(() => {

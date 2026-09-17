@@ -187,7 +187,7 @@ export class EvaluacionesController {
   }
 
   @Get('infracciones')
-  @Roles('superusuario', 'admin', 'controladorhcu')
+  @Roles('superusuario', 'admin', 'controladorhcu', 'jurado')
   listarInfracciones(@Query('idGestion') idGestion?: string) {
     const id = idGestion ? parseInt(idGestion, 10) : undefined;
     return this.evaluacionesService.listarInfracciones(Number.isFinite(id) ? id : undefined);
@@ -356,6 +356,7 @@ export class EvaluacionesController {
     { name: 'logo', maxCount: 1 },
     { name: 'banner', maxCount: 1 },
     { name: 'loginImg', maxCount: 1 },
+    { name: 'mapaImg', maxCount: 1 },
     { name: 'landingFrat0', maxCount: 1 },
     { name: 'landingFrat1', maxCount: 1 },
     { name: 'landingFrat2', maxCount: 1 },
@@ -367,6 +368,7 @@ export class EvaluacionesController {
       logo?: any[];
       banner?: any[];
       loginImg?: any[];
+      mapaImg?: any[];
       landingFrat0?: any[];
       landingFrat1?: any[];
       landingFrat2?: any[];
@@ -377,6 +379,7 @@ export class EvaluacionesController {
       if (files.logo) data.urlLogo = `/api/v1/archivos/gestion/${files.logo[0].filename}`;
       if (files.banner) data.urlBanner = `/api/v1/archivos/gestion/${files.banner[0].filename}`;
       if (files.loginImg) data.urlImagenLogin = `/api/v1/archivos/gestion/${files.loginImg[0].filename}`;
+      if (files.mapaImg) data.urlImagenMapa = `/api/v1/archivos/gestion/${files.mapaImg[0].filename}`;
 
       const landingKeys = ['landingFrat0', 'landingFrat1', 'landingFrat2'] as const;
       if (landingKeys.some((k) => files[k]?.length)) {

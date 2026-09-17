@@ -341,7 +341,7 @@
         <div class="max-w-7xl mx-auto relative z-10">
           <div class="text-center mb-16 md:mb-24 reveal reveal-left">
             <h2 class="text-4xl md:text-6xl font-black text-slate-900 italic tracking-tighter uppercase mb-4">RECORRIDO <span class="text-primary">OFICIAL</span></h2>
-            <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Sigue la ruta de la entrada universitaria</p>
+            <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">{{ recorridoSubtitulo }}</p>
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -359,17 +359,21 @@
             </div>
 
             <!-- Map Placeholder / Interactive Area -->
-            <div class="relative group reveal reveal-right" @click="mostrarMapa = true">
-              <div class="relative h-[260px] sm:h-[350px] md:h-[600px] rounded-2xl sm:rounded-[2rem] md:rounded-[3rem] overflow-hidden border border-slate-200 shadow-2xl group cursor-pointer transition-all duration-500">
-                <img alt="Mapa Ruta" class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-1000"
-                  src="/src/assets/img/Maps.png" />
+            <div class="relative group reveal reveal-right cursor-pointer" @click="mostrarMapa = true">
+              <div class="relative h-[260px] sm:h-[350px] md:h-[600px] rounded-2xl sm:rounded-[2rem] md:rounded-[3rem] overflow-hidden border border-slate-200 shadow-2xl group transition-all duration-500">
+                <img
+                  alt="Mapa Ruta"
+                  class="w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-1000"
+                  :src="imagenMapaUrl"
+                />
                 <div class="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent"></div>
                 <div class="absolute bottom-6 md:bottom-10 left-6 md:left-10 right-6 md:right-10 p-5 md:p-8 bg-white/95 backdrop-blur-xl rounded-2xl md:rounded-3xl border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
                   <div class="text-center md:text-left">
                     <p class="text-[8px] md:text-[10px] text-secondary font-black uppercase tracking-widest mb-1">GPS Activo</p>
                     <span class="text-slate-900 font-black italic text-lg md:text-2xl uppercase">Ruta del Folklore</span>
                   </div>
-                  <button 
+                  <button
+                    type="button"
                     class="w-full md:w-auto bg-primary text-white px-6 py-3 rounded-full text-[10px] md:text-xs font-black uppercase shadow-lg shadow-primary/20 group-hover:bg-secondary transition-colors"
                   >
                     Ver el mapa aquí
@@ -982,18 +986,61 @@ const mostrarMapa = ref(false)
 const MAPA_RECORRIDO_DEFAULT =
   'https://www.google.com/maps/d/embed?mid=1-YtosxPGnmPvgFZ2NelW2cREgouvfb4&ehbc=2E312F&noprof=1'
 
+const DEFAULT_RECORRIDO_SUBTITULO = 'Sigue la ruta de la entrada universitaria'
+
+const DEFAULT_RECORRIDO_PUNTOS = [
+  { titulo: 'Partida: Plaza Bolivia', desc: 'Capitán Ravelo — Punto de inicio y concentración.' },
+  { titulo: 'Palco: Av. Camacho', desc: 'Centro del recorrido y punto de mayor concurrencia.' },
+  { titulo: 'Final: Simón Bolívar', desc: 'Desconcentración frente al Estadio.' },
+]
+
 const extractMapEmbedUrl = (raw) => {
-  const text = String(raw || '').trim()
+  let text = String(raw || '').trim()
   if (!text) return ''
+  text = text
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
   const iframeSrc = text.match(/src\s*=\s*["']([^"']+)["']/i)
-  if (iframeSrc?.[1]) return iframeSrc[1].trim()
-  if (/^https?:\/\//i.test(text)) return text.split(/\s/)[0].trim()
-  return ''
+  let url = (iframeSrc?.[1] || text).trim()
+  if (/^https?:\/\//i.test(url)) url = url.split(/\s/)[0].trim()
+  else if (!iframeSrc) return ''
+  if (url.includes('maps/d/viewer') && /[?&]mid=/.test(url)) {
+    const mid = url.match(/[?&]mid=([^&]+)/i)?.[1]
+    if (mid) url = `https://www.google.com/maps/d/embed?mid=${decodeURIComponent(mid)}&ehbc=2E312F`
+  }
+  return url
 }
 
 const mapaRecorridoUrl = computed(
   () => extractMapEmbedUrl(siteInfo.value?.urlMapaUbicacion) || MAPA_RECORRIDO_DEFAULT,
 )
+
+const imagenMapaUrl = computed(() => {
+  const custom = String(siteInfo.value?.urlImagenMapa || '').trim()
+  if (custom) return getImageUrl(custom)
+  // Fallback visual si aún no subieron imagen de portada
+  return defaultHeroBanner || siteInfo.value?.urlBanner || ''
+})
+
+const recorridoSubtitulo = computed(() => {
+  const t = String(siteInfo.value?.recorridoSubtitulo || '').trim()
+  return t || DEFAULT_RECORRIDO_SUBTITULO
+})
+
+const ruta = computed(() => {
+  const list = Array.isArray(siteInfo.value?.recorridoPuntos)
+    ? siteInfo.value.recorridoPuntos
+    : []
+  const clean = list
+    .map((p) => ({
+      titulo: String(p?.titulo || '').trim(),
+      desc: String(p?.desc || p?.descripcion || '').trim(),
+    }))
+    .filter((p) => p.titulo)
+  return clean.length ? clean : DEFAULT_RECORRIDO_PUNTOS
+})
+
 const mainRef = ref(null)
 
 const DEFAULT_LANDING_FRATERNIDADES = [
@@ -1079,6 +1126,7 @@ const cargarDatos = async (opts = {}) => {
     if (data) {
        data.urlLogo = getImageUrl(data.urlLogo)
        data.urlBanner = getImageUrl(data.urlBanner)
+       data.urlImagenMapa = data.urlImagenMapa ? getImageUrl(data.urlImagenMapa) : ''
        siteInfo.value = data
        applySiteTitle(data.nombreSitio)
     }
@@ -1305,12 +1353,6 @@ const scrollTo = (id) => {
     history.pushState(null, null, `#${targetId}`)
   }
 }
-
-const ruta = [
-  { titulo: 'Partida: Plaza Bolivia', desc: 'Capitán Ravelo — Punto de inicio y concentración.' },
-  { titulo: 'Palco: Av. Camacho', desc: 'Centro del recorrido y punto de mayor concurrencia.' },
-  { titulo: 'Final: Simón Bolívar', desc: 'Desconcentración frente al Estadio.' },
-]
 
 const mostrarRanking = ref(false)
 </script>

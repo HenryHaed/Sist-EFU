@@ -322,6 +322,26 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     SET tipo_persona = 'ESTUDIANTE'
     WHERE tipo_persona IS NULL OR TRIM(tipo_persona) = ''
   `);
+  await runPatch(dataSource, 'miembros_nomina.asegurado', `
+    ALTER TABLE miembros_nomina
+    ADD COLUMN IF NOT EXISTS asegurado BOOLEAN NOT NULL DEFAULT false
+  `);
+  await runPatch(dataSource, 'gestiones.url_mapa_ubicacion text', `
+    ALTER TABLE gestiones
+    ALTER COLUMN url_mapa_ubicacion TYPE TEXT
+  `);
+  await runPatch(dataSource, 'gestiones.url_imagen_mapa', `
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS url_imagen_mapa VARCHAR(500) NULL
+  `);
+  await runPatch(dataSource, 'gestiones.recorrido_subtitulo', `
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS recorrido_subtitulo VARCHAR(255) NULL
+  `);
+  await runPatch(dataSource, 'gestiones.recorrido_puntos', `
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS recorrido_puntos JSONB NULL
+  `);
   await runPatch(dataSource, 'idx fases.id_fase_padre', `
     CREATE INDEX IF NOT EXISTS idx_fases_fase_padre ON fases(id_fase_padre)
   `);

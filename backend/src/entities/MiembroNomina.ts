@@ -67,6 +67,13 @@ export class MiembroNomina {
   @Column({ name: 'tipo_danza', length: 120, nullable: true })
   tipoDanza: string | null;
 
+  /**
+   * Seguro otorgado por admin/superusuario.
+   * Solo ellos pueden marcar/desmarcar; el delegado no lo controla.
+   */
+  @Column({ name: 'asegurado', type: 'boolean', default: false })
+  asegurado: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

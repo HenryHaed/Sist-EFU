@@ -2712,7 +2712,8 @@ export class EvaluacionesService {
     const payload: Partial<Gestion> = {};
     const allowed = [
       'anio', 'edicion', 'lema', 'activa', 'nombreSitio', 'tituloPrincipal', 'subtituloPrincipal',
-      'urlBanner', 'urlLogo', 'urlImagenLogin', 'urlMapaUbicacion',
+      'urlBanner', 'urlLogo', 'urlImagenLogin', 'urlMapaUbicacion', 'urlImagenMapa',
+      'recorridoSubtitulo', 'recorridoPuntos',
       'modoMantenimiento', 'mostrarRanking', 'mostrarHistorico',
       'mostrarRankingEstadisticas', 'mostrarRankingConcursosExternos', 'rankingConcursosOcultos',
       'permiteInscripcionPublica',
@@ -2755,6 +2756,42 @@ export class EvaluacionesService {
 
     if (payload.edicion !== undefined) {
       payload.edicion = String(payload.edicion || '').trim().toUpperCase().slice(0, 20) || null;
+    }
+
+    if (payload.urlMapaUbicacion !== undefined) {
+      const raw = String(payload.urlMapaUbicacion || '').trim();
+      // Acepta URL de embed o iframe completo; se guarda solo el src limpio.
+      const iframeSrc = raw.match(/src\s*=\s*["']([^"']+)["']/i)?.[1];
+      let url = (iframeSrc || raw).trim();
+      url = url
+        .replace(/&amp;/gi, '&')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/g, "'");
+      if (url.includes('maps/d/viewer') && /[?&]mid=/.test(url)) {
+        const mid = url.match(/[?&]mid=([^&]+)/i)?.[1];
+        if (mid) {
+          url = `https://www.google.com/maps/d/embed?mid=${decodeURIComponent(mid)}&ehbc=2E312F`;
+        }
+      }
+      payload.urlMapaUbicacion = url ? url.slice(0, 2000) : null;
+    }
+
+    if (payload.recorridoSubtitulo !== undefined) {
+      payload.recorridoSubtitulo =
+        String(payload.recorridoSubtitulo || '').trim().slice(0, 255) || null;
+    }
+
+    if (payload.recorridoPuntos !== undefined) {
+      const raw = payload.recorridoPuntos;
+      const list = Array.isArray(raw) ? raw : [];
+      payload.recorridoPuntos = list
+        .slice(0, 12)
+        .map((item: any) => ({
+          titulo: String(item?.titulo || '').trim().slice(0, 120),
+          desc: String(item?.desc || item?.descripcion || '').trim().slice(0, 500),
+        }))
+        .filter((p: { titulo: string }) => !!p.titulo);
+      if (!payload.recorridoPuntos.length) payload.recorridoPuntos = null;
     }
 
     if (payload.landingFraternidades !== undefined) {

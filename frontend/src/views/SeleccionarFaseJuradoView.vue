@@ -1,13 +1,25 @@
 <template>
   <div class="dashboard-page max-w-7xl min-h-full">
-    <div class="mb-8">
-      <h2 class="text-3xl font-black text-primary tracking-tighter uppercase italic">
-        {{ tipoConcurso === 'EFU' ? 'Calificar Fases EFU' : 'Concursos Externos' }}
-      </h2>
-      <p class="text-slate-500 font-medium text-sm mt-1">
-        {{ tipoConcurso === 'EFU' ? 'Selecciona el módulo de evaluación de la Entrada Universitaria.' : 'Califica a los participantes de los concursos y actividades externas.' }}
-      </p>
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+      <div>
+        <h2 class="text-2xl sm:text-3xl font-black text-primary tracking-tighter uppercase italic">
+          {{ tipoConcurso === 'EFU' ? 'Calificar Fases EFU' : 'Concursos Externos' }}
+        </h2>
+        <p class="text-slate-500 font-medium text-sm sm:text-sm mt-1">
+          {{ tipoConcurso === 'EFU' ? 'Selecciona el módulo de evaluación de la Entrada Universitaria.' : 'Califica a los participantes de los concursos y actividades externas.' }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center justify-center gap-2 self-start px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors shrink-0"
+        @click="abrirTutorial"
+      >
+        <span class="material-symbols-outlined text-[18px]">school</span>
+        Ver tutorial
+      </button>
     </div>
+
+    <TutorialCalificarModal v-model="tutorialAbierto" :variant="tutorialVariant" />
 
     <div v-if="loading" class="flex justify-center py-20">
       <span class="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
@@ -22,10 +34,11 @@
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div 
-        v-for="fase in fases" 
+        v-for="(fase, index) in fases" 
         :key="fase.idFase"
         class="relative bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm transition-all group"
         :class="fase.accesible ? 'hover:shadow-xl hover:shadow-primary/10 hover:border-primary/30 cursor-pointer' : 'opacity-80 grayscale-[30%] cursor-not-allowed'"
+        :data-tutorial="index === 0 ? 'fase-card' : undefined"
         @click="fase.accesible ? seleccionarFase(fase) : null"
       >
         <div v-if="!fase.accesible" class="absolute inset-0 bg-slate-900/40 z-10 flex flex-col items-center justify-center backdrop-blur-[2px]">
@@ -62,6 +75,7 @@
           <button 
             class="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
             :class="fase.accesible ? (tipoConcurso === 'EFU' ? 'bg-primary/5 text-primary hover:bg-primary hover:!text-white shadow-sm hover:shadow-primary/20' : 'bg-secondary/5 text-secondary hover:bg-secondary hover:!text-white shadow-sm hover:shadow-secondary/20') : 'bg-slate-100 text-slate-400'"
+            :data-tutorial="index === 0 ? 'fase-enter' : undefined"
           >
             {{ fase.accesible
               ? (tipoConcurso === 'EFU'
@@ -296,12 +310,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
 import { getImageUrl } from '../utils/url'
 import { esFaseChachaWarmi } from '../utils/chachaWarmi'
 import { useAuthStore } from '../store/auth'
 import { notify } from '../utils/notify'
+import TutorialCalificarModal from '../components/TutorialCalificarModal.vue'
+import {
+  TUTORIAL_VARIANT,
+  hasSeenTutorial,
+} from '../utils/tutorialCalificar'
 
 const authStore = useAuthStore()
 const esAdmin = computed(() => ['admin', 'superusuario'].includes(authStore.userRole))
@@ -591,7 +610,24 @@ const formatearFecha = (fechaString) => {
   return fecha.toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+const tutorialAbierto = ref(false)
+const tutorialVariant = computed(() =>
+  props.tipoConcurso === 'EXTERNO'
+    ? TUTORIAL_VARIANT.FASE_EXTERNO
+    : TUTORIAL_VARIANT.FASE_EFU,
+)
+
+function abrirTutorial() {
+  tutorialAbierto.value = true
+}
+
 onMounted(() => {
   cargarFases()
+})
+
+watch(loading, (isLoading) => {
+  if (!isLoading && !error.value && !hasSeenTutorial(tutorialVariant.value)) {
+    tutorialAbierto.value = true
+  }
 })
 </script>

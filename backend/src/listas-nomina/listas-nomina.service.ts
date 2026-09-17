@@ -274,6 +274,7 @@ export class ListasNominaService {
       registroUniversitario: m.registroUniversitario,
       tipoDanza: m.tipoDanza,
       nombreFraternidad: m.fraternidad?.nombre ?? null,
+      asegurado: !!m.asegurado,
       createdAt: m.createdAt,
     };
   }
@@ -1018,6 +1019,7 @@ export class ListasNominaService {
           celular: r.celular,
           registroUniversitario: r.registroUniversitario,
           tipoDanza: r.tipoDanza,
+          asegurado: false,
         }),
       );
       await qr.manager.save(entities);
@@ -1072,9 +1074,43 @@ export class ListasNominaService {
       relations: ['fraternidad'],
       order: { apellidoPaterno: 'ASC', nombres: 'ASC' },
     });
+    const cantidadAsegurados = miembros.filter((m) => !!m.asegurado).length;
     return {
-      lista: this.toResponse(lista, { cantidadMiembros: miembros.length }),
+      lista: this.toResponse(lista, {
+        cantidadMiembros: miembros.length,
+        cantidadAsegurados,
+      }),
+      cantidadAsegurados,
       miembros: miembros.map((m) => this.toMiembroResponse(m)),
+    };
+  }
+
+  async setAseguradoMiembro(idMiembro: number, asegurado: boolean) {
+    const miembro = await this.miembroRepo.findOne({
+      where: { idMiembro },
+      relations: ['fraternidad', 'lista', 'gestion'],
+    });
+    if (!miembro) throw new NotFoundException('Fraterno no encontrado en la nómina.');
+    const idLista = miembro.lista?.idLista;
+    if (!idLista) throw new BadRequestException('El fraterno no está vinculado a una nómina.');
+
+    miembro.asegurado = !!asegurado;
+    await this.miembroRepo.save(miembro);
+
+    const cantidadAsegurados = await this.miembroRepo.count({
+      where: {
+        lista: { idLista },
+        asegurado: true,
+      },
+    });
+
+    return {
+      ok: true,
+      miembro: this.toMiembroResponse(miembro),
+      cantidadAsegurados,
+      mensaje: asegurado
+        ? 'Seguro otorgado exitosamente'
+        : 'Seguro retirado exitosamente',
     };
   }
 
@@ -1124,17 +1160,25 @@ export class ListasNominaService {
             .createQueryBuilder('m')
             .select('m.id_lista', 'idLista')
             .addSelect('COUNT(*)', 'cnt')
+            .addSelect(
+              'SUM(CASE WHEN m.asegurado = true THEN 1 ELSE 0 END)',
+              'cntAseg',
+            )
             .where('m.id_lista IN (:...ids)', { ids: listas.map((l) => l.idLista) })
             .groupBy('m.id_lista')
             .getRawMany()
         : [];
     const countByLista = new Map(counts.map((c) => [Number(c.idLista), Number(c.cnt)]));
+    const asegByLista = new Map(
+      counts.map((c) => [Number(c.idLista), Number(c.cntAseg) || 0]),
+    );
 
     return {
       gestion: gestion ? { idGestion: gestion.idGestion, anio: gestion.anio } : null,
       items: fraternidades.map((f) => {
         const lista = byFrat.get(f.idFraternidad);
         const cantidadMiembros = lista ? countByLista.get(lista.idLista) || 0 : 0;
+        const cantidadAsegurados = lista ? asegByLista.get(lista.idLista) || 0 : 0;
         return {
           idFraternidad: f.idFraternidad,
           nombreFraternidad: f.nombre,
@@ -1142,7 +1186,10 @@ export class ListasNominaService {
           tipoDanza: f.tipoDanza?.nombre || null,
           tieneArchivo: !!lista,
           cantidadMiembros,
-          lista: lista ? this.toResponse(lista, { cantidadMiembros }) : null,
+          cantidadAsegurados,
+          lista: lista
+            ? this.toResponse(lista, { cantidadMiembros, cantidadAsegurados })
+            : null,
         };
       }),
     };

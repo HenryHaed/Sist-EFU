@@ -206,9 +206,6 @@ export class ReportesService implements OnModuleInit {
     }
     if (instancia) {
       qb.andWhere('f.nivel_representacion = :instancia', { instancia });
-      if (esExterno) {
-        qb.andWhere('institucionExterna.id_institucion_externa IS NOT NULL');
-      }
       if (esCentral) {
         qb.andWhere('facultad.id_facultad IS NULL');
         qb.andWhere('carrera.id_carrera IS NULL');
@@ -357,15 +354,23 @@ export class ReportesService implements OnModuleInit {
 
     const orden = dto.orden === 'DESC' ? 'DESC' : 'ASC';
     const ordenarPor = dto.ordenarPor || 'nombreFraternidad';
-    const sortMap: Record<string, string> = {
-      nombreFraternidad: 'COALESCE(fraternidadCreada.nombre, s.nombre_fraternidad)',
-      tipoDanza: 'tipoDanza.nombre',
-      facultad: 'facultad.nombre',
-      categoria: 'categoria.nombre',
-      gestion: 'gestion.anio',
-      fechaSolicitud: 's.created_at',
-    };
-    qb.orderBy(sortMap[ordenarPor] || 'COALESCE(fraternidadCreada.nombre, s.nombre_fraternidad)', orden as 'ASC' | 'DESC');
+    if (ordenarPor === 'tipoDanza') {
+      qb.orderBy('tipoDanza.nombre', orden as 'ASC' | 'DESC');
+    } else if (ordenarPor === 'facultad') {
+      qb.orderBy('facultad.nombre', orden as 'ASC' | 'DESC');
+    } else if (ordenarPor === 'categoria') {
+      qb.orderBy('categoria.nombre', orden as 'ASC' | 'DESC');
+    } else if (ordenarPor === 'gestion') {
+      qb.orderBy('gestion.anio', orden as 'ASC' | 'DESC');
+    } else if (ordenarPor === 'fechaSolicitud') {
+      qb.orderBy('s.created_at', orden as 'ASC' | 'DESC');
+    } else {
+      // Evitar COALESCE en orderBy (TypeORM lo cita como columna y rompe el SQL)
+      qb.orderBy('fraternidadCreada.nombre', orden as 'ASC' | 'DESC').addOrderBy(
+        's.nombre_fraternidad',
+        orden as 'ASC' | 'DESC',
+      );
+    }
 
     return qb;
   }

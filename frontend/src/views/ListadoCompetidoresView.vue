@@ -4,6 +4,7 @@
       <div class="flex items-center gap-4">
         <button
           type="button"
+          data-tutorial="volver"
           @click="onVolver"
           class="size-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-colors"
         >
@@ -27,6 +28,14 @@
 
       <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
         <button
+          type="button"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+          @click="abrirTutorial"
+        >
+          <span class="material-symbols-outlined text-[18px]">school</span>
+          Ver tutorial
+        </button>
+        <button
           v-if="esAdmin"
           type="button"
           @click="abrirPanelAdmin()"
@@ -36,6 +45,7 @@
           Calificaciones admin
         </button>
         <div
+          data-tutorial="tiempo"
           class="flex items-center gap-3 px-4 py-2.5 border rounded-xl w-full sm:w-auto"
           :class="urgenciaStatus.bgClass"
         >
@@ -48,6 +58,8 @@
       </div>
     </div>
 
+    <TutorialCalificarModal v-model="tutorialAbierto" :variant="tutorialVariant" />
+
     <div class="flex-1 dashboard-page max-w-7xl">
       <div v-if="loading" class="flex justify-center py-20">
         <span class="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
@@ -58,7 +70,7 @@
           v-if="!(esChacha && vista === 'pareja')"
           class="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 flex-wrap"
         >
-          <div class="relative max-w-lg flex-1 min-w-[200px]">
+          <div class="relative max-w-lg flex-1 min-w-[200px]" data-tutorial="buscar">
             <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
             <input
               v-model="busqueda"
@@ -85,160 +97,221 @@
         </div>
 
       <!-- CHACHA: fraternidades (nota por pareja) -->
-      <div v-if="esChacha && vista === 'fraternidades'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div
-          v-for="grupo in fraternidadesGruposFiltrados"
-          :key="grupo.idFraternidad ?? 'sin'"
-          class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all p-6 group flex flex-col"
-        >
-          <div class="flex justify-between items-start mb-4">
-            <div class="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-              <span class="material-symbols-outlined text-3xl">groups</span>
+      <div v-if="esChacha && vista === 'fraternidades'" class="space-y-8">
+        <section>
+          <div class="flex items-center justify-between gap-3 mb-4 px-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-amber-700 text-[22px]">pending_actions</span>
+              <h3 class="text-base font-black text-amber-900 uppercase tracking-wide truncate">Pendientes de calificar</h3>
             </div>
+            <span class="shrink-0 px-2.5 py-1 rounded-lg bg-amber-200/80 text-amber-950 text-sm font-black">{{ gruposPendientes.length }}</span>
+          </div>
+          <div v-if="gruposPendientes.length === 0" class="py-10 text-center text-slate-400 text-base font-medium bg-white rounded-3xl border border-slate-200">
+            No hay fraternidades pendientes.
+          </div>
+          <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div
-              class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest"
-              :class="grupo.estadoEvaluacion === 'COMPLETADO'
-                ? 'bg-emerald-100 text-emerald-700'
-                : (grupo.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500')"
+              v-for="grupo in gruposPendientes"
+              :key="'gp-' + (grupo.idFraternidad ?? 'sin')"
+              class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all p-5 sm:p-6 group flex flex-col"
             >
-              {{ grupo.estadoEvaluacion || 'PENDIENTE' }}
+              <div class="flex justify-between items-start mb-4 gap-2">
+                <div class="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                  <span class="material-symbols-outlined text-3xl">groups</span>
+                </div>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide border pointer-events-none"
+                  :class="grupo.estadoEvaluacion === 'EN_PROGRESO'
+                    ? 'bg-amber-100 text-amber-800 border-amber-200'
+                    : 'bg-orange-100 text-orange-800 border-orange-200'"
+                >
+                  {{ grupo.estadoEvaluacion === 'EN_PROGRESO' ? 'En progreso' : 'No calificado' }}
+                </button>
+              </div>
+              <h3 class="font-black text-xl sm:text-xl text-slate-800 uppercase tracking-tighter leading-tight mb-2">{{ grupo.nombre }}</h3>
+              <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">{{ (grupo.nombresPareja || []).join(' · ') || 'Pareja Chacha-Warmi' }}</p>
+              <p class="text-xs font-medium text-slate-400 mb-2">
+                {{ formatFechaSolicitud(grupo.fechaSolicitud) }}
+                <span v-if="grupo.instanciaRepresentacion"> · {{ grupo.instanciaRepresentacion }}</span>
+              </p>
+              <p class="text-xl font-black text-primary mb-4">{{ grupo.puntajeActual || 0 }} <span class="text-xs text-slate-400">pts</span></p>
+              <div class="mt-auto flex flex-col gap-2">
+                <button v-if="esAdmin" type="button" @click="abrirPanelAdminFraternidad(grupo.idFraternidad)" class="w-full py-2.5 rounded-2xl text-sm font-black uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all flex items-center justify-center gap-2">
+                  <span class="material-symbols-outlined text-[18px]">monitoring</span>
+                  Ver calificaciones
+                </button>
+                <button
+                  type="button"
+                  @click="iniciarEvaluacionFraternidad(grupo)"
+                  :disabled="tiempoRestante <= 0"
+                  :data-tutorial="grupo === primerCalificarGrupo ? 'calificar' : undefined"
+                  class="w-full py-3.5 rounded-2xl text-base sm:text-sm font-black transition-all flex items-center justify-center gap-2"
+                  :class="tiempoRestante <= 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-blue-900 shadow-xl shadow-primary/20'"
+                >
+                  {{ tiempoRestante <= 0 ? 'Fase Cerrada' : (grupo.estadoEvaluacion === 'PENDIENTE' ? 'Calificar pareja' : 'Continuar calificación') }}
+                  <span class="material-symbols-outlined text-[22px]">{{ tiempoRestante <= 0 ? 'lock' : 'arrow_forward' }}</span>
+                </button>
+              </div>
             </div>
           </div>
-          <h3 class="font-black text-xl text-slate-800 uppercase tracking-tighter leading-tight mb-2">
-            {{ grupo.nombre }}
-          </h3>
-          <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-            {{ (grupo.nombresPareja || []).join(' · ') || 'Pareja Chacha-Warmi' }}
-          </p>
-          <p class="text-[10px] font-medium text-slate-400 mb-2">
-            {{ formatFechaSolicitud(grupo.fechaSolicitud) }}
-            <span v-if="grupo.instanciaRepresentacion"> · {{ grupo.instanciaRepresentacion }}</span>
-          </p>
-          <p class="text-lg font-black text-primary mb-4">{{ grupo.puntajeActual || 0 }} <span class="text-[10px] text-slate-400">pts</span></p>
+        </section>
 
-          <div class="mt-auto flex flex-col gap-2">
-            <button
-              v-if="esAdmin"
-              type="button"
-              @click="abrirPanelAdminFraternidad(grupo.idFraternidad)"
-              class="w-full py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
-            >
-              <span class="material-symbols-outlined text-[18px]">monitoring</span>
-              Ver calificaciones
-            </button>
-            <button
-              type="button"
-              @click="iniciarEvaluacionFraternidad(grupo)"
-              :disabled="grupo.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0"
-              class="w-full py-3 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2"
-              :class="(grupo.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0)
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                : 'bg-primary text-white hover:bg-blue-900 shadow-xl shadow-primary/20'"
-            >
-              {{ (grupo.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0)
-                ? (tiempoRestante <= 0 ? 'Fase Cerrada' : 'Nota Sellada')
-                : (grupo.estadoEvaluacion === 'PENDIENTE' ? 'Calificar pareja' : 'Continuar calificación') }}
-              <span class="material-symbols-outlined text-[20px]">
-                {{ (grupo.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0) ? 'lock' : 'arrow_forward' }}
-              </span>
-            </button>
+        <section v-if="gruposCalificados.length">
+          <div class="flex items-center justify-between gap-3 mb-4 px-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-emerald-700 text-[22px]">verified</span>
+              <h3 class="text-base font-black text-emerald-900 uppercase tracking-wide truncate">Ya calificadas</h3>
+            </div>
+            <span class="shrink-0 px-2.5 py-1 rounded-lg bg-emerald-200/80 text-emerald-950 text-sm font-black">{{ gruposCalificados.length }}</span>
           </div>
-        </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              v-for="grupo in gruposCalificados"
+              :key="'gc-' + (grupo.idFraternidad ?? 'sin')"
+              class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col opacity-95"
+            >
+              <div class="flex justify-between items-start mb-4">
+                <div class="size-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <span class="material-symbols-outlined text-3xl">groups</span>
+                </div>
+                <div class="px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide bg-emerald-100 text-emerald-700 border border-emerald-200">Calificado</div>
+              </div>
+              <h3 class="font-black text-xl text-slate-800 uppercase tracking-tighter leading-tight mb-2">{{ grupo.nombre }}</h3>
+              <p class="text-xl font-black text-primary mb-4">{{ grupo.puntajeActual || 0 }} <span class="text-xs text-slate-400">pts</span></p>
+              <button disabled class="mt-auto w-full py-3.5 rounded-2xl text-base sm:text-sm font-black bg-slate-200 text-slate-400 cursor-not-allowed flex items-center justify-center gap-2">
+                Nota Sellada <span class="material-symbols-outlined">lock</span>
+              </button>
+            </div>
+          </div>
+        </section>
 
-        <div v-if="fraternidadesGruposFiltrados.length === 0" class="col-span-full py-20 text-center">
+        <div v-if="fraternidadesGruposFiltrados.length === 0" class="py-20 text-center">
           <span class="material-symbols-outlined text-6xl text-slate-200 mb-4">groups</span>
-          <p class="text-slate-400 font-bold uppercase tracking-widest max-w-md mx-auto">
-            {{ busqueda.trim()
-              ? `Ninguna fraternidad coincide con “${busqueda}”.`
-              : 'No hay fraternidades con Chacha-Warmi para calificar.' }}
+          <p class="text-slate-400 font-bold uppercase tracking-widest max-w-md mx-auto text-sm">
+            {{ busqueda.trim() ? `Ninguna fraternidad coincide con “${busqueda}”.` : 'No hay fraternidades con Chacha-Warmi para calificar.' }}
           </p>
         </div>
       </div>
 
       <!-- CHACHA: pareja / listado plano de otros -->
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div
-          v-for="p in participantesVistaFiltrados"
-          :key="p.idParticipante"
-          class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg transition-all group flex flex-col"
-        >
-          <div class="p-6 flex-1">
-            <div class="flex justify-between items-start mb-4">
-              <div
-                class="size-12 rounded-2xl flex items-center justify-center shrink-0"
-                :class="p.tipo === 'Warmi' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'"
-              >
-                <span class="material-symbols-outlined text-3xl">
-                  {{ p.tipo === 'Warmi' ? 'person_2' : 'person' }}
-                </span>
+      <div v-else class="space-y-8">
+        <section>
+          <div v-if="!(esChacha && vista === 'pareja')" class="flex items-center justify-between gap-3 mb-4 px-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-amber-700 text-[22px]">pending_actions</span>
+              <h3 class="text-base font-black text-amber-900 uppercase tracking-wide truncate">Pendientes de calificar</h3>
+            </div>
+            <span class="shrink-0 px-2.5 py-1 rounded-lg bg-amber-200/80 text-amber-950 text-sm font-black">{{ participantesPendientes.length }}</span>
+          </div>
+          <div v-if="participantesPendientes.length === 0 && !(esChacha && vista === 'pareja')" class="py-10 text-center text-slate-400 text-base font-medium bg-white rounded-3xl border border-slate-200">
+            No hay participantes pendientes.
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              v-for="p in (esChacha && vista === 'pareja' ? participantesVistaFiltrados : participantesPendientes)"
+              :key="'pp-' + p.idParticipante"
+              class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg transition-all group flex flex-col"
+            >
+              <div class="p-5 sm:p-6 flex-1">
+                <div class="flex justify-between items-start mb-4 gap-2">
+                  <div
+                    class="size-12 rounded-2xl flex items-center justify-center shrink-0"
+                    :class="p.tipo === 'Warmi' ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary'"
+                  >
+                    <span class="material-symbols-outlined text-3xl">{{ p.tipo === 'Warmi' ? 'person_2' : 'person' }}</span>
+                  </div>
+                  <button
+                    v-if="!estaCalificado(p)"
+                    type="button"
+                    class="px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide border pointer-events-none"
+                    :class="p.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-orange-100 text-orange-800 border-orange-200'"
+                  >
+                    {{ p.estadoEvaluacion === 'EN_PROGRESO' ? 'En progreso' : 'No calificado' }}
+                  </button>
+                  <div v-else class="px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide bg-emerald-100 text-emerald-700 border border-emerald-200">Calificado</div>
+                </div>
+                <div class="mb-4 flex items-center justify-between gap-3">
+                  <div class="flex flex-col min-w-0">
+                    <h3 class="font-black text-xl text-slate-800 uppercase tracking-tighter leading-tight">{{ p.nombre }}</h3>
+                    <p class="text-primary font-bold text-xs uppercase tracking-widest mt-1">{{ p.tipo || 'PARTICIPANTE' }}</p>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <p class="text-xs font-black text-slate-400 uppercase leading-none mb-1">Puntaje</p>
+                    <p class="text-2xl font-black text-primary leading-none">{{ p.puntajeActual || 0 }}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span class="material-symbols-outlined text-slate-400 text-lg">groups</span>
+                  <div class="min-w-0">
+                    <p class="text-[10px] font-black uppercase text-slate-400 leading-none mb-1">Representa a</p>
+                    <p class="text-sm font-bold text-slate-700 leading-none truncate">{{ p.fraternidad }}</p>
+                  </div>
+                </div>
               </div>
-              <div
-                class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest"
-                :class="p.estadoEvaluacion === 'COMPLETADO' ? 'bg-emerald-100 text-emerald-700' : (p.estadoEvaluacion === 'EN_PROGRESO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500')"
-              >
-                {{ p.estadoEvaluacion }}
+              <div class="p-4 bg-slate-50 border-t border-slate-100 flex flex-col gap-2">
+                <button v-if="esAdmin" type="button" @click="abrirPanelAdmin(p.idParticipante)" class="w-full py-2.5 rounded-2xl text-sm font-black uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center gap-2">
+                  <span class="material-symbols-outlined text-[18px]">monitoring</span>
+                  Ver calificaciones
+                </button>
+                <button
+                  type="button"
+                  @click="iniciarEvaluacion(p)"
+                  :disabled="estaCalificado(p) || tiempoRestante <= 0"
+                  :data-tutorial="p.idParticipante === primerCalificarParticipante ? 'calificar' : undefined"
+                  class="w-full py-3.5 rounded-2xl text-base sm:text-sm font-black transition-all flex items-center justify-center gap-2"
+                  :class="(estaCalificado(p) || tiempoRestante <= 0)
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-primary text-white hover:bg-blue-900 shadow-xl shadow-primary/20'"
+                >
+                  <span>
+                    {{ (estaCalificado(p) || tiempoRestante <= 0)
+                      ? (tiempoRestante <= 0 ? 'Fase Cerrada' : 'Nota Sellada')
+                      : (p.estadoEvaluacion === 'PENDIENTE' ? 'Iniciar Calificación' : 'Continuar Calificación') }}
+                  </span>
+                  <span class="material-symbols-outlined text-[22px]">{{ (estaCalificado(p) || tiempoRestante <= 0) ? 'lock' : 'arrow_forward' }}</span>
+                </button>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div class="mb-4 flex items-center justify-between gap-3">
-              <div class="flex flex-col min-w-0">
+        <section v-if="!(esChacha && vista === 'pareja') && participantesCalificados.length">
+          <div class="flex items-center justify-between gap-3 mb-4 px-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-emerald-700 text-[22px]">verified</span>
+              <h3 class="text-base font-black text-emerald-900 uppercase tracking-wide truncate">Ya calificados</h3>
+            </div>
+            <span class="shrink-0 px-2.5 py-1 rounded-lg bg-emerald-200/80 text-emerald-950 text-sm font-black">{{ participantesCalificados.length }}</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              v-for="p in participantesCalificados"
+              :key="'pc-' + p.idParticipante"
+              class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm flex flex-col opacity-95"
+            >
+              <div class="p-5 sm:p-6 flex-1">
+                <div class="flex justify-between items-start mb-4">
+                  <div class="size-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-3xl">person</span>
+                  </div>
+                  <div class="px-3 py-1.5 rounded-full text-xs font-black uppercase bg-emerald-100 text-emerald-700 border border-emerald-200">Calificado</div>
+                </div>
                 <h3 class="font-black text-xl text-slate-800 uppercase tracking-tighter leading-tight">{{ p.nombre }}</h3>
-                <p class="text-primary font-bold text-[10px] uppercase tracking-widest">{{ p.tipo || 'PARTICIPANTE' }}</p>
+                <p class="text-xl font-black text-primary mt-3">{{ p.puntajeActual || 0 }} pts</p>
               </div>
-              <div class="text-right shrink-0">
-                <p class="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Puntaje</p>
-                <p class="text-xl font-black text-primary leading-none">{{ p.puntajeActual || 0 }} pts</p>
+              <div class="p-4 bg-slate-50 border-t border-slate-100">
+                <button disabled class="w-full py-3.5 rounded-2xl text-base sm:text-sm font-black bg-slate-200 text-slate-400 cursor-not-allowed flex items-center justify-center gap-2">
+                  Nota Sellada <span class="material-symbols-outlined">lock</span>
+                </button>
               </div>
-            </div>
-
-            <div class="flex items-center gap-2 mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-              <span class="material-symbols-outlined text-slate-400 text-lg">groups</span>
-              <div class="min-w-0">
-                <p class="text-[8px] font-black uppercase text-slate-400 leading-none mb-1">Representa a</p>
-                <p class="text-[10px] font-bold text-slate-700 leading-none truncate">{{ p.fraternidad }}</p>
-              </div>
-            </div>
-
-            <div v-if="p.fechaApertura" class="text-[9px] text-slate-400 font-bold uppercase tracking-widest flex flex-col gap-1">
-              <p>Inició: {{ formatearFecha(p.fechaApertura) }}</p>
-              <p v-if="p.fechaCierre">Cerró: {{ formatearFecha(p.fechaCierre) }}</p>
             </div>
           </div>
+        </section>
 
-          <div class="p-4 bg-slate-50 border-t border-slate-100 flex flex-col gap-2">
-            <button
-              v-if="esAdmin"
-              type="button"
-              @click="abrirPanelAdmin(p.idParticipante)"
-              class="w-full py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
-            >
-              <span class="material-symbols-outlined text-[18px]">monitoring</span>
-              Ver calificaciones
-            </button>
-            <button
-              type="button"
-              @click="iniciarEvaluacion(p)"
-              :disabled="p.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0"
-              class="w-full py-3 rounded-2xl text-sm font-black transition-all flex items-center justify-center gap-2"
-              :class="(p.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0)
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                : 'bg-primary text-white hover:bg-blue-900 shadow-xl shadow-primary/20'"
-            >
-              <span>
-                {{ (p.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0)
-                  ? (tiempoRestante <= 0 ? 'Fase Cerrada' : 'Nota Sellada')
-                  : (p.estadoEvaluacion === 'PENDIENTE' ? 'Iniciar Calificación' : 'Continuar Calificación') }}
-              </span>
-              <span class="material-symbols-outlined text-[20px]">
-                {{ (p.estadoEvaluacion === 'COMPLETADO' || tiempoRestante <= 0) ? 'lock' : 'arrow_forward' }}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <div v-if="participantesVistaFiltrados.length === 0" class="col-span-full py-20 text-center">
+        <div v-if="participantesVistaFiltrados.length === 0" class="py-20 text-center">
           <span class="material-symbols-outlined text-6xl text-slate-200 mb-4">person_off</span>
-          <p class="text-slate-400 font-bold uppercase tracking-widest">
+          <p class="text-slate-400 font-bold uppercase tracking-widest text-sm">
             {{ busqueda.trim()
               ? `Ningún resultado para “${busqueda}”.`
               : (esChacha
@@ -270,8 +343,10 @@ import Swal from 'sweetalert2'
 import api from '../services/api'
 import { esFaseChachaWarmi } from '../utils/chachaWarmi'
 import ModalResumenCalificacionesAdmin from '../components/ModalResumenCalificacionesAdmin.vue'
+import TutorialCalificarModal from '../components/TutorialCalificarModal.vue'
 import { useAuthStore } from '../store/auth'
 import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
+import { TUTORIAL_VARIANT, hasSeenTutorial } from '../utils/tutorialCalificar'
 
 const authStore = useAuthStore()
 const esAdmin = computed(() => ['admin', 'superusuario'].includes(authStore.userRole))
@@ -280,6 +355,12 @@ const props = defineProps({
   fase: { type: Object, required: true },
 })
 const emit = defineEmits(['volver', 'evaluar-participante'])
+
+const tutorialVariant = TUTORIAL_VARIANT.LISTADO_EXTERNO
+const tutorialAbierto = ref(false)
+function abrirTutorial() {
+  tutorialAbierto.value = true
+}
 
 const participantes = ref([])
 const loading = ref(true)
@@ -419,6 +500,25 @@ const participantesVistaFiltrados = computed(() => {
   })
 })
 
+const estaCalificado = (item) => item?.estadoEvaluacion === 'COMPLETADO'
+
+const gruposPendientes = computed(() =>
+  fraternidadesGruposFiltrados.value.filter((g) => !estaCalificado(g)),
+)
+const gruposCalificados = computed(() =>
+  fraternidadesGruposFiltrados.value.filter((g) => estaCalificado(g)),
+)
+const participantesPendientes = computed(() =>
+  participantesVistaFiltrados.value.filter((p) => !estaCalificado(p)),
+)
+const participantesCalificados = computed(() =>
+  participantesVistaFiltrados.value.filter((p) => estaCalificado(p)),
+)
+const primerCalificarGrupo = computed(() => gruposPendientes.value[0] || fraternidadesGruposFiltrados.value[0])
+const primerCalificarParticipante = computed(
+  () => participantesPendientes.value[0]?.idParticipante ?? participantesVistaFiltrados.value[0]?.idParticipante,
+)
+
 const resumenTipos = (lista) => {
   const chacha = lista.filter((p) => p.tipo === 'Chacha').length
   const warmi = lista.filter((p) => p.tipo === 'Warmi').length
@@ -552,6 +652,12 @@ watch(
 
 onMounted(() => {
   cargarParticipantes()
+})
+
+watch(loading, (isLoading) => {
+  if (!isLoading && !hasSeenTutorial(tutorialVariant)) {
+    tutorialAbierto.value = true
+  }
 })
 
 onUnmounted(() => {
