@@ -885,7 +885,7 @@ const loading = ref(true)
 const actualizando = ref(false)
 const filtroEstado = ref('')
 const busqueda = ref('')
-const ordenCriterio = ref('fechaSolicitud')
+const ordenCriterio = ref('ordenOficial')
 const ordenDir = ref('asc')
 const opcionesOrden = ORDEN_CRITERIOS
 
@@ -962,6 +962,7 @@ const solicitudesFiltradas = computed(() => {
     fecha: (x) => x.createdAt,
     nombre: (x) => x.nombreFraternidad,
     instancia: (x) => instanciaLabel(x),
+    orden: (x) => x.fraternidadCreada?.ordenDesfile ?? x.ordenDesfile ?? null,
     id: (x) => x.idSolicitud,
   })
 })

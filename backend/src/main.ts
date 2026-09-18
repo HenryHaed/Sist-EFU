@@ -346,6 +346,34 @@ async function ensureSchemaPatches(dataSource: DataSource) {
     CREATE INDEX IF NOT EXISTS idx_fases_fase_padre ON fases(id_fase_padre)
   `);
 
+  await runPatch(dataSource, 'fraternidades.orden_desfile', `
+    ALTER TABLE fraternidades
+    ADD COLUMN IF NOT EXISTS orden_desfile INTEGER NULL
+  `);
+  await runPatch(dataSource, 'idx fraternidades.orden_desfile', `
+    CREATE INDEX IF NOT EXISTS idx_fraternidades_orden_desfile ON fraternidades(orden_desfile)
+  `);
+
+  await runPatch(dataSource, 'criterios.escala_visual', `
+    ALTER TABLE criterios
+    ADD COLUMN IF NOT EXISTS escala_visual NUMERIC(5,2) NOT NULL DEFAULT 6
+  `);
+  await runPatch(dataSource, 'gestiones.banderas_amarilla_habilitada', `
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS banderas_amarilla_habilitada boolean NOT NULL DEFAULT true
+  `);
+  await runPatch(dataSource, 'gestiones.banderas_roja_habilitada', `
+    ALTER TABLE gestiones
+    ADD COLUMN IF NOT EXISTS banderas_roja_habilitada boolean NOT NULL DEFAULT true
+  `);
+  await runPatch(dataSource, 'tabla jurado_criterios', `
+    CREATE TABLE IF NOT EXISTS jurado_criterios (
+      id_jurado INTEGER NOT NULL REFERENCES jurados(id_jurado) ON DELETE CASCADE,
+      id_criterio INTEGER NOT NULL REFERENCES criterios(id_criterio) ON DELETE CASCADE,
+      PRIMARY KEY (id_jurado, id_criterio)
+    )
+  `);
+
   await runPatch(dataSource, 'usuarios.es_decisor', `
     ALTER TABLE usuarios
     ADD COLUMN IF NOT EXISTS es_decisor boolean NOT NULL DEFAULT false

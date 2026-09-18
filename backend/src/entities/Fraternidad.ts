@@ -64,6 +64,10 @@ export class Fraternidad {
     @Column({ name: 'es_excedente', default: false })
     esExcedente: boolean;
 
+    /** Orden oficial de desfile / calificación (1 = primero). Editable por admin con drag. */
+    @Column({ name: 'orden_desfile', type: 'int', nullable: true })
+    ordenDesfile: number | null;
+
     @Column({ name: 'logo_url', type: 'text', nullable: true })
     logoUrl: string;
 

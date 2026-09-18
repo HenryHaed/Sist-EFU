@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Request, Req } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Request, Req, Res, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PasswordResetService } from './password-reset.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -12,6 +12,7 @@ import {
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Response } from 'express';
 
 @ApiTags('Autenticacion')
 @Controller('auth')
@@ -58,6 +59,21 @@ export class AuthController {
   @Get('me')
   getProfile(@Request() req: any) {
     return this.authService.getPerfil(req.user.idUsuario);
+  }
+
+  @ApiOperation({ summary: 'Generar PDF de credencial del sistema (anverso y reverso 10×6 cm)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('credencial')
+  generarCredencial(@Request() req: any, @Res() res: Response) {
+    return this.authService.generarCredencialPdf(req.user.idUsuario, res);
+  }
+
+  @Public()
+  @ApiOperation({ summary: 'Validar credencial del sistema vía QR' })
+  @Get('credencial/validar')
+  validarCredencial(@Query('t') t?: string, @Query('token') token?: string) {
+    return this.authService.validarCredencial(t || token || '');
   }
 
   @ApiOperation({ summary: 'Cambiar contraseña de usuario' })

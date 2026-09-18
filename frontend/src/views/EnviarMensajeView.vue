@@ -200,7 +200,7 @@ const tabs = [
 ]
 
 const OPCIONES_ROL = {
-  controladorhcu: { id: 'controladorhcu', label: 'Controladores HCU' },
+  controladorhcu: { id: 'controladorhcu', label: 'Controladores' },
   delegado: { id: 'delegado', label: 'Delegados' },
   jurado: { id: 'jurado', label: 'Jurados' },
   admin: { id: 'admin', label: 'Administradores' },

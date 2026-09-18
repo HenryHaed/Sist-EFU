@@ -1,9 +1,10 @@
 /**
  * Orden de listados de fraternidades / concursos para revisión y calificación.
- * Criterios: fechaSolicitud (default ASC), nombre, instancia.
+ * Criterios: orden oficial (desfile), fechaSolicitud, nombre, instancia.
  */
 
 export const ORDEN_CRITERIOS = [
+  { id: 'ordenOficial', label: 'Orden oficial' },
   { id: 'fechaSolicitud', label: 'Fecha de solicitud' },
   { id: 'nombre', label: 'Nombre' },
   { id: 'instancia', label: 'Instancia' },
@@ -22,11 +23,24 @@ export function compareTextoEs(a, b) {
   return String(a || '').localeCompare(String(b || ''), 'es', { sensitivity: 'base' })
 }
 
+function compareOrdenOficial(a, b, getOrden, getNombre, getId) {
+  const oa = getOrden(a)
+  const ob = getOrden(b)
+  const aNum = oa != null && oa !== '' && Number.isFinite(Number(oa))
+  const bNum = ob != null && ob !== '' && Number.isFinite(Number(ob))
+  if (aNum && bNum && Number(oa) !== Number(ob)) return Number(oa) - Number(ob)
+  if (aNum && !bNum) return -1
+  if (!aNum && bNum) return 1
+  const byNombre = compareTextoEs(getNombre(a), getNombre(b))
+  if (byNombre !== 0) return byNombre
+  return Number(getId(a)) - Number(getId(b))
+}
+
 /**
  * @param {Array} list
- * @param {'fechaSolicitud'|'nombre'|'instancia'} criterio
+ * @param {'ordenOficial'|'fechaSolicitud'|'nombre'|'instancia'} criterio
  * @param {'asc'|'desc'} dir
- * @param {(item: any) => object} getters - { fecha, nombre, instancia, id }
+ * @param {(item: any) => object} getters - { fecha, nombre, instancia, id, orden }
  */
 export function ordenarListado(list, criterio, dir = 'asc', getters = {}) {
   const getFecha = getters.fecha || ((x) => x.fechaSolicitud || x.fechaEnvio || x.createdAt)
@@ -35,17 +49,22 @@ export function ordenarListado(list, criterio, dir = 'asc', getters = {}) {
     getters.instancia ||
     ((x) => x.instanciaRepresentacion || x.instancia || x.nivelRepresentacion || '')
   const getId = getters.id || ((x) => x.idFraternidad || x.idInscripcion || x.idParticipante || 0)
+  const getOrden = getters.orden || ((x) => x.ordenDesfile ?? x.orden ?? null)
 
   const mult = dir === 'desc' ? -1 : 1
   return [...list].sort((a, b) => {
     let cmp = 0
+    if (criterio === 'ordenOficial') {
+      cmp = compareOrdenOficial(a, b, getOrden, getNombre, getId)
+      return dir === 'desc' ? -cmp : cmp
+    }
     if (criterio === 'nombre') {
       cmp = compareTextoEs(getNombre(a), getNombre(b))
     } else if (criterio === 'instancia') {
       cmp = compareTextoEs(getInstancia(a), getInstancia(b))
       if (cmp === 0) cmp = compareTextoEs(getNombre(a), getNombre(b))
     } else {
-      // fechaSolicitud (default)
+      // fechaSolicitud (legacy default)
       cmp = compareFechaAsc(getFecha(a), getFecha(b))
       if (dir === 'desc') cmp = -cmp
       if (cmp === 0) cmp = compareTextoEs(getNombre(a), getNombre(b))

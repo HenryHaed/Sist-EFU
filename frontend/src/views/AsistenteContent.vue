@@ -73,7 +73,12 @@
             Paso {{ criterioActualIndex + 1 }}: Evalúa {{ criterioActual.nombre }}
           </h3>
           <p class="text-slate-500 text-sm sm:text-sm font-medium mt-1.5">
-            Máximo {{ Number(criterioActual.puntajeMaximo) }} pts
+            <template v-if="esFaseDisciplina">
+              Escala visual {{ escalaActual }} · máx. real {{ Number(criterioActual.puntajeMaximo) }} pts
+            </template>
+            <template v-else>
+              Máximo {{ Number(criterioActual.puntajeMaximo) }} pts
+            </template>
             <span class="text-slate-400"> · paso {{ criterioActualIndex + 1 }} de {{ totalCriterios }}</span>
           </p>
         </div>
@@ -139,15 +144,21 @@
                         enterkeyhint="done"
                         v-model.number="formValues[criterioActual.idCriterio]" 
                         min="0" 
-                        :max="Number(criterioActual.puntajeMaximo)"
+                        :max="escalaActual"
                         @input="validarPuntaje(criterioActual)"
                         @blur="validarPuntaje(criterioActual)"
                         class="w-28 sm:w-24 px-3 py-3 sm:py-2 bg-white border-2 border-slate-300 text-primary font-black text-3xl sm:text-2xl text-center rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
                         :disabled="estadoOriginal === 'COMPLETADO'"
                       />
-                      <span class="text-slate-400 font-bold text-sm">/ {{ Number(criterioActual.puntajeMaximo) }}</span>
+                      <span class="text-slate-400 font-bold text-sm">/ {{ escalaActual }}</span>
                     </div>
                   </div>
+                  <p v-if="esFaseDisciplina && conversionActual" class="text-[10px] font-bold text-primary/80 uppercase tracking-widest -mt-2">
+                    Equivalente: {{ conversionActual }}
+                    <span class="text-slate-400 font-medium normal-case tracking-normal">
+                      (máx. {{ Number(criterioActual.puntajeMaximo) }} pts reales)
+                    </span>
+                  </p>
                   
                   <div class="relative flex items-center gap-4" v-if="estadoOriginal !== 'COMPLETADO'">
                     <span class="text-xs font-black text-slate-400">0</span>
@@ -156,11 +167,12 @@
                         type="range" 
                         v-model.number="formValues[criterioActual.idCriterio]" 
                         min="0" 
-                        :max="Number(criterioActual.puntajeMaximo)"
+                        :max="escalaActual"
+                        step="0.01"
                         class="w-full h-3 bg-slate-200 rounded-full appearance-none cursor-pointer accent-primary focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all custom-range shadow-inner"
                       />
                     </div>
-                    <span class="text-xs font-black text-slate-400">{{ Number(criterioActual.puntajeMaximo) }}</span>
+                    <span class="text-xs font-black text-slate-400">{{ escalaActual }}</span>
                   </div>
                 </div>
 
@@ -460,6 +472,27 @@ function abrirTutorial() {
   tutorialAbierto.value = true
 }
 
+const esFaseDisciplina = computed(() =>
+  String(props.faseSeleccionada?.nombre || '').toLowerCase().includes('disciplina'),
+)
+
+const escalaActual = computed(() => {
+  const c = criterioActual.value
+  if (!c) return 1
+  if (esFaseDisciplina.value) return Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6
+  return Number(c.puntajeMaximo) || 0
+})
+
+const conversionActual = computed(() => {
+  if (!esFaseDisciplina.value || !criterioActual.value) return null
+  const visual = Number(formValues.value[criterioActual.value.idCriterio])
+  if (!Number.isFinite(visual)) return null
+  const escala = escalaActual.value
+  const max = Number(criterioActual.value.puntajeMaximo) || 0
+  const real = escala > 0 ? ((Math.min(visual, escala) / escala) * max).toFixed(2) : '0'
+  return `${visual} / ${escala} → ${real} pts`
+})
+
 const loading = ref(true)
 const saving = ref(false)
 const criterios = ref([])
@@ -554,7 +587,14 @@ const cargarDatos = async () => {
       estadoOriginal.value = resEval.data.estado
       const jsonb = resEval.data.criteriosEvaluados
       if (jsonb) {
-        Object.keys(jsonb).forEach(key => { formValues.value[key] = jsonb[key] })
+        Object.keys(jsonb).forEach((key) => {
+          const raw = jsonb[key]
+          if (raw != null && typeof raw === 'object' && ('visual' in raw || 'real' in raw)) {
+            formValues.value[key] = raw.visual != null ? Number(raw.visual) : Number(raw.real)
+          } else {
+            formValues.value[key] = raw
+          }
+        })
       }
     }
     
@@ -589,7 +629,9 @@ const cargarDatos = async () => {
 const validarPuntaje = (criterio) => {
   const id = criterio.idCriterio
   let val = formValues.value[id]
-  const max = Number(criterio.puntajeMaximo)
+  const max = esFaseDisciplina.value
+    ? (Number(criterio.escalaVisual) > 0 ? Number(criterio.escalaVisual) : 6)
+    : Number(criterio.puntajeMaximo)
   
   if (val === null || val === undefined || val === '') return
 
@@ -622,7 +664,10 @@ const abrirResumenModal = () => {
   })
   const superaLimites = criterios.value.some(c => {
     const v = formValues.value[c.idCriterio]
-    return Number(v) > Number(c.puntajeMaximo) || Number(v) < 0
+    const max = esFaseDisciplina.value
+      ? (Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6)
+      : Number(c.puntajeMaximo)
+    return Number(v) > max || Number(v) < 0
   })
 
   if (sinLlenar) {
@@ -648,7 +693,16 @@ const irDestinoPostCierre = (destino) => {
 
 // Stats & Guardado
 const puntajeCalculado = computed(() => {
-  return Object.values(formValues.value).reduce((t, val) => t + (Number(val) || 0), 0)
+  if (!esFaseDisciplina.value) {
+    return Object.values(formValues.value).reduce((t, val) => t + (Number(val) || 0), 0)
+  }
+  return criterios.value.reduce((t, c) => {
+    const visual = Number(formValues.value[c.idCriterio])
+    if (!Number.isFinite(visual)) return t
+    const escala = Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6
+    const max = Number(c.puntajeMaximo) || 0
+    return t + (escala > 0 ? (Math.min(visual, escala) / escala) * max : 0)
+  }, 0)
 })
 
 const puntajePosible = computed(() => criterios.value.reduce((a, c) => a + Number(c.puntajeMaximo), 0))
@@ -656,9 +710,13 @@ const puntajePosible = computed(() => criterios.value.reduce((a, c) => a + Numbe
 const guardar = async (finalizar = false) => {
   saving.value = true
   const payloadCriterios = {}
-  Object.keys(formValues.value).forEach(k => {
+  Object.keys(formValues.value).forEach((k) => {
     if (formValues.value[k] !== null && formValues.value[k] !== '') {
-      payloadCriterios[k] = formValues.value[k]
+      if (esFaseDisciplina.value) {
+        payloadCriterios[k] = { visual: Number(formValues.value[k]) }
+      } else {
+        payloadCriterios[k] = formValues.value[k]
+      }
     }
   })
 

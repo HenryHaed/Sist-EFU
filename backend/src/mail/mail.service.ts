@@ -165,7 +165,7 @@ export class MailService {
     const labels: Record<string, string> = {
       superusuario: 'Superusuario',
       admin: 'Administrador',
-      controladorhcu: 'Controlador HCU',
+      controladorhcu: 'Controlador',
       delegado: 'Delegado',
       jurado: 'Jurado',
       veedor: 'Veedor',

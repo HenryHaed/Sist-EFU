@@ -81,6 +81,14 @@ export class Gestion {
     @Column({ name: 'mostrar_ranking_concursos_externos', default: true })
     mostrarRankingConcursosExternos: boolean;
 
+    /** Habilita botones de bandera amarilla en calificar disciplina. */
+    @Column({ name: 'banderas_amarilla_habilitada', default: true })
+    banderasAmarillaHabilitada: boolean;
+
+    /** Habilita botones de bandera roja en calificar disciplina. */
+    @Column({ name: 'banderas_roja_habilitada', default: true })
+    banderasRojaHabilitada: boolean;
+
     /** IDs de fases EXTERNO cuyo ranking no debe publicarse. Los nuevos concursos se muestran salvo que estén aquí. */
     @Column({ name: 'ranking_concursos_ocultos', type: 'jsonb', nullable: true })
     rankingConcursosOcultos: number[] | null;

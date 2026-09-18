@@ -115,7 +115,7 @@ const busqueda = ref('')
 const tabActivo = ref('todas')
 const loading = ref(true)
 const fraternidades = ref([])
-const ordenCriterio = ref('fechaSolicitud')
+const ordenCriterio = ref('ordenOficial')
 const ordenDir = ref('asc')
 const opcionesOrden = ORDEN_CRITERIOS
 
@@ -155,6 +155,7 @@ const cargarFraternidades = async () => {
       categoria: f.categoria?.nombre,
       instanciaRepresentacion: f.instanciaRepresentacion || f.nivelRepresentacion || '',
       fechaSolicitud: f.fechaSolicitud || f.createdAt || null,
+      ordenDesfile: f.ordenDesfile ?? null,
       calificado: false,
       imagen: f.logoUrl || FALLBACK_IMAGE
     }))
@@ -189,6 +190,7 @@ const fraternidadesFiltradas = computed(() => {
     fecha: (x) => x.fechaSolicitud,
     nombre: (x) => x.nombre,
     instancia: (x) => x.instanciaRepresentacion,
+    orden: (x) => x.ordenDesfile,
     id: (x) => x.id,
   })
 })

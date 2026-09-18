@@ -172,7 +172,7 @@
                   </td>
                   <td class="px-6 py-4 text-center">
                     <div class="text-lg font-black text-primary">
-                      {{ item.puntajeActual || 0 }} <span class="text-[10px] text-slate-400">pts</span>
+                      {{ ptsMostrados(item) || 0 }} <span class="text-[10px] text-slate-400">pts</span>
                     </div>
                   </td>
                   <td class="px-6 py-4">
@@ -207,14 +207,24 @@
                       <span v-if="tiempoRestante > 0" class="material-symbols-outlined text-[16px]">{{ item.estadoEvaluacion === 'EN_PROGRESO' ? 'play_arrow' : 'edit_document' }}</span>
                       <span v-else class="material-symbols-outlined text-[16px]">lock</span>
                     </button>
-                    <template v-if="fase?.nombre?.toLowerCase().includes('disciplina')">
-                      <button @click="aplicarPenalizacion(item, 'AMARILLA')" title="Bandera Amarilla (-1 pto)" class="inline-flex size-9 items-center justify-center rounded-lg bg-yellow-400 text-white hover:brightness-110 shadow-sm">
+                    <template v-if="esFaseDisciplina">
+                      <button
+                        v-if="banderasHabilitadas.amarilla"
+                        @click="aplicarPenalizacion(item, 'AMARILLA')"
+                        title="Bandera Amarilla (nota final EFU)"
+                        class="inline-flex size-9 items-center justify-center rounded-lg bg-yellow-400 text-white hover:brightness-110 shadow-sm"
+                      >
                         <span class="material-symbols-outlined text-[20px]">flag</span>
                       </button>
-                      <button @click="aplicarPenalizacion(item, 'ROJA')" title="Bandera Roja (-2 ptos)" class="inline-flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:brightness-110 shadow-sm">
+                      <button
+                        v-if="banderasHabilitadas.roja"
+                        @click="aplicarPenalizacion(item, 'ROJA')"
+                        title="Bandera Roja (nota final EFU)"
+                        class="inline-flex size-9 items-center justify-center rounded-lg bg-red-600 text-white hover:brightness-110 shadow-sm"
+                      >
                         <span class="material-symbols-outlined text-[20px]">flag</span>
                       </button>
-                      <button @click="abrirSanciones(item)" title="Sanciones Graves" class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 shadow-sm shadow-red-200 transition-all">
+                      <button @click="abrirSanciones(item)" title="Sanciones Graves (nota final EFU)" class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 shadow-sm shadow-red-200 transition-all">
                         <span class="material-symbols-outlined text-[18px]">gavel</span>
                         <span class="text-[10px] font-black uppercase tracking-widest">Sanciones</span>
                       </button>
@@ -240,7 +250,7 @@
                   <p class="text-sm text-slate-500 mt-0.5">{{ item.categoria || 'Sin categoría' }}</p>
                 </div>
                 <div class="text-right shrink-0">
-                  <p class="text-2xl font-black leading-none" :class="tieneSancionGrave(item) ? 'text-red-700' : 'text-primary'">{{ item.puntajeActual || 0 }}</p>
+                  <p class="text-2xl font-black leading-none" :class="tieneSancionGrave(item) ? 'text-red-700' : 'text-primary'">{{ ptsMostrados(item) || 0 }}</p>
                   <p class="text-xs text-slate-400 font-bold uppercase mt-0.5">pts</p>
                 </div>
               </div>
@@ -267,11 +277,11 @@
                   {{ etiquetaPenalizacion(p) }}
                 </div>
               </div>
-              <div v-if="fase?.nombre?.toLowerCase().includes('disciplina')" class="flex items-center gap-2 pl-2">
-                <button @click="aplicarPenalizacion(item, 'AMARILLA')" class="flex-1 py-2.5 rounded-xl bg-yellow-400 text-white flex items-center justify-center shadow-sm">
+              <div v-if="esFaseDisciplina" class="flex items-center gap-2 pl-2">
+                <button v-if="banderasHabilitadas.amarilla" @click="aplicarPenalizacion(item, 'AMARILLA')" class="flex-1 py-2.5 rounded-xl bg-yellow-400 text-white flex items-center justify-center shadow-sm">
                   <span class="material-symbols-outlined text-[20px]">flag</span>
                 </button>
-                <button @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
+                <button v-if="banderasHabilitadas.roja" @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
                   <span class="material-symbols-outlined text-[20px]">flag</span>
                 </button>
                 <button @click="abrirSanciones(item)" class="flex-[2] py-2.5 rounded-xl bg-red-700 text-white flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest shadow-sm shadow-red-200">
@@ -366,7 +376,7 @@
                     </div>
                   </td>
                   <td class="px-6 py-4 text-center">
-                    <div class="text-lg font-black text-primary">{{ item.puntajeActual || 0 }} <span class="text-[10px] text-slate-400">pts</span></div>
+                    <div class="text-lg font-black text-primary">{{ ptsMostrados(item) || 0 }} <span class="text-[10px] text-slate-400">pts</span></div>
                   </td>
                   <td class="px-6 py-4">
                     <div v-if="item.fechaApertura" class="text-xs text-slate-500 flex flex-col gap-1">
@@ -384,9 +394,9 @@
                       Nota Sellada
                       <span class="material-symbols-outlined text-[16px]">lock</span>
                     </button>
-                    <template v-if="fase?.nombre?.toLowerCase().includes('disciplina')">
-                      <button @click="aplicarPenalizacion(item, 'AMARILLA')" class="inline-flex size-9 items-center justify-center rounded-lg bg-yellow-400 text-white"><span class="material-symbols-outlined text-[20px]">flag</span></button>
-                      <button @click="aplicarPenalizacion(item, 'ROJA')" class="inline-flex size-9 items-center justify-center rounded-lg bg-red-600 text-white"><span class="material-symbols-outlined text-[20px]">flag</span></button>
+                    <template v-if="esFaseDisciplina">
+                      <button v-if="banderasHabilitadas.amarilla" @click="aplicarPenalizacion(item, 'AMARILLA')" class="inline-flex size-9 items-center justify-center rounded-lg bg-yellow-400 text-white"><span class="material-symbols-outlined text-[20px]">flag</span></button>
+                      <button v-if="banderasHabilitadas.roja" @click="aplicarPenalizacion(item, 'ROJA')" class="inline-flex size-9 items-center justify-center rounded-lg bg-red-600 text-white"><span class="material-symbols-outlined text-[20px]">flag</span></button>
                       <button @click="abrirSanciones(item)" class="inline-flex h-9 items-center gap-2 px-3 rounded-lg bg-red-700 text-white"><span class="material-symbols-outlined text-[18px]">gavel</span><span class="text-[10px] font-black uppercase">Sanciones</span></button>
                     </template>
                   </td>
@@ -409,7 +419,7 @@
                   <p class="text-sm text-slate-500 mt-0.5">{{ item.categoria || 'Sin categoría' }}</p>
                 </div>
                 <div class="text-right shrink-0">
-                  <p class="text-2xl font-black leading-none text-primary">{{ item.puntajeActual || 0 }}</p>
+                  <p class="text-2xl font-black leading-none text-primary">{{ ptsMostrados(item) || 0 }}</p>
                   <p class="text-xs text-slate-400 font-bold uppercase mt-0.5">pts</p>
                 </div>
               </div>
@@ -419,9 +429,9 @@
                   Calificado
                 </div>
               </div>
-              <div v-if="fase?.nombre?.toLowerCase().includes('disciplina')" class="flex items-center gap-2 pl-2">
-                <button @click="aplicarPenalizacion(item, 'AMARILLA')" class="flex-1 py-2.5 rounded-xl bg-yellow-400 text-white flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">flag</span></button>
-                <button @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">flag</span></button>
+              <div v-if="esFaseDisciplina" class="flex items-center gap-2 pl-2">
+                <button v-if="banderasHabilitadas.amarilla" @click="aplicarPenalizacion(item, 'AMARILLA')" class="flex-1 py-2.5 rounded-xl bg-yellow-400 text-white flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">flag</span></button>
+                <button v-if="banderasHabilitadas.roja" @click="aplicarPenalizacion(item, 'ROJA')" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white flex items-center justify-center"><span class="material-symbols-outlined text-[20px]">flag</span></button>
                 <button @click="abrirSanciones(item)" class="flex-[2] py-2.5 rounded-xl bg-red-700 text-white flex items-center justify-center gap-2 font-black text-xs uppercase"><span class="material-symbols-outlined text-[18px]">gavel</span>Sanciones</button>
               </div>
               <div class="flex items-center gap-2 pt-2 border-t border-slate-200 pl-2">
@@ -473,7 +483,7 @@
         <v-card-text class="pa-6 sm:pa-8 bg-red-50 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
           <p class="text-red-900 text-sm mb-6 font-medium leading-relaxed">
             Seleccione una sanción del catálogo (valores dinámicos por gestión).
-            <b class="uppercase">Estas acciones afectan el puntaje final</b> de la fraternidad.
+            <b class="uppercase">Impactan la nota final EFU</b> (todas las fases), no el puntaje de la fase Disciplina.
           </p>
           
           <div class="grid gap-3">
@@ -611,7 +621,7 @@ const fase = ref(null)
 const fraternidades = ref([])
 const busqueda = ref('')
 const loading = ref(true)
-const ordenCriterio = ref('fechaSolicitud')
+const ordenCriterio = ref('ordenOficial')
 const ordenDir = ref('asc')
 const opcionesOrden = ORDEN_CRITERIOS
 
@@ -640,6 +650,7 @@ const fraternidadesFiltradas = computed(() => {
     fecha: (x) => x.fechaSolicitud,
     nombre: (x) => x.nombre,
     instancia: (x) => x.instanciaRepresentacion,
+    orden: (x) => x.ordenDesfile,
     id: (x) => x.idFraternidad,
   })
 })
@@ -696,6 +707,20 @@ let countdownInterval = null
 const sancionesCatalogo = ref([])
 const nuevaInfraccion = ref({ nombre: '', tipoImpacto: 'RESTA_PUNTOS', valorImpacto: -1 })
 const guardandoInfraccion = ref(false)
+const banderasHabilitadas = ref({ amarilla: true, roja: true })
+
+const esFaseDisciplina = computed(() =>
+  String(fase.value?.nombre || props.faseSeleccionada?.nombre || '')
+    .toLowerCase()
+    .includes('disciplina'),
+)
+
+const ptsMostrados = (item) => {
+  if (esFaseDisciplina.value && item.puntajeFaseMerged != null) {
+    return item.puntajeFaseMerged
+  }
+  return item.puntajeActual ?? item.puntajeFase ?? 0
+}
 
 const esSancionGrave = (p) => p?.tipoImpacto === 'SUSPENSION' || Number(p?.valor) <= -10
 const tieneSancionGrave = (item) => (item?.penalizaciones || []).some(esSancionGrave)
@@ -774,6 +799,10 @@ const cargarFaseData = async () => {
     const { data } = await api.get(`/evaluaciones/fase/${props.faseSeleccionada.idFase}/fraternidades`)
     fase.value = data.fase
     fraternidades.value = data.listado
+    banderasHabilitadas.value = {
+      amarilla: data.banderas?.amarilla !== false,
+      roja: data.banderas?.roja !== false,
+    }
     
     const parseSafeDate = (d, isEnd = true) => {
       if (!d) return null
@@ -927,7 +956,7 @@ const aplicarPenalizacion = async (fraternidad, tipo) => {
   const pts = tipo === 'AMARILLA' ? '1 punto' : '2 puntos'
   const result = await Swal.fire({
     title: tipo === 'AMARILLA' ? '¿Bandera Amarilla?' : '¿Bandera Roja?',
-    text: `Se descontarán ${pts} del puntaje final (valor del catálogo de infracciones de la gestión).`,
+    text: `Se registrará sobre la nota final EFU (no altera el puntaje de la fase Disciplina). Catálogo: −${pts}.`,
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: tipo === 'AMARILLA' ? '#facc15' : '#dc2626',
@@ -938,7 +967,7 @@ const aplicarPenalizacion = async (fraternidad, tipo) => {
   if (result.isConfirmed) {
     try {
       await api.post(`/evaluaciones/fase/${fase.value.idFase}/fraternidad/${fraternidad.idFraternidad}/penalizar`, { tipo })
-      Swal.fire('Aplicado', 'La penalización se registró correctamente.', 'success')
+      Swal.fire('Aplicado', 'La penalización se registró sobre la nota final EFU.', 'success')
       cargarFaseData()
     } catch (e) {
       Swal.fire('Error', e.response?.data?.message || 'No se pudo aplicar la penalización.', 'error')

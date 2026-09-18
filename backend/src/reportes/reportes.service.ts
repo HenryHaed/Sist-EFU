@@ -31,6 +31,10 @@ import { FORMULA_EFU_PROMEDIO } from '../evaluaciones/efu-scoring';
 import { EvaluacionesService } from '../evaluaciones/evaluaciones.service';
 import { drawPdfInstitutionalHeader, PDF_UMSA_BLUE, PDF_UMSA_RED } from '../common/pdf-layout';
 import { InstanciaRepresentacion } from '../entities/SolicitudInscripcion';
+import { compareOrdenDesfileAsc } from '../common/orden-por-fecha';
+
+/** Claves de orden que mapean al orden oficial de desfile (drag-and-drop admin). */
+const ORDEN_OFICIAL_KEYS = new Set(['ordenDesfile', 'ordenOficial', 'orden']);
 
 @Injectable()
 export class ReportesService implements OnModuleInit {
@@ -62,6 +66,26 @@ export class ReportesService implements OnModuleInit {
 
   async onModuleInit() {
     await ensureTiposDanzaDefault(this.tipoDanzaRepo);
+  }
+
+  private esOrdenOficial(key?: string | null) {
+    return !key || ORDEN_OFICIAL_KEYS.has(key) || key === 'nombreFraternidad';
+  }
+
+  private sortRowsPorOrdenDesfile<T extends { ordenDesfile?: number | null; nombreFraternidad?: string; nombre?: string; idFraternidad?: number | null }>(
+    rows: T[],
+    desc = false,
+  ) {
+    rows.sort((a, b) => {
+      const cmp = compareOrdenDesfileAsc(
+        a,
+        b,
+        (x) => x.nombreFraternidad || x.nombre || '',
+        (x) => Number(x.idFraternidad) || 0,
+      );
+      return desc ? -cmp : cmp;
+    });
+    return rows;
   }
 
   async getTiposDanza() {
@@ -225,15 +249,22 @@ export class ReportesService implements OnModuleInit {
     }
 
     const orden = dto.orden === 'DESC' ? 'DESC' : 'ASC';
-    const ordenarPor = dto.ordenarPor || 'nombreFraternidad';
+    const ordenarPor = dto.ordenarPor || 'ordenDesfile';
     const sortMap: Record<string, string> = {
-      nombreFraternidad: 'f.nombre',
+      ordenDesfile: 'f.orden_desfile',
+      ordenOficial: 'f.orden_desfile',
+      nombreFraternidad: 'f.orden_desfile',
       tipoDanza: 'tipoDanza.nombre',
       facultad: 'facultad.nombre',
       categoria: 'categoria.nombre',
       gestion: 'gestion.anio',
     };
-    qb.orderBy(sortMap[ordenarPor] || 'f.nombre', orden as 'ASC' | 'DESC');
+    if (ordenarPor === 'ordenDesfile' || ordenarPor === 'ordenOficial' || ordenarPor === 'nombreFraternidad') {
+      // NULLS LAST: sin orden al final
+      qb.orderBy('f.orden_desfile', orden as 'ASC' | 'DESC', 'NULLS LAST').addOrderBy('f.nombre', 'ASC');
+    } else {
+      qb.orderBy(sortMap[ordenarPor] || 'f.orden_desfile', orden as 'ASC' | 'DESC');
+    }
 
     return qb;
   }
@@ -249,6 +280,7 @@ export class ReportesService implements OnModuleInit {
       idFraternidad: f.idFraternidad,
       idSolicitud: null as number | null,
       nombreFraternidad: f.nombre,
+      ordenDesfile: f.ordenDesfile ?? null,
       tipoDanza: f.tipoDanza?.nombre || '—',
       idTipoDanza: f.tipoDanza?.idTipoDanza || null,
       categoria: f.categoria?.nombre || '—',
@@ -280,6 +312,7 @@ export class ReportesService implements OnModuleInit {
       idFraternidad: s.fraternidadCreada?.idFraternidad || null,
       idSolicitud: s.idSolicitud,
       nombreFraternidad: s.fraternidadCreada?.nombre || s.nombreFraternidad,
+      ordenDesfile: s.fraternidadCreada?.ordenDesfile ?? null,
       tipoDanza: s.tipoDanza?.nombre || '—',
       idTipoDanza: s.tipoDanza?.idTipoDanza || null,
       categoria: s.categoria?.nombre || '—',
@@ -353,7 +386,7 @@ export class ReportesService implements OnModuleInit {
     }
 
     const orden = dto.orden === 'DESC' ? 'DESC' : 'ASC';
-    const ordenarPor = dto.ordenarPor || 'nombreFraternidad';
+    const ordenarPor = dto.ordenarPor || 'ordenDesfile';
     if (ordenarPor === 'tipoDanza') {
       qb.orderBy('tipoDanza.nombre', orden as 'ASC' | 'DESC');
     } else if (ordenarPor === 'facultad') {
@@ -364,12 +397,18 @@ export class ReportesService implements OnModuleInit {
       qb.orderBy('gestion.anio', orden as 'ASC' | 'DESC');
     } else if (ordenarPor === 'fechaSolicitud') {
       qb.orderBy('s.created_at', orden as 'ASC' | 'DESC');
+    } else if (
+      ordenarPor === 'ordenDesfile' ||
+      ordenarPor === 'ordenOficial' ||
+      ordenarPor === 'nombreFraternidad'
+    ) {
+      qb.orderBy('fraternidadCreada.orden_desfile', orden as 'ASC' | 'DESC', 'NULLS LAST')
+        .addOrderBy('fraternidadCreada.nombre', 'ASC')
+        .addOrderBy('s.nombre_fraternidad', 'ASC');
     } else {
-      // Evitar COALESCE en orderBy (TypeORM lo cita como columna y rompe el SQL)
-      qb.orderBy('fraternidadCreada.nombre', orden as 'ASC' | 'DESC').addOrderBy(
-        's.nombre_fraternidad',
-        orden as 'ASC' | 'DESC',
-      );
+      qb.orderBy('fraternidadCreada.orden_desfile', orden as 'ASC' | 'DESC', 'NULLS LAST')
+        .addOrderBy('fraternidadCreada.nombre', 'ASC')
+        .addOrderBy('s.nombre_fraternidad', 'ASC');
     }
 
     return qb;
@@ -412,17 +451,21 @@ export class ReportesService implements OnModuleInit {
     }
 
     const orden = dto.orden === 'DESC' ? -1 : 1;
-    const key = dto.ordenarPor || 'nombreFraternidad';
-    rows.sort((a, b) => {
-      if (key === 'fechaSolicitud') {
-        const ta = a.fechaSolicitud ? new Date(a.fechaSolicitud as any).getTime() : 0;
-        const tb = b.fechaSolicitud ? new Date(b.fechaSolicitud as any).getTime() : 0;
-        return (ta - tb) * orden;
-      }
-      const av = String((a as any)[key] ?? a.nombreFraternidad ?? '').toLowerCase();
-      const bv = String((b as any)[key] ?? b.nombreFraternidad ?? '').toLowerCase();
-      return av.localeCompare(bv, 'es') * orden;
-    });
+    const key = dto.ordenarPor || 'ordenDesfile';
+    if (this.esOrdenOficial(key) || key === 'ordenDesfile') {
+      this.sortRowsPorOrdenDesfile(rows, dto.orden === 'DESC');
+    } else {
+      rows.sort((a, b) => {
+        if (key === 'fechaSolicitud') {
+          const ta = a.fechaSolicitud ? new Date(a.fechaSolicitud as any).getTime() : 0;
+          const tb = b.fechaSolicitud ? new Date(b.fechaSolicitud as any).getTime() : 0;
+          return (ta - tb) * orden;
+        }
+        const av = String((a as any)[key] ?? a.nombreFraternidad ?? '').toLowerCase();
+        const bv = String((b as any)[key] ?? b.nombreFraternidad ?? '').toLowerCase();
+        return av.localeCompare(bv, 'es') * orden;
+      });
+    }
 
     const total = rows.length;
     const data = rows.slice(skip, skip + limit);
@@ -550,21 +593,36 @@ export class ReportesService implements OnModuleInit {
         }
       }
       const ordenDir = dto.orden === 'DESC' ? -1 : 1;
-      const keyDir = dto.ordenarPor || 'nombreFraternidad';
-      rows.sort((a, b) => {
-        if (keyDir === 'fechaSolicitud') {
-          const ta = a.fechaSolicitud ? new Date(a.fechaSolicitud).getTime() : 0;
-          const tb = b.fechaSolicitud ? new Date(b.fechaSolicitud).getTime() : 0;
-          const cmp = (ta - tb) * ordenDir;
+      const keyDir = dto.ordenarPor || 'ordenDesfile';
+      if (this.esOrdenOficial(keyDir)) {
+        this.sortRowsPorOrdenDesfile(rows, dto.orden === 'DESC');
+        rows.sort((a, b) => {
+          // Mantener cargos agrupados por fraternidad tras orden oficial
+          const byOrden = compareOrdenDesfileAsc(
+            a,
+            b,
+            (x) => x.nombreFraternidad || '',
+            (x) => Number(x.idFraternidad) || 0,
+          );
+          if (byOrden !== 0) return dto.orden === 'DESC' ? -byOrden : byOrden;
+          return String(a.cargo || '').localeCompare(String(b.cargo || ''), 'es');
+        });
+      } else {
+        rows.sort((a, b) => {
+          if (keyDir === 'fechaSolicitud') {
+            const ta = a.fechaSolicitud ? new Date(a.fechaSolicitud).getTime() : 0;
+            const tb = b.fechaSolicitud ? new Date(b.fechaSolicitud).getTime() : 0;
+            const cmp = (ta - tb) * ordenDir;
+            if (cmp !== 0) return cmp;
+            return String(a.nombreFraternidad || '').localeCompare(String(b.nombreFraternidad || ''), 'es');
+          }
+          const av = String(a[keyDir] ?? a.nombreFraternidad ?? '').toLowerCase();
+          const bv = String(b[keyDir] ?? b.nombreFraternidad ?? '').toLowerCase();
+          const cmp = av.localeCompare(bv, 'es') * ordenDir;
           if (cmp !== 0) return cmp;
-          return String(a.nombreFraternidad || '').localeCompare(String(b.nombreFraternidad || ''), 'es');
-        }
-        const av = String(a[keyDir] ?? a.nombreFraternidad ?? '').toLowerCase();
-        const bv = String(b[keyDir] ?? b.nombreFraternidad ?? '').toLowerCase();
-        const cmp = av.localeCompare(bv, 'es') * ordenDir;
-        if (cmp !== 0) return cmp;
-        return String(a.cargo || '').localeCompare(String(b.cargo || ''), 'es');
-      });
+          return String(a.cargo || '').localeCompare(String(b.cargo || ''), 'es');
+        });
+      }
       const total = rows.length;
       return {
         tipoReporte: dto.tipoReporte,
@@ -607,10 +665,14 @@ export class ReportesService implements OnModuleInit {
         const vb = dto.ordenarPor === 'puesto' ? b.puesto : b.puntajeFinal;
         return desc ? vb - va : va - vb;
       });
-    } else if (dto.ordenarPor === 'nombre' || dto.ordenarPor === 'nombreFraternidad') {
+    } else if (this.esOrdenOficial(dto.ordenarPor) || !dto.ordenarPor) {
+      this.sortRowsPorOrdenDesfile(grupos, dto.orden === 'DESC');
+    } else {
       const desc = dto.orden === 'DESC';
       grupos.sort((a, b) => {
-        const cmp = String(a.nombreFraternidad || '').localeCompare(String(b.nombreFraternidad || ''), 'es');
+        const av = String((a as any)[dto.ordenarPor!] ?? a.nombreFraternidad ?? '').toLowerCase();
+        const bv = String((b as any)[dto.ordenarPor!] ?? b.nombreFraternidad ?? '').toLowerCase();
+        const cmp = av.localeCompare(bv, 'es');
         return desc ? -cmp : cmp;
       });
     }
@@ -693,6 +755,7 @@ export class ReportesService implements OnModuleInit {
           idIncidencia: inc.idIncidencia,
           idFraternidad: frat.idFraternidad,
           nombreFraternidad: frat.nombre,
+          ordenDesfile: frat.ordenDesfile ?? null,
           tipoDanza: frat.tipoDanza?.nombre || '—',
           categoria: frat.categoria?.nombre || '—',
           instancia: frat.nivelRepresentacion || '—',
@@ -716,17 +779,31 @@ export class ReportesService implements OnModuleInit {
 
     const orden = dto.orden === 'ASC' ? 1 : -1;
     const key = dto.ordenarPor || 'fechaHora';
-    rows.sort((a, b) => {
-      if (key === 'fechaHora') {
-        return (new Date(a.fechaHora).getTime() - new Date(b.fechaHora).getTime()) * orden;
-      }
-      if (key === 'valorImpacto') {
-        return (a.valorImpacto - b.valorImpacto) * orden;
-      }
-      const av = String((a as any)[key] ?? a.nombreFraternidad ?? '').toLowerCase();
-      const bv = String((b as any)[key] ?? b.nombreFraternidad ?? '').toLowerCase();
-      return av.localeCompare(bv, 'es') * orden;
-    });
+    if (this.esOrdenOficial(key) && key !== 'fechaHora') {
+      this.sortRowsPorOrdenDesfile(rows, dto.orden === 'DESC');
+    } else {
+      rows.sort((a, b) => {
+        if (key === 'fechaHora') {
+          return (new Date(a.fechaHora).getTime() - new Date(b.fechaHora).getTime()) * orden;
+        }
+        if (key === 'valorImpacto') {
+          return (a.valorImpacto - b.valorImpacto) * orden;
+        }
+        if (key === 'ordenDesfile' || key === 'ordenOficial') {
+          return (
+            compareOrdenDesfileAsc(
+              a,
+              b,
+              (x) => x.nombreFraternidad || '',
+              (x) => Number(x.idFraternidad) || 0,
+            ) * orden
+          );
+        }
+        const av = String((a as any)[key] ?? a.nombreFraternidad ?? '').toLowerCase();
+        const bv = String((b as any)[key] ?? b.nombreFraternidad ?? '').toLowerCase();
+        return av.localeCompare(bv, 'es') * orden;
+      });
+    }
 
     let gestion: { anio?: number } | null = null;
     if (dto.idGestion) {
@@ -827,7 +904,9 @@ export class ReportesService implements OnModuleInit {
     );
 
     type CostoRow = {
+      idFraternidad?: number | null;
       nombreFraternidad: string;
+      ordenDesfile?: number | null;
       tipoDanza: string;
       categoria: string;
       facultad: string;
@@ -864,7 +943,9 @@ export class ReportesService implements OnModuleInit {
 
     for (const s of solicitudes) {
       pushCostos(s.costosParticipacion, {
+        idFraternidad: s.fraternidadCreada?.idFraternidad ?? null,
         nombreFraternidad: s.fraternidadCreada?.nombre || s.nombreFraternidad || '—',
+        ordenDesfile: s.fraternidadCreada?.ordenDesfile ?? null,
         tipoDanza: s.tipoDanza?.nombre || '—',
         categoria: s.categoria?.nombre || '—',
         facultad: s.facultad?.nombre || '—',
@@ -880,7 +961,9 @@ export class ReportesService implements OnModuleInit {
     for (const f of fraternidades) {
       if (idsFratDesdeSolicitud.has(f.idFraternidad)) continue;
       pushCostos(f.costosParticipacion as any, {
+        idFraternidad: f.idFraternidad,
         nombreFraternidad: f.nombre,
+        ordenDesfile: f.ordenDesfile ?? null,
         tipoDanza: f.tipoDanza?.nombre || '—',
         categoria: f.categoria?.nombre || '—',
         facultad: f.facultad?.nombre || '—',
@@ -893,30 +976,34 @@ export class ReportesService implements OnModuleInit {
       });
     }
 
-    const ordenarPor = dto.ordenarPor || 'nombreFraternidad';
+    const ordenarPor = dto.ordenarPor || 'ordenDesfile';
     const desc = dto.orden === 'DESC';
-    rows.sort((a, b) => {
-      let va: string | number = a.nombreFraternidad;
-      let vb: string | number = b.nombreFraternidad;
-      if (ordenarPor === 'monto') {
-        va = a.monto;
-        vb = b.monto;
-      } else if (ordenarPor === 'tipoDanza') {
-        va = a.tipoDanza;
-        vb = b.tipoDanza;
-      } else if (ordenarPor === 'concepto') {
-        va = a.concepto;
-        vb = b.concepto;
-      } else if (ordenarPor === 'estructura') {
-        va = a.estructura;
-        vb = b.estructura;
-      }
-      if (typeof va === 'number' && typeof vb === 'number') {
-        return desc ? vb - va : va - vb;
-      }
-      const cmp = String(va).localeCompare(String(vb), 'es');
-      return desc ? -cmp : cmp;
-    });
+    if (this.esOrdenOficial(ordenarPor) || ordenarPor === 'ordenDesfile') {
+      this.sortRowsPorOrdenDesfile(rows, desc);
+    } else {
+      rows.sort((a, b) => {
+        let va: string | number = a.nombreFraternidad;
+        let vb: string | number = b.nombreFraternidad;
+        if (ordenarPor === 'monto') {
+          va = a.monto;
+          vb = b.monto;
+        } else if (ordenarPor === 'tipoDanza') {
+          va = a.tipoDanza;
+          vb = b.tipoDanza;
+        } else if (ordenarPor === 'concepto') {
+          va = a.concepto;
+          vb = b.concepto;
+        } else if (ordenarPor === 'estructura') {
+          va = a.estructura;
+          vb = b.estructura;
+        }
+        if (typeof va === 'number' && typeof vb === 'number') {
+          return desc ? vb - va : va - vb;
+        }
+        const cmp = String(va).localeCompare(String(vb), 'es');
+        return desc ? -cmp : cmp;
+      });
+    }
 
     let gestion: { anio?: number } | null = null;
     if (dto.idGestion) {
@@ -1071,14 +1158,19 @@ export class ReportesService implements OnModuleInit {
       );
     }
 
-    const ordenarPor = dto.ordenarPor || 'nombre';
+    const ordenarPor = dto.ordenarPor || 'ordenDesfile';
     const orden = dto.orden === 'DESC' ? 'DESC' : 'ASC';
-    // Chacha: priorizar fraternidad (+ tipo) en SQL para no separar la pareja
+    // Chacha / orden oficial: priorizar fraternidad (+ tipo) para no separar la pareja
     if (
       dto.plantillaRequisitos === PlantillaConcursoExterno.CHACHA_WARMI ||
-      ordenarPor === 'nombreFraternidad'
+      ordenarPor === 'nombreFraternidad' ||
+      ordenarPor === 'ordenDesfile' ||
+      ordenarPor === 'ordenOficial'
     ) {
-      qb.orderBy('frat.nombre', orden).addOrderBy('p.tipo', 'ASC').addOrderBy('p.nombre', 'ASC');
+      qb.orderBy('frat.orden_desfile', orden, 'NULLS LAST')
+        .addOrderBy('frat.nombre', 'ASC')
+        .addOrderBy('p.tipo', 'ASC')
+        .addOrderBy('p.nombre', 'ASC');
     } else {
       const orderMap: Record<string, string> = {
         nombre: 'p.nombre',
@@ -1149,6 +1241,8 @@ export class ReportesService implements OnModuleInit {
         idParticipante: p.idParticipante,
         idInscripcion: insc?.idInscripcion ?? null,
         idFraternidad: p.fraternidad?.idFraternidad || insc?.fraternidad?.idFraternidad || null,
+        ordenDesfile:
+          p.fraternidad?.ordenDesfile ?? insc?.fraternidad?.ordenDesfile ?? null,
         nombre: p.nombre,
         tipo: p.tipo || 'Participante',
         nombreFraternidad,
@@ -1196,11 +1290,13 @@ export class ReportesService implements OnModuleInit {
           const concursoCmp = String(a.concurso || '').localeCompare(String(b.concurso || ''), 'es');
           if (concursoCmp !== 0) return concursoCmp;
 
-          const fratCmp = String(a.nombreFraternidad || '').localeCompare(
-            String(b.nombreFraternidad || ''),
-            'es',
+          const ordenCmp = compareOrdenDesfileAsc(
+            a,
+            b,
+            (x) => x.nombreFraternidad || '',
+            (x) => Number(x.idFraternidad) || 0,
           );
-          if (fratCmp !== 0) return desc ? -fratCmp : fratCmp;
+          if (ordenCmp !== 0) return desc ? -ordenCmp : ordenCmp;
         }
 
         const idA = a.idInscripcion ?? a.idFraternidad ?? a.idParticipante;

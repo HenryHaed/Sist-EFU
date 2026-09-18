@@ -16,7 +16,11 @@ import { CreateFraternidadDto, UpdateFraternidadDto } from './dto/fraternidad.dt
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 import { buildMiembrosDirectiva } from '../common/personas-directiva';
-import { compareFechaAsc, compareTextoEs } from '../common/orden-por-fecha';
+import { compareFechaAsc, compareTextoEs, compareOrdenDesfileAsc } from '../common/orden-por-fecha';
+import {
+  ORDEN_DESFILE_SUGERIDO,
+  normalizarNombreFraternidad,
+} from '../common/orden-desfile-fraternidades';
 
 @Injectable()
 export class FraternidadesService {
@@ -51,7 +55,7 @@ export class FraternidadesService {
         ...(gestion ? { gestion: { idGestion: gestion.idGestion } } : {}),
       },
       relations: ['facultad', 'carrera', 'institucionExterna', 'categoria', 'tipoDanza'],
-      order: { nombre: 'ASC' },
+      order: { ordenDesfile: 'ASC', nombre: 'ASC' },
     });
 
     const ids = fraternidades.map((f) => f.idFraternidad);
@@ -90,14 +94,99 @@ export class FraternidadesService {
     });
 
     enriquecidas.sort((a, b) => {
+      const byOrden = compareOrdenDesfileAsc(a, b);
+      if (byOrden !== 0) return byOrden;
       const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
       if (byFecha !== 0) return byFecha;
-      const byNombre = compareTextoEs(a.nombre, b.nombre);
-      if (byNombre !== 0) return byNombre;
       return a.idFraternidad - b.idFraternidad;
     });
 
     return enriquecidas;
+  }
+
+  /**
+   * Guarda el orden oficial (drag-and-drop). `ids` = orden de idFraternidad de primero a último.
+   */
+  async guardarOrdenDesfile(ids: number[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('Envía el arreglo ordenado de idFraternidad.');
+    }
+    const uniq = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
+    if (uniq.length !== ids.length) {
+      throw new BadRequestException('La lista de IDs tiene duplicados o valores inválidos.');
+    }
+
+    const existentes = await this.fraternidadRepo.find({
+      where: { idFraternidad: In(uniq) },
+      select: ['idFraternidad'],
+    });
+    if (existentes.length !== uniq.length) {
+      throw new BadRequestException('Uno o más IDs de fraternidad no existen.');
+    }
+
+    await this.fraternidadRepo.manager.transaction(async (em) => {
+      for (let i = 0; i < uniq.length; i++) {
+        await em.update(Fraternidad, { idFraternidad: uniq[i] }, { ordenDesfile: i + 1 });
+      }
+    });
+
+    return { ok: true, total: uniq.length };
+  }
+
+  /**
+   * Si ninguna fraternidad de la gestión tiene orden_desfile, siembra con la lista sugerida (por nombre).
+   * No sobrescribe un orden ya guardado.
+   */
+  async sembrarOrdenDesfileSugerido(forzar = false) {
+    const gestion = await this.getGestionActiva();
+    const where: any = gestion ? { gestion: { idGestion: gestion.idGestion } } : {};
+    const frats = await this.fraternidadRepo.find({ where, select: ['idFraternidad', 'nombre', 'ordenDesfile'] });
+    if (!frats.length) return { ok: true, sembradas: 0, mensaje: 'Sin fraternidades' };
+
+    const algunaConOrden = frats.some((f) => f.ordenDesfile != null);
+    if (algunaConOrden && !forzar) {
+      return {
+        ok: true,
+        sembradas: 0,
+        mensaje: 'Ya existe un orden guardado. Usa forzar=true para sobrescribir con la lista sugerida.',
+      };
+    }
+
+    const porNombre = new Map<string, Fraternidad>();
+    for (const f of frats) {
+      porNombre.set(normalizarNombreFraternidad(f.nombre), f);
+    }
+
+    const ordenados: Fraternidad[] = [];
+    const usados = new Set<number>();
+    for (const nombre of ORDEN_DESFILE_SUGERIDO) {
+      const f = porNombre.get(normalizarNombreFraternidad(nombre));
+      if (f && !usados.has(f.idFraternidad)) {
+        ordenados.push(f);
+        usados.add(f.idFraternidad);
+      }
+    }
+    const resto = frats
+      .filter((f) => !usados.has(f.idFraternidad))
+      .sort((a, b) => compareTextoEs(a.nombre, b.nombre));
+    const finalList = [...ordenados, ...resto];
+
+    await this.fraternidadRepo.manager.transaction(async (em) => {
+      for (let i = 0; i < finalList.length; i++) {
+        await em.update(
+          Fraternidad,
+          { idFraternidad: finalList[i].idFraternidad },
+          { ordenDesfile: i + 1 },
+        );
+      }
+    });
+
+    return {
+      ok: true,
+      sembradas: finalList.length,
+      coincidenciasLista: ordenados.length,
+      sinCoincidencia: resto.length,
+    };
   }
 
   async buscar(q: string) {
@@ -202,6 +291,13 @@ export class FraternidadesService {
       categoria: { idCategoria } as any,
       gestion: gestion ? { idGestion: gestion.idGestion } as any : null
     });
+
+    const maxRow = await this.fraternidadRepo
+      .createQueryBuilder('f')
+      .select('MAX(f.orden_desfile)', 'max')
+      .getRawOne<{ max: string | null }>();
+    const maxOrden = maxRow?.max != null ? Number(maxRow.max) : 0;
+    fraternidad.ordenDesfile = (Number.isFinite(maxOrden) ? maxOrden : 0) + 1;
 
     return this.fraternidadRepo.save(fraternidad);
   }

@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany } from 'typeorm';
 import { Gestion } from './Gestion';
 import { Fase } from './Fase';
+import { Jurado } from './Jurado';
 
 @Entity('criterios')
 export class Criterio {
@@ -21,6 +22,13 @@ export class Criterio {
     @Column({ name: 'puntaje_maximo', type: 'decimal', precision: 5, scale: 2 })
     puntajeMaximo: number;
 
+    /**
+     * Techo visual para el Controlador (ej. 6).
+     * notaReal = (notaVisual / escalaVisual) * puntajeMaximo
+     */
+    @Column({ name: 'escala_visual', type: 'decimal', precision: 5, scale: 2, default: 6 })
+    escalaVisual: number;
+
     @Column({ name: 'url_imagen', length: 500, nullable: true })
     urlImagen: string;
 
@@ -29,4 +37,7 @@ export class Criterio {
 
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
+
+    @ManyToMany(() => Jurado, (jurado) => jurado.criteriosAsignados)
+    juradosAsignados: Jurado[];
 }

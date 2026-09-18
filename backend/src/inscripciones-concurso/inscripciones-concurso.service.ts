@@ -387,6 +387,7 @@ export class InscripcionesConcursoService {
       idFraternidad: frat.idFraternidad,
       nombre: frat.nombre,
       habilitadoEfu: frat.habilitadoEfu,
+      ordenDesfile: frat.ordenDesfile ?? null,
     };
   }
 

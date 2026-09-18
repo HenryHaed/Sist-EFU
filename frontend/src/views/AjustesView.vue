@@ -231,6 +231,26 @@
               </div>
               <input type="checkbox" v-model="gestion.mostrarRankingConcursosExternos" class="toggle-checkbox shrink-0 mt-0.5" />
             </div>
+
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-xs font-black text-slate-800 uppercase leading-snug">Bandera amarilla</p>
+                <p class="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
+                  Si se apaga, el botón de bandera amarilla no aparece en Calificar Disciplina.
+                </p>
+              </div>
+              <input type="checkbox" v-model="gestion.banderasAmarillaHabilitada" class="toggle-checkbox shrink-0 mt-0.5" />
+            </div>
+
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-xs font-black text-slate-800 uppercase leading-snug">Bandera roja</p>
+                <p class="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
+                  Si se apaga, el botón de bandera roja no aparece en Calificar Disciplina.
+                </p>
+              </div>
+              <input type="checkbox" v-model="gestion.banderasRojaHabilitada" class="toggle-checkbox shrink-0 mt-0.5" />
+            </div>
           </div>
 
           <div
@@ -1219,6 +1239,8 @@ const gestion = ref({
   mostrarHistorico: false,
   mostrarRankingEstadisticas: true,
   mostrarRankingConcursosExternos: true,
+  banderasAmarillaHabilitada: true,
+  banderasRojaHabilitada: true,
   rankingConcursosOcultos: [],
   permiteInscripcionPublica: false,
   nominaExcelInicio: '',
@@ -1325,6 +1347,8 @@ const loadGestion = async (idGestion = null) => {
       data.mostrarHistorico = data.mostrarHistorico === true
       data.mostrarRankingEstadisticas = data.mostrarRankingEstadisticas !== false
       data.mostrarRankingConcursosExternos = data.mostrarRankingConcursosExternos !== false
+      data.banderasAmarillaHabilitada = data.banderasAmarillaHabilitada !== false
+      data.banderasRojaHabilitada = data.banderasRojaHabilitada !== false
       data.rankingConcursosOcultos = Array.isArray(data.rankingConcursosOcultos)
         ? data.rankingConcursosOcultos.map((id) => Number(id)).filter((id) => Number.isFinite(id))
         : []

@@ -56,6 +56,23 @@ export class FraternidadesController {
     return this.fraternidadesService.buscar(q || '');
   }
 
+  @Post('orden')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Guardar orden oficial de desfile (lista ordenada de idFraternidad)' })
+  guardarOrden(@Body() body: { ids: number[] }) {
+    return this.fraternidadesService.guardarOrdenDesfile(body?.ids || []);
+  }
+
+  @Post('orden/sembrar-sugerido')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({
+    summary:
+      'Siembra orden_desfile desde la lista sugerida por nombre. No sobrescribe salvo forzar=true.',
+  })
+  sembrarOrden(@Body() body: { forzar?: boolean }) {
+    return this.fraternidadesService.sembrarOrdenDesfileSugerido(!!body?.forzar);
+  }
+
   @Post('reparar-nombres')
   @Roles('superusuario', 'admin')
   @ApiOperation({

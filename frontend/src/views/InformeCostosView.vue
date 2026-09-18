@@ -55,6 +55,7 @@
         <div>
           <label class="label-xs">Ordenar por</label>
           <select v-model="filtros.ordenarPor" class="form-input !py-2 !text-sm">
+            <option value="ordenDesfile">Orden oficial</option>
             <option value="nombreFraternidad">Fraternidad</option>
             <option value="tipoDanza">Tipo de danza</option>
             <option value="concepto">Concepto</option>
@@ -267,7 +268,7 @@ const filtros = ref({
   idTipoDanza: null,
   idCategoria: null,
   busqueda: '',
-  ordenarPor: 'nombreFraternidad',
+  ordenarPor: 'ordenDesfile',
   orden: 'ASC',
   page: 1,
   limit: 50,

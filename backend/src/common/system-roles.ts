@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 export const SYSTEM_ROLES = [
   { nombre: 'superusuario', descripcion: 'Dueño del sistema. Acceso total.' },
   { nombre: 'admin', descripcion: 'Administrador general del evento y gestión de usuarios.' },
-  { nombre: 'controladorhcu', descripcion: 'Control de asistencia y disciplina.' },
+  { nombre: 'controladorhcu', descripcion: 'Controlador: asistencia y disciplina.' },
   { nombre: 'delegado', descripcion: 'Delegado de fraternidad.' },
   { nombre: 'jurado', descripcion: 'Jurado calificador del evento.' },
   {

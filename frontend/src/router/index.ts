@@ -6,6 +6,7 @@ import Dashboard from '../views/Dashboard.vue';
 import RegistroDelegadoView from '../views/RegistroDelegadoView.vue';
 import OlvideContrasenaView from '../views/OlvideContrasenaView.vue';
 import RestablecerContrasenaView from '../views/RestablecerContrasenaView.vue';
+import ValidarCredencialView from '../views/ValidarCredencialView.vue';
 
 const routes = [
   { path: '/', component: LandingView },
@@ -13,6 +14,7 @@ const routes = [
   { path: '/registro-delegado', component: RegistroDelegadoView },
   { path: '/olvide-contrasena', component: OlvideContrasenaView },
   { path: '/restablecer-contrasena', component: RestablecerContrasenaView },
+  { path: '/validar-credencial', component: ValidarCredencialView },
   { 
     path: '/dashboard', 
     component: Dashboard,

@@ -9,7 +9,7 @@
       >
         <div class="p-4 sm:p-6 flex flex-col h-full overflow-y-auto">
           <!-- Logo/Brand -->
-          <div class="flex items-center gap-3 mb-6 sm:mb-10">
+          <div class="flex items-center gap-3 mb-4">
             <div v-if="siteInfo.urlLogo" class="size-12 overflow-hidden rounded-lg flex items-center justify-center border-2 border-primary shadow-sm bg-white dark:bg-slate-800">
               <img :src="siteInfo.urlLogo" class="size-full object-contain" alt="Logo" />
             </div>
@@ -25,6 +25,31 @@
               </p>
             </div>
           </div>
+
+          <!-- Perfil usuario (abre sección de información) -->
+          <button
+            type="button"
+            @click="setVista('mi_perfil')"
+            class="w-full mb-6 text-left group"
+          >
+            <div
+              class="bg-white dark:bg-slate-800 p-3.5 rounded-xl border shadow-[2px_2px_0px_0px_#e2e8f0] dark:shadow-none transition-all"
+              :class="vistaActual === 'mi_perfil'
+                ? 'border-primary ring-2 ring-primary/15'
+                : 'border-slate-200 dark:border-slate-600 group-hover:border-primary/40'"
+            >
+              <div class="flex items-center gap-3">
+                <div class="size-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border-2 border-slate-200 shrink-0">
+                  <span class="material-symbols-outlined text-2xl">account_circle</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-bold text-primary truncate">{{ nombreSidebar }}</p>
+                  <p class="text-[10px] text-slate-500 uppercase font-black tracking-tighter truncate">{{ rolSidebar }}</p>
+                </div>
+                <span class="material-symbols-outlined text-slate-300 text-[18px] group-hover:text-primary transition-colors">chevron_right</span>
+              </div>
+            </div>
+          </button>
 
           <!-- Navigation Links -->
           <nav class="flex-1 space-y-1">
@@ -223,7 +248,7 @@
                   class="flex items-center gap-2 py-2 text-xs transition-colors text-left w-full"
                 >
                   <span class="material-symbols-outlined text-[16px]">admin_panel_settings</span>
-                  Controladores HCU
+                  Controladores
                 </button>
                 <button
                   @click="setVista('usuarios_delegado')"
@@ -359,21 +384,6 @@
               <span class="text-sm">Cerrar sesión</span>
             </button>
           </nav>
-
-          <!-- User Profile -->
-          <div class="mt-auto pt-6 border-t border-slate-100 dark:border-slate-700">
-            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-600 shadow-[2px_2px_0px_0px_#e2e8f0] dark:shadow-none">
-              <div class="flex items-center gap-3">
-                <div class="size-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border-2 border-slate-200">
-                  <span class="material-symbols-outlined text-2xl">account_circle</span>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-primary">{{ currentUser ? currentUser.nombres : 'Cargando...' }}</p>
-                  <p class="text-[10px] text-slate-500 uppercase font-black tracking-tighter">{{ currentUser ? currentUser.rol : '-' }}</p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </aside>
 
@@ -448,6 +458,11 @@
               v-if="vistaActual === 'estadisticas'"
               key="estadisticas"
               @ir-calificar="setVista('seleccionar_fase')"
+            />
+
+            <MiPerfilView
+              v-else-if="vistaActual === 'mi_perfil'"
+              key="mi_perfil"
             />
 
             <!-- Vista: Nueva Selección Inteligente de Fase -->
@@ -808,10 +823,12 @@ import FichaTecnicaMonografiaView from './FichaTecnicaMonografiaView.vue'
 import AdminFichasTecnicasView from './AdminFichasTecnicasView.vue'
 import AdminNominasExcelView from './AdminNominasExcelView.vue'
 import VeedorMonografiasView from './VeedorMonografiasView.vue'
+import MiPerfilView from './MiPerfilView.vue'
 
 import { getImageUrl } from '../utils/url'
 import { applySiteTitle } from '../utils/siteTitle'
 import { isPasswordPolicyValid, getPasswordPolicyErrors, getPasswordStrength } from '../utils/passwordPolicy'
+import { etiquetaRol, nombreCompletoUsuario } from '../utils/roles'
 import { useTheme } from 'vuetify'
 
 const router = useRouter()
@@ -852,6 +869,10 @@ const changingPass = ref(false)
 
 // User data from store
 const currentUser = computed(() => authStore.user)
+const nombreSidebar = computed(() =>
+  nombreCompletoUsuario(currentUser.value) || currentUser.value?.nombres || 'Cargando...',
+)
+const rolSidebar = computed(() => etiquetaRol(currentUser.value?.rol).titulo)
 const esDelegado = computed(() => authStore.userRole?.toLowerCase() === 'delegado')
 const citasDelegado = ref([])
 
@@ -1017,13 +1038,14 @@ const tituloVista = computed(() => {
   if (vistaActual.value.startsWith('usuarios_')) {
     const rol = vistaActual.value.replace('usuarios_', '')
     if (rol === 'admin') return 'Gestión de Administradores'
-    if (rol === 'controladorhcu') return 'Gestión de Controladores HCU'
+    if (rol === 'controladorhcu') return 'Gestión de Controladores'
     if (rol === 'veedor') return 'Gestión de Veedores'
     return `Gestión de ${rol.charAt(0).toUpperCase() + rol.slice(1)}s`
   }
 
   const titulos = {
     estadisticas: 'Panel de Estadísticas',
+    mi_perfil: 'Mi perfil',
     seleccionar_fase: 'Calificación de Fraternidades',
     seleccionar_concurso: 'Calificación de Concursos',
     fraternidades_crud: 'Listado de Fraternidades',

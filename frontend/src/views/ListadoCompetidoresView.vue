@@ -371,7 +371,7 @@ const busqueda = ref('')
 const vista = ref('lista') // 'lista' | 'fraternidades' | 'pareja'
 const fraternidadActiva = ref(null)
 const plantillaDesdeApi = ref(null)
-const ordenCriterio = ref('fechaSolicitud')
+const ordenCriterio = ref('ordenOficial')
 const ordenDir = ref('asc')
 const opcionesOrden = ORDEN_CRITERIOS
 
@@ -428,6 +428,7 @@ const fraternidadesGrupos = computed(() => {
         fecha: (x) => x.fechaSolicitud,
         nombre: (x) => x.nombre,
         instancia: (x) => x.instanciaRepresentacion,
+        orden: (x) => x.ordenDesfile,
         id: (x) => x.idFraternidad || 0,
       },
     )
@@ -443,6 +444,7 @@ const fraternidadesGrupos = computed(() => {
         nombre: p.fraternidad || 'Sin fraternidad',
         instanciaRepresentacion: p.instanciaRepresentacion || null,
         fechaSolicitud: p.fechaSolicitud || null,
+        ordenDesfile: p.ordenDesfile ?? null,
         nombresPareja: [],
         estadoEvaluacion: p.estadoEvaluacion,
         puntajeActual: p.puntajeActual,
@@ -451,6 +453,7 @@ const fraternidadesGrupos = computed(() => {
     }
     const g = map.get(key)
     g.participantes.push(p)
+    if (p.ordenDesfile != null && g.ordenDesfile == null) g.ordenDesfile = p.ordenDesfile
     if (p.nombre && !g.nombresPareja.includes(p.nombre)) g.nombresPareja.push(p.nombre)
     if (p.fechaSolicitud && (!g.fechaSolicitud || new Date(p.fechaSolicitud) < new Date(g.fechaSolicitud))) {
       g.fechaSolicitud = p.fechaSolicitud
@@ -460,6 +463,7 @@ const fraternidadesGrupos = computed(() => {
     fecha: (x) => x.fechaSolicitud,
     nombre: (x) => x.nombre,
     instancia: (x) => x.instanciaRepresentacion,
+    orden: (x) => x.ordenDesfile,
     id: (x) => x.idFraternidad || 0,
   })
 })
@@ -479,6 +483,7 @@ const participantesVista = computed(() => {
     fecha: (x) => x.fechaSolicitud,
     nombre: (x) => x.nombre,
     instancia: (x) => x.instanciaRepresentacion || x.fraternidad,
+    orden: (x) => x.ordenDesfile,
     id: (x) => x.idParticipante,
   })
 })

@@ -528,7 +528,7 @@ const filtros = ref({
   idCategoria: null,
   instanciaRepresentacion: null,
   busqueda: '',
-  ordenarPor: 'nombreFraternidad',
+  ordenarPor: 'ordenDesfile',
   orden: 'ASC',
   page: 1,
   limit: 50,
@@ -614,7 +614,7 @@ const esFiltroChachaActivo = computed(() => {
 const onPlantillaExternaChange = () => {
   filtros.value.idFase = null
   if (filtros.value.plantillaRequisitos === 'chacha_warmi') {
-    filtros.value.ordenarPor = 'nombreFraternidad'
+    filtros.value.ordenarPor = 'ordenDesfile'
   }
 }
 
@@ -792,6 +792,7 @@ const filasMatrizGrupo = (grupo) => {
 const opcionesOrden = computed(() => {
   if (filtros.value.tipoReporte === 'concursantes_externos') {
     return [
+      { value: 'ordenDesfile', label: 'Orden oficial' },
       { value: 'nombre', label: 'Nombre concursante' },
       { value: 'nombreFraternidad', label: 'Fraternidad' },
       { value: 'concurso', label: 'Concurso' },
@@ -800,6 +801,7 @@ const opcionesOrden = computed(() => {
     ]
   }
   const base = [
+    { value: 'ordenDesfile', label: 'Orden oficial' },
     { value: 'nombreFraternidad', label: 'Nombre fraternidad' },
     { value: 'tipoDanza', label: 'Tipo de danza' },
     { value: 'facultad', label: 'Facultad' },
@@ -809,21 +811,23 @@ const opcionesOrden = computed(() => {
   if (filtros.value.tipoReporte === 'calificaciones') {
     // Calificaciones: sin fecha de solicitud de inscripción
     return [
+      { value: 'puesto', label: 'Puesto' },
+      { value: 'puntajeFinal', label: 'Puntaje final' },
+      { value: 'ordenDesfile', label: 'Orden oficial' },
       { value: 'nombreFraternidad', label: 'Nombre fraternidad' },
       { value: 'tipoDanza', label: 'Tipo de danza' },
       { value: 'facultad', label: 'Facultad' },
       { value: 'categoria', label: 'Categoría' },
-      { value: 'puntajeFinal', label: 'Puntaje final' },
-      { value: 'puesto', label: 'Puesto' },
     ]
   }
   if (filtros.value.tipoReporte === 'disciplina') {
     return [
+      { value: 'fechaHora', label: 'Fecha' },
+      { value: 'ordenDesfile', label: 'Orden oficial' },
       { value: 'nombreFraternidad', label: 'Nombre fraternidad' },
       { value: 'tipoDanza', label: 'Tipo de danza' },
       { value: 'facultad', label: 'Facultad' },
       { value: 'categoria', label: 'Categoría' },
-      { value: 'fechaHora', label: 'Fecha' },
       { value: 'tipoLabel', label: 'Tipo de incidencia' },
       { value: 'valorImpacto', label: 'Impacto' },
     ]
@@ -884,12 +888,12 @@ const seleccionarTipo = (id) => {
     filtros.value.ordenarPor = 'fechaHora'
     filtros.value.orden = 'DESC'
   } else if (id === 'concursantes_externos') {
-    filtros.value.ordenarPor = 'nombreFraternidad'
+    filtros.value.ordenarPor = 'ordenDesfile'
     filtros.value.orden = 'ASC'
     filtros.value.plantillaRequisitos = 'todos'
     filtros.value.idFase = null
   } else {
-    filtros.value.ordenarPor = 'nombreFraternidad'
+    filtros.value.ordenarPor = 'ordenDesfile'
     filtros.value.orden = 'ASC'
   }
   if (id !== 'fraternidades') {

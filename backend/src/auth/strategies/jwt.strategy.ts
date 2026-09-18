@@ -33,6 +33,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload?.purpose === 'password_reset') {
       throw new UnauthorizedException('Token de recuperación no válido para esta operación.');
     }
+    if (payload?.purpose === 'credencial') {
+      throw new UnauthorizedException('Token de credencial no válido para esta operación.');
+    }
 
     const usuario = await this.usuarioRepo.findOne({
       where: { idUsuario: payload.sub },

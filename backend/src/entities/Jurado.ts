@@ -5,6 +5,7 @@ import { Carrera } from './Carrera';
 import { Evaluacion } from './Evaluacion';
 import { Fase } from './Fase';
 import { Fraternidad } from './Fraternidad';
+import { Criterio } from './Criterio';
 
 @Entity('jurados')
 export class Jurado {
@@ -56,4 +57,13 @@ export class Jurado {
         inverseJoinColumn: { name: 'id_fraternidad', referencedColumnName: 'idFraternidad' }
     })
     fraternidadesHabilitadas: Fraternidad[];
+
+    /** Criterios de disciplina asignados a este controlador/jurado. */
+    @ManyToMany(() => Criterio, (criterio) => criterio.juradosAsignados)
+    @JoinTable({
+        name: 'jurado_criterios',
+        joinColumn: { name: 'id_jurado', referencedColumnName: 'idJurado' },
+        inverseJoinColumn: { name: 'id_criterio', referencedColumnName: 'idCriterio' },
+    })
+    criteriosAsignados: Criterio[];
 }

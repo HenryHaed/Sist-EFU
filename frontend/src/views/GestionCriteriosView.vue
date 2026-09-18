@@ -87,8 +87,11 @@
             </td>
             <td class="px-8 py-4">
               <span class="bg-primary/5 text-primary border border-primary/20 px-3 py-1 rounded-lg font-black text-sm">
-                {{ Number(c.puntajeMaximo) }}%
+                {{ Number(c.puntajeMaximo) }} pts
               </span>
+              <p v-if="esFaseDisciplina" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                Escala visual: {{ Number(c.escalaVisual ?? 6) }}
+              </p>
             </td>
             <td class="px-8 py-4">
                <div v-if="c.urlImagen" class="size-12 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-inner group-hover:scale-110 transition-transform cursor-pointer" @click="previsualizarImagen(c.urlImagen)" title="Ver imagen">
@@ -137,7 +140,7 @@
               <p class="font-bold text-slate-800 text-base leading-tight mb-1">{{ c.nombre }}</p>
               <div class="flex items-center gap-2">
                 <span class="bg-primary/5 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-black">
-                  {{ Number(c.puntajeMaximo) }}%
+                  {{ Number(c.puntajeMaximo) }} pts
                 </span>
                 <span class="text-[9px] uppercase font-black text-slate-400 tracking-widest">Fase: {{ fase?.nombre }}</span>
               </div>
@@ -170,6 +173,62 @@
         </div>
       </div>
     </div>
+
+    <!-- Asignación criterios → controladores (solo disciplina) -->
+    <div v-if="esFaseDisciplina && esActiva" class="mt-8 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/80">
+        <h3 class="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+          <span class="material-symbols-outlined text-[18px]">group</span>
+          Asignar criterios a controladores
+        </h3>
+        <p class="text-xs text-slate-500 font-medium mt-1">
+          Cada controlador solo verá y calificará los criterios que le marques. Guarda por controlador.
+        </p>
+      </div>
+      <div v-if="!controladoresFase.length" class="p-8 text-center text-slate-400 text-sm">
+        Asigna controladores a esta fase en Gestión de Fases primero.
+      </div>
+      <div v-else class="divide-y divide-slate-100">
+        <div v-for="ctrl in controladoresFase" :key="ctrl.idJurado" class="p-5 sm:p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div>
+              <p class="font-bold text-slate-800">{{ ctrl.nombre }}</p>
+              <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600">Controlador · CI {{ ctrl.ci || '—' }}</p>
+            </div>
+            <button
+              type="button"
+              :disabled="guardandoAsignacion === ctrl.idJurado"
+              @click="guardarAsignacionControlador(ctrl)"
+              class="px-4 py-2 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-50"
+            >
+              {{ guardandoAsignacion === ctrl.idJurado ? 'Guardando…' : 'Guardar asignación' }}
+            </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <label
+              v-for="c in criterios"
+              :key="`${ctrl.idJurado}-${c.idCriterio}`"
+              class="flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer text-sm"
+              :class="(asignacionDraft[ctrl.idJurado] || []).includes(c.idCriterio)
+                ? 'border-primary/40 bg-primary/5'
+                : 'border-slate-100 hover:border-slate-200'"
+            >
+              <input
+                type="checkbox"
+                class="mt-0.5 accent-primary"
+                :checked="(asignacionDraft[ctrl.idJurado] || []).includes(c.idCriterio)"
+                @change="toggleCriterioAsignado(ctrl.idJurado, c.idCriterio, $event.target.checked)"
+              />
+              <span class="min-w-0">
+                <span class="font-bold text-slate-700 block truncate">{{ c.nombre }}</span>
+                <span class="text-[9px] text-slate-400 font-black uppercase">{{ Number(c.puntajeMaximo) }} pts · escala {{ Number(c.escalaVisual ?? 6) }}</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Banner de solo lectura -->
     <div v-if="!esActiva" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-amber-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-sm font-bold">
       <span class="material-symbols-outlined text-xl">history</span>
@@ -204,20 +263,20 @@
 
             <div>
               <div class="flex items-center justify-between mb-2">
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500">Puntaje / Peso (%) *</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500">Puntaje máximo (pts reales) *</label>
                 <div class="flex items-center gap-1.5 text-[10px] font-black">
                   <span :class="disponiblePuntajeCalc < 0 ? 'text-secondary' : 'text-primary' " class="transition-colors">
                     {{ disponiblePuntajeCalc < 0 ? '⚠ Exceso sobre Fase:' : 'Disponible en Fase:' }}
-                    {{ Math.max(0, disponiblePuntajeCalc).toFixed(1) }}%
+                    {{ Math.max(0, disponiblePuntajeCalc).toFixed(1) }}
                   </span>
                 </div>
               </div>
               <div class="relative">
-                 <input v-model.number="form.puntajeMaximo" type="number" 
+                 <input v-model.number="form.puntajeMaximo" type="number" step="0.01" min="0"
                    :class="disponiblePuntajeCalc < 0 ? 'border-secondary bg-red-50 text-secondary' : 'border-slate-100 bg-slate-50 focus:border-primary text-primary'"
                    class="w-full px-5 py-4 border-2 rounded-xl outline-none font-black text-2xl transition-all shadow-inner" 
                  />
-                 <span class="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xl">%</span>
+                 <span class="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xl">pts</span>
               </div>
               
               <!-- Mini barra de progreso en modal -->
@@ -230,10 +289,30 @@
                    ></div>
                  </div>
                  <div class="flex justify-between text-[8px] font-black text-slate-300 uppercase tracking-tighter mt-1">
-                    <span>Ocupado: {{ puntajeUsadoConActual || 0 }}%</span>
-                    <span>Techo Fase: {{ limiteFase }}%</span>
+                    <span>Ocupado: {{ puntajeUsadoConActual || 0 }}</span>
+                    <span>Techo Fase: {{ limiteFase }}</span>
                  </div>
               </div>
+            </div>
+
+            <div v-if="esFaseDisciplina">
+              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                Escala visual (lo que ve el Controlador) *
+              </label>
+              <div class="relative">
+                <input
+                  v-model.number="form.escalaVisual"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  class="w-full px-5 py-4 border-2 border-slate-100 bg-slate-50 focus:border-primary text-primary rounded-xl outline-none font-black text-2xl transition-all shadow-inner"
+                />
+                <span class="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xl">pts</span>
+              </div>
+              <p class="text-[10px] text-slate-400 font-medium mt-2 leading-relaxed">
+                Ejemplo: escala 6 y máximo 1 → si pone 3/6, el sistema guarda 0.50 pts reales.
+                ({{ previewConversion }})
+              </p>
             </div>
 
             <div>
@@ -312,6 +391,9 @@ const props = defineProps({
 defineEmits(['volver'])
 
 const criterios = ref([])
+const controladoresFase = ref([])
+const asignacionDraft = ref({})
+const guardandoAsignacion = ref(null)
 const modalOpen = ref(false)
 const editandoId = ref(null)
 const archivoImagen = ref(null)
@@ -338,7 +420,19 @@ const previsualizarImagen = (url) => {
   })
 }
 
-const form = ref({ idFase: '', nombre: '', puntajeMaximo: 20, urlImagen: '' })
+const form = ref({ idFase: '', nombre: '', puntajeMaximo: 1, escalaVisual: 6, urlImagen: '' })
+
+const esFaseDisciplina = computed(() =>
+  String(props.fase?.nombre || '').toLowerCase().includes('disciplina'),
+)
+
+const previewConversion = computed(() => {
+  const escala = Number(form.value.escalaVisual) || 6
+  const max = Number(form.value.puntajeMaximo) || 0
+  const mitad = escala / 2
+  const real = escala > 0 ? ((mitad / escala) * max).toFixed(2) : '0'
+  return `${mitad}/${escala} → ${real} pts`
+})
 
 // ── Computed Properties (Budget Logic) ────────────────────────────────────
 const limiteFase = computed(() => {
@@ -374,8 +468,76 @@ const cargarDatos = async () => {
   try {
     const res = await api.get(`/evaluaciones/fase/${props.fase.idFase}/criterios`)
     criterios.value = res.data || []
+    if (esFaseDisciplina.value) await cargarControladoresYAsignaciones()
   } catch (e) { 
     console.error('Error al cargar criterios:', e) 
+  }
+}
+
+const cargarControladoresYAsignaciones = async () => {
+  try {
+    const { data: controladores } = await api.get('/usuarios/controladores')
+    const deFase = (controladores || []).filter((c) =>
+      (c.fasesHabilitadas || []).some((f) => f.idFase === props.fase.idFase) || c.idJurado,
+    )
+    // Preferir los que tienen la fase; si API no trae fases, usar jurados de la fase
+    let list = deFase
+    if (!list.length && props.fase?.jurados?.length) {
+      list = props.fase.jurados
+        .filter((j) => j.usuario?.rol?.nombre === 'controladorhcu' || j.idJurado)
+        .map((j) => ({
+          idJurado: j.idJurado,
+          idUsuario: j.usuario?.idUsuario,
+          nombre: [j.usuario?.nombres, j.usuario?.primerApellido].filter(Boolean).join(' ') || j.nombre || `Jurado #${j.idJurado}`,
+          ci: j.usuario?.ci || j.ci,
+        }))
+    } else {
+      list = list.map((c) => ({
+        idJurado: c.idJurado,
+        idUsuario: c.idUsuario,
+        nombre: c.nombre,
+        ci: c.ci,
+      })).filter((c) => c.idJurado)
+    }
+    controladoresFase.value = list
+
+    const draft = {}
+    for (const c of criterios.value) {
+      for (const jid of c.juradosAsignadosIds || []) {
+        if (!draft[jid]) draft[jid] = []
+        draft[jid].push(c.idCriterio)
+      }
+    }
+    for (const ctrl of list) {
+      if (!draft[ctrl.idJurado]) draft[ctrl.idJurado] = []
+    }
+    asignacionDraft.value = draft
+  } catch (e) {
+    console.error('Error al cargar controladores:', e)
+    controladoresFase.value = []
+  }
+}
+
+const toggleCriterioAsignado = (idJurado, idCriterio, checked) => {
+  const cur = new Set(asignacionDraft.value[idJurado] || [])
+  if (checked) cur.add(idCriterio)
+  else cur.delete(idCriterio)
+  asignacionDraft.value = { ...asignacionDraft.value, [idJurado]: [...cur] }
+}
+
+const guardarAsignacionControlador = async (ctrl) => {
+  guardandoAsignacion.value = ctrl.idJurado
+  try {
+    await api.post(
+      `/evaluaciones/fase/${props.fase.idFase}/jurados/${ctrl.idJurado}/criterios`,
+      { idsCriterio: asignacionDraft.value[ctrl.idJurado] || [] },
+    )
+    notify.success('Asignación guardada', `${ctrl.nombre}: criterios actualizados.`)
+    await cargarDatos()
+  } catch (e) {
+    notify.error('Error', e?.response?.data?.message || 'No se pudo guardar la asignación')
+  } finally {
+    guardandoAsignacion.value = null
   }
 }
 
@@ -385,11 +547,24 @@ watch(() => props.fase, cargarDatos, { immediate: true })
 const abrirModal = (item = null) => {
   if (item) {
     editandoId.value = item.idCriterio
-    form.value = { ...item, idFase: props.fase.idFase, puntajeMaximo: Number(item.puntajeMaximo) }
+    form.value = {
+      ...item,
+      idFase: props.fase.idFase,
+      puntajeMaximo: Number(item.puntajeMaximo),
+      escalaVisual: Number(item.escalaVisual ?? 6),
+    }
   } else {
     editandoId.value = null
-    const sugerido = disponiblePuntaje.value > 0 ? Math.min(20, disponiblePuntaje.value) : 0
-    form.value = { idFase: props.fase.idFase, nombre: '', puntajeMaximo: sugerido, urlImagen: '' }
+    const sugerido = esFaseDisciplina.value
+      ? Math.min(1, disponiblePuntaje.value > 0 ? disponiblePuntaje.value : 1)
+      : (disponiblePuntaje.value > 0 ? Math.min(20, disponiblePuntaje.value) : 0)
+    form.value = {
+      idFase: props.fase.idFase,
+      nombre: '',
+      puntajeMaximo: sugerido,
+      escalaVisual: 6,
+      urlImagen: '',
+    }
   }
   archivoImagen.value = null
   archivoPreview.value = null
@@ -399,12 +574,15 @@ const abrirModal = (item = null) => {
 const guardar = async () => {
   if (!form.value.idFase) return notify.error('Error', 'No hay una fase vinculada.')
   if (!form.value.nombre?.trim()) return notify.error('Error', 'El nombre del criterio es obligatorio.')
-  if (form.value.puntajeMaximo <= 0) return notify.error('Error', 'El puntaje debe ser mayor a 0%.')
+  if (form.value.puntajeMaximo <= 0) return notify.error('Error', 'El puntaje debe ser mayor a 0.')
+  if (esFaseDisciplina.value && !(Number(form.value.escalaVisual) > 0)) {
+    return notify.error('Error', 'La escala visual debe ser mayor a 0.')
+  }
   
   if (puntajeUsadoConActual.value > limiteFase.value) {
     const disp = (limiteFase.value - puntajeUsadoSinActual.value).toFixed(2)
-    const extra = props.fase?.tipoConcurso === 'EFU' ? ` (Peso de Fase: ${limiteFase.value}%)` : ''
-    return notify.warning('Presupuesto excedido', `La suma de criterios de la fase no puede superar el techo permitido${extra}. Solo tienes disponible un ${disp}%.`)
+    const extra = props.fase?.tipoConcurso === 'EFU' ? ` (Peso de Fase: ${limiteFase.value})` : ''
+    return notify.warning('Presupuesto excedido', `La suma de criterios de la fase no puede superar el techo permitido${extra}. Solo tienes disponible ${disp} pts.`)
   }
 
   try {

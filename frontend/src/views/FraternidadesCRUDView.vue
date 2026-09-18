@@ -19,10 +19,21 @@
             v-model="busqueda"
             type="search"
             placeholder="Buscar fraternidad..."
-            class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm"
+            :disabled="editandoOrden"
+            class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm font-medium text-sm disabled:opacity-50"
           />
         </div>
         <button
+          v-if="!editandoOrden"
+          type="button"
+          @click="iniciarEdicionOrden"
+          class="w-full sm:w-auto bg-white text-primary border-2 border-primary px-5 py-3 rounded-xl font-black text-sm uppercase tracking-wider hover:bg-primary/5 active:scale-95 transition-all flex items-center justify-center gap-2"
+        >
+          <span class="material-symbols-outlined">swap_vert</span>
+          Editar orden
+        </button>
+        <button
+          v-if="!editandoOrden"
           @click="abrirModalCrear"
           class="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
         >
@@ -32,8 +43,74 @@
       </div>
     </div>
 
-    <!-- Orden -->
-    <div class="flex flex-wrap items-center gap-2 mb-4">
+    <!-- Modo editar orden (drag & drop) -->
+    <div v-if="editandoOrden" class="mb-6 bg-white rounded-2xl border-2 border-primary/30 shadow-sm overflow-hidden">
+      <div class="px-4 sm:px-6 py-4 bg-primary/5 border-b border-primary/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-black text-primary uppercase tracking-wide flex items-center gap-2">
+            <span class="material-symbols-outlined">drag_indicator</span>
+            Editar orden oficial
+          </h3>
+          <p class="text-xs text-slate-500 font-medium mt-1">
+            Arrastra cada fraternidad como en una playlist. El 1 queda primero en calificación y listados.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            :disabled="guardandoOrden"
+            @click="sembrarOrdenSugerido"
+            class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Lista sugerida
+          </button>
+          <button
+            type="button"
+            :disabled="guardandoOrden"
+            @click="cancelarEdicionOrden"
+            class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 text-slate-600 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            :disabled="guardandoOrden || !ordenDraft.length"
+            @click="guardarOrden"
+            class="px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-primary text-white hover:brightness-110 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            <span class="material-symbols-outlined text-[16px]" :class="{ 'animate-spin': guardandoOrden }">{{ guardandoOrden ? 'sync' : 'save' }}</span>
+            Guardar orden
+          </button>
+        </div>
+      </div>
+
+      <ul class="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
+        <li
+          v-for="(item, index) in ordenDraft"
+          :key="item.idFraternidad"
+          draggable="true"
+          class="flex items-center gap-3 px-4 sm:px-5 py-3 bg-white hover:bg-slate-50 cursor-grab active:cursor-grabbing transition-colors select-none"
+          :class="{
+            'opacity-40': dragIndex === index,
+            'ring-2 ring-inset ring-primary/40 bg-primary/5': dropIndex === index && dragIndex !== null && dragIndex !== index,
+          }"
+          @dragstart="onDragStart(index, $event)"
+          @dragover.prevent="onDragOver(index, $event)"
+          @drop.prevent="onDrop"
+          @dragend="onDragEnd"
+        >
+          <span class="material-symbols-outlined text-slate-300 text-[22px] shrink-0">drag_indicator</span>
+          <span class="size-8 rounded-lg bg-slate-100 text-slate-600 text-xs font-black flex items-center justify-center shrink-0">{{ index + 1 }}</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-bold text-sm text-slate-800 truncate">{{ item.nombre }}</p>
+            <p class="text-[10px] text-slate-400 font-medium truncate">{{ item.categoria?.nombre || item.categoria || '—' }}</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Orden filtros (oculto en modo edición) -->
+    <div v-if="!editandoOrden" class="flex flex-wrap items-center gap-2 mb-4">
       <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1">Ordenar por</span>
       <button
         v-for="opt in opcionesOrden"
@@ -53,7 +130,7 @@
     </div>
 
     <!-- Table Card -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div v-if="!editandoOrden" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div v-if="loading" class="p-20 flex flex-col items-center justify-center gap-4 text-slate-400">
         <span class="material-symbols-outlined animate-spin text-5xl">progress_activity</span>
         <p class="font-bold uppercase tracking-widest text-xs">Cargando datos...</p>
@@ -74,6 +151,7 @@
         <table class="w-full text-left">
           <thead>
             <tr class="bg-slate-50/50 border-b border-slate-100">
+              <th class="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-14">#</th>
               <th
                 @click="setOrden('nombre')"
                 class="px-6 py-4 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none transition-colors hover:text-primary"
@@ -150,7 +228,12 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-for="f in fraternidadesOrdenadas" :key="f.idFraternidad" class="hover:bg-slate-50/50 transition-colors group">
+            <tr v-for="(f, idx) in fraternidadesOrdenadas" :key="f.idFraternidad" class="hover:bg-slate-50/50 transition-colors group">
+              <td class="px-4 py-4">
+                <span class="size-8 rounded-lg bg-slate-100 text-slate-600 text-xs font-black flex items-center justify-center">
+                  {{ sortField === 'ordenOficial' && sortDir === 'asc' ? (f.ordenDesfile ?? idx + 1) : idx + 1 }}
+                </span>
+              </td>
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
                   <div v-if="f.logoUrl" class="size-10 rounded-lg overflow-hidden border border-slate-200">
@@ -411,9 +494,16 @@ const loading = ref(true)
 const busqueda = ref('')
 const modalAbierto = ref(false)
 const editando = ref(false)
-const sortField = ref('fechaSolicitud')
+const sortField = ref('ordenOficial')
 const sortDir = ref('asc')
 const opcionesOrden = ORDEN_CRITERIOS
+
+/** Modo playlist: arrastrar para definir orden oficial */
+const editandoOrden = ref(false)
+const ordenDraft = ref([])
+const guardandoOrden = ref(false)
+const dragIndex = ref(null)
+const dropIndex = ref(null)
 
 const categorias = ref([])
 const loadingCategorias = ref(true)
@@ -525,11 +615,12 @@ const fraternidadesOrdenadas = computed(() => {
     })
   }
 
-  if (['fechaSolicitud', 'nombre', 'instancia'].includes(sortField.value)) {
+  if (['ordenOficial', 'fechaSolicitud', 'nombre', 'instancia'].includes(sortField.value)) {
     return ordenarListado(list, sortField.value, sortDir.value, {
       fecha: (x) => x.fechaSolicitud || x.createdAt,
       nombre: (x) => x.nombre,
       instancia: (x) => x.instanciaRepresentacion || x.nivelRepresentacion,
+      orden: (x) => x.ordenDesfile,
       id: (x) => x.idFraternidad,
     })
   }
@@ -562,6 +653,102 @@ const fraternidadesOrdenadas = computed(() => {
 
   return list
 })
+
+const listaParaOrden = () =>
+  ordenarListado([...fraternidades.value], 'ordenOficial', 'asc', {
+    nombre: (x) => x.nombre,
+    orden: (x) => x.ordenDesfile,
+    id: (x) => x.idFraternidad,
+  })
+
+const iniciarEdicionOrden = () => {
+  editandoOrden.value = true
+  ordenDraft.value = listaParaOrden().map((f) => ({ ...f }))
+  dragIndex.value = null
+  dropIndex.value = null
+}
+
+const cancelarEdicionOrden = () => {
+  editandoOrden.value = false
+  ordenDraft.value = []
+  dragIndex.value = null
+  dropIndex.value = null
+}
+
+const onDragStart = (index, event) => {
+  dragIndex.value = index
+  dropIndex.value = index
+  try {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  } catch {
+    /* IE / Safari antiguos */
+  }
+}
+
+const onDragOver = (index) => {
+  const from = dragIndex.value
+  if (from === null || from === index) {
+    dropIndex.value = index
+    return
+  }
+  const next = [...ordenDraft.value]
+  const [moved] = next.splice(from, 1)
+  next.splice(index, 0, moved)
+  ordenDraft.value = next
+  dragIndex.value = index
+  dropIndex.value = index
+}
+
+const onDrop = () => {
+  dragIndex.value = null
+  dropIndex.value = null
+}
+
+const onDragEnd = () => {
+  dragIndex.value = null
+  dropIndex.value = null
+}
+
+const guardarOrden = async () => {
+  if (!ordenDraft.value.length) return
+  guardandoOrden.value = true
+  try {
+    const ids = ordenDraft.value.map((f) => f.idFraternidad)
+    await api.post('/fraternidades/orden', { ids })
+    notify.success('Orden oficial guardado')
+    editandoOrden.value = false
+    ordenDraft.value = []
+    sortField.value = 'ordenOficial'
+    sortDir.value = 'asc'
+    await cargarDatos()
+  } catch (error) {
+    console.error(error)
+    notify.error(error?.response?.data?.message || 'No se pudo guardar el orden')
+  } finally {
+    guardandoOrden.value = false
+  }
+}
+
+const sembrarOrdenSugerido = async () => {
+  const ok = window.confirm(
+    '¿Aplicar la lista sugerida por nombre? Si ya hay un orden guardado, se sobrescribirá.',
+  )
+  if (!ok) return
+  guardandoOrden.value = true
+  try {
+    await api.post('/fraternidades/orden/sembrar-sugerido', { forzar: true })
+    notify.success('Orden sugerido aplicado')
+    const { data } = await api.get('/fraternidades')
+    fraternidades.value = data
+    ordenDraft.value = listaParaOrden().map((f) => ({ ...f }))
+  } catch (error) {
+    console.error(error)
+    notify.error(error?.response?.data?.message || 'No se pudo sembrar el orden')
+  } finally {
+    guardandoOrden.value = false
+  }
+}
 
 const cargarDatos = async () => {
   loading.value = true

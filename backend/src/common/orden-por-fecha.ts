@@ -13,3 +13,25 @@ export function compareTextoEs(a: string | null | undefined, b: string | null | 
   return String(a || '')
     .localeCompare(String(b || ''), 'es', { sensitivity: 'base' });
 }
+
+/**
+ * Orden oficial de desfile (admin drag-and-drop).
+ * Números primero (ASC); sin orden al final; empate por nombre e id.
+ */
+export function compareOrdenDesfileAsc(
+  a: { ordenDesfile?: number | null; nombre?: string | null; idFraternidad?: number | null },
+  b: { ordenDesfile?: number | null; nombre?: string | null; idFraternidad?: number | null },
+  getNombre: (x: any) => string = (x) => x?.nombre || x?.nombreFraternidad || '',
+  getId: (x: any) => number = (x) => Number(x?.idFraternidad) || 0,
+): number {
+  const oa = a?.ordenDesfile;
+  const ob = b?.ordenDesfile;
+  const aNum = oa != null && oa !== ('' as any) && Number.isFinite(Number(oa));
+  const bNum = ob != null && ob !== ('' as any) && Number.isFinite(Number(ob));
+  if (aNum && bNum && Number(oa) !== Number(ob)) return Number(oa) - Number(ob);
+  if (aNum && !bNum) return -1;
+  if (!aNum && bNum) return 1;
+  const byNombre = compareTextoEs(getNombre(a), getNombre(b));
+  if (byNombre !== 0) return byNombre;
+  return getId(a) - getId(b);
+}

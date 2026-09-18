@@ -270,7 +270,7 @@
           <h3 class="text-base sm:text-lg font-black italic uppercase tracking-tighter">Asignar Jurados</h3>
           <p class="text-slate-300 text-xs font-medium mt-0.5">{{ faseParaJurados?.nombre }}</p>
           <p class="text-[10px] text-slate-400 font-medium mt-1">
-            {{ esFaseDisciplina(faseParaJurados) ? 'Controladores HCU' : faseParaJurados?.tipoConcurso }} ·
+            {{ esFaseDisciplina(faseParaJurados) ? 'Controladores' : faseParaJurados?.tipoConcurso }} ·
             {{ juradosSeleccionados.length }} seleccionado(s)
           </p>
         </v-card-title>
@@ -324,7 +324,7 @@
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-bold text-slate-800 truncate">{{ c.nombre }}</p>
                   <p class="text-[9px] uppercase font-black tracking-widest text-emerald-600">
-                    Controlador HCU · CI: {{ c.ci }}
+                    Controlador · CI: {{ c.ci }}
                   </p>
                   <p v-if="c.fasesHabilitadas?.length" class="text-[9px] text-slate-500 mt-1 truncate">
                     {{ c.fasesHabilitadas.length }} fase(s) en perfil

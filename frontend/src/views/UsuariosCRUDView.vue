@@ -825,7 +825,7 @@ const props = defineProps({
 
 const tituloVista = computed(() => {
   if (props.rolFiltro === 'admin') return 'Administradores'
-  if (props.rolFiltro === 'controladorhcu') return 'Controladores HCU'
+  if (props.rolFiltro === 'controladorhcu') return 'Controladores'
   if (props.rolFiltro === 'veedor') return 'Veedores'
   if (props.rolFiltro === 'concursante') return 'Concursantes'
   return props.rolFiltro + 's'

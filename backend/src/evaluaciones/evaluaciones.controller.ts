@@ -97,8 +97,14 @@ export class EvaluacionesController {
   }
 
   @Get('fase/:idFase/criterios')
-  getCriterios(@Param('idFase', ParseIntPipe) idFase: number) {
-    return this.evaluacionesService.getCriteriosPorFase(idFase);
+  getCriterios(
+    @Request() req: any,
+    @Param('idFase', ParseIntPipe) idFase: number,
+  ) {
+    return this.evaluacionesService.getCriteriosPorFase(idFase, {
+      idUsuario: req.user?.idUsuario,
+      rol: req.user?.rol,
+    });
   }
 
   @Get('fase/:idFase/fraternidades/:idFraternidad/evaluacion')
@@ -494,6 +500,20 @@ export class EvaluacionesController {
   @Roles('superusuario', 'admin')
   removeCriterio(@Param('id', ParseIntPipe) id: number) {
     return this.evaluacionesService.deleteCriterio(id);
+  }
+
+  @Post('fase/:idFase/jurados/:idJurado/criterios')
+  @Roles('superusuario', 'admin')
+  asignarCriteriosJurado(
+    @Param('idFase', ParseIntPipe) idFase: number,
+    @Param('idJurado', ParseIntPipe) idJurado: number,
+    @Body() body: { idsCriterio?: number[] },
+  ) {
+    return this.evaluacionesService.asignarCriteriosAJurado(
+      idJurado,
+      idFase,
+      body?.idsCriterio || [],
+    );
   }
 
   // ── Documentos de Gestión (Reglamentos) ──────────────────────────────────

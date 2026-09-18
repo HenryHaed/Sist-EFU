@@ -73,8 +73,9 @@
       <div
         v-for="(f, i) in content.floats || []"
         :key="`float-${i}`"
-        class="absolute z-10 max-w-[11rem] sm:max-w-[13rem] rounded-2xl border-2 border-amber-300/90 bg-amber-950/85 text-amber-50 px-3 py-2 shadow-xl backdrop-blur-sm pointer-events-none"
+        class="absolute z-10 rounded-2xl border-2 border-amber-300/90 bg-amber-950/85 text-amber-50 px-3 py-2 shadow-xl backdrop-blur-sm pointer-events-none"
         :class="floatClass(f.spot)"
+        :style="floatStyle(f.spot)"
       >
         <p class="text-sm sm:text-[13px] font-black leading-tight">{{ f.label }}</p>
         <p v-if="f.sub" class="text-xs text-amber-100/90 leading-snug mt-0.5 font-medium">{{ f.sub }}</p>
@@ -109,9 +110,29 @@ const isMobile = ref(false)
 let raf = 0
 
 function floatClass(spot) {
-  if (spot === 'mid-right') return 'right-3 top-[48%] -translate-y-1/2'
-  if (spot === 'bottom') return 'left-1/2 -translate-x-1/2 bottom-20'
-  return 'left-3 top-[42%]'
+  // En móvil: no centrar (chocan con callouts de fase/puntaje/calificar)
+  if (isMobile.value) {
+    if (spot === 'mid-right' || spot === 'mid-left') {
+      return 'left-3 right-3 max-w-none'
+    }
+    if (spot === 'bottom') {
+      return 'left-3 right-3 max-w-none bottom-24'
+    }
+  }
+  if (spot === 'mid-right') return 'right-3 top-[48%] -translate-y-1/2 max-w-[13rem]'
+  if (spot === 'bottom') return 'left-1/2 -translate-x-1/2 bottom-20 max-w-[13rem]'
+  return 'left-3 top-[42%] max-w-[13rem]'
+}
+
+/** Posición bajo el header en móvil (respeta notch / safe-area). */
+function floatStyle(spot) {
+  if (!isMobile.value) return undefined
+  if (spot === 'mid-right' || spot === 'mid-left') {
+    return {
+      top: 'calc(max(0.65rem, env(safe-area-inset-top, 0px)) + 6.25rem)',
+    }
+  }
+  return undefined
 }
 
 function updateIsMobile() {

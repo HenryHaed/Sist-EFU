@@ -586,7 +586,7 @@ const fasesExternas = ref([])
 const filtroFase = ref('')
 const filtroEstado = ref('PENDIENTE')
 const busqueda = ref('')
-const ordenCriterio = ref('fechaSolicitud')
+const ordenCriterio = ref('ordenOficial')
 const ordenDir = ref('asc')
 const opcionesOrden = ORDEN_CRITERIOS
 const detalle = ref(null)
@@ -692,6 +692,7 @@ const listaFiltrada = computed(() => {
     fecha: (x) => x.fechaEnvio || x.fechaSolicitud || x.createdAt,
     nombre: (x) => nombreInscripcion(x),
     instancia: (x) => instanciaInscripcion(x),
+    orden: (x) => x.fraternidad?.ordenDesfile ?? x.ordenDesfile ?? null,
     id: (x) => x.idInscripcion,
   })
 })

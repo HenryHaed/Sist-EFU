@@ -24,7 +24,15 @@ import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { ensureCategoriasDefault } from '../common/categorias-default';
 import { drawPdfInstitutionalHeader } from '../common/pdf-layout';
 import { recalcularExcedentesGestion } from '../common/cupo-fraternidades';
-import { compareFechaAsc, compareTextoEs } from '../common/orden-por-fecha';
+import { compareFechaAsc, compareTextoEs, compareOrdenDesfileAsc } from '../common/orden-por-fecha';
+import {
+  esFaseDisciplinaNombre,
+  convertirNotaVisualAReal,
+  valorRealCriterio,
+  valorVisualCriterio,
+  fusionarPuntajeDisciplina,
+  round2 as round2Disc,
+} from '../common/disciplina-scoring';
 import {
   esFaseChachaWarmi,
   esPlantillaChachaWarmi,
@@ -326,6 +334,7 @@ export class EvaluacionesService {
             nombresPareja: string[];
             instanciaRepresentacion: string | null;
             fechaSolicitud: Date | null;
+            ordenDesfile: number | null;
           }
         >();
         for (const p of participantes) {
@@ -342,6 +351,7 @@ export class EvaluacionesService {
               instanciaRepresentacion:
                 meta?.instancia || p.fraternidad?.nivelRepresentacion || null,
               fechaSolicitud: meta?.fechaSolicitud || p.createdAt || null,
+              ordenDesfile: p.fraternidad?.ordenDesfile ?? null,
             });
           }
           const g = byFrat.get(fid)!;
@@ -358,6 +368,7 @@ export class EvaluacionesService {
             nombresPareja: g.nombresPareja,
             instanciaRepresentacion: g.instanciaRepresentacion,
             fechaSolicitud: g.fechaSolicitud,
+            ordenDesfile: g.ordenDesfile,
             modoCalificacion: 'fraternidad' as const,
             estadoEvaluacion: ev ? ev.estado : 'PENDIENTE',
             idEvaluacion: ev ? ev.idEvaluacion : null,
@@ -368,10 +379,10 @@ export class EvaluacionesService {
         });
 
         listado.sort((a, b) => {
+          const byOrden = compareOrdenDesfileAsc(a, b);
+          if (byOrden !== 0) return byOrden;
           const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
           if (byFecha !== 0) return byFecha;
-          const byNombre = compareTextoEs(a.nombre, b.nombre);
-          if (byNombre !== 0) return byNombre;
           return a.idFraternidad - b.idFraternidad;
         });
 
@@ -438,6 +449,7 @@ export class EvaluacionesService {
           instanciaRepresentacion:
             meta?.instancia || p.fraternidad?.nivelRepresentacion || null,
           fechaSolicitud: meta?.fechaSolicitud || p.createdAt || null,
+          ordenDesfile: p.fraternidad?.ordenDesfile ?? null,
           modoCalificacion: 'participante' as const,
           estadoEvaluacion: ev ? ev.estado : 'PENDIENTE',
           idEvaluacion: ev ? ev.idEvaluacion : null,
@@ -448,10 +460,15 @@ export class EvaluacionesService {
       });
 
       listado.sort((a, b) => {
+        const byOrden = compareOrdenDesfileAsc(
+          a,
+          b,
+          (x) => x.nombre || '',
+          (x) => Number(x.idParticipante) || Number(x.idFraternidad) || 0,
+        );
+        if (byOrden !== 0) return byOrden;
         const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
         if (byFecha !== 0) return byFecha;
-        const byNombre = compareTextoEs(a.nombre, b.nombre);
-        if (byNombre !== 0) return byNombre;
         return a.idParticipante - b.idParticipante;
       });
 
@@ -539,25 +556,33 @@ export class EvaluacionesService {
       });
     });
 
-    const listado = fraternidades.map(frat => {
+    const esDisciplina = esFaseDisciplinaNombre(fase.nombre);
+
+    const listado = fraternidades.map((frat) => {
       const ev = mapEv.get(frat.idFraternidad);
       const penalties = mapInc.get(frat.idFraternidad) || [];
-      const totalPenalties = penalties.reduce((acc, p) => acc + p.valor, 0);
       const meta = metaPorFrat.get(frat.idFraternidad);
-      
-      let score = ev?.puntajeTotal || 0;
-      score = Math.max(0, Number(score) + totalPenalties);
 
-      return { 
-        idFraternidad: frat.idFraternidad, 
+      // Disciplina: el puntaje de fase NO incluye sanciones (van a la nota final EFU).
+      let score = Number(ev?.puntajeTotal) || 0;
+      if (!esDisciplina) {
+        const totalPenalties = penalties.reduce((acc, p) => acc + p.valor, 0);
+        score = Math.max(0, score + totalPenalties);
+      }
+
+      return {
+        idFraternidad: frat.idFraternidad,
         nombre: frat.nombre,
+        ordenDesfile: frat.ordenDesfile ?? null,
         categoria: (frat as any).categoria?.nombre || null,
         instanciaRepresentacion:
           meta?.instanciaRepresentacion || frat.nivelRepresentacion || null,
         fechaSolicitud: meta?.fechaSolicitud || frat.createdAt || null,
-        idEvaluacion: ev?.idEvaluacion || null, 
-        estadoEvaluacion: ev?.estado || 'PENDIENTE', 
+        idEvaluacion: ev?.idEvaluacion || null,
+        estadoEvaluacion: ev?.estado || 'PENDIENTE',
         puntajeActual: score,
+        puntajeFase: Number(ev?.puntajeTotal) || 0,
+        puntajeFaseMerged: Number(ev?.puntajeTotal) || 0,
         penalizaciones: penalties,
         suspendida: penalties.some((p) => p.tipoImpacto === 'SUSPENSION'),
         fechaApertura: ev?.fechaApertura || null,
@@ -565,22 +590,98 @@ export class EvaluacionesService {
       };
     });
 
+    if (esDisciplina && fraternidades.length) {
+      const todasActas = await this.evaluacionRepo.find({
+        where: { fase: { idFase } },
+        relations: ['fraternidad'],
+      });
+      const porFrat = new Map<number, typeof todasActas>();
+      for (const a of todasActas) {
+        const fid = a.fraternidad?.idFraternidad;
+        if (!fid) continue;
+        if (!porFrat.has(fid)) porFrat.set(fid, []);
+        porFrat.get(fid)!.push(a);
+      }
+      for (const row of listado) {
+        const actas = porFrat.get(row.idFraternidad) || [];
+        row.puntajeFaseMerged = fusionarPuntajeDisciplina(actas);
+      }
+    }
+
     listado.sort((a, b) => {
+      const byOrden = compareOrdenDesfileAsc(a, b);
+      if (byOrden !== 0) return byOrden;
       const byFecha = compareFechaAsc(a.fechaSolicitud, b.fechaSolicitud);
       if (byFecha !== 0) return byFecha;
-      const byNombre = compareTextoEs(a.nombre, b.nombre);
-      if (byNombre !== 0) return byNombre;
       return a.idFraternidad - b.idFraternidad;
     });
 
+    const gestionFlags = fase.gestion
+      ? await this.gestionRepo.findOne({ where: { idGestion: fase.gestion.idGestion } })
+      : await this.getGestionActiva();
+
     return {
-      fase: { idFase: fase.idFase, nombre: fase.nombre, tipoConcurso: 'EFU', categoriaEfu: fase.categoriaEfu || null },
+      fase: {
+        idFase: fase.idFase,
+        nombre: fase.nombre,
+        tipoConcurso: 'EFU',
+        categoriaEfu: fase.categoriaEfu || null,
+        esDisciplina,
+      },
+      banderas: {
+        amarilla: gestionFlags?.banderasAmarillaHabilitada !== false,
+        roja: gestionFlags?.banderasRojaHabilitada !== false,
+      },
       listado,
     };
   }
 
-  async getCriteriosPorFase(idFase: number) {
-    return this.criterioRepo.find({ where: { fase: { idFase } }, order: { idCriterio: 'ASC' } });
+  async getCriteriosPorFase(idFase: number, opts?: { idUsuario?: number; rol?: string }) {
+    const fase = await this.faseRepo.findOne({ where: { idFase } });
+    if (!fase) return [];
+
+    const all = await this.criterioRepo.find({
+      where: { fase: { idFase } },
+      order: { idCriterio: 'ASC' },
+      relations: ['juradosAsignados'],
+    });
+
+    const rol = String(opts?.rol || '').toLowerCase();
+    const esAdmin = rol === 'admin' || rol === 'superusuario';
+    if (!esFaseDisciplinaNombre(fase.nombre) || esAdmin || !opts?.idUsuario) {
+      return all.map((c) => this.serializeCriterio(c));
+    }
+
+    try {
+      const jurado = await this.getValidadorJurado(opts.idUsuario, opts.rol!, idFase);
+      const withCrit = await this.juradoRepo.findOne({
+        where: { idJurado: jurado.idJurado },
+        relations: ['criteriosAsignados'],
+      });
+      const asignados = (withCrit?.criteriosAsignados || []).map((c) => c.idCriterio);
+      if (!asignados.length) {
+        const algunoAsignado = all.some((c) => (c.juradosAsignados || []).length > 0);
+        if (!algunoAsignado) return all.map((c) => this.serializeCriterio(c));
+        return [];
+      }
+      return all
+        .filter((c) => asignados.includes(c.idCriterio))
+        .map((c) => this.serializeCriterio(c));
+    } catch {
+      return all.map((c) => this.serializeCriterio(c));
+    }
+  }
+
+  private serializeCriterio(c: Criterio) {
+    return {
+      idCriterio: c.idCriterio,
+      nombre: c.nombre,
+      puntajeMaximo: Number(c.puntajeMaximo),
+      escalaVisual: c.escalaVisual != null ? Number(c.escalaVisual) : 6,
+      urlImagen: c.urlImagen || null,
+      idFase: (c as any).fase?.idFase ?? null,
+      juradosAsignadosIds: (c.juradosAsignados || []).map((j) => j.idJurado),
+    };
   }
 
   async getEvaluacionActual(idUsuario: number, rol: string, idFase: number, args: { idFraternidad?: number, idParticipante?: number }) {
@@ -667,11 +768,15 @@ export class EvaluacionesService {
       const rolNombre = String(ev.jurado?.usuario?.rol?.nombre || '').toLowerCase();
       const criteriosDetalle = Object.entries(ev.criteriosEvaluados || {}).map(([id, valor]) => {
         const crit = mapCriterio.get(Number(id));
+        const real = valorRealCriterio(valor);
+        const visual = valorVisualCriterio(valor);
         return {
           idCriterio: Number(id),
           nombre: crit?.nombre || `Criterio #${id}`,
-          puntaje: Number(valor) || 0,
+          puntaje: real,
+          visual,
           puntajeMaximo: crit?.puntajeMaximo != null ? Number(crit.puntajeMaximo) : null,
+          escalaVisual: crit?.escalaVisual != null ? Number(crit.escalaVisual) : 6,
         };
       });
 
@@ -750,7 +855,7 @@ export class EvaluacionesService {
           relations: ['fraternidad'],
           order: { nombre: 'ASC' },
         });
-        const byFrat = new Map<number, { idFraternidad: number; nombre: string; nombres: string[] }>();
+        const byFrat = new Map<number, { idFraternidad: number; nombre: string; nombres: string[]; ordenDesfile: number | null }>();
         for (const p of participantes) {
           const fid = p.fraternidad?.idFraternidad;
           if (!fid) continue;
@@ -759,6 +864,7 @@ export class EvaluacionesService {
               idFraternidad: fid,
               nombre: p.fraternidad!.nombre,
               nombres: [],
+              ordenDesfile: p.fraternidad?.ordenDesfile ?? null,
             });
           }
           if (p.nombre) byFrat.get(fid)!.nombres.push(p.nombre);
@@ -772,7 +878,9 @@ export class EvaluacionesService {
           mapEv.get(id)!.push(ev);
         }
 
-        const sujetos = Array.from(byFrat.values()).map((g) => {
+        const sujetos = Array.from(byFrat.values())
+          .sort((a, b) => compareOrdenDesfileAsc(a, b))
+          .map((g) => {
           const evs = mapEv.get(g.idFraternidad) || [];
           const selladas = evs.filter((e) => e.estado === 'COMPLETADO');
           const promedio =
@@ -784,6 +892,7 @@ export class EvaluacionesService {
           return {
             idFraternidad: g.idFraternidad,
             nombre: g.nombre,
+            ordenDesfile: g.ordenDesfile,
             nombresPareja: g.nombres,
             cantidadCalificadores: evs.length,
             cantidadCompletadas: selladas.length,
@@ -856,7 +965,15 @@ export class EvaluacionesService {
         mapEv.get(id)!.push(ev);
       }
 
-      const sujetos = participantes.map((p) => {
+      const sujetos = participantes
+        .slice()
+        .sort((a, b) =>
+          compareOrdenDesfileAsc(
+            { ordenDesfile: a.fraternidad?.ordenDesfile, nombre: a.fraternidad?.nombre || a.nombre, idFraternidad: a.fraternidad?.idFraternidad },
+            { ordenDesfile: b.fraternidad?.ordenDesfile, nombre: b.fraternidad?.nombre || b.nombre, idFraternidad: b.fraternidad?.idFraternidad },
+          ),
+        )
+        .map((p) => {
         const evs = mapEv.get(p.idParticipante) || [];
         const selladas = evs.filter((e) => e.estado === 'COMPLETADO');
         const promedio =
@@ -870,6 +987,7 @@ export class EvaluacionesService {
           nombre: p.nombre,
           tipoParticipante: p.tipo || null,
           fraternidad: p.fraternidad?.nombre || null,
+          ordenDesfile: p.fraternidad?.ordenDesfile ?? null,
           cantidadCalificadores: evs.length,
           cantidadCompletadas: selladas.length,
           cantidadPendientes: evs.filter((e) => e.estado !== 'COMPLETADO').length,
@@ -888,7 +1006,7 @@ export class EvaluacionesService {
         ...(idGestionFase ? { gestion: { idGestion: idGestionFase } } : {}),
       },
       relations: ['categoria'],
-      order: { nombre: 'ASC' },
+      order: { ordenDesfile: 'ASC', nombre: 'ASC' },
     });
 
     const mapEv = new Map<number, typeof evaluaciones>();
@@ -911,6 +1029,7 @@ export class EvaluacionesService {
       return {
         idFraternidad: frat.idFraternidad,
         nombre: frat.nombre,
+        ordenDesfile: frat.ordenDesfile ?? null,
         categoria: frat.categoria?.nombre || null,
         cantidadCalificadores: evs.length,
         cantidadCompletadas: selladas.length,
@@ -1227,19 +1346,84 @@ export class EvaluacionesService {
     if (ev && ev.estado === 'COMPLETADO') throw new ForbiddenException('Evaluación ya finalizada.');
 
     let pts = 0;
-    if (criterios) Object.values(criterios).forEach(v => pts += Number(v) || 0);
+    const criteriosNormalizados: Record<string, any> = {};
+    const esDisciplina = esFaseDisciplinaNombre(fase.nombre);
+
+    if (criterios && typeof criterios === 'object') {
+      const catalogo = await this.criterioRepo.find({ where: { fase: { idFase } } });
+      const mapCrit = new Map(catalogo.map((c) => [c.idCriterio, c]));
+
+      if (esDisciplina) {
+        const withCrit = await this.juradoRepo.findOne({
+          where: { idJurado: jurado.idJurado },
+          relations: ['criteriosAsignados'],
+        });
+        const asignados = new Set((withCrit?.criteriosAsignados || []).map((c) => c.idCriterio));
+        const algunoAsignadoEnFase = await this.dataSource
+          .createQueryBuilder()
+          .select('1')
+          .from('jurado_criterios', 'jc')
+          .innerJoin('criterios', 'c', 'c.id_criterio = jc.id_criterio')
+          .where('c.id_fase = :idFase', { idFase })
+          .limit(1)
+          .getRawOne();
+
+        for (const [key, raw] of Object.entries(criterios)) {
+          const idC = Number(key);
+          const crit = mapCrit.get(idC);
+          if (!crit) continue;
+          if (algunoAsignadoEnFase && asignados.size > 0 && !asignados.has(idC)) {
+            throw new ForbiddenException(`No tienes asignado el criterio "${crit.nombre}".`);
+          }
+
+          let visual: number;
+          let real: number;
+          if (raw != null && typeof raw === 'object' && ('visual' in (raw as any) || 'real' in (raw as any))) {
+            visual = Number((raw as any).visual);
+            if (!Number.isFinite(visual)) {
+              real = valorRealCriterio(raw);
+              visual = valorVisualCriterio(raw) ?? real;
+            } else {
+              real = convertirNotaVisualAReal(
+                visual,
+                Number(crit.escalaVisual) || 6,
+                Number(crit.puntajeMaximo) || 0,
+              );
+            }
+          } else {
+            // Compat: número = visual en disciplina
+            visual = Number(raw);
+            real = convertirNotaVisualAReal(
+              visual,
+              Number(crit.escalaVisual) || 6,
+              Number(crit.puntajeMaximo) || 0,
+            );
+          }
+          criteriosNormalizados[String(idC)] = { visual: round2Disc(visual), real };
+          pts += real;
+        }
+      } else {
+        for (const [key, raw] of Object.entries(criterios)) {
+          const val = valorRealCriterio(raw);
+          criteriosNormalizados[key] = val;
+          pts += val;
+        }
+      }
+    }
+
+    pts = round2Disc(pts);
 
     if (!ev) {
       ev = this.evaluacionRepo.create({
         jurado: { idJurado: jurado.idJurado }, fase: { idFase },
         fraternidad: idFraternidad ? { idFraternidad } : null,
         participante: idParticipante ? { idParticipante } : null,
-        criteriosEvaluados: criterios, puntajeTotal: pts,
+        criteriosEvaluados: criteriosNormalizados, puntajeTotal: pts,
         estado: finalizar ? 'COMPLETADO' : 'EN_PROGRESO',
         fechaApertura: new Date(), fechaCierre: finalizar ? new Date() : null
       });
     } else {
-      ev.criteriosEvaluados = criterios; ev.puntajeTotal = pts;
+      ev.criteriosEvaluados = criteriosNormalizados; ev.puntajeTotal = pts;
       ev.estado = finalizar ? 'COMPLETADO' : 'EN_PROGRESO';
       if (finalizar) ev.fechaCierre = new Date();
     }
@@ -2716,6 +2900,7 @@ export class EvaluacionesService {
       'recorridoSubtitulo', 'recorridoPuntos',
       'modoMantenimiento', 'mostrarRanking', 'mostrarHistorico',
       'mostrarRankingEstadisticas', 'mostrarRankingConcursosExternos', 'rankingConcursosOcultos',
+      'banderasAmarillaHabilitada', 'banderasRojaHabilitada',
       'permiteInscripcionPublica',
       'nominaExcelInicio',
       'nominaExcelFin',
@@ -3337,9 +3522,76 @@ export class EvaluacionesService {
     return this.faseRepo.delete(id);
   }
 
-  async createCriterio(data: any) { return this.criterioRepo.save(this.criterioRepo.create(data)); }
-  async updateCriterio(id: number, data: any) { await this.criterioRepo.update(id, data); return this.criterioRepo.findOne({ where: { idCriterio: id } }); }
-  async deleteCriterio(id: number) { return this.criterioRepo.delete(id); }
+  async createCriterio(data: any) {
+    const payload: any = {
+      nombre: data.nombre,
+      puntajeMaximo: Number(data.puntajeMaximo),
+      escalaVisual:
+        data.escalaVisual != null && data.escalaVisual !== ''
+          ? Number(data.escalaVisual)
+          : 6,
+      urlImagen: data.urlImagen || null,
+    };
+    if (data.idFase) payload.fase = { idFase: Number(data.idFase) };
+    else if (data.fase?.idFase) payload.fase = { idFase: Number(data.fase.idFase) };
+    const idFaseRef = payload.fase?.idFase;
+    if (data.idGestion) payload.gestion = { idGestion: Number(data.idGestion) };
+    else if (idFaseRef) {
+      const fase = await this.faseRepo.findOne({
+        where: { idFase: idFaseRef },
+        relations: ['gestion'],
+      });
+      if (fase?.gestion) payload.gestion = { idGestion: fase.gestion.idGestion };
+    }
+    return this.criterioRepo.save(this.criterioRepo.create(payload));
+  }
+
+  async updateCriterio(id: number, data: any) {
+    const payload: any = {};
+    if (data.nombre !== undefined) payload.nombre = data.nombre;
+    if (data.puntajeMaximo !== undefined) payload.puntajeMaximo = Number(data.puntajeMaximo);
+    if (data.escalaVisual !== undefined) {
+      payload.escalaVisual =
+        data.escalaVisual != null && data.escalaVisual !== ''
+          ? Number(data.escalaVisual)
+          : 6;
+    }
+    if (data.urlImagen !== undefined) payload.urlImagen = data.urlImagen;
+    await this.criterioRepo.update(id, payload);
+    return this.criterioRepo.findOne({
+      where: { idCriterio: id },
+      relations: ['juradosAsignados'],
+    });
+  }
+
+  async deleteCriterio(id: number) {
+    return this.criterioRepo.delete(id);
+  }
+
+  /** Asigna criterios de una fase a un jurado/controlador (reemplaza set de esa fase). */
+  async asignarCriteriosAJurado(idJurado: number, idFase: number, idsCriterio: number[]) {
+    const jurado = await this.juradoRepo.findOne({
+      where: { idJurado },
+      relations: ['criteriosAsignados', 'criteriosAsignados.fase'],
+    });
+    if (!jurado) throw new NotFoundException('Jurado/controlador no encontrado');
+
+    const deOtrasFases = (jurado.criteriosAsignados || []).filter(
+      (c) => c.fase?.idFase !== idFase,
+    );
+    const nuevos = idsCriterio.length
+      ? await this.criterioRepo.find({
+          where: { idCriterio: In(idsCriterio), fase: { idFase } },
+        })
+      : [];
+    jurado.criteriosAsignados = [...deOtrasFases, ...nuevos];
+    await this.juradoRepo.save(jurado);
+    return {
+      idJurado,
+      idFase,
+      criterios: nuevos.map((c) => this.serializeCriterio(c)),
+    };
+  }
 
   // ── Documentos de Gestión (Reglamentos, circulares, etc.) ──────────────────
 
@@ -3561,6 +3813,14 @@ export class EvaluacionesService {
 
     await this.ensureInfraccionesPreset(gestion.idGestion);
 
+    const tipoNorm = String(tipo || '').toUpperCase();
+    if (tipoNorm === 'AMARILLA' && gestion.banderasAmarillaHabilitada === false) {
+      throw new ForbiddenException('Las banderas amarillas están deshabilitadas en Ajustes.');
+    }
+    if (tipoNorm === 'ROJA' && gestion.banderasRojaHabilitada === false) {
+      throw new ForbiddenException('Las banderas rojas están deshabilitadas en Ajustes.');
+    }
+
     let infraccion: Infraccion | null = null;
 
     if (idInfraccion) {
@@ -3603,7 +3863,7 @@ export class EvaluacionesService {
       fraternidad,
       usuario,
       infraccion,
-      observacion: observacion || `Registrado por controlador HCU`,
+      observacion: observacion || `Registrado por controlador`,
     });
 
     return this.incidenciaRepo.save(incidencia);
