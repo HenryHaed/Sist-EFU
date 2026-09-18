@@ -85,12 +85,7 @@
             <span class="hidden sm:inline">Paso {{ criterioActualIndex + 1 }}: Evalúa {{ criterioActual.nombre }}</span>
           </h3>
           <p class="text-slate-500 text-[11px] sm:text-sm font-medium mt-1 break-words">
-            <template v-if="esFaseDisciplina">
-              0–{{ escalaActual }} visual · {{ Number(criterioActual.puntajeMaximo) }} pts reales
-            </template>
-            <template v-else>
-              Máximo {{ Number(criterioActual.puntajeMaximo) }} pts
-            </template>
+            Máximo {{ escalaActual }} pts
             <span class="text-slate-400"> · paso {{ criterioActualIndex + 1 }} de {{ totalCriterios }}</span>
           </p>
         </div>
@@ -108,7 +103,7 @@
                 {{ estadoOriginal === 'COMPLETADO' ? 'Lectura' : 'En Evaluación' }}
               </div>
               <div class="absolute bottom-4 right-4 z-20 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-white font-black text-xs border border-white/30 shadow-lg">
-                Máximo: {{ Number(criterioActual.puntajeMaximo) }} pts
+                Máximo: {{ escalaActual }} pts
               </div>
               <img
                 v-if="criterioActual.urlImagen"
@@ -135,15 +130,15 @@
                 </p>
               </div>
 
-              <div class="mt-0 lg:mt-auto order-1 lg:order-2 space-y-4 sm:space-y-8 min-w-0">
+              <div class="mt-0 lg:mt-auto order-1 lg:order-2 space-y-5 sm:space-y-8 min-w-0">
                 <!-- Score Control -->
-                <div class="bg-slate-50 rounded-2xl border border-slate-200 p-3 sm:p-6 min-w-0" data-tutorial="puntaje">
-                  <div class="flex justify-between items-center gap-2 sm:gap-3 mb-3 sm:mb-6 min-w-0">
-                    <label class="text-slate-800 font-black text-xs sm:text-sm uppercase tracking-widest flex items-center gap-1.5 sm:gap-2 shrink-0">
-                      <span class="material-symbols-outlined text-primary text-xl">analytics</span>
-                      <span>{{ esFaseDisciplina ? 'Nota' : 'Puntaje' }}</span>
+                <div class="bg-slate-50 rounded-2xl border border-slate-200 p-4 sm:p-6 min-w-0" data-tutorial="puntaje">
+                  <div class="flex justify-between items-center gap-3 mb-4 sm:mb-6 min-w-0">
+                    <label class="text-slate-800 font-black text-sm uppercase tracking-widest flex items-center gap-2 shrink-0">
+                      <span class="material-symbols-outlined text-primary text-2xl sm:text-xl">analytics</span>
+                      <span>Puntaje</span>
                     </label>
-                    <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                    <div class="flex items-center gap-2 sm:gap-3 shrink-0">
                       <input
                         ref="puntajeInputRef"
                         type="number"
@@ -154,21 +149,15 @@
                         :max="escalaActual"
                         @input="validarPuntaje(criterioActual)"
                         @blur="validarPuntaje(criterioActual)"
-                        class="w-[4.5rem] sm:w-24 px-2 py-2.5 sm:py-2 bg-white border-2 border-slate-300 text-primary font-black text-2xl text-center rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
+                        class="w-24 sm:w-28 px-3 py-3 sm:py-2.5 bg-white border-2 border-slate-300 text-primary font-black text-3xl sm:text-3xl text-center rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
                         :disabled="estadoOriginal === 'COMPLETADO'"
                       />
-                      <span class="text-slate-400 font-bold text-sm whitespace-nowrap">/ {{ escalaActual }}</span>
+                      <span class="text-slate-400 font-bold text-base sm:text-lg whitespace-nowrap">/ {{ escalaActual }}</span>
                     </div>
                   </div>
-                  <p
-                    v-if="esFaseDisciplina && conversionActual"
-                    class="text-[10px] font-bold text-primary/80 tracking-wide mb-2 break-words"
-                  >
-                    {{ conversionActual }}
-                  </p>
                   
-                  <div class="relative flex items-center gap-2 sm:gap-4 min-w-0" v-if="estadoOriginal !== 'COMPLETADO'">
-                    <span class="text-[10px] sm:text-xs font-black text-slate-400 shrink-0">0</span>
+                  <div class="relative flex items-center gap-3 sm:gap-4 min-w-0" v-if="estadoOriginal !== 'COMPLETADO'">
+                    <span class="text-xs font-black text-slate-400 shrink-0">0</span>
                     <div class="flex-1 min-w-0 relative flex items-center">
                       <input
                         type="range"
@@ -176,19 +165,21 @@
                         min="0"
                         :max="escalaActual"
                         step="0.01"
-                        class="w-full max-w-full h-3 bg-slate-200 rounded-full appearance-none cursor-pointer accent-primary focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all custom-range shadow-inner"
+                        class="w-full max-w-full h-4 sm:h-3 bg-slate-200 rounded-full appearance-none cursor-pointer accent-primary focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all custom-range shadow-inner"
                       />
                     </div>
-                    <span class="text-[10px] sm:text-xs font-black text-slate-400 shrink-0">{{ escalaActual }}</span>
+                    <span class="text-xs font-black text-slate-400 shrink-0">{{ escalaActual }}</span>
                   </div>
                 </div>
 
                 <div
                   v-if="esFaseDisciplina"
-                  class="sm:hidden flex items-center justify-between gap-2 px-1 text-[11px] font-bold text-slate-500 min-w-0"
+                  class="sm:hidden flex items-center justify-between gap-2 px-1 text-xs font-bold text-slate-600 min-w-0"
                 >
-                  <span class="truncate">Visual {{ formatNum(totalVisualDisciplina) }}/{{ formatNum(totalVisualPosibleDisciplina) }}</span>
-                  <span class="text-emerald-700 shrink-0">Real {{ formatNum(puntajeCalculado) }}/{{ formatNum(puntajePosible) }}</span>
+                  <span>Acumulado</span>
+                  <span class="text-primary font-black tabular-nums">
+                    {{ formatNum(totalVisualDisciplina) }} / {{ formatNum(totalVisualPosibleDisciplina) }}
+                  </span>
                 </div>
 
                 <!-- Desktop nav -->
@@ -254,17 +245,14 @@
               <div class="absolute top-0 left-0 w-full h-2 bg-secondary"></div>
               
               <template v-if="esFaseDisciplina">
-                <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Acumulado visual</h5>
-                <div class="flex items-end gap-1 mb-1">
+                <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Puntaje acumulado</h5>
+                <div class="flex items-end gap-1 mb-2">
                   <p class="text-5xl font-black italic tracking-tighter">{{ formatNum(totalVisualDisciplina) }}</p>
                   <p class="text-lg text-slate-500 font-bold mb-1.5">/ {{ formatNum(totalVisualPosibleDisciplina) }}</p>
                 </div>
-                <p class="text-[10px] text-emerald-300/90 font-bold mb-3">
-                  → {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }} pts reales
-                </p>
               </template>
               <template v-else>
-                <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Puntaje Acumulado</h5>
+                <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Puntaje acumulado</h5>
                 <div class="flex items-end gap-1 mb-2">
                   <p class="text-7xl font-black italic tracking-tighter">{{ formatNum(puntajeCalculado) }}</p>
                   <p class="text-xl text-slate-500 font-bold mb-2">/ {{ formatNum(puntajePosible) }}</p>
@@ -354,45 +342,47 @@
       </div>
     </main>
 
-    <!-- Barra de acciones móvil (en el flujo, sin position:fixed) -->
+    <!-- Barra de acciones móvil -->
     <div
       v-if="!loading && criterios.length > 0"
-      class="sm:hidden shrink-0 z-30 w-full max-w-full border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2.5 safe-bottom"
-      style="padding-bottom: max(0.65rem, env(safe-area-inset-bottom))"
+      class="sm:hidden shrink-0 z-30 w-full max-w-full border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-3"
+      style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom))"
     >
-      <div class="flex items-center gap-2 w-full min-w-0">
-        <button
-          type="button"
-          data-tutorial="anterior"
-          @click="pasoAnterior"
-          :disabled="criterioActualIndex === 0"
-          class="flex items-center justify-center size-11 rounded-xl bg-white border-2 border-slate-200 text-slate-600 shrink-0 disabled:opacity-30"
-          aria-label="Anterior"
-        >
-          <span class="material-symbols-outlined">arrow_back</span>
-        </button>
+      <div class="flex flex-col gap-2 w-full min-w-0">
+        <div class="flex items-center gap-2 w-full">
+          <button
+            type="button"
+            data-tutorial="anterior"
+            @click="pasoAnterior"
+            :disabled="criterioActualIndex === 0"
+            class="flex items-center justify-center gap-1.5 h-12 px-3 rounded-xl bg-white border-2 border-slate-200 text-slate-700 font-black uppercase text-[11px] tracking-widest shrink-0 disabled:opacity-30"
+          >
+            <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+            Anterior
+          </button>
 
-        <button
-          v-if="estadoOriginal !== 'COMPLETADO'"
-          type="button"
-          data-tutorial="guardar"
-          @click="guardar(false)"
-          :disabled="saving || tiempoRestante <= 0"
-          class="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-11 px-2 rounded-xl bg-white border-2 border-primary text-primary font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
-        >
-          <span class="material-symbols-outlined text-[18px]" :class="{ 'animate-spin': saving }">{{ saving ? 'sync' : 'save' }}</span>
-          <span class="truncate">{{ tiempoRestante <= 0 ? 'Cerrada' : 'Guardar' }}</span>
-        </button>
+          <button
+            v-if="estadoOriginal !== 'COMPLETADO'"
+            type="button"
+            data-tutorial="guardar"
+            @click="guardar(false)"
+            :disabled="saving || tiempoRestante <= 0"
+            class="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-12 px-3 rounded-xl bg-white border-2 border-primary text-primary font-black uppercase text-[11px] tracking-widest disabled:opacity-50"
+          >
+            <span class="material-symbols-outlined text-[20px]" :class="{ 'animate-spin': saving }">{{ saving ? 'sync' : 'save' }}</span>
+            {{ tiempoRestante <= 0 ? 'Fase cerrada' : 'Guardar' }}
+          </button>
+        </div>
 
         <button
           v-if="criterioActualIndex < totalCriterios - 1"
           type="button"
           data-tutorial="siguiente"
           @click="pasoSiguiente"
-          class="flex items-center justify-center gap-1 flex-1 min-w-0 h-11 px-2 rounded-xl bg-primary text-white font-black uppercase text-[10px] tracking-widest shadow-md"
+          class="flex items-center justify-center gap-2 w-full h-12 px-3 rounded-xl bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-md"
         >
-          <span class="truncate">Siguiente</span>
-          <span class="material-symbols-outlined text-[18px] shrink-0">arrow_forward</span>
+          Siguiente criterio
+          <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
         </button>
 
         <button
@@ -401,10 +391,10 @@
           data-tutorial="finalizar"
           @click="abrirResumenModal"
           :disabled="tiempoRestante <= 0"
-          class="flex items-center justify-center gap-1 flex-1 min-w-0 h-11 px-2 rounded-xl bg-secondary text-white font-black uppercase text-[10px] tracking-widest shadow-md disabled:bg-slate-200 disabled:text-slate-400"
+          class="flex items-center justify-center gap-2 w-full h-12 px-3 rounded-xl bg-secondary text-white font-black uppercase text-[11px] tracking-widest shadow-md disabled:bg-slate-200 disabled:text-slate-400"
         >
-          <span class="material-symbols-outlined text-[18px] shrink-0">{{ tiempoRestante <= 0 ? 'lock' : 'verified' }}</span>
-          <span class="truncate">{{ tiempoRestante <= 0 ? 'Cerrada' : 'Finalizar' }}</span>
+          <span class="material-symbols-outlined text-[20px]">{{ tiempoRestante <= 0 ? 'lock' : 'verified' }}</span>
+          {{ tiempoRestante <= 0 ? 'Fase cerrada' : 'Finalizar evaluación' }}
         </button>
       </div>
     </div>
@@ -419,117 +409,64 @@
         </v-card-title>
         
         <v-card-text class="pa-0 bg-slate-50 flex-grow-1 overflow-y-auto" style="max-height: 65vh;">
-          <!-- Disciplina: doble escala visual / real -->
+          <!-- Disciplina: solo puntaje que calificó el controlador -->
           <template v-if="esFaseDisciplina">
-            <div class="bg-white border-b border-slate-200 p-3.5 sm:p-6">
-              <p class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-2.5 sm:mb-4">
-                Totales
+            <div class="bg-white border-b border-slate-200 p-4 sm:p-6 text-center">
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje total</p>
+              <p class="text-2xl sm:text-4xl font-black text-primary tabular-nums leading-tight">
+                {{ formatNum(totalVisualDisciplina) }}
+                <span class="text-base sm:text-xl font-bold text-slate-400">/ {{ formatNum(totalVisualPosibleDisciplina) }}</span>
               </p>
-              <div class="grid grid-cols-2 gap-2 sm:gap-3">
-                <div class="rounded-xl sm:rounded-2xl border border-primary/20 sm:border-2 bg-primary/5 px-2.5 py-2.5 sm:p-4 text-center">
-                  <p class="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-primary/70 mb-0.5">Visual</p>
-                  <p class="text-lg sm:text-4xl font-black text-primary tabular-nums leading-tight">
-                    {{ formatNum(totalVisualDisciplina) }}
-                    <span class="text-[11px] sm:text-sm font-bold text-slate-400">/{{ formatNum(totalVisualPosibleDisciplina) }}</span>
-                  </p>
-                  <div class="mt-2 h-1 sm:h-1.5 bg-white rounded-full overflow-hidden border border-primary/10">
-                    <div
-                      class="h-full bg-primary rounded-full transition-all"
-                      :style="{ width: `${pctVisualDisciplina}%` }"
-                    />
-                  </div>
-                </div>
-                <div class="rounded-xl sm:rounded-2xl border border-emerald-200 sm:border-2 bg-emerald-50 px-2.5 py-2.5 sm:p-4 text-center">
-                  <p class="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-emerald-700/70 mb-0.5">Real</p>
-                  <p class="text-lg sm:text-4xl font-black text-emerald-800 tabular-nums leading-tight">
-                    {{ formatNum(puntajeCalculado) }}
-                    <span class="text-[11px] sm:text-sm font-bold text-slate-400">/{{ formatNum(puntajePosible) }}</span>
-                  </p>
-                  <div class="mt-2 h-1 sm:h-1.5 bg-white rounded-full overflow-hidden border border-emerald-100">
-                    <div
-                      class="h-full bg-emerald-600 rounded-full transition-all"
-                      :style="{ width: `${pctRealDisciplina}%` }"
-                    />
-                  </div>
-                </div>
+              <div class="mt-3 mx-auto max-w-xs h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-primary rounded-full transition-all"
+                  :style="{ width: `${pctVisualDisciplina}%` }"
+                />
               </div>
-              <p class="hidden sm:block text-[10px] text-slate-500 font-medium text-center mt-4 leading-relaxed">
-                Cada criterio se califica de 0 a su escala visual (ej. 6).
-                La suma visual (ej. 5×6 = 30) se convierte a puntos reales del sistema (ej. 5 pts).
-              </p>
             </div>
 
             <div class="p-3 sm:p-5">
-              <p class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 sm:mb-3 px-0.5">
-                {{ totalCriterios }} criterios
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 sm:mb-3 px-0.5">
+                Desglose · {{ totalCriterios }} criterios
               </p>
               <div class="space-y-1.5 sm:space-y-2">
                 <div
                   v-for="(row, idx) in desgloseDisciplina"
                   :key="row.idCriterio"
-                  class="bg-white border border-slate-200 rounded-xl sm:rounded-2xl px-2.5 py-2 sm:p-4"
+                  class="bg-white border border-slate-200 rounded-xl px-3 py-2.5 sm:p-3.5 flex items-center gap-2.5 min-w-0"
                 >
-                  <!-- Móvil: una sola fila compacta -->
-                  <div class="sm:hidden flex items-center gap-2">
-                    <span class="size-5 shrink-0 bg-slate-100 text-slate-600 rounded font-black text-[10px] flex items-center justify-center">
-                      {{ idx + 1 }}
-                    </span>
-                    <p class="min-w-0 flex-1 text-xs font-bold text-slate-800 truncate">{{ row.nombre }}</p>
-                    <div class="shrink-0 text-right leading-tight">
-                      <p class="text-xs font-black text-primary tabular-nums">{{ formatNum(row.visual) }}/{{ formatNum(row.escala) }}</p>
-                      <p class="text-[10px] font-bold text-emerald-700 tabular-nums">{{ formatNum(row.real) }} pts</p>
-                    </div>
-                  </div>
-                  <!-- Desktop: desglose amplio -->
-                  <div class="hidden sm:flex items-start gap-3">
-                    <span class="size-7 shrink-0 bg-slate-100 text-slate-600 rounded-lg font-black text-xs flex items-center justify-center mt-0.5">
-                      {{ idx + 1 }}
-                    </span>
-                    <div class="min-w-0 flex-1">
-                      <p class="font-bold text-sm text-slate-800 leading-snug">{{ row.nombre }}</p>
-                      <div class="mt-2.5 grid grid-cols-2 gap-2">
-                        <div class="rounded-xl bg-primary/5 border border-primary/10 px-2.5 py-2">
-                          <p class="text-[8px] font-black uppercase tracking-widest text-primary/60">Visual</p>
-                          <p class="text-sm font-black text-primary">
-                            {{ formatNum(row.visual) }}
-                            <span class="text-[10px] font-bold text-slate-400">/ {{ formatNum(row.escala) }}</span>
-                          </p>
-                        </div>
-                        <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-2.5 py-2">
-                          <p class="text-[8px] font-black uppercase tracking-widest text-emerald-700/60">Real</p>
-                          <p class="text-sm font-black text-emerald-800">
-                            {{ formatNum(row.real) }}
-                            <span class="text-[10px] font-bold text-slate-400">/ {{ formatNum(row.max) }} pts</span>
-                          </p>
-                        </div>
-                      </div>
-                      <p class="text-[10px] text-slate-400 font-medium mt-2">
-                        {{ formatNum(row.visual) }} / {{ formatNum(row.escala) }} → {{ formatNum(row.real) }} pts reales
-                      </p>
-                    </div>
-                  </div>
+                  <span class="size-6 shrink-0 bg-slate-100 text-slate-600 rounded-lg font-black text-[10px] flex items-center justify-center">
+                    {{ idx + 1 }}
+                  </span>
+                  <p class="min-w-0 flex-1 text-xs sm:text-sm font-bold text-slate-800 leading-snug break-words">
+                    {{ row.nombre }}
+                  </p>
+                  <p class="shrink-0 text-sm sm:text-base font-black text-primary tabular-nums">
+                    {{ formatNum(row.visual) }}
+                    <span class="text-[11px] font-bold text-slate-400">/ {{ formatNum(row.escala) }}</span>
+                  </p>
                 </div>
               </div>
             </div>
           </template>
 
-          <!-- Otras fases (sin escala visual) -->
+          <!-- Otras fases -->
           <template v-else>
             <div class="bg-white border-b border-slate-200 p-8 text-center flex flex-col items-center">
-              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje Total Calculado</p>
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje total</p>
               <div class="flex items-end justify-center gap-1">
-                <span class="text-6xl font-black text-slate-900 italic tracking-tighter">{{ formatNum(puntajeCalculado) }}</span>
-                <span class="text-xl text-slate-500 font-bold mb-1.5">/ {{ formatNum(puntajePosible) }} pts</span>
+                <span class="text-4xl sm:text-6xl font-black text-slate-900 italic tracking-tighter">{{ formatNum(puntajeCalculado) }}</span>
+                <span class="text-lg sm:text-xl text-slate-500 font-bold mb-1.5">/ {{ formatNum(puntajePosible) }} pts</span>
               </div>
             </div>
 
             <div class="p-6">
-              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Desglose por Criterio</p>
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Desglose por criterio</p>
               <div class="space-y-2">
-                <div v-for="(c, idx) in criterios" :key="c.idCriterio" class="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl gap-3">
+                <div v-for="(c, idx) in criterios" :key="c.idCriterio" class="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl gap-3 min-w-0">
                   <div class="flex items-center gap-3 min-w-0">
                     <span class="size-6 shrink-0 bg-slate-100 text-slate-500 rounded font-black text-xs flex items-center justify-center">{{ idx + 1 }}</span>
-                    <span class="font-bold text-sm text-slate-700 truncate">{{ c.nombre }}</span>
+                    <span class="font-bold text-sm text-slate-700 break-words min-w-0">{{ c.nombre }}</span>
                   </div>
                   <div class="font-black text-primary text-lg shrink-0">
                     {{ formValues[c.idCriterio] ?? '0' }} <span class="text-xs text-slate-400 font-bold">/ {{ Number(c.puntajeMaximo) }}</span>
@@ -581,8 +518,7 @@
             </p>
             <p class="text-xs text-slate-500 font-bold pt-1">
               <template v-if="esFaseDisciplina">
-                Visual {{ formatNum(totalVisualDisciplina) }} / {{ formatNum(totalVisualPosibleDisciplina) }}
-                · Real {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }} pts
+                Puntaje: {{ formatNum(totalVisualDisciplina) }} / {{ formatNum(totalVisualPosibleDisciplina) }}
               </template>
               <template v-else>
                 Puntaje: {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }}
@@ -676,16 +612,6 @@ const escalaActual = computed(() => {
   if (!c) return 1
   if (esFaseDisciplina.value) return Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6
   return Number(c.puntajeMaximo) || 0
-})
-
-const conversionActual = computed(() => {
-  if (!esFaseDisciplina.value || !criterioActual.value) return null
-  const visual = Number(formValues.value[criterioActual.value.idCriterio])
-  if (!Number.isFinite(visual)) return null
-  const escala = escalaActual.value
-  const max = Number(criterioActual.value.puntajeMaximo) || 0
-  const real = escala > 0 ? ((Math.min(visual, escala) / escala) * max).toFixed(2) : '0'
-  return `${visual} / ${escala} → ${real} pts`
 })
 
 const loading = ref(true)
@@ -1031,14 +957,20 @@ onUnmounted(() => { if (timerInterval) clearInterval(timerInterval) })
 input[type=range].custom-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 24px;
-  height: 24px;
-  background: #003399; /* Primary Blue */
+  width: 28px;
+  height: 28px;
+  background: #003399;
   cursor: pointer;
   border-radius: 50%;
   border: 3px solid white;
   box-shadow: 0 0 10px rgba(0, 51, 153, 0.3);
   transition: transform 0.1s ease;
+}
+@media (min-width: 640px) {
+  input[type=range].custom-range::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+  }
 }
 input[type=range].custom-range::-webkit-slider-thumb:hover {
   transform: scale(1.1);

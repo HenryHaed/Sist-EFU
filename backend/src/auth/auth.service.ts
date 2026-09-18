@@ -224,11 +224,13 @@ export class AuthService {
     const qrBuffer = Buffer.from(qrBase64, 'base64');
 
     const CM = 28.3464567;
-    const W = 10 * CM;
-    const H = 6 * CM;
+    const CARD_W = 10 * CM;
+    const CARD_H = 6 * CM;
+    const PAGE_W = CARD_W * 2; // anverso | reverso en una sola hoja
+    const PAGE_H = CARD_H;
     const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({
-      size: [W, H],
+      size: [PAGE_W, PAGE_H],
       margin: 0,
       autoFirstPage: false,
       info: {
@@ -253,17 +255,20 @@ export class AuthService {
     });
     const codigoCorto = `EFU-${String(usuario.idUsuario).padStart(5, '0')}`;
 
-    // ── ANVERSO ──────────────────────────────────────────────
-    doc.addPage({ size: [W, H], margin: 0 });
+    doc.addPage({ size: [PAGE_W, PAGE_H], margin: 0 });
 
-    doc.rect(0, 0, W, H).fill('#ffffff');
-    doc.rect(0, 0, W, 22).fill(PDF_UMSA_BLUE);
-    doc.rect(0, H - 14, W, 14).fill(PDF_UMSA_BLUE);
-    doc.rect(0, 22, 4, H - 36).fill(PDF_UMSA_RED);
+    // Fondo blanco de toda la hoja
+    doc.rect(0, 0, PAGE_W, PAGE_H).fill('#ffffff');
+
+    // ── ANVERSO (izquierda) ──────────────────────────────────
+    const ax0 = 0;
+    doc.rect(ax0, 0, CARD_W, 22).fill(PDF_UMSA_BLUE);
+    doc.rect(ax0, CARD_H - 14, CARD_W, 14).fill(PDF_UMSA_BLUE);
+    doc.rect(ax0, 22, 4, CARD_H - 36).fill(PDF_UMSA_RED);
 
     if (hasLogo) {
       try {
-        doc.image(logoPath, 10, 3.5, { height: 15 });
+        doc.image(logoPath, ax0 + 10, 3.5, { height: 15 });
       } catch {
         /* ignore */
       }
@@ -273,97 +278,79 @@ export class AuthService {
       .fillColor('#ffffff')
       .font('Helvetica-Bold')
       .fontSize(7)
-      .text('UMSA · ENTRADA FOLKLÓRICA UNIVERSITARIA', hasLogo ? 30 : 10, 5, {
-        width: W - (hasLogo ? 40 : 20),
+      .text('UMSA · ENTRADA FOLKLÓRICA UNIVERSITARIA', ax0 + (hasLogo ? 30 : 10), 5, {
+        width: CARD_W - (hasLogo ? 40 : 20),
       });
     doc
       .font('Helvetica')
       .fontSize(5.5)
-      .text('CREDENCIAL DEL SISTEMA', hasLogo ? 30 : 10, 13, {
-        width: W - (hasLogo ? 40 : 20),
+      .text('CREDENCIAL DEL SISTEMA', ax0 + (hasLogo ? 30 : 10), 13, {
+        width: CARD_W - (hasLogo ? 40 : 20),
       });
 
-    // Avatar circle
-    const ax = 18;
-    const ay = 42;
-    const ar = 16;
-    doc.circle(ax + ar, ay + ar, ar).fill('#e2e8f0');
+    const avX = ax0 + 18;
+    const avY = 42;
+    const avR = 16;
+    doc.circle(avX + avR, avY + avR, avR).fill('#e2e8f0');
     doc
       .fillColor(PDF_UMSA_BLUE)
       .font('Helvetica-Bold')
       .fontSize(14)
       .text(
         (usuario.nombres || '?').charAt(0).toUpperCase(),
-        ax,
-        ay + ar - 6,
-        { width: ar * 2, align: 'center' },
+        avX,
+        avY + avR - 6,
+        { width: avR * 2, align: 'center' },
       );
 
-    const tx = 56;
+    const tx = ax0 + 56;
     doc
       .fillColor('#0f172a')
       .font('Helvetica-Bold')
       .fontSize(9)
-      .text(nombreCompleto || '—', tx, 36, { width: W - tx - 12 });
+      .text(nombreCompleto || '—', tx, 36, { width: CARD_W - 68 });
 
-    doc
-      .fillColor('#64748b')
-      .font('Helvetica')
-      .fontSize(6)
-      .text('CÉDULA DE IDENTIDAD', tx, 52);
-    doc
-      .fillColor('#0f172a')
-      .font('Helvetica-Bold')
-      .fontSize(8)
-      .text(usuario.ci || '—', tx, 60);
+    doc.fillColor('#64748b').font('Helvetica').fontSize(6).text('CÉDULA DE IDENTIDAD', tx, 52);
+    doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8).text(usuario.ci || '—', tx, 60);
 
-    doc
-      .fillColor('#64748b')
-      .font('Helvetica')
-      .fontSize(6)
-      .text('ROL EN EL SISTEMA', tx, 74);
-    doc
-      .fillColor(PDF_UMSA_BLUE)
-      .font('Helvetica-Bold')
-      .fontSize(9)
-      .text(etiqueta.titulo, tx, 82);
+    doc.fillColor('#64748b').font('Helvetica').fontSize(6).text('ROL EN EL SISTEMA', tx, 74);
+    doc.fillColor(PDF_UMSA_BLUE).font('Helvetica-Bold').fontSize(9).text(etiqueta.titulo, tx, 82);
     doc
       .fillColor(PDF_UMSA_RED)
       .font('Helvetica-Oblique')
       .fontSize(6.5)
-      .text(etiqueta.subtitulo, tx, 93, { width: W - tx - 12 });
+      .text(etiqueta.subtitulo, tx, 93, { width: CARD_W - 68 });
 
     if (usuario.correo) {
       doc
         .fillColor('#64748b')
         .font('Helvetica')
         .fontSize(5.5)
-        .text(usuario.correo, tx, 106, { width: W - tx - 12 });
+        .text(usuario.correo, tx, 106, { width: CARD_W - 68 });
     }
 
     doc
       .fillColor('#ffffff')
       .font('Helvetica')
       .fontSize(5.5)
-      .text(`Código ${codigoCorto}  ·  Emitida ${emitido}  ·  ANVERSO`, 10, H - 10, {
-        width: W - 20,
+      .text(`Código ${codigoCorto}  ·  Emitida ${emitido}  ·  ANVERSO`, ax0 + 10, CARD_H - 10, {
+        width: CARD_W - 20,
       });
 
-    // ── REVERSO ──────────────────────────────────────────────
-    doc.addPage({ size: [W, H], margin: 0 });
-    doc.rect(0, 0, W, H).fill('#ffffff');
-    doc.rect(0, 0, W, 18).fill(PDF_UMSA_BLUE);
-    doc.rect(0, H - 14, W, 14).fill(PDF_UMSA_BLUE);
-    doc.rect(W - 4, 18, 4, H - 32).fill(PDF_UMSA_RED);
+    // ── REVERSO (derecha) ────────────────────────────────────
+    const bx0 = CARD_W;
+    doc.rect(bx0, 0, CARD_W, 18).fill(PDF_UMSA_BLUE);
+    doc.rect(bx0, CARD_H - 14, CARD_W, 14).fill(PDF_UMSA_BLUE);
+    doc.rect(bx0 + CARD_W - 4, 18, 4, CARD_H - 32).fill(PDF_UMSA_RED);
 
     doc
       .fillColor('#ffffff')
       .font('Helvetica-Bold')
       .fontSize(7)
-      .text('VALIDACIÓN DE CREDENCIAL', 12, 6, { width: W - 24 });
+      .text('VALIDACIÓN DE CREDENCIAL', bx0 + 12, 6, { width: CARD_W - 24 });
 
     const qrSize = 78;
-    const qrX = 16;
+    const qrX = bx0 + 16;
     const qrY = 28;
     doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
 
@@ -372,7 +359,7 @@ export class AuthService {
       .fillColor('#0f172a')
       .font('Helvetica-Bold')
       .fontSize(8)
-      .text('Escanea el código QR', rx, 32, { width: W - rx - 14 });
+      .text('Escanea el código QR', rx, 32, { width: bx0 + CARD_W - rx - 14 });
     doc
       .fillColor('#475569')
       .font('Helvetica')
@@ -381,30 +368,18 @@ export class AuthService {
         'Para verificar la autenticidad de esta credencial ante el sistema oficial de la Entrada Folklórica Universitaria.',
         rx,
         44,
-        { width: W - rx - 14, lineGap: 1.5 },
+        { width: bx0 + CARD_W - rx - 14, lineGap: 1.5 },
       );
 
-    doc
-      .fillColor('#64748b')
-      .font('Helvetica')
-      .fontSize(5.5)
-      .text('TITULAR', rx, 72);
+    doc.fillColor('#64748b').font('Helvetica').fontSize(5.5).text('TITULAR', rx, 72);
     doc
       .fillColor('#0f172a')
       .font('Helvetica-Bold')
       .fontSize(7)
-      .text(nombreCompleto, rx, 80, { width: W - rx - 14 });
+      .text(nombreCompleto, rx, 80, { width: bx0 + CARD_W - rx - 14 });
 
-    doc
-      .fillColor('#64748b')
-      .font('Helvetica')
-      .fontSize(5.5)
-      .text('ROL', rx, 94);
-    doc
-      .fillColor(PDF_UMSA_BLUE)
-      .font('Helvetica-Bold')
-      .fontSize(7.5)
-      .text(etiqueta.titulo, rx, 102);
+    doc.fillColor('#64748b').font('Helvetica').fontSize(5.5).text('ROL', rx, 94);
+    doc.fillColor(PDF_UMSA_BLUE).font('Helvetica-Bold').fontSize(7.5).text(etiqueta.titulo, rx, 102);
     if (rol === 'superusuario') {
       doc
         .fillColor(PDF_UMSA_RED)
@@ -417,9 +392,32 @@ export class AuthService {
       .fillColor('#ffffff')
       .font('Helvetica')
       .fontSize(5.5)
-      .text(`Código ${codigoCorto}  ·  Uso exclusivo del evento  ·  REVERSO`, 10, H - 10, {
-        width: W - 20,
+      .text(`Código ${codigoCorto}  ·  Uso exclusivo del evento  ·  REVERSO`, bx0 + 10, CARD_H - 10, {
+        width: CARD_W - 20,
       });
+
+    // Línea de pliegue (tipo libro) al centro
+    doc
+      .save()
+      .strokeColor('#cbd5e1')
+      .lineWidth(0.6)
+      .dash(3, { space: 2 })
+      .moveTo(CARD_W, 4)
+      .lineTo(CARD_W, CARD_H - 4)
+      .stroke()
+      .undash()
+      .restore();
+
+    // Marcas de corte en las esquinas exteriores
+    const mark = (x1: number, y1: number, x2: number, y2: number) => {
+      doc.moveTo(x1, y1).lineTo(x2, y2).stroke();
+    };
+    doc.save().strokeColor('#94a3b8').lineWidth(0.5);
+    mark(0, 6, 0, 0); mark(0, 0, 6, 0);
+    mark(PAGE_W, 6, PAGE_W, 0); mark(PAGE_W, 0, PAGE_W - 6, 0);
+    mark(0, PAGE_H - 6, 0, PAGE_H); mark(0, PAGE_H, 6, PAGE_H);
+    mark(PAGE_W, PAGE_H - 6, PAGE_W, PAGE_H); mark(PAGE_W, PAGE_H, PAGE_W - 6, PAGE_H);
+    doc.restore();
 
     doc.end();
   }

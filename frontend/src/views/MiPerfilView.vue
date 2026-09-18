@@ -55,7 +55,7 @@
         <section v-if="puedeCredencial" class="border-t border-slate-100 pt-5">
           <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Credencial del sistema</h3>
           <p class="text-xs text-slate-500 font-medium mb-4 leading-relaxed">
-            Genera tu carnet digital (anverso y reverso, 10 × 6 cm) con código QR para validación oficial.
+            Genera tu carnet digital (anverso y reverso en una hoja tipo libro, 10 × 6 cm c/u) con código QR para validación oficial.
           </p>
           <button
             type="button"
@@ -151,7 +151,7 @@ const generarCredencial = async () => {
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
-    notify.success('Credencial lista', 'Se descargó el PDF (anverso y reverso 10×6 cm).')
+    notify.success('Credencial lista', 'Se descargó el PDF (anverso | reverso en una hoja, 10×6 cm c/u).')
   } catch (e) {
     let msg = e.response?.data?.message || 'No se pudo generar la credencial.'
     if (e.response?.data instanceof Blob) {
