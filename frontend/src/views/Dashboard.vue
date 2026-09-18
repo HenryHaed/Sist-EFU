@@ -424,7 +424,12 @@
         </header>
 
         <!-- Scroll Area -->
-        <main class="flex-1 overflow-y-auto overflow-x-hidden bg-transparent min-w-0">
+        <main
+          class="flex-1 bg-transparent min-w-0"
+          :class="esVistaWizard
+            ? 'overflow-hidden flex flex-col'
+            : 'overflow-y-auto overflow-x-hidden'"
+        >
           <!-- Citaciones privadas para delegados -->
           <div
             v-if="esDelegado && citasDelegado.length > 0"
@@ -514,7 +519,11 @@
             />
 
             <!-- Vista: Wizard de Evaluación -->
-            <div v-else-if="vistaActual === 'wizard' && activeFaseJurado && activeFraternidadJurado" key="wizard">
+            <div
+              v-else-if="vistaActual === 'wizard' && activeFaseJurado && activeFraternidadJurado"
+              key="wizard"
+              class="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden h-full"
+            >
                <AsistenteContent 
                  :fase-seleccionada="activeFaseJurado" 
                  :fraternidad="activeFraternidadJurado" 
@@ -532,7 +541,11 @@
               />
             </div>
 
-            <div v-else-if="vistaActual === 'wizard_concurso' && activeFaseJurado" key="wizard_concurso">
+            <div
+              v-else-if="vistaActual === 'wizard_concurso' && activeFaseJurado"
+              key="wizard_concurso"
+              class="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden h-full"
+            >
                <AsistenteContent 
                  :fase-seleccionada="activeFaseJurado" 
                  :fraternidad="activeFraternidadJurado" 
@@ -873,6 +886,9 @@ const nombreSidebar = computed(() =>
   nombreCompletoUsuario(currentUser.value) || currentUser.value?.nombres || 'Cargando...',
 )
 const rolSidebar = computed(() => etiquetaRol(currentUser.value?.rol).titulo)
+const esVistaWizard = computed(() =>
+  vistaActual.value === 'wizard' || vistaActual.value === 'wizard_concurso',
+)
 const esDelegado = computed(() => authStore.userRole?.toLowerCase() === 'delegado')
 const citasDelegado = ref([])
 

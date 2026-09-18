@@ -1,64 +1,70 @@
 <template>
-  <div class="relative flex flex-col w-full h-full wizard-gradient overflow-y-auto">
+  <div class="relative flex flex-col w-full max-w-full min-w-0 h-full min-h-0 wizard-gradient overflow-x-hidden overflow-y-hidden">
     
-    <!-- Wizard Header (replaces standard header) -->
-    <div class="sticky top-0 z-40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 px-4 sm:px-6 py-3 sm:py-4 bg-white/95 backdrop-blur-md shadow-sm">
-      <div class="flex items-center gap-3 min-w-0">
+    <!-- Wizard Header -->
+    <div class="shrink-0 z-40 w-full max-w-full border-b border-slate-100 px-3 sm:px-6 py-2.5 sm:py-4 bg-white/95 backdrop-blur-md shadow-sm">
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0 w-full">
         <button
           data-tutorial="volver"
+          type="button"
           @click="$emit('volver')"
-          class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-50 text-slate-500 hover:bg-slate-200 transition-colors border border-slate-200"
+          class="flex items-center justify-center rounded-lg h-9 w-9 sm:h-10 sm:w-10 bg-slate-50 text-slate-500 hover:bg-slate-200 transition-colors border border-slate-200 shrink-0"
         >
-          <span class="material-symbols-outlined">arrow_back</span>
+          <span class="material-symbols-outlined text-[20px] sm:text-[24px]">arrow_back</span>
         </button>
-        <div class="flex flex-col">
-          <h2 class="text-primary text-base sm:text-xl font-black italic leading-tight tracking-tight uppercase truncate">
-            <template v-if="participanteNombre">
-              {{ participanteNombre }}
-              <span v-if="fraternidad" class="text-slate-400 font-medium text-sm block sm:inline sm:ml-2">/ {{ fraternidad.nombre }}</span>
-            </template>
-            <template v-else>
-              {{ fraternidad?.nombre || 'Evaluación' }}
-            </template>
+        <div class="flex flex-col min-w-0 flex-1 overflow-hidden">
+          <h2 class="text-primary text-sm sm:text-xl font-black italic leading-snug tracking-tight uppercase truncate">
+            <template v-if="participanteNombre">{{ participanteNombre }}</template>
+            <template v-else>{{ fraternidad?.nombre || 'Evaluación' }}</template>
           </h2>
-          <p class="text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-            {{ faseSeleccionada?.nombre }} <span v-if="participanteTipo" class="text-amber-600 ml-1">• {{ participanteTipo }}</span>
+          <p class="text-slate-500 text-[9px] sm:text-[10px] uppercase tracking-widest font-bold truncate">
+            {{ faseSeleccionada?.nombre }}
+            <span class="text-primary normal-case tracking-normal font-bold">
+              · {{ criterioActualIndex + 1 }}/{{ totalCriterios || 0 }}
+            </span>
+            <span v-if="participanteTipo" class="text-amber-600 ml-1">· {{ participanteTipo }}</span>
           </p>
         </div>
-      </div>
-      
-      <div class="flex items-center gap-3 mt-4 sm:mt-0 flex-wrap justify-end">
+        <div
+          class="flex items-center gap-1 px-2 py-1.5 rounded-lg border shrink-0"
+          :class="urgenciaStatus.textClass"
+        >
+          <span class="material-symbols-outlined text-[14px] sm:text-sm animate-pulse">schedule</span>
+          <span class="text-[10px] sm:text-xs font-black tabular-nums whitespace-nowrap">{{ countdownText }}</span>
+        </div>
         <button
           type="button"
-          class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors"
+          class="hidden sm:inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors shrink-0"
           @click="abrirTutorial"
         >
           <span class="material-symbols-outlined text-[16px]">school</span>
-          Ver tutorial
+          Tutorial
         </button>
-        <div class="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg border border-slate-200" :class="urgenciaStatus.textClass">
-          <span class="material-symbols-outlined animate-pulse text-sm">schedule</span>
-          <span class="text-xs font-black">{{ countdownText }}</span>
-        </div>
         <button
           v-if="esFaseMonografia && fraternidad"
+          type="button"
           @click="abrirMonografia"
           :disabled="cargandoMonografia"
-          class="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-800 rounded-lg font-black text-[10px] uppercase tracking-widest border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+          class="hidden sm:flex items-center gap-2 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg font-black text-[10px] uppercase tracking-widest border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50 shrink-0"
         >
           <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
-          Ver Monografía
+          Monografía
         </button>
-        <div v-if="estadoOriginal === 'COMPLETADO'" class="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-black text-xs uppercase tracking-widest border border-emerald-200">
-          <span class="material-symbols-outlined text-sm">verified_user</span> Sellada
+        <div
+          v-if="estadoOriginal === 'COMPLETADO'"
+          class="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-black text-[10px] uppercase tracking-widest border border-emerald-200 shrink-0"
+        >
+          <span class="material-symbols-outlined text-sm">verified_user</span>
+          Sellada
         </div>
       </div>
     </div>
 
     <TutorialCalificarModal v-model="tutorialAbierto" :variant="tutorialVariant" />
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col items-center p-4 sm:p-6 md:p-8 w-full max-w-6xl mx-auto min-w-0">
+    <!-- Main scrollable content -->
+    <main class="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden">
+      <div class="flex flex-col items-stretch w-full max-w-6xl mx-auto min-w-0 px-3 sm:px-6 md:px-8 pt-3 sm:pt-6 pb-4 sm:pb-8">
       
       <!-- Loading State -->
       <div v-if="loading" class="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -67,14 +73,20 @@
       </div>
 
       <template v-else-if="criterios.length > 0">
-        <!-- Progress section -->
-        <div class="w-full max-w-5xl mb-4 lg:mb-6">
-          <h3 class="text-2xl sm:text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-tight">
-            Paso {{ criterioActualIndex + 1 }}: Evalúa {{ criterioActual.nombre }}
+        <!-- Progress -->
+        <div class="w-full min-w-0 mb-3 sm:mb-6">
+          <div class="sm:hidden mb-2">
+            <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full transition-all" :style="{ width: `${porcentajeProgreso}%` }" />
+            </div>
+          </div>
+          <h3 class="text-base sm:text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-snug break-words">
+            <span class="sm:hidden line-clamp-2">{{ criterioActual.nombre }}</span>
+            <span class="hidden sm:inline">Paso {{ criterioActualIndex + 1 }}: Evalúa {{ criterioActual.nombre }}</span>
           </h3>
-          <p class="text-slate-500 text-sm sm:text-sm font-medium mt-1.5">
+          <p class="text-slate-500 text-[11px] sm:text-sm font-medium mt-1 break-words">
             <template v-if="esFaseDisciplina">
-              Escala visual {{ escalaActual }} · máx. real {{ Number(criterioActual.puntajeMaximo) }} pts
+              0–{{ escalaActual }} visual · {{ Number(criterioActual.puntajeMaximo) }} pts reales
             </template>
             <template v-else>
               Máximo {{ Number(criterioActual.puntajeMaximo) }} pts
@@ -84,142 +96,146 @@
         </div>
 
         <!-- Layout Grid -->
-        <div class="relative w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-10">
+        <div class="relative w-full min-w-0 max-w-full grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-8 items-start mb-4 sm:mb-10">
           
-          <!-- LEFT CARD (Active Criterion) -->
-          <div class="lg:col-span-8 flex flex-col glass-panel rounded-2xl overflow-hidden border-t-4 border-t-primary bg-white shadow-xl">
-            <!-- Criterion Image (solo desktop) -->
+          <!-- LEFT CARD -->
+          <div class="lg:col-span-8 flex flex-col min-w-0 max-w-full glass-panel rounded-2xl overflow-hidden border-t-4 border-t-primary bg-white shadow-xl">
             <div class="hidden lg:block aspect-video relative w-full overflow-hidden bg-slate-100">
               <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent z-10 pointer-events-none"></div>
-              
-              <!-- Badge status -->
               <div class="absolute top-4 left-4 z-20 bg-primary px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest text-white shadow-lg border-l-4 border-secondary flex items-center gap-1">
                 <span class="material-symbols-outlined text-[14px]" v-if="estadoOriginal === 'COMPLETADO'">lock</span>
                 <span class="material-symbols-outlined text-[14px]" v-else>radio_button_checked</span>
                 {{ estadoOriginal === 'COMPLETADO' ? 'Lectura' : 'En Evaluación' }}
               </div>
-              
               <div class="absolute bottom-4 right-4 z-20 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-white font-black text-xs border border-white/30 shadow-lg">
                 Máximo: {{ Number(criterioActual.puntajeMaximo) }} pts
               </div>
-
-              <img 
-                v-if="criterioActual.urlImagen" 
-                :src="getImageUrl(criterioActual.urlImagen)" 
-                class="w-full h-full object-cover" 
-                alt="Imagen Criterio" 
+              <img
+                v-if="criterioActual.urlImagen"
+                :src="getImageUrl(criterioActual.urlImagen)"
+                class="w-full h-full object-cover"
+                alt="Imagen Criterio"
               />
               <div v-else class="w-full h-full andean-pattern flex items-center justify-center opacity-80 mix-blend-multiply bg-primary/10">
                 <span class="material-symbols-outlined text-6xl text-primary/20">school</span>
               </div>
             </div>
             
-            <div class="p-4 sm:p-6 md:p-10 flex-1 flex flex-col bg-white">
-              <!-- Título/desc: en móvil más breve y después del puntaje -->
-              <div class="mb-4 lg:mb-8 order-2 lg:order-1">
-                <div class="hidden lg:flex items-center gap-2 mb-3">
+            <div class="flex-1 flex flex-col bg-white min-w-0 p-3 sm:p-6 md:p-10">
+              <!-- Descripción solo desktop / tablet -->
+              <div class="hidden sm:block mb-4 lg:mb-8 order-2 lg:order-1 min-w-0">
+                <div class="hidden lg:flex items-center gap-2 mb-3 min-w-0">
                   <span class="size-2 rounded-full bg-secondary shrink-0"></span>
-                  <h4 class="text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-tight">
+                  <h4 class="text-2xl font-black text-slate-900 italic tracking-tighter uppercase leading-tight break-words min-w-0">
                     Evalúa {{ criterioActual.nombre }}
                   </h4>
                 </div>
-                <p class="text-slate-600 text-sm sm:text-sm leading-relaxed font-medium line-clamp-4 lg:line-clamp-none">
+                <p class="text-slate-600 text-sm leading-relaxed font-medium line-clamp-4 lg:line-clamp-none break-words">
                   {{ criterioActual.descripcion || 'Asigne el puntaje correspondiente de acuerdo a los criterios observados durante el desarrollo del recorrido.' }}
                 </p>
               </div>
 
-              <div class="mt-0 lg:mt-auto space-y-6 lg:space-y-8 order-1 lg:order-2">
-                <!-- Score Control (primero en móvil) -->
-                <div class="bg-slate-50 p-4 sm:p-6 rounded-2xl border border-slate-200" data-tutorial="puntaje">
-                  <div class="flex justify-between items-center mb-4 sm:mb-6 gap-3">
-                    <label class="text-slate-800 font-black text-sm sm:text-sm uppercase tracking-widest flex items-center gap-2">
-                      <span class="material-symbols-outlined text-primary text-2xl sm:text-xl">analytics</span>
-                      Puntaje
+              <div class="mt-0 lg:mt-auto order-1 lg:order-2 space-y-4 sm:space-y-8 min-w-0">
+                <!-- Score Control -->
+                <div class="bg-slate-50 rounded-2xl border border-slate-200 p-3 sm:p-6 min-w-0" data-tutorial="puntaje">
+                  <div class="flex justify-between items-center gap-2 sm:gap-3 mb-3 sm:mb-6 min-w-0">
+                    <label class="text-slate-800 font-black text-xs sm:text-sm uppercase tracking-widest flex items-center gap-1.5 sm:gap-2 shrink-0">
+                      <span class="material-symbols-outlined text-primary text-xl">analytics</span>
+                      <span>{{ esFaseDisciplina ? 'Nota' : 'Puntaje' }}</span>
                     </label>
-                    <div class="flex items-center gap-2 sm:gap-3">
-                      <input 
+                    <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                      <input
                         ref="puntajeInputRef"
-                        type="number" 
+                        type="number"
                         inputmode="decimal"
                         enterkeyhint="done"
-                        v-model.number="formValues[criterioActual.idCriterio]" 
-                        min="0" 
+                        v-model.number="formValues[criterioActual.idCriterio]"
+                        min="0"
                         :max="escalaActual"
                         @input="validarPuntaje(criterioActual)"
                         @blur="validarPuntaje(criterioActual)"
-                        class="w-28 sm:w-24 px-3 py-3 sm:py-2 bg-white border-2 border-slate-300 text-primary font-black text-3xl sm:text-2xl text-center rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
+                        class="w-[4.5rem] sm:w-24 px-2 py-2.5 sm:py-2 bg-white border-2 border-slate-300 text-primary font-black text-2xl text-center rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none"
                         :disabled="estadoOriginal === 'COMPLETADO'"
                       />
-                      <span class="text-slate-400 font-bold text-sm">/ {{ escalaActual }}</span>
+                      <span class="text-slate-400 font-bold text-sm whitespace-nowrap">/ {{ escalaActual }}</span>
                     </div>
                   </div>
-                  <p v-if="esFaseDisciplina && conversionActual" class="text-[10px] font-bold text-primary/80 uppercase tracking-widest -mt-2">
-                    Equivalente: {{ conversionActual }}
-                    <span class="text-slate-400 font-medium normal-case tracking-normal">
-                      (máx. {{ Number(criterioActual.puntajeMaximo) }} pts reales)
-                    </span>
+                  <p
+                    v-if="esFaseDisciplina && conversionActual"
+                    class="text-[10px] font-bold text-primary/80 tracking-wide mb-2 break-words"
+                  >
+                    {{ conversionActual }}
                   </p>
                   
-                  <div class="relative flex items-center gap-4" v-if="estadoOriginal !== 'COMPLETADO'">
-                    <span class="text-xs font-black text-slate-400">0</span>
-                    <div class="flex-1 relative flex items-center group">
-                      <input 
-                        type="range" 
-                        v-model.number="formValues[criterioActual.idCriterio]" 
-                        min="0" 
+                  <div class="relative flex items-center gap-2 sm:gap-4 min-w-0" v-if="estadoOriginal !== 'COMPLETADO'">
+                    <span class="text-[10px] sm:text-xs font-black text-slate-400 shrink-0">0</span>
+                    <div class="flex-1 min-w-0 relative flex items-center">
+                      <input
+                        type="range"
+                        v-model.number="formValues[criterioActual.idCriterio]"
+                        min="0"
                         :max="escalaActual"
                         step="0.01"
-                        class="w-full h-3 bg-slate-200 rounded-full appearance-none cursor-pointer accent-primary focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all custom-range shadow-inner"
+                        class="w-full max-w-full h-3 bg-slate-200 rounded-full appearance-none cursor-pointer accent-primary focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all custom-range shadow-inner"
                       />
                     </div>
-                    <span class="text-xs font-black text-slate-400">{{ escalaActual }}</span>
+                    <span class="text-[10px] sm:text-xs font-black text-slate-400 shrink-0">{{ escalaActual }}</span>
                   </div>
                 </div>
 
-                <!-- Navigation Controls -->
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-100">
-                  <button 
+                <div
+                  v-if="esFaseDisciplina"
+                  class="sm:hidden flex items-center justify-between gap-2 px-1 text-[11px] font-bold text-slate-500 min-w-0"
+                >
+                  <span class="truncate">Visual {{ formatNum(totalVisualDisciplina) }}/{{ formatNum(totalVisualPosibleDisciplina) }}</span>
+                  <span class="text-emerald-700 shrink-0">Real {{ formatNum(puntajeCalculado) }}/{{ formatNum(puntajePosible) }}</span>
+                </div>
+
+                <!-- Desktop nav -->
+                <div class="hidden sm:flex flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100 min-w-0">
+                  <button
                     data-tutorial="anterior"
-                    @click="pasoAnterior" 
+                    type="button"
+                    @click="pasoAnterior"
                     :disabled="criterioActualIndex === 0"
-                    class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 rounded-xl font-black uppercase text-xs sm:text-[10px] tracking-widest transition-all border-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                    class="flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all border-2 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
                     :class="criterioActualIndex === 0 ? 'bg-slate-50 border-slate-100 text-slate-400' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 shadow-sm'"
                   >
                     <span class="material-symbols-outlined text-lg">arrow_back</span>
                     Anterior
                   </button>
 
-                  <div class="flex flex-col xs:flex-row gap-2 sm:gap-3 flex-1 sm:justify-end min-w-0 w-full sm:w-auto">
-                    <button 
+                  <div class="flex gap-3 justify-end min-w-0 flex-wrap">
+                    <button
                       v-if="estadoOriginal !== 'COMPLETADO'"
                       data-tutorial="guardar"
-                      @click="guardar(false)" 
+                      type="button"
+                      @click="guardar(false)"
                       :disabled="saving || tiempoRestante <= 0"
-                      class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 rounded-xl bg-white border-2 border-primary text-primary font-black uppercase text-xs sm:text-[10px] tracking-widest hover:bg-primary/5 transition-all shadow-sm disabled:opacity-50"
+                      class="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-white border-2 border-primary text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary/5 transition-all shadow-sm disabled:opacity-50"
                     >
-                      <span
-                        class="material-symbols-outlined text-lg"
-                        :class="{ 'animate-spin': saving }"
-                      >{{ saving ? 'sync' : 'save' }}</span>
-                      <span>{{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Guardar evaluación' }}</span>
+                      <span class="material-symbols-outlined text-lg" :class="{ 'animate-spin': saving }">{{ saving ? 'sync' : 'save' }}</span>
+                      {{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Guardar evaluación' }}
                     </button>
 
-                    <button 
+                    <button
                       v-if="criterioActualIndex < totalCriterios - 1"
                       data-tutorial="siguiente"
+                      type="button"
                       @click="pasoSiguiente"
-                      class="w-full sm:w-auto sm:flex-1 sm:max-w-[220px] flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 rounded-xl bg-primary text-white font-black uppercase text-xs sm:text-[10px] tracking-widest hover:bg-blue-900 transition-all glow-blue shadow-lg shadow-primary/30 border-b-4 border-blue-900 active:border-b-0 active:translate-y-1"
+                      class="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-primary text-white font-black uppercase text-[10px] tracking-widest hover:bg-blue-900 transition-all glow-blue shadow-lg shadow-primary/30 border-b-4 border-blue-900 active:border-b-0 active:translate-y-1"
                     >
-                      Siguiente 
+                      Siguiente
                       <span class="material-symbols-outlined text-lg">arrow_forward</span>
                     </button>
 
-                    <button 
+                    <button
                       v-else-if="estadoOriginal !== 'COMPLETADO'"
                       data-tutorial="finalizar"
+                      type="button"
                       @click="abrirResumenModal"
                       :disabled="tiempoRestante <= 0"
-                      class="w-full sm:w-auto sm:flex-1 sm:max-w-[280px] flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 rounded-xl bg-secondary text-white font-black uppercase text-xs sm:text-[10px] tracking-widest hover:bg-red-800 transition-all shadow-lg shadow-secondary/30 border-b-4 border-red-900 active:border-b-0 active:translate-y-1 disabled:bg-slate-200 disabled:text-slate-400 disabled:border-transparent"
+                      class="flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-secondary text-white font-black uppercase text-[10px] tracking-widest hover:bg-red-800 transition-all shadow-lg shadow-secondary/30 border-b-4 border-red-900 active:border-b-0 active:translate-y-1 disabled:bg-slate-200 disabled:text-slate-400 disabled:border-transparent"
                     >
                       <span class="material-symbols-outlined text-lg">{{ tiempoRestante <= 0 ? 'lock' : 'verified' }}</span>
                       {{ tiempoRestante <= 0 ? 'Fase Cerrada' : 'Finalizar evaluación' }}
@@ -237,11 +253,23 @@
             <div class="bg-slate-900 text-white border border-slate-800 rounded-2xl p-8 flex flex-col justify-center items-center text-center shadow-2xl shadow-slate-900/20 relative overflow-hidden">
               <div class="absolute top-0 left-0 w-full h-2 bg-secondary"></div>
               
-              <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Puntaje Acumulado</h5>
-              <div class="flex items-end gap-1 mb-2">
-                <p class="text-7xl font-black italic tracking-tighter">{{ puntajeCalculado }}</p>
-                <p class="text-xl text-slate-500 font-bold mb-2">/ {{ puntajePosible }}</p>
-              </div>
+              <template v-if="esFaseDisciplina">
+                <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Acumulado visual</h5>
+                <div class="flex items-end gap-1 mb-1">
+                  <p class="text-5xl font-black italic tracking-tighter">{{ formatNum(totalVisualDisciplina) }}</p>
+                  <p class="text-lg text-slate-500 font-bold mb-1.5">/ {{ formatNum(totalVisualPosibleDisciplina) }}</p>
+                </div>
+                <p class="text-[10px] text-emerald-300/90 font-bold mb-3">
+                  → {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }} pts reales
+                </p>
+              </template>
+              <template v-else>
+                <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Puntaje Acumulado</h5>
+                <div class="flex items-end gap-1 mb-2">
+                  <p class="text-7xl font-black italic tracking-tighter">{{ formatNum(puntajeCalculado) }}</p>
+                  <p class="text-xl text-slate-500 font-bold mb-2">/ {{ formatNum(puntajePosible) }}</p>
+                </div>
+              </template>
               
               <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 text-slate-300 text-[9px] font-black uppercase tracking-widest mt-2 border border-white/5">
                 <span class="material-symbols-outlined text-[14px]">done_all</span>
@@ -300,7 +328,14 @@
                       <span class="material-symbols-outlined text-[14px]">{{ formValues[c.idCriterio] != null ? 'check_circle' : 'radio_button_unchecked' }}</span>
                       <span class="text-xs font-bold truncate max-w-[120px]">{{ idx + 1 }}. {{ c.nombre }}</span>
                     </div>
-                    <span class="text-xs font-black">{{ formValues[c.idCriterio] ?? '-' }} / {{ Number(c.puntajeMaximo) }}</span>
+                    <span class="text-xs font-black">
+                      <template v-if="esFaseDisciplina">
+                        {{ formValues[c.idCriterio] ?? '-' }} / {{ Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6 }}
+                      </template>
+                      <template v-else>
+                        {{ formValues[c.idCriterio] ?? '-' }} / {{ Number(c.puntajeMaximo) }}
+                      </template>
+                    </span>
                   </div>
                 </div>
             </div>
@@ -310,63 +345,217 @@
       </template>
 
       <!-- Fallback general -->
-      <div v-else class="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm w-full">
+      <div v-else class="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm w-full min-w-0">
         <span class="material-symbols-outlined text-5xl text-slate-300">inventory_2</span>
-        <p class="mt-4 font-bold text-slate-600 text-lg">No existen criterios definidos para esta fase.</p>
-        <button @click="$emit('volver')" class="mt-6 px-6 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200">Volver al Listado</button>
+        <p class="mt-4 font-bold text-slate-600 text-lg break-words px-4">No existen criterios definidos para esta fase.</p>
+        <button type="button" @click="$emit('volver')" class="mt-6 px-6 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200">Volver al Listado</button>
       </div>
 
+      </div>
     </main>
 
+    <!-- Barra de acciones móvil (en el flujo, sin position:fixed) -->
+    <div
+      v-if="!loading && criterios.length > 0"
+      class="sm:hidden shrink-0 z-30 w-full max-w-full border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2.5 safe-bottom"
+      style="padding-bottom: max(0.65rem, env(safe-area-inset-bottom))"
+    >
+      <div class="flex items-center gap-2 w-full min-w-0">
+        <button
+          type="button"
+          data-tutorial="anterior"
+          @click="pasoAnterior"
+          :disabled="criterioActualIndex === 0"
+          class="flex items-center justify-center size-11 rounded-xl bg-white border-2 border-slate-200 text-slate-600 shrink-0 disabled:opacity-30"
+          aria-label="Anterior"
+        >
+          <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+
+        <button
+          v-if="estadoOriginal !== 'COMPLETADO'"
+          type="button"
+          data-tutorial="guardar"
+          @click="guardar(false)"
+          :disabled="saving || tiempoRestante <= 0"
+          class="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-11 px-2 rounded-xl bg-white border-2 border-primary text-primary font-black uppercase text-[10px] tracking-widest disabled:opacity-50"
+        >
+          <span class="material-symbols-outlined text-[18px]" :class="{ 'animate-spin': saving }">{{ saving ? 'sync' : 'save' }}</span>
+          <span class="truncate">{{ tiempoRestante <= 0 ? 'Cerrada' : 'Guardar' }}</span>
+        </button>
+
+        <button
+          v-if="criterioActualIndex < totalCriterios - 1"
+          type="button"
+          data-tutorial="siguiente"
+          @click="pasoSiguiente"
+          class="flex items-center justify-center gap-1 flex-1 min-w-0 h-11 px-2 rounded-xl bg-primary text-white font-black uppercase text-[10px] tracking-widest shadow-md"
+        >
+          <span class="truncate">Siguiente</span>
+          <span class="material-symbols-outlined text-[18px] shrink-0">arrow_forward</span>
+        </button>
+
+        <button
+          v-else-if="estadoOriginal !== 'COMPLETADO'"
+          type="button"
+          data-tutorial="finalizar"
+          @click="abrirResumenModal"
+          :disabled="tiempoRestante <= 0"
+          class="flex items-center justify-center gap-1 flex-1 min-w-0 h-11 px-2 rounded-xl bg-secondary text-white font-black uppercase text-[10px] tracking-widest shadow-md disabled:bg-slate-200 disabled:text-slate-400"
+        >
+          <span class="material-symbols-outlined text-[18px] shrink-0">{{ tiempoRestante <= 0 ? 'lock' : 'verified' }}</span>
+          <span class="truncate">{{ tiempoRestante <= 0 ? 'Cerrada' : 'Finalizar' }}</span>
+        </button>
+      </div>
+    </div>
+
     <!-- MODAL RESUMEN FINAL -->
-    <v-dialog v-model="modalResumen" max-width="500px" persistent scrollable>
+    <v-dialog v-model="modalResumen" :max-width="esFaseDisciplina ? '560px' : '500px'" persistent scrollable>
       <v-card class="rounded-3xl border-4 border-secondary overflow-hidden">
-        <v-card-title class="bg-secondary text-white pa-6 text-center flex flex-col items-center shrink-0">
-          <span class="material-symbols-outlined text-5xl mb-2 opacity-90">verified_user</span>
-          <h3 class="text-2xl font-black italic uppercase tracking-tighter shadow-sm">Confirmar finalización</h3>
-          <p class="text-xs text-white/80 font-medium tracking-wide mt-1 uppercase">Revisión final de calificaciones</p>
+        <v-card-title class="bg-secondary text-white pa-4 sm:pa-6 text-center flex flex-col items-center shrink-0">
+          <span class="material-symbols-outlined text-3xl sm:text-5xl mb-1 sm:mb-2 opacity-90">verified_user</span>
+          <h3 class="text-base sm:text-2xl font-black italic uppercase tracking-tighter shadow-sm">Confirmar finalización</h3>
+          <p class="text-[10px] sm:text-xs text-white/80 font-medium tracking-wide mt-0.5 sm:mt-1 uppercase">Revisión final</p>
         </v-card-title>
         
-        <v-card-text class="pa-0 bg-slate-50 flex-grow-1 overflow-y-auto" style="max-height: 60vh;">
-          <div class="bg-white border-b border-slate-200 p-8 text-center flex flex-col items-center">
-            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje Total Calculado</p>
-            <div class="flex items-end justify-center gap-1">
-              <span class="text-6xl font-black text-slate-900 italic tracking-tighter">{{ puntajeCalculado }}</span>
-              <span class="text-xl text-slate-500 font-bold mb-1.5">/ {{ puntajePosible }} pts</span>
-            </div>
-          </div>
-
-          <div class="p-6">
-            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Desglose por Criterio</p>
-            <div class="space-y-2">
-              <div v-for="(c, idx) in criterios" :key="c.idCriterio" class="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl">
-                <div class="flex items-center gap-3">
-                  <span class="size-6 bg-slate-100 text-slate-500 rounded font-black text-xs flex items-center justify-center">{{ idx + 1 }}</span>
-                  <span class="font-bold text-sm text-slate-700">{{ c.nombre }}</span>
+        <v-card-text class="pa-0 bg-slate-50 flex-grow-1 overflow-y-auto" style="max-height: 65vh;">
+          <!-- Disciplina: doble escala visual / real -->
+          <template v-if="esFaseDisciplina">
+            <div class="bg-white border-b border-slate-200 p-3.5 sm:p-6">
+              <p class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-2.5 sm:mb-4">
+                Totales
+              </p>
+              <div class="grid grid-cols-2 gap-2 sm:gap-3">
+                <div class="rounded-xl sm:rounded-2xl border border-primary/20 sm:border-2 bg-primary/5 px-2.5 py-2.5 sm:p-4 text-center">
+                  <p class="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-primary/70 mb-0.5">Visual</p>
+                  <p class="text-lg sm:text-4xl font-black text-primary tabular-nums leading-tight">
+                    {{ formatNum(totalVisualDisciplina) }}
+                    <span class="text-[11px] sm:text-sm font-bold text-slate-400">/{{ formatNum(totalVisualPosibleDisciplina) }}</span>
+                  </p>
+                  <div class="mt-2 h-1 sm:h-1.5 bg-white rounded-full overflow-hidden border border-primary/10">
+                    <div
+                      class="h-full bg-primary rounded-full transition-all"
+                      :style="{ width: `${pctVisualDisciplina}%` }"
+                    />
+                  </div>
                 </div>
-                <div class="font-black text-primary text-lg">
-                  {{ formValues[c.idCriterio] ?? '0' }} <span class="text-xs text-slate-400 font-bold">/ {{ Number(c.puntajeMaximo) }}</span>
+                <div class="rounded-xl sm:rounded-2xl border border-emerald-200 sm:border-2 bg-emerald-50 px-2.5 py-2.5 sm:p-4 text-center">
+                  <p class="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-emerald-700/70 mb-0.5">Real</p>
+                  <p class="text-lg sm:text-4xl font-black text-emerald-800 tabular-nums leading-tight">
+                    {{ formatNum(puntajeCalculado) }}
+                    <span class="text-[11px] sm:text-sm font-bold text-slate-400">/{{ formatNum(puntajePosible) }}</span>
+                  </p>
+                  <div class="mt-2 h-1 sm:h-1.5 bg-white rounded-full overflow-hidden border border-emerald-100">
+                    <div
+                      class="h-full bg-emerald-600 rounded-full transition-all"
+                      :style="{ width: `${pctRealDisciplina}%` }"
+                    />
+                  </div>
+                </div>
+              </div>
+              <p class="hidden sm:block text-[10px] text-slate-500 font-medium text-center mt-4 leading-relaxed">
+                Cada criterio se califica de 0 a su escala visual (ej. 6).
+                La suma visual (ej. 5×6 = 30) se convierte a puntos reales del sistema (ej. 5 pts).
+              </p>
+            </div>
+
+            <div class="p-3 sm:p-5">
+              <p class="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 sm:mb-3 px-0.5">
+                {{ totalCriterios }} criterios
+              </p>
+              <div class="space-y-1.5 sm:space-y-2">
+                <div
+                  v-for="(row, idx) in desgloseDisciplina"
+                  :key="row.idCriterio"
+                  class="bg-white border border-slate-200 rounded-xl sm:rounded-2xl px-2.5 py-2 sm:p-4"
+                >
+                  <!-- Móvil: una sola fila compacta -->
+                  <div class="sm:hidden flex items-center gap-2">
+                    <span class="size-5 shrink-0 bg-slate-100 text-slate-600 rounded font-black text-[10px] flex items-center justify-center">
+                      {{ idx + 1 }}
+                    </span>
+                    <p class="min-w-0 flex-1 text-xs font-bold text-slate-800 truncate">{{ row.nombre }}</p>
+                    <div class="shrink-0 text-right leading-tight">
+                      <p class="text-xs font-black text-primary tabular-nums">{{ formatNum(row.visual) }}/{{ formatNum(row.escala) }}</p>
+                      <p class="text-[10px] font-bold text-emerald-700 tabular-nums">{{ formatNum(row.real) }} pts</p>
+                    </div>
+                  </div>
+                  <!-- Desktop: desglose amplio -->
+                  <div class="hidden sm:flex items-start gap-3">
+                    <span class="size-7 shrink-0 bg-slate-100 text-slate-600 rounded-lg font-black text-xs flex items-center justify-center mt-0.5">
+                      {{ idx + 1 }}
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <p class="font-bold text-sm text-slate-800 leading-snug">{{ row.nombre }}</p>
+                      <div class="mt-2.5 grid grid-cols-2 gap-2">
+                        <div class="rounded-xl bg-primary/5 border border-primary/10 px-2.5 py-2">
+                          <p class="text-[8px] font-black uppercase tracking-widest text-primary/60">Visual</p>
+                          <p class="text-sm font-black text-primary">
+                            {{ formatNum(row.visual) }}
+                            <span class="text-[10px] font-bold text-slate-400">/ {{ formatNum(row.escala) }}</span>
+                          </p>
+                        </div>
+                        <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-2.5 py-2">
+                          <p class="text-[8px] font-black uppercase tracking-widest text-emerald-700/60">Real</p>
+                          <p class="text-sm font-black text-emerald-800">
+                            {{ formatNum(row.real) }}
+                            <span class="text-[10px] font-bold text-slate-400">/ {{ formatNum(row.max) }} pts</span>
+                          </p>
+                        </div>
+                      </div>
+                      <p class="text-[10px] text-slate-400 font-medium mt-2">
+                        {{ formatNum(row.visual) }} / {{ formatNum(row.escala) }} → {{ formatNum(row.real) }} pts reales
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </template>
+
+          <!-- Otras fases (sin escala visual) -->
+          <template v-else>
+            <div class="bg-white border-b border-slate-200 p-8 text-center flex flex-col items-center">
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje Total Calculado</p>
+              <div class="flex items-end justify-center gap-1">
+                <span class="text-6xl font-black text-slate-900 italic tracking-tighter">{{ formatNum(puntajeCalculado) }}</span>
+                <span class="text-xl text-slate-500 font-bold mb-1.5">/ {{ formatNum(puntajePosible) }} pts</span>
+              </div>
+            </div>
+
+            <div class="p-6">
+              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Desglose por Criterio</p>
+              <div class="space-y-2">
+                <div v-for="(c, idx) in criterios" :key="c.idCriterio" class="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl gap-3">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <span class="size-6 shrink-0 bg-slate-100 text-slate-500 rounded font-black text-xs flex items-center justify-center">{{ idx + 1 }}</span>
+                    <span class="font-bold text-sm text-slate-700 truncate">{{ c.nombre }}</span>
+                  </div>
+                  <div class="font-black text-primary text-lg shrink-0">
+                    {{ formValues[c.idCriterio] ?? '0' }} <span class="text-xs text-slate-400 font-bold">/ {{ Number(c.puntajeMaximo) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
           
-          <div class="px-6 pb-6 text-center">
-             <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold p-3 rounded-xl flex items-center gap-2 text-left">
-               <span class="material-symbols-outlined text-amber-500 shrink-0">warning</span>
-               Al finalizar y cerrar la evaluación ya no podrás modificar estas calificaciones.
+          <div class="px-3 sm:px-6 pb-3 sm:pb-5 text-center">
+             <div class="bg-amber-50 border border-amber-200 text-amber-800 text-[11px] sm:text-xs font-bold p-2.5 sm:p-3 rounded-xl flex items-center gap-2 text-left">
+               <span class="material-symbols-outlined text-amber-500 shrink-0 text-[18px] sm:text-[24px]">warning</span>
+               Al finalizar ya no podrás modificar estas calificaciones.
              </div>
           </div>
         </v-card-text>
 
-        <v-card-actions class="pa-6 bg-white border-t border-slate-200 flex flex-col sm:flex-row gap-3 sm:gap-4">
-          <button @click="modalResumen = false" class="w-full sm:flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors border-2 border-transparent hover:border-slate-200">
+        <v-card-actions class="pa-3 sm:pa-6 bg-white border-t border-slate-200 flex flex-col sm:flex-row gap-2 sm:gap-4">
+          <button @click="modalResumen = false" class="w-full sm:flex-1 py-2.5 sm:py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors border-2 border-transparent hover:border-slate-200 text-sm">
             Revisar
           </button>
-          <button @click="confirmarSello" :disabled="saving" class="w-full sm:flex-1 bg-secondary text-white font-black py-3 px-3 rounded-xl uppercase tracking-widest text-[10px] sm:text-xs flex items-center justify-center gap-2 shadow-lg shadow-secondary/30 hover:bg-red-800 transition-colors">
+          <button @click="confirmarSello" :disabled="saving" class="w-full sm:flex-1 bg-secondary text-white font-black py-2.5 sm:py-3 px-3 rounded-xl uppercase tracking-widest text-[10px] sm:text-xs flex items-center justify-center gap-2 shadow-lg shadow-secondary/30 hover:bg-red-800 transition-colors">
              <span v-if="saving" class="material-symbols-outlined animate-spin text-sm">sync</span>
              <span v-else class="material-symbols-outlined text-sm">lock</span>
-             Finalizar y cerrar evaluación
+             <span class="sm:hidden">Cerrar evaluación</span>
+             <span class="hidden sm:inline">Finalizar y cerrar evaluación</span>
           </button>
         </v-card-actions>
       </v-card>
@@ -391,7 +580,13 @@
               <span v-if="participanteNombre && fraternidad"> · {{ fraternidad.nombre }}</span>
             </p>
             <p class="text-xs text-slate-500 font-bold pt-1">
-              Puntaje: {{ puntajeCalculado }} / {{ puntajePosible }}
+              <template v-if="esFaseDisciplina">
+                Visual {{ formatNum(totalVisualDisciplina) }} / {{ formatNum(totalVisualPosibleDisciplina) }}
+                · Real {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }} pts
+              </template>
+              <template v-else>
+                Puntaje: {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }}
+              </template>
             </p>
           </div>
         </v-card-text>
@@ -692,17 +887,54 @@ const irDestinoPostCierre = (destino) => {
 }
 
 // Stats & Guardado
-const puntajeCalculado = computed(() => {
-  if (!esFaseDisciplina.value) {
-    return Object.values(formValues.value).reduce((t, val) => t + (Number(val) || 0), 0)
-  }
-  return criterios.value.reduce((t, c) => {
-    const visual = Number(formValues.value[c.idCriterio])
-    if (!Number.isFinite(visual)) return t
+const formatNum = (n) => {
+  const v = Number(n)
+  if (!Number.isFinite(v)) return '0'
+  return Number.isInteger(v) ? String(v) : v.toFixed(2)
+}
+
+const desgloseDisciplina = computed(() => {
+  return criterios.value.map((c) => {
     const escala = Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6
     const max = Number(c.puntajeMaximo) || 0
-    return t + (escala > 0 ? (Math.min(visual, escala) / escala) * max : 0)
-  }, 0)
+    const raw = Number(formValues.value[c.idCriterio])
+    const visual = Number.isFinite(raw) ? Math.min(Math.max(raw, 0), escala) : 0
+    const real = escala > 0 ? (visual / escala) * max : 0
+    return {
+      idCriterio: c.idCriterio,
+      nombre: c.nombre,
+      escala,
+      max,
+      visual,
+      real: Number(real.toFixed(2)),
+    }
+  })
+})
+
+const totalVisualDisciplina = computed(() =>
+  desgloseDisciplina.value.reduce((s, r) => s + r.visual, 0),
+)
+const totalVisualPosibleDisciplina = computed(() =>
+  desgloseDisciplina.value.reduce((s, r) => s + r.escala, 0),
+)
+const pctVisualDisciplina = computed(() => {
+  const max = totalVisualPosibleDisciplina.value
+  if (!max) return 0
+  return Math.min(100, (totalVisualDisciplina.value / max) * 100)
+})
+const pctRealDisciplina = computed(() => {
+  const max = Number(puntajePosible.value) || 0
+  if (!max) return 0
+  return Math.min(100, (Number(puntajeCalculado.value) / max) * 100)
+})
+
+const puntajeCalculado = computed(() => {
+  if (!esFaseDisciplina.value) {
+    const sum = Object.values(formValues.value).reduce((t, val) => t + (Number(val) || 0), 0)
+    return Number(Number(sum).toFixed(2))
+  }
+  const sum = desgloseDisciplina.value.reduce((t, r) => t + r.real, 0)
+  return Number(sum.toFixed(2))
 })
 
 const puntajePosible = computed(() => criterios.value.reduce((a, c) => a + Number(c.puntajeMaximo), 0))
