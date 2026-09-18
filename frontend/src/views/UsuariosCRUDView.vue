@@ -167,6 +167,26 @@
               </td>
               <td class="p-4 text-right">
                 <div class="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <template v-if="usuarioTieneCredencial(user)">
+                    <button
+                      type="button"
+                      :disabled="credencialBusyId === user.idUsuario"
+                      @click="verCredencial(user)"
+                      class="size-8 rounded bg-primary/10 hover:bg-primary/20 text-primary flex items-center justify-center transition-colors disabled:opacity-50"
+                      title="Ver credencial"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">visibility</span>
+                    </button>
+                    <button
+                      type="button"
+                      :disabled="credencialBusyId === user.idUsuario"
+                      @click="descargarCredencial(user)"
+                      class="size-8 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center transition-colors disabled:opacity-50"
+                      title="Descargar credencial"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">id_card</span>
+                    </button>
+                  </template>
                   <button 
                     @click="abrirModal(true, user)"
                     class="size-8 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors"
@@ -246,6 +266,26 @@
 
           <!-- Acciones -->
           <div class="flex items-center gap-2 pt-2 border-t border-slate-200 mt-1">
+            <template v-if="usuarioTieneCredencial(user)">
+              <button
+                type="button"
+                :disabled="credencialBusyId === user.idUsuario"
+                @click="verCredencial(user)"
+                class="flex-1 py-2 bg-white text-primary hover:bg-primary/5 rounded-xl border border-primary/20 flex justify-center shadow-sm disabled:opacity-50"
+                title="Ver credencial"
+              >
+                <span class="material-symbols-outlined text-[18px]">visibility</span>
+              </button>
+              <button
+                type="button"
+                :disabled="credencialBusyId === user.idUsuario"
+                @click="descargarCredencial(user)"
+                class="flex-1 py-2 bg-white text-emerald-700 hover:bg-emerald-50 rounded-xl border border-emerald-200 flex justify-center shadow-sm disabled:opacity-50"
+                title="Descargar credencial"
+              >
+                <span class="material-symbols-outlined text-[18px]">id_card</span>
+              </button>
+            </template>
             <button @click="abrirModal(true, user)" class="flex-1 py-2 bg-white text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 flex justify-center shadow-sm">
               <span class="material-symbols-outlined text-[18px]">edit</span>
             </button>
@@ -814,10 +854,73 @@ import Swal from 'sweetalert2'
 import { validarCiUsuario, normalizarCiUsuario } from '../utils/ciUsuario'
 import { getPasswordPolicyErrors } from '../utils/passwordPolicy'
 import { useAuthStore } from '../store/auth'
+import { puedeGenerarCredencial } from '../utils/roles'
+import { notify } from '../utils/notify'
 
 const authStore = useAuthStore()
 const esSuperusuario = computed(() => authStore.userRole?.toLowerCase() === 'superusuario')
 const decisorActual = ref(null)
+const credencialBusyId = ref(null)
+
+const usuarioTieneCredencial = (user) =>
+  puedeGenerarCredencial(user?.rol?.nombre)
+
+const fetchCredencialBlob = async (user) => {
+  const { data } = await api.get(`/usuarios/${user.idUsuario}/credencial`, {
+    responseType: 'blob',
+  })
+  return new Blob([data], { type: 'application/pdf' })
+}
+
+const verCredencial = async (user) => {
+  if (!user?.idUsuario || credencialBusyId.value) return
+  credencialBusyId.value = user.idUsuario
+  try {
+    const blob = await fetchCredencialBlob(user)
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (e) {
+    let msg = e.response?.data?.message || 'No se pudo abrir la credencial.'
+    if (e.response?.data instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await e.response.data.text())
+        msg = parsed.message || msg
+      } catch { /* keep */ }
+    }
+    notify.error('Error', Array.isArray(msg) ? msg.join(' ') : msg)
+  } finally {
+    credencialBusyId.value = null
+  }
+}
+
+const descargarCredencial = async (user) => {
+  if (!user?.idUsuario || credencialBusyId.value) return
+  credencialBusyId.value = user.idUsuario
+  try {
+    const blob = await fetchCredencialBlob(user)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `credencial-efu-${user.ci || user.idUsuario}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    notify.success('Credencial', 'PDF descargado.')
+  } catch (e) {
+    let msg = e.response?.data?.message || 'No se pudo descargar la credencial.'
+    if (e.response?.data instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await e.response.data.text())
+        msg = parsed.message || msg
+      } catch { /* keep */ }
+    }
+    notify.error('Error', Array.isArray(msg) ? msg.join(' ') : msg)
+  } finally {
+    credencialBusyId.value = null
+  }
+}
 
 const props = defineProps({
   rolFiltro: { type: String, required: true }

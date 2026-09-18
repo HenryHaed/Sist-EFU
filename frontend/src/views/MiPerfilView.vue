@@ -77,6 +77,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import api from '../services/api'
+import { useAuthStore } from '../store/auth'
 import { notify } from '../utils/notify'
 import {
   etiquetaRol,

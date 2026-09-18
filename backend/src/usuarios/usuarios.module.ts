@@ -11,12 +11,14 @@ import { UsuariosService } from './usuarios.service';
 import { UsuariosController } from './usuarios.controller';
 import { MailModule } from '../mail/mail.module';
 import { FraternidadesModule } from '../fraternidades/fraternidades.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Usuario, Role, Jurado, Gestion, Fase, Fraternidad, SolicitudInscripcion]),
     MailModule,
     FraternidadesModule,
+    AuthModule,
   ],
   controllers: [UsuariosController],
   providers: [UsuariosService],

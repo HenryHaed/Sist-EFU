@@ -1,20 +1,24 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, ParseIntPipe, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, ParseIntPipe, Req, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
+import { AuthService } from '../auth/auth.service';
 import { CreateUsuarioDto, UpdateUsuarioDto } from './dto/usuario.dto';
 import { RegisterDelegadoDto } from './dto/register-delegado.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-
 import { Public } from '../auth/decorators/public.decorator';
+import { Response } from 'express';
 
 @ApiTags('Usuarios')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('usuarios')
 export class UsuariosController {
-  constructor(private readonly usuariosService: UsuariosService) {}
+  constructor(
+    private readonly usuariosService: UsuariosService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Public()
   @Post('registrar-delegado')
@@ -100,6 +104,18 @@ export class UsuariosController {
   @ApiOperation({ summary: 'Obtener el perfil de jurado de un usuario' })
   findPerfilJurado(@Param('id') id: string) {
     return this.usuariosService.findPerfilJurado(+id);
+  }
+
+  @Get(':id/credencial')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({
+    summary: 'Descargar/ver PDF de credencial de un usuario (solo roles con credencial)',
+  })
+  generarCredencialUsuario(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    return this.authService.generarCredencialPdf(id, res);
   }
 
   @Post('fases/:idFase/jurados')
