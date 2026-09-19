@@ -85,7 +85,8 @@
             <span class="hidden sm:inline">Paso {{ criterioActualIndex + 1 }}: Evalúa {{ criterioActual.nombre }}</span>
           </h3>
           <p class="text-slate-500 text-[11px] sm:text-sm font-medium mt-1 break-words">
-            Máximo {{ escalaActual }} pts
+            <template v-if="esFaseDisciplina">¿Cumple este criterio? · SI = 1 · NO = 0</template>
+            <template v-else>Máximo {{ escalaActual }} pts</template>
             <span class="text-slate-400"> · paso {{ criterioActualIndex + 1 }} de {{ totalCriterios }}</span>
           </p>
         </div>
@@ -103,7 +104,8 @@
                 {{ estadoOriginal === 'COMPLETADO' ? 'Lectura' : 'En Evaluación' }}
               </div>
               <div class="absolute bottom-4 right-4 z-20 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-white font-black text-xs border border-white/30 shadow-lg">
-                Máximo: {{ escalaActual }} pts
+                <template v-if="esFaseDisciplina">Decisión SI / NO</template>
+                <template v-else>Máximo: {{ escalaActual }} pts</template>
               </div>
               <img
                 v-if="criterioActual.urlImagen"
@@ -126,13 +128,63 @@
                   </h4>
                 </div>
                 <p class="text-slate-600 text-sm leading-relaxed font-medium line-clamp-4 lg:line-clamp-none break-words">
-                  {{ criterioActual.descripcion || 'Asigne el puntaje correspondiente de acuerdo a los criterios observados durante el desarrollo del recorrido.' }}
+                  <template v-if="esFaseDisciplina">
+                    {{ criterioActual.descripcion || 'Indique si la fraternidad cumple o no este criterio de disciplina.' }}
+                  </template>
+                  <template v-else>
+                    {{ criterioActual.descripcion || 'Asigne el puntaje correspondiente de acuerdo a los criterios observados durante el desarrollo del recorrido.' }}
+                  </template>
                 </p>
               </div>
 
               <div class="mt-0 lg:mt-auto order-1 lg:order-2 space-y-5 sm:space-y-8 min-w-0">
-                <!-- Score Control -->
-                <div class="bg-slate-50 rounded-2xl border border-slate-200 p-4 sm:p-6 min-w-0" data-tutorial="puntaje">
+                <!-- Disciplina: decisión SI / NO -->
+                <div
+                  v-if="esFaseDisciplina"
+                  class="bg-slate-50 rounded-2xl border border-slate-200 p-4 sm:p-6 min-w-0"
+                  data-tutorial="puntaje"
+                >
+                  <label class="text-slate-800 font-black text-sm uppercase tracking-widest flex items-center gap-2 mb-4 sm:mb-5">
+                    <span class="material-symbols-outlined text-primary text-2xl sm:text-xl">rule</span>
+                    <span>¿Cumple el criterio?</span>
+                  </label>
+
+                  <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                    <button
+                      type="button"
+                      :disabled="estadoOriginal === 'COMPLETADO'"
+                      @click="setDecisionDisciplina(criterioActual.idCriterio, 1)"
+                      class="flex flex-col items-center justify-center gap-2 min-h-[5.5rem] sm:min-h-[6.5rem] rounded-2xl border-2 font-black uppercase tracking-widest transition-all"
+                      :class="formValues[criterioActual.idCriterio] === 1
+                        ? 'bg-emerald-600 border-emerald-700 text-white shadow-lg shadow-emerald-600/30'
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-700'"
+                    >
+                      <span class="material-symbols-outlined text-3xl sm:text-4xl">check_circle</span>
+                      <span class="text-lg sm:text-xl">Sí</span>
+                      <span class="text-[10px] opacity-80 normal-case tracking-normal font-bold">1 pt</span>
+                    </button>
+                    <button
+                      type="button"
+                      :disabled="estadoOriginal === 'COMPLETADO'"
+                      @click="setDecisionDisciplina(criterioActual.idCriterio, 0)"
+                      class="flex flex-col items-center justify-center gap-2 min-h-[5.5rem] sm:min-h-[6.5rem] rounded-2xl border-2 font-black uppercase tracking-widest transition-all"
+                      :class="formValues[criterioActual.idCriterio] === 0
+                        ? 'bg-secondary border-red-800 text-white shadow-lg shadow-secondary/30'
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-red-300 hover:text-secondary'"
+                    >
+                      <span class="material-symbols-outlined text-3xl sm:text-4xl">cancel</span>
+                      <span class="text-lg sm:text-xl">No</span>
+                      <span class="text-[10px] opacity-80 normal-case tracking-normal font-bold">0 pts</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Otras fases: puntaje numérico -->
+                <div
+                  v-else
+                  class="bg-slate-50 rounded-2xl border border-slate-200 p-4 sm:p-6 min-w-0"
+                  data-tutorial="puntaje"
+                >
                   <div class="flex justify-between items-center gap-3 mb-4 sm:mb-6 min-w-0">
                     <label class="text-slate-800 font-black text-sm uppercase tracking-widest flex items-center gap-2 shrink-0">
                       <span class="material-symbols-outlined text-primary text-2xl sm:text-xl">analytics</span>
@@ -172,13 +224,36 @@
                   </div>
                 </div>
 
+                <!-- Observación opcional (disciplina) -->
+                <div
+                  v-if="esFaseDisciplina"
+                  class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 min-w-0"
+                >
+                  <label class="text-slate-800 font-black text-[11px] sm:text-sm uppercase tracking-widest flex items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-amber-600 text-xl">visibility</span>
+                    Observación
+                    <span class="text-[9px] font-bold text-slate-400 normal-case tracking-normal">(opcional)</span>
+                  </label>
+                  <textarea
+                    v-model="observacionDisciplina"
+                    rows="3"
+                    maxlength="2000"
+                    :disabled="estadoOriginal === 'COMPLETADO'"
+                    placeholder="Declare una observación si corresponde (queda registrada en el acta)…"
+                    class="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm text-slate-800 font-medium outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 resize-y min-h-[4.5rem] disabled:opacity-60"
+                  />
+                  <p class="mt-1.5 text-[10px] text-slate-400 font-medium">
+                    {{ observacionDisciplina.length }}/2000
+                  </p>
+                </div>
+
                 <div
                   v-if="esFaseDisciplina"
                   class="sm:hidden flex items-center justify-between gap-2 px-1 text-xs font-bold text-slate-600 min-w-0"
                 >
                   <span>Acumulado</span>
                   <span class="text-primary font-black tabular-nums">
-                    {{ formatNum(totalVisualDisciplina) }} / {{ formatNum(totalVisualPosibleDisciplina) }}
+                    {{ totalDecisionesSi }} / {{ totalCriterios }}
                   </span>
                 </div>
 
@@ -247,8 +322,8 @@
               <template v-if="esFaseDisciplina">
                 <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Puntaje acumulado</h5>
                 <div class="flex items-end gap-1 mb-2">
-                  <p class="text-5xl font-black italic tracking-tighter">{{ formatNum(totalVisualDisciplina) }}</p>
-                  <p class="text-lg text-slate-500 font-bold mb-1.5">/ {{ formatNum(totalVisualPosibleDisciplina) }}</p>
+                  <p class="text-5xl font-black italic tracking-tighter">{{ totalDecisionesSi }}</p>
+                  <p class="text-lg text-slate-500 font-bold mb-1.5">/ {{ totalCriterios }}</p>
                 </div>
               </template>
               <template v-else>
@@ -318,7 +393,9 @@
                     </div>
                     <span class="text-xs font-black">
                       <template v-if="esFaseDisciplina">
-                        {{ formValues[c.idCriterio] ?? '-' }} / {{ Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6 }}
+                        <span v-if="formValues[c.idCriterio] === 1" class="text-emerald-700">SÍ</span>
+                        <span v-else-if="formValues[c.idCriterio] === 0" class="text-secondary">NO</span>
+                        <span v-else>-</span>
                       </template>
                       <template v-else>
                         {{ formValues[c.idCriterio] ?? '-' }} / {{ Number(c.puntajeMaximo) }}
@@ -414,13 +491,13 @@
             <div class="bg-white border-b border-slate-200 p-4 sm:p-6 text-center">
               <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje total</p>
               <p class="text-2xl sm:text-4xl font-black text-primary tabular-nums leading-tight">
-                {{ formatNum(totalVisualDisciplina) }}
-                <span class="text-base sm:text-xl font-bold text-slate-400">/ {{ formatNum(totalVisualPosibleDisciplina) }}</span>
+                {{ totalDecisionesSi }}
+                <span class="text-base sm:text-xl font-bold text-slate-400">/ {{ totalCriterios }}</span>
               </p>
               <div class="mt-3 mx-auto max-w-xs h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
                   class="h-full bg-primary rounded-full transition-all"
-                  :style="{ width: `${pctVisualDisciplina}%` }"
+                  :style="{ width: `${pctDecisionesDisciplina}%` }"
                 />
               </div>
             </div>
@@ -441,11 +518,21 @@
                   <p class="min-w-0 flex-1 text-xs sm:text-sm font-bold text-slate-800 leading-snug break-words">
                     {{ row.nombre }}
                   </p>
-                  <p class="shrink-0 text-sm sm:text-base font-black text-primary tabular-nums">
-                    {{ formatNum(row.visual) }}
-                    <span class="text-[11px] font-bold text-slate-400">/ {{ formatNum(row.escala) }}</span>
-                  </p>
+                  <span
+                    class="shrink-0 text-xs sm:text-sm font-black uppercase tracking-widest px-2 py-1 rounded-lg"
+                    :class="row.valor === 1 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-secondary'"
+                  >
+                    {{ row.valor === 1 ? 'Sí · 1' : 'No · 0' }}
+                  </span>
                 </div>
+              </div>
+
+              <div
+                v-if="observacionDisciplina.trim()"
+                class="mt-3 sm:mt-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-left"
+              >
+                <p class="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">Observación</p>
+                <p class="text-xs sm:text-sm text-amber-900 font-medium whitespace-pre-wrap break-words">{{ observacionDisciplina.trim() }}</p>
               </div>
             </div>
           </template>
@@ -518,7 +605,7 @@
             </p>
             <p class="text-xs text-slate-500 font-bold pt-1">
               <template v-if="esFaseDisciplina">
-                Puntaje: {{ formatNum(totalVisualDisciplina) }} / {{ formatNum(totalVisualPosibleDisciplina) }}
+                Puntaje: {{ totalDecisionesSi }} / {{ totalCriterios }}
               </template>
               <template v-else>
                 Puntaje: {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }}
@@ -610,14 +697,14 @@ const esFaseDisciplina = computed(() =>
 const escalaActual = computed(() => {
   const c = criterioActual.value
   if (!c) return 1
-  if (esFaseDisciplina.value) return Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6
   return Number(c.puntajeMaximo) || 0
 })
 
 const loading = ref(true)
 const saving = ref(false)
 const criterios = ref([])
-const formValues = ref({}) 
+const formValues = ref({})
+const observacionDisciplina = ref('')
 const estadoOriginal = ref('PENDIENTE')
 const puntajeInputRef = ref(null)
 
@@ -706,12 +793,19 @@ const cargarDatos = async () => {
 
     if (resEval && resEval.data) {
       estadoOriginal.value = resEval.data.estado
+      observacionDisciplina.value = resEval.data.observacion || ''
       const jsonb = resEval.data.criteriosEvaluados
       if (jsonb) {
         Object.keys(jsonb).forEach((key) => {
           const raw = jsonb[key]
-          if (raw != null && typeof raw === 'object' && ('visual' in raw || 'real' in raw)) {
-            formValues.value[key] = raw.visual != null ? Number(raw.visual) : Number(raw.real)
+          if (esFaseDisciplina.value) {
+            formValues.value[key] = normalizarDecisionLocal(raw)
+          } else if (raw != null && typeof raw === 'object' && ('visual' in raw || 'real' in raw || 'valor' in raw)) {
+            formValues.value[key] = raw.valor != null
+              ? Number(raw.valor)
+              : raw.visual != null
+                ? Number(raw.visual)
+                : Number(raw.real)
           } else {
             formValues.value[key] = raw
           }
@@ -747,12 +841,35 @@ const cargarDatos = async () => {
   }
 }
 
+const normalizarDecisionLocal = (raw) => {
+  if (raw == null || raw === '') return null
+  if (typeof raw === 'boolean') return raw ? 1 : 0
+  if (typeof raw === 'string') {
+    const s = raw.trim().toLowerCase()
+    if (['si', 'sí', '1', 'true', 'cumple', 'yes', 's'].includes(s)) return 1
+    if (['no', '0', 'false', 'no_cumple', 'n'].includes(s)) return 0
+  }
+  if (typeof raw === 'object') {
+    if ('decision' in raw) return normalizarDecisionLocal(raw.decision)
+    if ('valor' in raw) return Number(raw.valor) > 0 ? 1 : 0
+    if ('real' in raw) return Number(raw.real) > 0 ? 1 : 0
+    if ('visual' in raw) return Number(raw.visual) > 0 ? 1 : 0
+  }
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return null
+  return n > 0 ? 1 : 0
+}
+
+const setDecisionDisciplina = (idCriterio, valor) => {
+  if (estadoOriginal.value === 'COMPLETADO') return
+  formValues.value[idCriterio] = valor === 1 ? 1 : 0
+}
+
 const validarPuntaje = (criterio) => {
+  if (esFaseDisciplina.value) return
   const id = criterio.idCriterio
   let val = formValues.value[id]
-  const max = esFaseDisciplina.value
-    ? (Number(criterio.escalaVisual) > 0 ? Number(criterio.escalaVisual) : 6)
-    : Number(criterio.puntajeMaximo)
+  const max = Number(criterio.puntajeMaximo)
   
   if (val === null || val === undefined || val === '') return
 
@@ -785,9 +902,10 @@ const abrirResumenModal = () => {
   })
   const superaLimites = criterios.value.some(c => {
     const v = formValues.value[c.idCriterio]
-    const max = esFaseDisciplina.value
-      ? (Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6)
-      : Number(c.puntajeMaximo)
+    if (esFaseDisciplina.value) {
+      return v !== 0 && v !== 1
+    }
+    const max = Number(c.puntajeMaximo)
     return Number(v) > max || Number(v) < 0
   })
 
@@ -796,7 +914,9 @@ const abrirResumenModal = () => {
     return
   }
   if (superaLimites) {
-    notify.error('Error', 'Existen puntajes fuera del rango permitido.')
+    notify.error('Error', esFaseDisciplina.value
+      ? 'Cada criterio debe ser SI o NO.'
+      : 'Existen puntajes fuera del rango permitido.')
     return
   }
   
@@ -821,49 +941,34 @@ const formatNum = (n) => {
 
 const desgloseDisciplina = computed(() => {
   return criterios.value.map((c) => {
-    const escala = Number(c.escalaVisual) > 0 ? Number(c.escalaVisual) : 6
-    const max = Number(c.puntajeMaximo) || 0
-    const raw = Number(formValues.value[c.idCriterio])
-    const visual = Number.isFinite(raw) ? Math.min(Math.max(raw, 0), escala) : 0
-    const real = escala > 0 ? (visual / escala) * max : 0
+    const raw = formValues.value[c.idCriterio]
+    const valor = raw === 1 ? 1 : raw === 0 ? 0 : null
     return {
       idCriterio: c.idCriterio,
       nombre: c.nombre,
-      escala,
-      max,
-      visual,
-      real: Number(real.toFixed(2)),
+      valor,
     }
   })
 })
 
-const totalVisualDisciplina = computed(() =>
-  desgloseDisciplina.value.reduce((s, r) => s + r.visual, 0),
+const totalDecisionesSi = computed(() =>
+  desgloseDisciplina.value.reduce((s, r) => s + (r.valor === 1 ? 1 : 0), 0),
 )
-const totalVisualPosibleDisciplina = computed(() =>
-  desgloseDisciplina.value.reduce((s, r) => s + r.escala, 0),
-)
-const pctVisualDisciplina = computed(() => {
-  const max = totalVisualPosibleDisciplina.value
-  if (!max) return 0
-  return Math.min(100, (totalVisualDisciplina.value / max) * 100)
-})
-const pctRealDisciplina = computed(() => {
-  const max = Number(puntajePosible.value) || 0
-  if (!max) return 0
-  return Math.min(100, (Number(puntajeCalculado.value) / max) * 100)
+const pctDecisionesDisciplina = computed(() => {
+  if (!totalCriterios.value) return 0
+  return Math.min(100, (totalDecisionesSi.value / totalCriterios.value) * 100)
 })
 
 const puntajeCalculado = computed(() => {
-  if (!esFaseDisciplina.value) {
-    const sum = Object.values(formValues.value).reduce((t, val) => t + (Number(val) || 0), 0)
-    return Number(Number(sum).toFixed(2))
-  }
-  const sum = desgloseDisciplina.value.reduce((t, r) => t + r.real, 0)
-  return Number(sum.toFixed(2))
+  if (esFaseDisciplina.value) return totalDecisionesSi.value
+  const sum = Object.values(formValues.value).reduce((t, val) => t + (Number(val) || 0), 0)
+  return Number(Number(sum).toFixed(2))
 })
 
-const puntajePosible = computed(() => criterios.value.reduce((a, c) => a + Number(c.puntajeMaximo), 0))
+const puntajePosible = computed(() => {
+  if (esFaseDisciplina.value) return totalCriterios.value
+  return criterios.value.reduce((a, c) => a + Number(c.puntajeMaximo), 0)
+})
 
 const guardar = async (finalizar = false) => {
   saving.value = true
@@ -871,7 +976,7 @@ const guardar = async (finalizar = false) => {
   Object.keys(formValues.value).forEach((k) => {
     if (formValues.value[k] !== null && formValues.value[k] !== '') {
       if (esFaseDisciplina.value) {
-        payloadCriterios[k] = { visual: Number(formValues.value[k]) }
+        payloadCriterios[k] = formValues.value[k] === 1 ? 1 : 0
       } else {
         payloadCriterios[k] = formValues.value[k]
       }
@@ -884,7 +989,10 @@ const guardar = async (finalizar = false) => {
       idFraternidad: props.fraternidad ? props.fraternidad.idFraternidad : undefined,
       idParticipante: props.participanteId || undefined,
       criterios: payloadCriterios,
-      finalizar
+      finalizar,
+      observacion: esFaseDisciplina.value
+        ? (observacionDisciplina.value.trim() || null)
+        : undefined,
     })
 
     if (finalizar) {

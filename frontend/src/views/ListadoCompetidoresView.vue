@@ -348,7 +348,7 @@ import { esFaseChachaWarmi } from '../utils/chachaWarmi'
 import ModalResumenCalificacionesAdmin from '../components/ModalResumenCalificacionesAdmin.vue'
 import TutorialCalificarModal from '../components/TutorialCalificarModal.vue'
 import { useAuthStore } from '../store/auth'
-import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
+import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado, ordenarPendientesCalificacion, ordenarCalificadosAlFinal } from '../utils/ordenListado'
 import { TUTORIAL_VARIANT, hasSeenTutorial } from '../utils/tutorialCalificar'
 
 const authStore = useAuthStore()
@@ -444,6 +444,7 @@ const fraternidadesGrupos = computed(() => {
         nombre: p.fraternidad || 'Sin fraternidad',
         instanciaRepresentacion: p.instanciaRepresentacion || null,
         fechaSolicitud: p.fechaSolicitud || null,
+        fechaCierre: p.fechaCierre || null,
         ordenDesfile: p.ordenDesfile ?? null,
         nombresPareja: [],
         estadoEvaluacion: p.estadoEvaluacion,
@@ -457,6 +458,16 @@ const fraternidadesGrupos = computed(() => {
     if (p.nombre && !g.nombresPareja.includes(p.nombre)) g.nombresPareja.push(p.nombre)
     if (p.fechaSolicitud && (!g.fechaSolicitud || new Date(p.fechaSolicitud) < new Date(g.fechaSolicitud))) {
       g.fechaSolicitud = p.fechaSolicitud
+    }
+    // Estado del grupo: COMPLETADO solo si todos sellaron; si alguno en progreso → EN_PROGRESO
+    const estados = g.participantes.map((x) => x.estadoEvaluacion)
+    if (estados.every((e) => e === 'COMPLETADO')) g.estadoEvaluacion = 'COMPLETADO'
+    else if (estados.some((e) => e === 'EN_PROGRESO' || e === 'COMPLETADO')) g.estadoEvaluacion = 'EN_PROGRESO'
+    else g.estadoEvaluacion = 'PENDIENTE'
+    if (p.fechaCierre) {
+      if (!g.fechaCierre || new Date(p.fechaCierre) > new Date(g.fechaCierre)) {
+        g.fechaCierre = p.fechaCierre
+      }
     }
   }
   return ordenarListado(Array.from(map.values()), ordenCriterio.value, ordenDir.value, {
@@ -511,16 +522,24 @@ const participantesVistaFiltrados = computed(() => {
 const estaCalificado = (item) => item?.estadoEvaluacion === 'COMPLETADO'
 
 const gruposPendientes = computed(() =>
-  fraternidadesGruposFiltrados.value.filter((g) => !estaCalificado(g)),
+  ordenarPendientesCalificacion(
+    fraternidadesGruposFiltrados.value.filter((g) => !estaCalificado(g)),
+  ),
 )
 const gruposCalificados = computed(() =>
-  fraternidadesGruposFiltrados.value.filter((g) => estaCalificado(g)),
+  ordenarCalificadosAlFinal(
+    fraternidadesGruposFiltrados.value.filter((g) => estaCalificado(g)),
+  ),
 )
 const participantesPendientes = computed(() =>
-  participantesVistaFiltrados.value.filter((p) => !estaCalificado(p)),
+  ordenarPendientesCalificacion(
+    participantesVistaFiltrados.value.filter((p) => !estaCalificado(p)),
+  ),
 )
 const participantesCalificados = computed(() =>
-  participantesVistaFiltrados.value.filter((p) => estaCalificado(p)),
+  ordenarCalificadosAlFinal(
+    participantesVistaFiltrados.value.filter((p) => estaCalificado(p)),
+  ),
 )
 const primerCalificarGrupo = computed(() => gruposPendientes.value[0] || fraternidadesGruposFiltrados.value[0])
 const primerCalificarParticipante = computed(

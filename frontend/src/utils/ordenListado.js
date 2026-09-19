@@ -89,3 +89,35 @@ export function formatFechaSolicitud(valor) {
     minute: '2-digit',
   })
 }
+
+/**
+ * Prioridad en listado de calificación:
+ * EN_PROGRESO (continuar) → PENDIENTE → COMPLETADO (al final).
+ */
+export function rankEstadoCalificacion(estado) {
+  const e = String(estado || '').toUpperCase()
+  if (e === 'EN_PROGRESO') return 0
+  if (e === 'COMPLETADO') return 2
+  return 1
+}
+
+/** Pendientes: en progreso primero; conserva orden relativo previo. */
+export function ordenarPendientesCalificacion(list) {
+  return [...(list || [])].sort((a, b) => {
+    const ra = rankEstadoCalificacion(a?.estadoEvaluacion)
+    const rb = rankEstadoCalificacion(b?.estadoEvaluacion)
+    return ra - rb
+  })
+}
+
+/**
+ * Ya selladas: van al final del listado; entre ellas, las recién cerradas al fondo
+ * (orden cronológico de sellado).
+ */
+export function ordenarCalificadosAlFinal(list) {
+  return [...(list || [])].sort((a, b) => {
+    const byCierre = compareFechaAsc(a?.fechaCierre, b?.fechaCierre)
+    if (byCierre !== 0) return byCierre
+    return String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es')
+  })
+}

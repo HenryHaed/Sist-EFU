@@ -763,18 +763,38 @@ export class UsuariosService {
     const controladores = await this.usuarioRepo.find({
       where: { rol: { idRol: roleControlador.idRol } },
       relations: ['jurados', 'jurados.fasesHabilitadas'],
+      order: { nombres: 'ASC', primerApellido: 'ASC' },
     });
 
-    return controladores.map(c => {
-      const j = c.jurados && c.jurados.length > 0 ? c.jurados[0] : null;
-      return {
+    const result: Array<{
+      idUsuario: number;
+      idJurado: number;
+      nombre: string;
+      ci: string;
+      fasesHabilitadas: any[];
+    }> = [];
+
+    for (const c of controladores) {
+      let j = c.jurados && c.jurados.length > 0 ? c.jurados[0] : null;
+      // Todo controlador debe poder recibir criterios: crear perfil de jurado si falta
+      if (!j) {
+        j = await this.asegurarPerfilJurado(c.idUsuario);
+        j = await this.juradoRepo.findOne({
+          where: { idJurado: j.idJurado },
+          relations: ['fasesHabilitadas'],
+        });
+      }
+      if (!j) continue;
+      result.push({
         idUsuario: c.idUsuario,
-        idJurado: j ? j.idJurado : null,
-        nombre: `${c.nombres} ${c.primerApellido}`,
+        idJurado: j.idJurado,
+        nombre: `${c.nombres} ${c.primerApellido}`.trim(),
         ci: c.ci,
-        fasesHabilitadas: j ? j.fasesHabilitadas : [],
-      };
-    });
+        fasesHabilitadas: j.fasesHabilitadas || [],
+      });
+    }
+
+    return result;
   }
 
   // Asegurar perfil de jurado para un usuario (útil para controladores asignados a disciplina)

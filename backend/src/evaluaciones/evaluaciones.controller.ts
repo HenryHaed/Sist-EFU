@@ -170,7 +170,14 @@ export class EvaluacionesController {
   @Post('guardar')
   guardarEvaluacion(
     @Request() req: any,
-    @Body() payload: { idFase: number, idFraternidad?: number, idParticipante?: number, criterios: any, finalizar: boolean }
+    @Body() payload: {
+      idFase: number;
+      idFraternidad?: number;
+      idParticipante?: number;
+      criterios: any;
+      finalizar: boolean;
+      observacion?: string | null;
+    },
   ) {
     return this.evaluacionesService.guardarEvaluacion(req.user.idUsuario, req.user.rol, payload);
   }

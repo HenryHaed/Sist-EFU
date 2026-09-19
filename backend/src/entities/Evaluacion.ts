@@ -32,6 +32,10 @@ export class Evaluacion {
     @Column({ name: 'criterios_evaluados', type: 'jsonb', nullable: true })
     criteriosEvaluados: any;
 
+    /** Observación escrita opcional del controlador (fase disciplina). */
+    @Column({ name: 'observacion', type: 'text', nullable: true })
+    observacion: string | null;
+
     @Column({ name: 'puntaje_total', type: 'decimal', precision: 5, scale: 2, default: 0 })
     puntajeTotal: number;
 

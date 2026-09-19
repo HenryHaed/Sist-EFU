@@ -87,11 +87,9 @@
             </td>
             <td class="px-8 py-4">
               <span class="bg-primary/5 text-primary border border-primary/20 px-3 py-1 rounded-lg font-black text-sm">
-                {{ Number(c.puntajeMaximo) }} pts
+                <template v-if="esFaseDisciplina">SI / NO · 1 pt</template>
+                <template v-else>{{ Number(c.puntajeMaximo) }} pts</template>
               </span>
-              <p v-if="esFaseDisciplina" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">
-                Escala visual: {{ Number(c.escalaVisual ?? 6) }}
-              </p>
             </td>
             <td class="px-8 py-4">
                <div v-if="c.urlImagen" class="size-12 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-inner group-hover:scale-110 transition-transform cursor-pointer" @click="previsualizarImagen(c.urlImagen)" title="Ver imagen">
@@ -140,7 +138,8 @@
               <p class="font-bold text-slate-800 text-base leading-tight mb-1">{{ c.nombre }}</p>
               <div class="flex items-center gap-2">
                 <span class="bg-primary/5 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-black">
-                  {{ Number(c.puntajeMaximo) }} pts
+                  <template v-if="esFaseDisciplina">SI / NO · 1 pt</template>
+                  <template v-else>{{ Number(c.puntajeMaximo) }} pts</template>
                 </span>
                 <span class="text-[9px] uppercase font-black text-slate-400 tracking-widest">Fase: {{ fase?.nombre }}</span>
               </div>
@@ -182,18 +181,21 @@
           Asignar criterios a controladores
         </h3>
         <p class="text-xs text-slate-500 font-medium mt-1">
-          Cada controlador solo verá y calificará los criterios que le marques. Guarda por controlador.
+          Aparecen todos los controladores del sistema. Marca los criterios de cada uno y guarda; al guardar también quedan habilitados en esta fase.
         </p>
       </div>
       <div v-if="!controladoresFase.length" class="p-8 text-center text-slate-400 text-sm">
-        Asigna controladores a esta fase en Gestión de Fases primero.
+        No hay controladores registrados. Créalos en Gestión de usuarios → Controladores.
       </div>
       <div v-else class="divide-y divide-slate-100">
         <div v-for="ctrl in controladoresFase" :key="ctrl.idJurado" class="p-5 sm:p-6">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
             <div>
               <p class="font-bold text-slate-800">{{ ctrl.nombre }}</p>
-              <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600">Controlador · CI {{ ctrl.ci || '—' }}</p>
+              <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                Controlador · CI {{ ctrl.ci || '—' }}
+                <span v-if="!ctrl.enFase" class="text-amber-600"> · pendiente de criterios</span>
+              </p>
             </div>
             <button
               type="button"
@@ -221,7 +223,10 @@
               />
               <span class="min-w-0">
                 <span class="font-bold text-slate-700 block truncate">{{ c.nombre }}</span>
-                <span class="text-[9px] text-slate-400 font-black uppercase">{{ Number(c.puntajeMaximo) }} pts · escala {{ Number(c.escalaVisual ?? 6) }}</span>
+                <span class="text-[9px] text-slate-400 font-black uppercase">
+                  <template v-if="esFaseDisciplina">SI / NO · 1 pt</template>
+                  <template v-else>{{ Number(c.puntajeMaximo) }} pts</template>
+                </span>
               </span>
             </label>
           </div>
@@ -261,7 +266,7 @@
               <input v-model="form.nombre" type="text" placeholder="Ej: Coreografía y Compás" class="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none font-bold placeholder:text-slate-300 transition-all shadow-inner" />
             </div>
 
-            <div>
+            <div v-if="!esFaseDisciplina">
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500">Puntaje máximo (pts reales) *</label>
                 <div class="flex items-center gap-1.5 text-[10px] font-black">
@@ -295,23 +300,11 @@
               </div>
             </div>
 
-            <div v-if="esFaseDisciplina">
-              <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                Escala visual (lo que ve el Controlador) *
-              </label>
-              <div class="relative">
-                <input
-                  v-model.number="form.escalaVisual"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  class="w-full px-5 py-4 border-2 border-slate-100 bg-slate-50 focus:border-primary text-primary rounded-xl outline-none font-black text-2xl transition-all shadow-inner"
-                />
-                <span class="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xl">pts</span>
-              </div>
-              <p class="text-[10px] text-slate-400 font-medium mt-2 leading-relaxed">
-                Ejemplo: escala 6 y máximo 1 → si pone 3/6, el sistema guarda 0.50 pts reales.
-                ({{ previewConversion }})
+            <div v-else class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p class="text-[10px] font-black uppercase tracking-widest text-emerald-800 mb-1">Tipo de criterio</p>
+              <p class="text-sm font-bold text-emerald-900">Decisión SI / NO → 1 pt / 0 pts</p>
+              <p class="text-[11px] text-emerald-700/80 font-medium mt-1 leading-relaxed">
+                El controlador solo indica si se cumple el criterio. No hay escala decimal.
               </p>
             </div>
 
@@ -356,7 +349,7 @@
             <button
               type="button"
               @click="guardar"
-              :disabled="puntajeUsadoConActual > 100"
+              :disabled="puntajeUsadoConActual > limiteFase"
               class="w-full sm:flex-[2] py-3 px-6 rounded-xl bg-primary hover:bg-blue-900 text-white font-black uppercase tracking-tighter shadow-lg shadow-primary/20 transition-all disabled:bg-slate-300 disabled:shadow-none disabled:cursor-not-allowed"
             >
               {{ editandoId ? 'Actualizar Criterio' : 'Guardar Criterio' }}
@@ -420,19 +413,11 @@ const previsualizarImagen = (url) => {
   })
 }
 
-const form = ref({ idFase: '', nombre: '', puntajeMaximo: 1, escalaVisual: 6, urlImagen: '' })
+const form = ref({ idFase: '', nombre: '', puntajeMaximo: 1, escalaVisual: 1, urlImagen: '' })
 
 const esFaseDisciplina = computed(() =>
   String(props.fase?.nombre || '').toLowerCase().includes('disciplina'),
 )
-
-const previewConversion = computed(() => {
-  const escala = Number(form.value.escalaVisual) || 6
-  const max = Number(form.value.puntajeMaximo) || 0
-  const mitad = escala / 2
-  const real = escala > 0 ? ((mitad / escala) * max).toFixed(2) : '0'
-  return `${mitad}/${escala} → ${real} pts`
-})
 
 // ── Computed Properties (Budget Logic) ────────────────────────────────────
 const limiteFase = computed(() => {
@@ -441,7 +426,10 @@ const limiteFase = computed(() => {
 })
 
 const puntajeUsado = computed(() => {
-  return (criterios.value || []).reduce((s, c) => s + Number(c.puntajeMaximo || 0), 0)
+  return (criterios.value || []).reduce((s, c) => {
+    if (esFaseDisciplina.value) return s + 1
+    return s + Number(c.puntajeMaximo || 0)
+  }, 0)
 })
 
 const disponiblePuntaje = computed(() => limiteFase.value - puntajeUsado.value)
@@ -449,16 +437,20 @@ const disponiblePuntaje = computed(() => limiteFase.value - puntajeUsado.value)
 const puntajeUsadoSinActual = computed(() => {
   return (criterios.value || [])
     .filter(c => c.idCriterio !== editandoId.value)
-    .reduce((s, c) => s + Number(c.puntajeMaximo || 0), 0)
+    .reduce((s, c) => {
+      if (esFaseDisciplina.value) return s + 1
+      return s + Number(c.puntajeMaximo || 0)
+    }, 0)
 })
 
 const puntajeUsadoConActual = computed(() => {
-  const sum = Number(puntajeUsadoSinActual.value) + Number(form.value.puntajeMaximo || 0)
+  const sum = Number(puntajeUsadoSinActual.value) + (esFaseDisciplina.value ? 1 : Number(form.value.puntajeMaximo || 0))
   return parseFloat(sum.toFixed(2))
 })
 
 const disponiblePuntajeCalc = computed(() => {
-  const disp = limiteFase.value - puntajeUsadoSinActual.value - Number(form.value.puntajeMaximo || 0)
+  const add = esFaseDisciplina.value ? 1 : Number(form.value.puntajeMaximo || 0)
+  const disp = limiteFase.value - puntajeUsadoSinActual.value - add
   return parseFloat(disp.toFixed(2))
 })
 
@@ -477,28 +469,18 @@ const cargarDatos = async () => {
 const cargarControladoresYAsignaciones = async () => {
   try {
     const { data: controladores } = await api.get('/usuarios/controladores')
-    const deFase = (controladores || []).filter((c) =>
-      (c.fasesHabilitadas || []).some((f) => f.idFase === props.fase.idFase) || c.idJurado,
-    )
-    // Preferir los que tienen la fase; si API no trae fases, usar jurados de la fase
-    let list = deFase
-    if (!list.length && props.fase?.jurados?.length) {
-      list = props.fase.jurados
-        .filter((j) => j.usuario?.rol?.nombre === 'controladorhcu' || j.idJurado)
-        .map((j) => ({
-          idJurado: j.idJurado,
-          idUsuario: j.usuario?.idUsuario,
-          nombre: [j.usuario?.nombres, j.usuario?.primerApellido].filter(Boolean).join(' ') || j.nombre || `Jurado #${j.idJurado}`,
-          ci: j.usuario?.ci || j.ci,
-        }))
-    } else {
-      list = list.map((c) => ({
+    // Todos los controladores HCU (el backend asegura perfil de jurado)
+    const list = (controladores || [])
+      .filter((c) => c.idJurado)
+      .map((c) => ({
         idJurado: c.idJurado,
         idUsuario: c.idUsuario,
         nombre: c.nombre,
         ci: c.ci,
-      })).filter((c) => c.idJurado)
-    }
+        enFase: (c.fasesHabilitadas || []).some((f) => f.idFase === props.fase.idFase),
+      }))
+      .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'))
+
     controladoresFase.value = list
 
     const draft = {}
@@ -550,19 +532,19 @@ const abrirModal = (item = null) => {
     form.value = {
       ...item,
       idFase: props.fase.idFase,
-      puntajeMaximo: Number(item.puntajeMaximo),
-      escalaVisual: Number(item.escalaVisual ?? 6),
+      puntajeMaximo: esFaseDisciplina.value ? 1 : Number(item.puntajeMaximo),
+      escalaVisual: esFaseDisciplina.value ? 1 : Number(item.escalaVisual ?? 1),
     }
   } else {
     editandoId.value = null
     const sugerido = esFaseDisciplina.value
-      ? Math.min(1, disponiblePuntaje.value > 0 ? disponiblePuntaje.value : 1)
+      ? 1
       : (disponiblePuntaje.value > 0 ? Math.min(20, disponiblePuntaje.value) : 0)
     form.value = {
       idFase: props.fase.idFase,
       nombre: '',
       puntajeMaximo: sugerido,
-      escalaVisual: 6,
+      escalaVisual: 1,
       urlImagen: '',
     }
   }
@@ -574,15 +556,22 @@ const abrirModal = (item = null) => {
 const guardar = async () => {
   if (!form.value.idFase) return notify.error('Error', 'No hay una fase vinculada.')
   if (!form.value.nombre?.trim()) return notify.error('Error', 'El nombre del criterio es obligatorio.')
-  if (form.value.puntajeMaximo <= 0) return notify.error('Error', 'El puntaje debe ser mayor a 0.')
-  if (esFaseDisciplina.value && !(Number(form.value.escalaVisual) > 0)) {
-    return notify.error('Error', 'La escala visual debe ser mayor a 0.')
+  if (esFaseDisciplina.value) {
+    form.value.puntajeMaximo = 1
+    form.value.escalaVisual = 1
+  } else if (form.value.puntajeMaximo <= 0) {
+    return notify.error('Error', 'El puntaje debe ser mayor a 0.')
   }
   
   if (puntajeUsadoConActual.value > limiteFase.value) {
-    const disp = (limiteFase.value - puntajeUsadoSinActual.value).toFixed(2)
+    const disp = (limiteFase.value - puntajeUsadoSinActual.value).toFixed(0)
     const extra = props.fase?.tipoConcurso === 'EFU' ? ` (Peso de Fase: ${limiteFase.value})` : ''
-    return notify.warning('Presupuesto excedido', `La suma de criterios de la fase no puede superar el techo permitido${extra}. Solo tienes disponible ${disp} pts.`)
+    return notify.warning(
+      'Presupuesto excedido',
+      esFaseDisciplina.value
+        ? `En disciplina cada criterio vale 1 pt. Solo puedes agregar ${disp} criterio(s) más (techo ${limiteFase.value}).`
+        : `La suma de criterios de la fase no puede superar el techo permitido${extra}. Solo tienes disponible ${disp} pts.`,
+    )
   }
 
   try {

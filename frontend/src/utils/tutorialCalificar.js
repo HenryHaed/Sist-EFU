@@ -115,10 +115,10 @@ export const TUTORIAL_CONTENT = {
   },
   [TUTORIAL_VARIANT.WIZARD_EFU]: {
     title: 'Calificar fraternidad',
-    tip: 'Ingresa el puntaje de cada criterio. Sin todos los criterios no puedes finalizar.',
+    tip: 'Completa cada criterio (puntaje o SI/NO en disciplina). Sin todos no puedes finalizar.',
     callouts: [
       { id: 'volver', label: 'Volver', prefer: 'bottom' },
-      { id: 'puntaje', label: 'Puntaje', sub: 'Nota de este criterio', prefer: 'top' },
+      { id: 'puntaje', label: 'Criterio', sub: 'Puntaje o decisión SI/NO', prefer: 'top' },
       { id: 'anterior', label: 'Anterior', prefer: 'right' },
       { id: 'guardar', label: 'Guardar', prefer: 'top' },
       { id: 'siguiente', label: 'Siguiente', sub: 'Siguiente criterio', prefer: 'left' },

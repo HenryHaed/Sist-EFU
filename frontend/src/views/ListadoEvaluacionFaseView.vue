@@ -12,7 +12,7 @@
           </button>
           <div class="min-w-0">
             <h2 class="text-[1.2rem] sm:text-xl font-black text-primary uppercase italic tracking-tighter truncate">{{ fase?.nombre || 'Cargando...' }}</h2>
-            <p class="text-sm sm:text-xs text-slate-500 font-medium mt-0.5 truncate">Listado oficial de fraternidades habilitadas</p>
+            <p class="text-sm sm:text-xs text-slate-500 font-medium mt-0.5 truncate">Pendientes arriba · ya calificadas al final</p>
           </div>
         </div>
 
@@ -597,7 +597,7 @@ import ModalResumenCalificacionesAdmin from '../components/ModalResumenCalificac
 import TutorialCalificarModal from '../components/TutorialCalificarModal.vue'
 import { getImageUrl } from '../utils/url'
 import { useAuthStore } from '../store/auth'
-import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado } from '../utils/ordenListado'
+import { ORDEN_CRITERIOS, formatFechaSolicitud, ordenarListado, ordenarPendientesCalificacion, ordenarCalificadosAlFinal } from '../utils/ordenListado'
 import { TUTORIAL_VARIANT, hasSeenTutorial } from '../utils/tutorialCalificar'
 
 const authStore = useAuthStore()
@@ -658,17 +658,14 @@ const fraternidadesFiltradas = computed(() => {
 const estaCalificado = (item) => item?.estadoEvaluacion === 'COMPLETADO'
 
 const fraternidadesPendientes = computed(() =>
-  fraternidadesFiltradas.value
-    .filter((f) => !estaCalificado(f))
-    .slice()
-    .sort((a, b) => {
-      // En progreso primero, luego no calificados
-      const rank = (x) => (x.estadoEvaluacion === 'EN_PROGRESO' ? 0 : 1)
-      return rank(a) - rank(b)
-    }),
+  ordenarPendientesCalificacion(
+    fraternidadesFiltradas.value.filter((f) => !estaCalificado(f)),
+  ),
 )
 const fraternidadesCalificadas = computed(() =>
-  fraternidadesFiltradas.value.filter((f) => estaCalificado(f)),
+  ordenarCalificadosAlFinal(
+    fraternidadesFiltradas.value.filter((f) => estaCalificado(f)),
+  ),
 )
 
 const primerPendienteId = computed(

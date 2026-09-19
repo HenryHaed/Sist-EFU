@@ -23,10 +23,10 @@ export class Criterio {
     puntajeMaximo: number;
 
     /**
-     * Techo visual para el Controlador (ej. 6).
-     * notaReal = (notaVisual / escalaVisual) * puntajeMaximo
+     * Legado: antes era techo visual. En disciplina los criterios son SI/NO (1/0);
+     * se mantiene la columna por compatibilidad (default 1).
      */
-    @Column({ name: 'escala_visual', type: 'decimal', precision: 5, scale: 2, default: 6 })
+    @Column({ name: 'escala_visual', type: 'decimal', precision: 5, scale: 2, default: 1 })
     escalaVisual: number;
 
     @Column({ name: 'url_imagen', length: 500, nullable: true })
