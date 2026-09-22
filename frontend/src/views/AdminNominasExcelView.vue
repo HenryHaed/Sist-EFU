@@ -1,103 +1,89 @@
 <template>
   <div class="dashboard-page max-w-7xl">
-    <!-- LISTADO FRATERNIDADES -->
+    <!-- LISTADO -->
     <template v-if="!detalleAbierto">
-      <div class="mb-6 flex flex-col gap-4">
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <h2 class="dashboard-page-title text-primary">Nóminas Excel</h2>
-            <p class="text-slate-500 text-sm font-medium mt-1">
-              Listado de fraternidades y fraternos cargados por Excel.
-              <span v-if="gestionAnio" class="text-slate-400"> · Gestión {{ gestionAnio }}</span>
-            </p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <v-btn
-              color="success"
-              variant="flat"
-              :loading="descargandoZip"
-              :disabled="!conArchivo"
-              prepend-icon="mdi-folder-zip"
-              @click="descargarZip"
-            >
-              Descargar todo
-            </v-btn>
-            <v-btn
-              variant="tonal"
-              color="primary"
-              :loading="loading"
-              @click="cargar"
-            >
-              Actualizar
-            </v-btn>
-          </div>
+      <div class="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h2 class="dashboard-page-title text-primary">Nóminas Excel</h2>
+          <p class="text-slate-500 text-sm font-medium mt-1">
+            Listado de fraternidades y fraternos cargados por Excel.
+            <span v-if="gestionAnio" class="text-slate-400"> · Gestión {{ gestionAnio }}</span>
+          </p>
         </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-          <div class="md:col-span-6">
-            <v-text-field
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div class="relative flex-1 sm:w-72">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
+            <input
               v-model="busqueda"
-              label="Buscar fraternidad, danza o archivo"
-              density="comfortable"
-              variant="outlined"
-              hide-details
-              clearable
-              bg-color="white"
+              type="search"
+              placeholder="Buscar fraternidad, danza o archivo…"
+              class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-primary"
             />
           </div>
-          <div class="md:col-span-6">
-            <v-select
-              v-model="filtroEstado"
-              :items="opcionesEstado"
-              item-title="title"
-              item-value="value"
-              label="Estado de nómina"
-              density="comfortable"
-              variant="outlined"
-              hide-details
-              bg-color="white"
-            />
-          </div>
+          <select
+            v-model="filtroEstado"
+            class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-primary"
+          >
+            <option value="todos">Todas</option>
+            <option value="cargada">Nómina cargada</option>
+            <option value="pendiente">Sin archivo</option>
+          </select>
+          <button
+            type="button"
+            @click="descargarZip"
+            :disabled="descargandoZip || !conArchivo"
+            class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest shrink-0"
+          >
+            <span class="material-symbols-outlined text-[18px]" :class="{ 'animate-spin': descargandoZip }">
+              {{ descargandoZip ? 'progress_activity' : 'folder_zip' }}
+            </span>
+            {{ descargandoZip ? 'ZIP…' : 'Descargar todo' }}
+          </button>
+          <button
+            type="button"
+            @click="cargar"
+            class="size-10 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center shrink-0"
+            title="Actualizar"
+          >
+            <span class="material-symbols-outlined text-slate-600" :class="{ 'animate-spin': loading }">refresh</span>
+          </button>
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 mb-6">
-        <v-card variant="outlined" rounded="xl" class="pa-3 sm:pa-4 text-center">
-          <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-tight">Fraternidades</p>
-          <p class="text-lg sm:text-xl font-black text-primary mt-1">{{ items.length }}</p>
-        </v-card>
-        <v-card variant="outlined" rounded="xl" class="pa-3 sm:pa-4 text-center bg-emerald-50/40">
-          <p class="text-[9px] font-black uppercase tracking-widest text-emerald-700 leading-tight">Con nómina</p>
-          <p class="text-lg sm:text-xl font-black text-emerald-800 mt-1">{{ conArchivo }}</p>
-        </v-card>
-        <v-card variant="outlined" rounded="xl" class="pa-3 sm:pa-4 text-center">
-          <p class="text-[9px] font-black uppercase tracking-widest text-primary leading-tight">Fraternos</p>
-          <p class="text-lg sm:text-xl font-black text-primary mt-1">{{ totalMiembros }}</p>
-        </v-card>
-        <v-card variant="outlined" rounded="xl" class="pa-3 sm:pa-4 text-center bg-sky-50/50">
-          <p class="text-[9px] font-black uppercase tracking-widest text-sky-700 leading-tight">Asegurados</p>
-          <p class="text-lg sm:text-xl font-black text-sky-800 mt-1">{{ totalAsegurados }}</p>
-        </v-card>
+      <div class="flex flex-wrap gap-2 sm:gap-3 mb-6 text-xs font-bold">
+        <span class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600">
+          {{ items.length }} fraternidad(es)
+        </span>
+        <span class="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700">
+          {{ conArchivo }} con nómina
+        </span>
+        <span class="px-3 py-1.5 rounded-lg bg-primary/10 text-primary">
+          {{ totalMiembros }} fraterno(s)
+        </span>
+        <span class="px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700">
+          {{ totalAsegurados }} asegurado(s)
+        </span>
       </div>
 
-      <v-card v-if="loading" variant="outlined" rounded="xl" class="py-16 text-center">
-        <v-progress-circular indeterminate color="primary" />
-      </v-card>
+      <div v-if="loading" class="py-20 text-center text-slate-400">
+        <span class="material-symbols-outlined animate-spin text-4xl">progress_activity</span>
+      </div>
 
-      <v-card v-else variant="outlined" rounded="xl" class="overflow-hidden">
-        <div v-if="filtradas.length" class="divide-y divide-slate-100">
+      <div v-else class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div v-if="filtradas.length === 0" class="py-16 text-center text-slate-400">
+          <span class="material-symbols-outlined text-5xl mb-2 opacity-30">table_view</span>
+          <p class="font-bold text-sm">No hay fraternidades con ese filtro.</p>
+        </div>
+        <div v-else class="divide-y divide-slate-100">
           <div
             v-for="row in filtradas"
             :key="row.idFraternidad"
-            class="p-4 sm:p-5"
-            :class="row.lista ? 'hover:bg-slate-50/80 cursor-pointer' : 'opacity-80'"
-            @click="row.lista && abrirDetalle(row)"
+            class="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-4 hover:bg-slate-50/80"
+            :class="row.lista ? '' : 'opacity-80'"
           >
-            <div class="min-w-0">
-              <p class="font-black text-slate-900 text-sm sm:text-base leading-snug break-words">
-                {{ row.nombreFraternidad }}
-              </p>
-              <p class="text-xs text-slate-500 font-medium mt-1 leading-relaxed break-words">
+            <div class="flex-1 min-w-0">
+              <p class="font-black text-slate-900 truncate">{{ row.nombreFraternidad }}</p>
+              <p class="text-xs text-slate-500 font-medium mt-0.5">
                 {{ row.tipoDanza || '—' }}
                 <span v-if="row.categoria"> · {{ row.categoria }}</span>
                 <template v-if="row.lista">
@@ -105,177 +91,145 @@
                   · {{ formatFecha(row.lista.updatedAt || row.lista.createdAt) }}
                 </template>
               </p>
+              <div v-if="row.tieneArchivo" class="mt-2 flex flex-wrap gap-1.5">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary border border-primary/20">
+                  {{ row.cantidadMiembros || 0 }} fraterno(s)
+                </span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-sky-50 text-sky-700 border border-sky-100">
+                  {{ row.cantidadAsegurados || 0 }} asegurado(s)
+                </span>
+              </div>
             </div>
-
-            <div class="mt-3 flex flex-wrap gap-2">
-              <v-chip
-                v-if="row.tieneArchivo"
-                size="small"
-                color="primary"
-                variant="tonal"
-                label
-              >
-                {{ row.cantidadMiembros || 0 }} fraterno(s)
-              </v-chip>
-              <v-chip
-                v-if="row.tieneArchivo"
-                size="small"
-                color="info"
-                variant="tonal"
-                label
-              >
-                {{ row.cantidadAsegurados || 0 }} asegurado(s)
-              </v-chip>
-              <v-chip
-                size="small"
-                :color="row.tieneArchivo ? 'success' : 'default'"
-                :variant="row.tieneArchivo ? 'tonal' : 'outlined'"
-                label
-              >
-                {{ row.tieneArchivo ? 'Cargada' : 'Sin archivo' }}
-              </v-chip>
-            </div>
-
-            <div v-if="row.lista" class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2" @click.stop>
-              <v-btn
-                size="small"
-                color="primary"
-                variant="flat"
-                block
+            <span
+              class="self-start px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border"
+              :class="row.tieneArchivo
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                : 'bg-amber-50 text-amber-700 border-amber-100'"
+            >
+              {{ row.tieneArchivo ? 'Cargada' : 'Sin archivo' }}
+            </span>
+            <div v-if="row.lista" class="flex flex-wrap gap-2">
+              <button
+                type="button"
                 @click="abrirDetalle(row)"
+                class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700"
               >
                 Ver fraternos
-              </v-btn>
-              <v-btn
-                size="small"
-                variant="tonal"
-                block
+              </button>
+              <button
+                type="button"
                 @click="descargar(row.lista)"
+                class="px-3 py-2 bg-primary hover:bg-blue-900 text-white rounded-xl text-xs font-bold"
               >
                 Descargar
-              </v-btn>
-              <v-btn
-                size="small"
-                color="error"
-                variant="tonal"
-                block
+              </button>
+              <button
+                type="button"
                 @click="eliminar(row.lista)"
+                class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-bold"
               >
                 Eliminar
-              </v-btn>
+              </button>
             </div>
           </div>
         </div>
-        <div v-else class="py-16 text-center text-slate-400">
-          <p class="font-bold text-sm">No hay fraternidades con ese filtro.</p>
-        </div>
-      </v-card>
+      </div>
     </template>
 
     <!-- DETALLE FRATERNOS -->
     <template v-else>
-      <div class="mb-4">
-        <v-btn
-          variant="text"
-          color="primary"
-          class="mb-3"
+      <div class="mb-6">
+        <button
+          type="button"
           @click="cerrarDetalle"
+          class="inline-flex items-center gap-1.5 mb-4 text-sm font-bold text-primary hover:underline"
         >
-          ← Volver al listado
-        </v-btn>
+          <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+          Volver al listado
+        </button>
 
-        <v-card variant="outlined" rounded="xl" class="pa-4 sm:pa-5 mb-4">
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-5 mb-4">
           <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div class="min-w-0">
-              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                Fraternidad
-              </p>
+              <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Fraternidad</p>
               <h2 class="text-xl sm:text-2xl font-black text-primary italic uppercase leading-tight">
                 {{ listaActiva?.nombreFraternidad || detalleRow?.nombreFraternidad || '—' }}
               </h2>
               <div class="mt-3 flex flex-wrap gap-2">
-                <v-chip size="small" variant="tonal" color="primary" label>
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-primary/10 text-primary border border-primary/20">
                   Danza: {{ listaActiva?.tipoDanza || detalleRow?.tipoDanza || '—' }}
-                </v-chip>
-                <v-chip size="small" variant="tonal" color="secondary" label>
+                </span>
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-secondary/10 text-secondary border border-secondary/20">
                   Gestión {{ gestionAnio || '—' }}
-                </v-chip>
-                <v-chip
+                </span>
+                <span
                   v-if="listaActiva?.categoria || detalleRow?.categoria"
-                  size="small"
-                  variant="outlined"
-                  label
+                  class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-600 border border-slate-200"
                 >
                   {{ listaActiva?.categoria || detalleRow?.categoria }}
-                </v-chip>
+                </span>
               </div>
             </div>
             <div class="flex flex-col gap-2 shrink-0 w-full lg:w-auto lg:items-end">
-              <v-chip color="info" size="large" variant="flat" label class="font-black w-fit">
+              <span class="inline-flex w-fit px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest bg-sky-600 text-white">
                 Asegurados: {{ cantidadAsegurados }}
-              </v-chip>
+              </span>
               <p class="text-xs text-slate-500 font-medium">
                 {{ miembros.length }} fraterno(s) en nómina
               </p>
-              <div class="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:flex-wrap">
-                <v-btn
-                  size="small"
-                  variant="tonal"
-                  block
-                  class="sm:!w-auto"
-                  :loading="cargandoDetalle"
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
                   @click="recargarMiembros"
+                  :disabled="cargandoDetalle"
+                  class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 disabled:opacity-50"
                 >
                   Actualizar
-                </v-btn>
-                <v-btn
-                  size="small"
-                  variant="tonal"
-                  block
-                  class="sm:!w-auto"
+                </button>
+                <button
+                  type="button"
                   @click="descargar(listaActiva)"
+                  class="px-3 py-2 bg-primary hover:bg-blue-900 text-white rounded-xl text-xs font-bold"
                 >
                   Descargar Excel
-                </v-btn>
+                </button>
               </div>
             </div>
           </div>
-        </v-card>
+        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-4">
-          <div class="md:col-span-7">
-            <v-text-field
-              v-model="busquedaMiembros"
-              label="Buscar por nombre, CI, celular o RU"
-              density="comfortable"
-              variant="outlined"
-              hide-details
-              clearable
-              bg-color="white"
-            />
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4 flex flex-wrap gap-3 items-end">
+          <div class="flex-1 min-w-[200px]">
+            <label class="label-xs">Buscar</label>
+            <div class="relative">
+              <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+              <input
+                v-model="busquedaMiembros"
+                type="search"
+                placeholder="Nombre, CI, celular o RU…"
+                class="form-input !py-2.5 !text-sm !pl-10 w-full"
+              />
+            </div>
           </div>
-          <div class="md:col-span-5">
-            <v-select
-              v-model="filtroTipoPersona"
-              :items="opcionesTipoPersona"
-              item-title="title"
-              item-value="value"
-              label="Tipo de persona"
-              density="comfortable"
-              variant="outlined"
-              hide-details
-              bg-color="white"
-            />
+          <div class="sm:w-52">
+            <label class="label-xs">Tipo de persona</label>
+            <select v-model="filtroTipoPersona" class="form-input !py-2.5 !text-sm w-full">
+              <option value="TODOS">Todos los tipos</option>
+              <option value="ESTUDIANTE">Estudiante</option>
+              <option value="DOCENTE">Docente</option>
+              <option value="ADMINISTRATIVO">Administrativo</option>
+              <option value="EXTERNO">Externo</option>
+            </select>
           </div>
         </div>
       </div>
 
-      <v-card v-if="cargandoDetalle" variant="outlined" rounded="xl" class="py-16 text-center">
-        <v-progress-circular indeterminate color="primary" />
-      </v-card>
+      <div v-if="cargandoDetalle" class="py-20 text-center text-slate-400">
+        <span class="material-symbols-outlined animate-spin text-4xl">progress_activity</span>
+      </div>
 
-      <v-card v-else variant="outlined" rounded="xl" class="overflow-hidden">
-        <!-- Mobile cards -->
+      <div v-else class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <!-- Mobile -->
         <div class="md:hidden divide-y divide-slate-100">
           <div
             v-if="!miembrosFiltrados.length"
@@ -321,7 +275,7 @@
           </div>
         </div>
 
-        <!-- Desktop table -->
+        <!-- Desktop -->
         <div class="hidden md:block overflow-x-auto">
           <table class="w-full text-left text-sm min-w-[820px]">
             <thead>
@@ -378,21 +332,8 @@
             </tbody>
           </table>
         </div>
-      </v-card>
+      </div>
     </template>
-
-    <v-snackbar
-      v-model="snackbar.show"
-      :color="snackbar.color"
-      location="top end"
-      :timeout="3500"
-      multi-line
-    >
-      {{ snackbar.text }}
-      <template #actions>
-        <v-btn variant="text" @click="snackbar.show = false">Cerrar</v-btn>
-      </template>
-    </v-snackbar>
   </div>
 </template>
 
@@ -417,26 +358,6 @@ const busquedaMiembros = ref('')
 const filtroTipoPersona = ref('TODOS')
 const cantidadAsegurados = ref(0)
 const guardandoAseguradoId = ref(null)
-
-const snackbar = ref({
-  show: false,
-  text: '',
-  color: 'success',
-})
-
-const opcionesEstado = [
-  { title: 'Todos los estados', value: 'todos' },
-  { title: 'Nómina cargada', value: 'cargada' },
-  { title: 'Sin archivo', value: 'pendiente' },
-]
-
-const opcionesTipoPersona = [
-  { title: 'Todos los tipos', value: 'TODOS' },
-  { title: 'Estudiante', value: 'ESTUDIANTE' },
-  { title: 'Docente', value: 'DOCENTE' },
-  { title: 'Administrativo', value: 'ADMINISTRATIVO' },
-  { title: 'Externo', value: 'EXTERNO' },
-]
 
 const conArchivo = computed(() => items.value.filter((i) => i.tieneArchivo).length)
 const totalMiembros = computed(() =>
@@ -499,10 +420,6 @@ const formatFecha = (fecha) => {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-const mostrarSnack = (text, color = 'success') => {
-  snackbar.value = { show: true, text, color }
 }
 
 const cargar = async () => {
@@ -582,16 +499,14 @@ const toggleAsegurado = async (miembro, asegurado) => {
     if (typeof data?.cantidadAsegurados === 'number') {
       cantidadAsegurados.value = data.cantidadAsegurados
     }
-    // Actualizar conteo en el listado en memoria
     const idLista = listaActiva.value?.idLista
     if (idLista) {
       const row = items.value.find((i) => i.lista?.idLista === idLista)
       if (row) row.cantidadAsegurados = cantidadAsegurados.value
     }
-    mostrarSnack(
-      data?.mensaje ||
-        (asegurado ? 'Seguro otorgado exitosamente' : 'Seguro retirado exitosamente'),
-      asegurado ? 'success' : 'info',
+    notify.success(
+      asegurado ? 'Seguro otorgado' : 'Seguro retirado',
+      data?.mensaje || (asegurado ? 'Seguro otorgado exitosamente' : 'Seguro retirado exitosamente'),
     )
   } catch (e) {
     miembro.asegurado = prev
@@ -614,7 +529,7 @@ const descargar = async (lista) => {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-  } catch (e) {
+  } catch {
     notify.error('Error', 'No se pudo descargar el archivo.')
   }
 }
