@@ -341,7 +341,9 @@
                 Nota final
                 <span class="block font-bold opacity-80 normal-case tracking-normal">/{{ techoEfuMatriz }}</span>
               </th>
-              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Chacha Warmi</th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider bg-sky-500 text-white">
+                Chacha Warmi
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -366,27 +368,44 @@
                 <td class="px-2 py-2 text-xs font-bold text-slate-800 max-w-[160px]">{{ fila.fraternidad }}</td>
                 <td class="px-2 py-2 text-xs text-slate-600">{{ fila.danza }}</td>
                 <td
-                  class="px-2 py-2 text-xs"
+                  class="px-2 py-2"
                   :class="fila.esPromedio
-                    ? 'text-amber-900 uppercase tracking-wide text-[10px] font-black'
+                    ? 'text-amber-900 uppercase tracking-wide text-sm sm:text-base font-black'
                     : fila.esControlador
-                      ? 'text-emerald-800 font-bold'
-                      : 'text-slate-700'"
+                      ? 'text-emerald-800 font-bold text-xs'
+                      : 'text-slate-700 text-xs'"
                 >
                   {{ fila.jurado }}
                 </td>
                 <td
                   v-for="f in fasesEfuMatriz"
                   :key="'c-' + grupo.idFraternidad + '-' + ji + '-' + f.idFase"
-                  class="px-2 py-2 text-xs text-slate-700 text-center"
+                  class="px-2 py-2 text-slate-700 text-center"
+                  :class="fila.esPromedio ? 'text-sm sm:text-base font-black' : 'text-xs'"
                 >
                   {{ fila.notas[f.idFase] }}
                 </td>
-                <td class="px-2 py-2 text-xs text-center" :class="fila.suspendida ? 'text-red-700 font-black' : 'text-slate-700'">
+                <td
+                  class="px-2 py-2 text-center"
+                  :class="[
+                    fila.suspendida ? 'text-red-700 font-black' : 'text-slate-700',
+                    fila.esPromedio ? 'text-sm sm:text-base font-black' : 'text-xs',
+                  ]"
+                >
                   {{ fila.sanciones }}
                 </td>
-                <td class="px-2 py-2 text-xs font-bold text-slate-800 text-center">{{ fila.totalEfu }}</td>
-                <td class="px-2 py-2 text-xs text-slate-700 text-center">{{ fila.chacha }}</td>
+                <td
+                  class="px-2 py-2 font-black text-slate-900 text-center"
+                  :class="fila.esPromedio ? 'text-base sm:text-lg' : 'text-xs font-bold text-slate-800'"
+                >
+                  {{ fila.totalEfu }}
+                </td>
+                <td
+                  class="px-2 py-2 text-center bg-sky-100 text-sky-950 border-l border-sky-200"
+                  :class="fila.esPromedio ? 'text-sm sm:text-base font-black' : 'text-xs font-semibold'"
+                >
+                  {{ fila.chacha }}
+                </td>
               </tr>
               <tr>
                 <td :colspan="5 + fasesEfuMatriz.length + 3" class="px-3 py-1.5 text-[10px] text-slate-500 italic bg-slate-50 border-b border-slate-100">
@@ -919,10 +938,10 @@ const opcionesOrden = computed(() => {
     { value: 'fechaSolicitud', label: 'Fecha de solicitud' },
   ]
   if (filtros.value.tipoReporte === 'calificaciones') {
-    // Calificaciones: sin fecha de solicitud de inscripción
+    // Calificaciones: por defecto mayor nota final primero
     return [
-      { value: 'puesto', label: 'Puesto' },
       { value: 'puntajeFinal', label: 'Puntaje final' },
+      { value: 'puesto', label: 'Puesto' },
       { value: 'ordenDesfile', label: 'Orden oficial' },
       { value: 'nombreFraternidad', label: 'Nombre fraternidad' },
       { value: 'tipoDanza', label: 'Tipo de danza' },
@@ -992,8 +1011,8 @@ const seleccionarCargoDirectiva = (prefix) => {
 const seleccionarTipo = (id) => {
   filtros.value.tipoReporte = id
   if (id === 'calificaciones') {
-    filtros.value.ordenarPor = 'puesto'
-    filtros.value.orden = 'ASC'
+    filtros.value.ordenarPor = 'puntajeFinal'
+    filtros.value.orden = 'DESC'
   } else if (id === 'disciplina') {
     filtros.value.ordenarPor = 'fechaHora'
     filtros.value.orden = 'DESC'

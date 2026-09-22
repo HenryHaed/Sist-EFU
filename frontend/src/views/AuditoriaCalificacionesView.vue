@@ -4,8 +4,8 @@
       <div>
         <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Desglose de notas</p>
         <p class="text-sm text-slate-600 font-medium max-w-2xl">
-          Promedio Final = suma de la NotaFraternidad de cada jurado, dividido entre los jurados que calificaron.
-          El detalle por fase se ve al expandir cada jurado.
+          Nota final = suma de las notas de cada fase (promedio por fase artística + sumatoria de disciplina).
+          Ordenadas de mayor a menor nota final. El detalle por fase se ve al expandir cada jurado.
         </p>
       </div>
       <div class="flex flex-col xl:flex-row xl:items-center gap-3">
@@ -111,7 +111,7 @@
           </div>
           <div class="flex items-center gap-4 sm:gap-6 shrink-0">
             <div class="text-right">
-              <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Promedio Final</p>
+              <p class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Suma fases</p>
               <p class="text-sm font-black text-slate-700">{{ fmt(item.promedioFinal ?? item.promedioJurado) }}</p>
             </div>
             <div class="text-right min-w-[5.5rem] rounded-xl px-2.5 py-1.5"
@@ -122,9 +122,9 @@
                 {{ item.suspendida && !(item.impactoSanciones < 0) ? 'SUSP.' : fmt(item.impactoSanciones) }}
               </p>
             </div>
-            <div class="text-right min-w-[4rem]">
-              <p class="text-[9px] font-black uppercase text-primary tracking-widest">Total</p>
-              <p class="text-lg font-black text-primary italic">{{ fmt(item.puntajeFinal) }}</p>
+            <div class="text-right min-w-[4.5rem]">
+              <p class="text-[9px] font-black uppercase text-primary tracking-widest">Nota final</p>
+              <p class="text-xl sm:text-2xl font-black text-primary italic">{{ fmt(item.puntajeFinal) }}</p>
             </div>
             <span class="material-symbols-outlined text-slate-400">
               {{ expandido[`f-${item.idFraternidad}`] ? 'expand_less' : 'expand_more' }}

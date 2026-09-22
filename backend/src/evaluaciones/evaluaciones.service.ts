@@ -1832,7 +1832,7 @@ export class EvaluacionesService {
     return {
       gestion: { idGestion: gestion.idGestion, anio: gestion.anio },
       ambito: 'EFU',
-      formula: `${FORMULA_EFU_PROMEDIO}; final = max(0, Promedio Final + sanciones)`,
+      formula: `${FORMULA_EFU_PROMEDIO}; final = max(0, suma(fases) + sanciones)`,
       items,
     };
   }
@@ -4123,8 +4123,6 @@ export class EvaluacionesService {
       const impactoSanciones = round2(
         sanciones.reduce((s, x) => s + (Number(x.valor) || 0), 0),
       );
-      const promedioFinal = score?.promedioFinal ?? 0;
-      const puntajeFinal = Math.max(0, round2(promedioFinal + impactoSanciones));
       const suspendida = sanciones.some((s) => s.tipoImpacto === 'SUSPENSION');
 
       const actasDisc = discPorFrat.get(f.idFraternidad) || [];
@@ -4147,8 +4145,9 @@ export class EvaluacionesService {
       for (const fase of fasesEfuMeta) {
         if (fase.esDisciplina) {
           notasPromedioPorFase[fase.idFase] = disciplinaNota;
+        } else if (score?.notasPorFase?.[fase.idFase] != null) {
+          notasPromedioPorFase[fase.idFase] = round2(score.notasPorFase[fase.idFase]);
         } else {
-          // Promedio de jurados artísticos que sí calificaron esa fase
           const vals: number[] = [];
           for (const j of score?.jurados || []) {
             const acta = j.fases.find((x) => x.idFase === fase.idFase);
@@ -4160,6 +4159,16 @@ export class EvaluacionesService {
               : null;
         }
       }
+
+      // Nota final = sumatoria de las notas de cada fase (lo que se muestra en columnas)
+      const sumaFases = round2(
+        Object.values(notasPromedioPorFase).reduce(
+          (s, v) => s + (v != null ? Number(v) : 0),
+          0,
+        ),
+      );
+      const promedioFinal = sumaFases;
+      const puntajeFinal = Math.max(0, round2(sumaFases + impactoSanciones));
 
       const jurados = (score?.jurados || []).map((j) => {
         const notasPorFase: Record<number, number | null> = {};
@@ -4247,7 +4256,7 @@ export class EvaluacionesService {
       techoEfu,
       techoDisciplina,
       formula:
-        `${FORMULA_EFU_PROMEDIO}. Disciplina = SUMATORIA de criterios de los N controladores (no promedio), techo = peso de fase en Gestión. Escala EFU: ${pesosTxt}. Nota final sobre ${techoEfu}.`,
+        `Nota final = suma de las notas de cada fase (${pesosTxt}). Fases artísticas = promedio de jurados; Disciplina = sumatoria de controladores. Escala total /${techoEfu}.`,
       grupos,
     };
   }
@@ -4413,7 +4422,7 @@ export class EvaluacionesService {
         activa: gestion.activa,
         fechaGeneracion: new Date()
       },
-      formula: `${FORMULA_EFU_PROMEDIO}; final = max(0, Promedio Final + sanciones)`,
+      formula: `${FORMULA_EFU_PROMEDIO}; final = max(0, suma(fases) + sanciones)`,
       rankingEfu,
       concursosExternos
     };

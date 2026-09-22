@@ -1,13 +1,11 @@
 /**
- * Puntuación EFU: cada jurado aporta UNA NotaFraternidad (suma de las fases
- * que sí calificó). El Promedio Final de la fraternidad es
- * suma(NotaFraternidad) / N jurados distintos. No se reescala ni se divide
- * por número de actas/fases.
+ * Puntuación EFU:
+ * - Cada fase artística: promedio de las actas selladas de esa fase.
+ * - Disciplina: SUMATORIA de criterios de los N controladores (no promedio).
+ * - Nota final = suma(notas de cada fase)  [ej. Monografía + Entrada + Disciplina].
  *
- * Disciplina (nombre de fase contiene "disciplina"): las actas parciales de
- * varios controladores se fusionan en UNA sola contribución por fraternidad
- * (suma de puntajes; criterios no se solapan) y se suma al promedio de los
- * jurados artísticos — los controladores no diluyen el promedio.
+ * Cada jurado sigue teniendo su NotaFraternidad (= suma de las fases que calificó)
+ * solo como detalle; no se usa para diluir la nota final.
  */
 
 import {
@@ -50,13 +48,16 @@ export type EfuJuradoNota = {
 export type EfuFraternidadScore = {
   idFraternidad: number;
   cantidadJurados: number;
+  /** Suma de (promedio por fase artística) + disciplina fusionada. */
   promedioFinal: number;
   disciplinaMerged?: number;
+  /** Promedio por idFase (solo fases artísticas). */
+  notasPorFase?: Record<number, number>;
   jurados: EfuJuradoNota[];
 };
 
 export const FORMULA_EFU_PROMEDIO =
-  'NotaFraternidad = suma de las fases artísticas que calificó el jurado; Promedio artístico = avg(jurados); Disciplina = sumatoria de criterios de controladores (no promedio); Promedio Final = avg(artísticos) + disciplina';
+  'Nota final = suma de las notas de cada fase EFU. Cada fase artística = promedio de jurados que la calificaron; Disciplina = sumatoria de controladores (no promedio)';
 
 export function nombreJuradoDesdeUsuario(jurado?: {
   idJurado?: number;
@@ -75,6 +76,11 @@ export function round2(n: number): number {
 function claveJurado(acta: EfuActa): string {
   if (acta.idJurado != null && Number.isFinite(acta.idJurado)) return `j:${acta.idJurado}`;
   return `n:${acta.juradoNombre || 'sin'}`;
+}
+
+function claveFase(acta: EfuActa): string {
+  if (acta.idFase != null && Number.isFinite(acta.idFase)) return `f:${acta.idFase}`;
+  return `n:${acta.faseNombre || 'sin'}`;
 }
 
 export function actaDesdeEvaluacion(e: {
@@ -109,8 +115,8 @@ export function actaDesdeEvaluacion(e: {
 }
 
 /**
- * Agrupa actas por fraternidad y por jurado.
- * Actas de disciplina se fusionan y se suman al promedio (no promedian controladores).
+ * Agrupa actas por fraternidad.
+ * Nota final = Σ (promedio por fase artística) + disciplina fusionada (sumatoria).
  */
 export function calcularScoresEfu(actas: EfuActa[]): Map<number, EfuFraternidadScore> {
   type AccJurado = {
@@ -122,6 +128,8 @@ export function calcularScoresEfu(actas: EfuActa[]): Map<number, EfuFraternidadS
 
   const disciplinaActasPorFrat = new Map<number, EfuActa[]>();
   const porFrat = new Map<number, Map<string, AccJurado>>();
+  /** idFraternidad → claveFase → notas */
+  const notasFasePorFrat = new Map<number, Map<string, { idFase: number | null; vals: number[] }>>();
 
   for (const acta of actas) {
     if (!acta?.idFraternidad) continue;
@@ -160,6 +168,19 @@ export function calcularScoresEfu(actas: EfuActa[]): Map<number, EfuFraternidadS
       estado: acta.estado || '',
       fechaCierre: acta.fechaCierre || null,
     });
+
+    let porFase = notasFasePorFrat.get(acta.idFraternidad);
+    if (!porFase) {
+      porFase = new Map();
+      notasFasePorFrat.set(acta.idFraternidad, porFase);
+    }
+    const fk = claveFase(acta);
+    let bucket = porFase.get(fk);
+    if (!bucket) {
+      bucket = { idFase: acta.idFase ?? null, vals: [] };
+      porFase.set(fk, bucket);
+    }
+    bucket.vals.push(Number(acta.puntajeTotal) || 0);
   }
 
   const disciplinaPorFrat = new Map<number, number>();
@@ -187,16 +208,26 @@ export function calcularScoresEfu(actas: EfuActa[]): Map<number, EfuFraternidadS
     jurados.sort((a, b) => b.notaFraternidad - a.notaFraternidad
       || String(a.juradoNombre).localeCompare(String(b.juradoNombre), 'es'));
 
-    const n = jurados.length;
-    const avgArtisticos = n > 0
-      ? round2(jurados.reduce((s, j) => s + j.notaFraternidad, 0) / n)
-      : 0;
+    const notasPorFase: Record<number, number> = {};
+    let sumaFasesArtisticas = 0;
+    const porFase = notasFasePorFrat.get(idFraternidad);
+    if (porFase) {
+      for (const bucket of porFase.values()) {
+        if (!bucket.vals.length) continue;
+        const avg = round2(
+          bucket.vals.reduce((s, v) => s + v, 0) / bucket.vals.length,
+        );
+        sumaFasesArtisticas += avg;
+        if (bucket.idFase != null) notasPorFase[bucket.idFase] = avg;
+      }
+    }
 
     result.set(idFraternidad, {
       idFraternidad,
-      cantidadJurados: n,
-      promedioFinal: round2(avgArtisticos + disciplinaMerged),
+      cantidadJurados: jurados.length,
+      promedioFinal: round2(sumaFasesArtisticas + disciplinaMerged),
       disciplinaMerged,
+      notasPorFase,
       jurados,
     });
   }

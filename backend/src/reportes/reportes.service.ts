@@ -658,20 +658,22 @@ export class ReportesService implements OnModuleInit {
         };
       });
 
-    if (dto.ordenarPor === 'puntajeFinal' || dto.ordenarPor === 'puesto') {
-      const desc = dto.orden === 'DESC';
+    // Por defecto: mayor nota final primero
+    const ordenarCalif = dto.ordenarPor || 'puntajeFinal';
+    if (ordenarCalif === 'puntajeFinal' || ordenarCalif === 'puesto') {
+      const desc = dto.orden !== 'ASC';
       grupos.sort((a, b) => {
-        const va = dto.ordenarPor === 'puesto' ? a.puesto : a.puntajeFinal;
-        const vb = dto.ordenarPor === 'puesto' ? b.puesto : b.puntajeFinal;
+        const va = ordenarCalif === 'puesto' ? a.puesto : a.puntajeFinal;
+        const vb = ordenarCalif === 'puesto' ? b.puesto : b.puntajeFinal;
         return desc ? vb - va : va - vb;
       });
-    } else if (this.esOrdenOficial(dto.ordenarPor) || !dto.ordenarPor) {
+    } else if (this.esOrdenOficial(ordenarCalif)) {
       this.sortRowsPorOrdenDesfile(grupos, dto.orden === 'DESC');
     } else {
       const desc = dto.orden === 'DESC';
       grupos.sort((a, b) => {
-        const av = String((a as any)[dto.ordenarPor!] ?? a.nombreFraternidad ?? '').toLowerCase();
-        const bv = String((b as any)[dto.ordenarPor!] ?? b.nombreFraternidad ?? '').toLowerCase();
+        const av = String((a as any)[ordenarCalif] ?? a.nombreFraternidad ?? '').toLowerCase();
+        const bv = String((b as any)[ordenarCalif] ?? b.nombreFraternidad ?? '').toLowerCase();
         const cmp = av.localeCompare(bv, 'es');
         return desc ? -cmp : cmp;
       });
@@ -1836,25 +1838,40 @@ export class ReportesService implements OnModuleInit {
       const fmtNota = (v: any) =>
         v === null || v === undefined || v === '' ? '—' : Number(v).toFixed(2);
 
+      const idxChacha = headers.length - 1;
+      const idxFinal = headers.length - 2;
+      const idxJurado = 4;
+
       const drawMatrixRow = (
         cells: string[],
         startY: number,
-        opts: { highlight?: boolean; bold?: boolean } = {},
+        opts: { highlight?: boolean; bold?: boolean; largeFinal?: boolean } = {},
       ) => {
-        const rowH = measureRowHeight(cells, widths, 11);
+        const rowH = Math.max(
+          measureRowHeight(cells, widths, 11),
+          opts.largeFinal ? 16 : 0,
+        );
         if (opts.highlight) {
           doc.save().rect(margin, startY, contentW, rowH).fill('#fef08a').restore();
         }
+        // Columna Chacha Warmi en celeste
+        {
+          let xCh = margin;
+          for (let i = 0; i < idxChacha; i++) xCh += widths[i];
+          doc.save().rect(xCh, startY, widths[idxChacha], rowH).fill('#bae6fd').restore();
+        }
         let x = margin;
-        doc
-          .font(opts.bold || opts.highlight ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(fontSize)
-          .fillColor('#0f172a');
         cells.forEach((cell, i) => {
+          const esFinalGrande =
+            opts.largeFinal && (i === idxJurado || i === idxFinal || i === idxChacha);
+          doc
+            .font(opts.bold || opts.highlight || esFinalGrande ? 'Helvetica-Bold' : 'Helvetica')
+            .fontSize(esFinalGrande ? fontSize + 2.5 : fontSize)
+            .fillColor(i === idxChacha ? '#0c4a6e' : '#0f172a');
           doc.text(String(cell ?? '—'), x + 2, startY + 2, {
             width: widths[i] - 4,
             height: rowH - 3,
-            align: i === 0 ? 'center' : 'left',
+            align: i === 0 || i >= idxFinal - 1 ? 'center' : 'left',
             ellipsis: true,
           });
           x += widths[i];
@@ -1863,7 +1880,23 @@ export class ReportesService implements OnModuleInit {
         return rowH;
       };
 
-      y += drawTableHeader(headers, widths, y);
+      const headerH = drawTableHeader(headers, widths, y);
+      {
+        let xCh = margin;
+        for (let i = 0; i < idxChacha; i++) xCh += widths[i];
+        doc.save().rect(xCh, y, widths[idxChacha], headerH).fill('#0284c7').restore();
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(headerFontSize)
+          .fillColor('#ffffff')
+          .text(headers[idxChacha], xCh + 2, y + 3, {
+            width: widths[idxChacha] - 4,
+            height: headerH - 4,
+            align: 'center',
+            ellipsis: true,
+          });
+      }
+      y += headerH;
 
       for (const grupo of rows) {
         const jurados = Array.isArray(grupo.jurados) ? grupo.jurados : [];
@@ -1950,7 +1983,7 @@ export class ReportesService implements OnModuleInit {
         ];
         const previewResumen = measureRowHeight(resumenCells, widths, 11);
         ensureSpace(previewResumen + 4, headers, widths);
-        y += drawMatrixRow(resumenCells, y, { highlight: true, bold: true });
+        y += drawMatrixRow(resumenCells, y, { highlight: true, bold: true, largeFinal: true });
 
         const partesDetalle: string[] = [];
         if (grupo.disciplina?.cantidadControladores) {
