@@ -301,6 +301,18 @@
           <span class="font-black uppercase tracking-widest text-slate-400 mr-1">Fórmula</span>
           {{ resultado.formula }}
         </p>
+        <p
+          v-if="filtros.tipoReporte === 'calificaciones' && fasesEfuMatriz.length"
+          class="w-full text-[11px] text-slate-600 font-medium"
+        >
+          <span class="font-black uppercase tracking-widest text-slate-400 mr-1">Escala fases</span>
+          <span v-for="(f, i) in fasesEfuMatriz" :key="'esc-' + f.idFase">
+            {{ f.nombre }} /{{ Number(f.pesoPorcentaje) || 0 }}<span v-if="i < fasesEfuMatriz.length - 1"> · </span>
+          </span>
+          <span class="ml-2 font-black text-primary">
+            Nota final /{{ Number(resultado.techoEfu) || fasesEfuMatriz.reduce((s, f) => s + (Number(f.pesoPorcentaje) || 0), 0) }}
+          </span>
+        </p>
       </div>
 
       <div class="overflow-x-auto">
@@ -322,9 +334,13 @@
                 class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider whitespace-nowrap"
               >
                 {{ f.nombre }}
+                <span class="block font-bold opacity-80 normal-case tracking-normal">/{{ Number(f.pesoPorcentaje) || 0 }}</span>
               </th>
               <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Sanciones</th>
-              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Total EFU</th>
+              <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">
+                Nota final
+                <span class="block font-bold opacity-80 normal-case tracking-normal">/{{ techoEfuMatriz }}</span>
+              </th>
               <th class="px-2 py-2.5 text-[9px] font-black uppercase tracking-wider">Chacha Warmi</th>
             </tr>
           </thead>
@@ -341,13 +357,22 @@
                 class="border-b border-slate-100"
                 :class="fila.esPromedio
                   ? 'bg-amber-100/90 font-bold'
-                  : ji % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'"
+                  : fila.esControlador
+                    ? 'bg-emerald-50/70'
+                    : ji % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'"
               >
                 <td class="px-2 py-2 text-xs text-slate-700">{{ fila.nro }}</td>
                 <td class="px-2 py-2 text-xs text-slate-700">{{ fila.categoria }}</td>
                 <td class="px-2 py-2 text-xs font-bold text-slate-800 max-w-[160px]">{{ fila.fraternidad }}</td>
                 <td class="px-2 py-2 text-xs text-slate-600">{{ fila.danza }}</td>
-                <td class="px-2 py-2 text-xs" :class="fila.esPromedio ? 'text-amber-900 uppercase tracking-wide text-[10px] font-black' : 'text-slate-700'">
+                <td
+                  class="px-2 py-2 text-xs"
+                  :class="fila.esPromedio
+                    ? 'text-amber-900 uppercase tracking-wide text-[10px] font-black'
+                    : fila.esControlador
+                      ? 'text-emerald-800 font-bold'
+                      : 'text-slate-700'"
+                >
                   {{ fila.jurado }}
                 </td>
                 <td
@@ -363,10 +388,19 @@
                 <td class="px-2 py-2 text-xs font-bold text-slate-800 text-center">{{ fila.totalEfu }}</td>
                 <td class="px-2 py-2 text-xs text-slate-700 text-center">{{ fila.chacha }}</td>
               </tr>
-              <tr v-if="grupo.detalleSanciones && grupo.detalleSanciones !== '—'" :key="'d-' + grupo.idFraternidad">
-                <td :colspan="5 + fasesEfuMatriz.length + 3" class="px-3 py-1.5 text-[10px] text-slate-500 italic bg-amber-50/40 border-b border-slate-100">
-                  Sanciones: {{ grupo.detalleSanciones }}
-                  · Puntaje final: {{ Number(grupo.puntajeFinal ?? 0).toFixed(2) }}
+              <tr :key="'meta-' + grupo.idFraternidad">
+                <td :colspan="5 + fasesEfuMatriz.length + 3" class="px-3 py-1.5 text-[10px] text-slate-500 italic bg-slate-50 border-b border-slate-100">
+                  <span v-if="grupo.disciplina?.cantidadControladores">
+                    Disciplina (sumatoria {{ grupo.disciplina.cantidadControladores }} controlador(es)):
+                    {{ fmtNotaMatriz(grupo.disciplina.nota) }} / {{ Number(grupo.disciplina.techo) || techoDisciplinaMatriz }}
+                    ·
+                    {{ (grupo.disciplina.controladores || []).map((c) => `${c.nombre}: ${fmtNotaMatriz(c.puntaje)}`).join(' + ') || '—' }}
+                  </span>
+                  <span v-if="grupo.detalleSanciones && grupo.detalleSanciones !== '—'">
+                    <span v-if="grupo.disciplina?.cantidadControladores"> · </span>
+                    Sanciones: {{ grupo.detalleSanciones }}
+                  </span>
+                  · Nota final: {{ fmtNotaMatriz(grupo.puntajeFinal) }} / {{ Number(grupo.escalaFinal) || techoEfuMatriz }}
                   <span v-if="grupo.chachaWarmi?.nombres?.length"> · Pareja: {{ grupo.chachaWarmi.nombres.join(' / ') }}</span>
                 </td>
               </tr>
@@ -492,7 +526,7 @@ const cargosDirectiva = PERSONAS_DIRECTIVA.map((p) => ({
 const tiposReporte = [
   { id: 'fraternidades', label: 'Fraternidades', icon: 'groups', desc: 'Listado con tipo de danza, categoría e instancia.' },
   { id: 'directiva', label: 'Directiva', icon: 'badge', desc: 'Por cargo: presidentes, vice, secretarios, vocales, delegados… PDF y Excel.' },
-  { id: 'calificaciones', label: 'Calificaciones', icon: 'leaderboard', desc: 'Matriz jurados × fases EFU, Promedio Final justo y Chacha-Warmi.' },
+  { id: 'calificaciones', label: 'Calificaciones', icon: 'leaderboard', desc: 'Matriz jurados × fases EFU, disciplina por sumatoria de controladores y nota final sobre el techo de fases.' },
   { id: 'disciplina', label: 'Disciplina', icon: 'gavel', desc: 'Todos los casos: banderas amarillas/rojas y sanciones por tipo.' },
   { id: 'concursantes_externos', label: 'Concursantes externos', icon: 'emoji_events', desc: 'Chacha-Warmi, fotografía u otros concursos externos de la gestión.' },
 ]
@@ -742,6 +776,18 @@ const columnas = computed(() => {
 
 const fasesEfuMatriz = computed(() => resultado.value?.fasesEfu || [])
 
+const techoEfuMatriz = computed(() => {
+  if (resultado.value?.techoEfu != null) return Number(resultado.value.techoEfu) || 0
+  return fasesEfuMatriz.value.reduce((s, f) => s + (Number(f.pesoPorcentaje) || 0), 0)
+})
+
+const techoDisciplinaMatriz = computed(() => {
+  if (resultado.value?.techoDisciplina != null) return Number(resultado.value.techoDisciplina) || 0
+  return fasesEfuMatriz.value
+    .filter((f) => f.esDisciplina)
+    .reduce((s, f) => s + (Number(f.pesoPorcentaje) || 0), 0)
+})
+
 const fmtNotaMatriz = (v) => {
   if (v === null || v === undefined || v === '') return '—'
   return Number(v).toFixed(2)
@@ -749,16 +795,24 @@ const fmtNotaMatriz = (v) => {
 
 const filasMatrizGrupo = (grupo) => {
   const jurados = Array.isArray(grupo.jurados) ? grupo.jurados : []
+  const controladores = Array.isArray(grupo.disciplina?.controladores)
+    ? grupo.disciplina.controladores
+    : []
   const filas = []
-  const lista = jurados.length ? jurados : [null]
+  const lista = jurados.length ? jurados : []
   lista.forEach((j, ji) => {
     const primera = ji === 0
     const notas = {}
     for (const f of fasesEfuMatriz.value) {
-      notas[f.idFase] = j ? fmtNotaMatriz(j.notasPorFase?.[f.idFase]) : '—'
+      if (f.esDisciplina) {
+        notas[f.idFase] = '—'
+      } else {
+        notas[f.idFase] = j ? fmtNotaMatriz(j.notasPorFase?.[f.idFase]) : '—'
+      }
     }
     filas.push({
       esPromedio: false,
+      esControlador: false,
       nro: primera ? (grupo.nro ?? grupo.puesto ?? '—') : '',
       categoria: primera ? (grupo.categoria || '—') : '',
       fraternidad: primera ? (grupo.nombreFraternidad || '—') : '',
@@ -771,18 +825,74 @@ const filasMatrizGrupo = (grupo) => {
       suspendida: false,
     })
   })
-  const notasVacias = {}
-  for (const f of fasesEfuMatriz.value) notasVacias[f.idFase] = ''
+
+  // Filas de controladores (aporte a disciplina; no promedian)
+  controladores.forEach((c, ci) => {
+    const primeraCtrl = lista.length === 0 && ci === 0
+    const notas = {}
+    for (const f of fasesEfuMatriz.value) {
+      if (f.esDisciplina) {
+        notas[f.idFase] = fmtNotaMatriz(c.puntaje)
+      } else {
+        notas[f.idFase] = '—'
+      }
+    }
+    filas.push({
+      esPromedio: false,
+      esControlador: true,
+      nro: primeraCtrl ? (grupo.nro ?? grupo.puesto ?? '—') : '',
+      categoria: primeraCtrl ? (grupo.categoria || '—') : '',
+      fraternidad: primeraCtrl ? (grupo.nombreFraternidad || '—') : '',
+      danza: primeraCtrl ? (grupo.tipoDanza || '—') : '',
+      jurado: `Ctrl · ${c.nombre || '—'}`,
+      notas,
+      sanciones: '',
+      totalEfu: fmtNotaMatriz(c.puntaje),
+      chacha: '',
+      suspendida: false,
+    })
+  })
+
+  if (!filas.length) {
+    const notasVacias = {}
+    for (const f of fasesEfuMatriz.value) notasVacias[f.idFase] = '—'
+    filas.push({
+      esPromedio: false,
+      esControlador: false,
+      nro: grupo.nro ?? grupo.puesto ?? '—',
+      categoria: grupo.categoria || '—',
+      fraternidad: grupo.nombreFraternidad || '—',
+      danza: grupo.tipoDanza || '—',
+      jurado: '—',
+      notas: notasVacias,
+      sanciones: '',
+      totalEfu: '—',
+      chacha: '',
+      suspendida: false,
+    })
+  }
+
+  const notasFinales = {}
+  for (const f of fasesEfuMatriz.value) {
+    const v = grupo.notasPromedioPorFase?.[f.idFase]
+    if (f.esDisciplina) {
+      notasFinales[f.idFase] = fmtNotaMatriz(grupo.disciplina?.nota ?? v)
+    } else {
+      notasFinales[f.idFase] = fmtNotaMatriz(v)
+    }
+  }
+  const techo = Number(grupo.escalaFinal) || techoEfuMatriz.value
   filas.push({
     esPromedio: true,
+    esControlador: false,
     nro: '',
     categoria: '',
     fraternidad: '',
     danza: '',
-    jurado: 'PROMEDIO FINAL',
-    notas: notasVacias,
+    jurado: `NOTA FINAL /${techo}`,
+    notas: notasFinales,
     sanciones: grupo.suspendida ? 'SUSP.' : fmtNotaMatriz(grupo.impactoSanciones),
-    totalEfu: fmtNotaMatriz(grupo.promedioFinal),
+    totalEfu: `${fmtNotaMatriz(grupo.puntajeFinal)} / ${techo}`,
     chacha: grupo.chachaWarmi?.nota != null ? fmtNotaMatriz(grupo.chachaWarmi.nota) : '—',
     suspendida: !!grupo.suspendida,
   })

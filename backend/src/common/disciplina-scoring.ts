@@ -1,5 +1,7 @@
 /**
- * Disciplina: cada criterio es decisión SI / NO → puntaje 1 / 0 (sin decimales).
+ * Disciplina: cada criterio es decisión SI / NO.
+ * SI → puntajeMaximo del criterio (ej. 5 pts); NO → 0.
+ * La nota de fraternidad es la SUMATORIA de criterios (no promedio de controladores).
  */
 
 export function esFaseDisciplinaNombre(nombre?: string | null): boolean {
@@ -33,7 +35,7 @@ export function valorVisualCriterio(raw: unknown): number | null {
 }
 
 /**
- * Normaliza cualquier payload de criterio de disciplina a 0 | 1.
+ * Normaliza cualquier payload de criterio de disciplina a decisión 0 | 1.
  * Acepta: 0/1, boolean, "SI"/"NO", { decision }, { valor }, legacy { visual, real }.
  */
 export function normalizarDecisionDisciplina(raw: unknown): 0 | 1 {
@@ -52,10 +54,17 @@ export function normalizarDecisionDisciplina(raw: unknown): 0 | 1 {
 
   if (typeof raw === 'object' && raw !== null) {
     const obj = raw as Record<string, unknown>;
-    if ('decision' in obj) return normalizarDecisionDisciplina(obj.decision);
-    if ('valor' in obj) return normalizarDecisionDisciplina(obj.valor);
+    if ('decision' in obj) {
+      const d = obj.decision;
+      if (typeof d === 'string') {
+        const s = d.trim().toLowerCase();
+        if (['si', 'sí', '1', 'true', 'cumple', 'yes', 's'].includes(s)) return 1;
+        if (['no', '0', 'false', 'no_cumple', 'n'].includes(s)) return 0;
+      }
+      return normalizarDecisionDisciplina(d);
+    }
     if ('cumple' in obj) return normalizarDecisionDisciplina(obj.cumple);
-    // Legacy escala visual → real
+    // valor/real > 0 cuenta como SI (compat con actas ya guardadas)
     const real = valorRealCriterio(raw);
     if (real > 0) return 1;
     const visual = valorVisualCriterio(raw);
@@ -68,35 +77,41 @@ export function normalizarDecisionDisciplina(raw: unknown): 0 | 1 {
   return 1;
 }
 
-/** Empaqueta decisión binaria para JSONB. */
-export function empaquetarDecisionDisciplina(decision: 0 | 1): {
-  valor: 0 | 1;
+/**
+ * Empaqueta decisión binaria: SI otorga el techo del criterio (puntajeMaximo).
+ */
+export function empaquetarDecisionDisciplina(
+  decision: 0 | 1,
+  puntajeMaximo = 1,
+): {
+  valor: number;
   decision: 'SI' | 'NO';
+  puntajeMaximo: number;
 } {
+  const max = Math.max(0, Number(puntajeMaximo) || 0);
   return {
-    valor: decision,
+    valor: decision === 1 ? max : 0,
     decision: decision === 1 ? 'SI' : 'NO',
+    puntajeMaximo: max,
   };
 }
 
 /**
- * @deprecated Usar normalizarDecisionDisciplina. Se mantiene por compat. de imports.
+ * @deprecated Usar normalizarDecisionDisciplina + empaquetarDecisionDisciplina.
  */
 export function convertirNotaVisualAReal(
   notaVisual: number,
   _escalaVisual: number,
-  _puntajeMaximo: number,
+  puntajeMaximo: number,
 ): number {
-  return normalizarDecisionDisciplina(notaVisual);
+  const d = normalizarDecisionDisciplina(notaVisual);
+  return empaquetarDecisionDisciplina(d, puntajeMaximo).valor;
 }
 
 /**
  * Fusiona actas parciales de disciplina: cada idCriterio cuenta una sola vez
- * (primera aparición gana). Si un acta no trae criteriosEvaluados, se usa
- * puntajeTotal como aporte total (compat).
- *
- * Formato nuevo: { valor: 0|1, decision: 'SI'|'NO' }
- * Formato legado: número o { visual, real } → se conserva el valor real.
+ * (primera aparición gana). Resultado = SUMATORIA de puntos, no promedio.
+ * Si un acta no trae criteriosEvaluados, se usa puntajeTotal (compat).
  */
 export function fusionarPuntajeDisciplina(
   actas: Array<{
@@ -112,16 +127,7 @@ export function fusionarPuntajeDisciplina(
     if (crits && typeof crits === 'object' && Object.keys(crits).length > 0) {
       for (const [id, raw] of Object.entries(crits)) {
         if (porCriterio.has(id)) continue;
-        if (
-          raw != null &&
-          typeof raw === 'object' &&
-          ('decision' in (raw as any) ||
-            ('valor' in (raw as any) && !('visual' in (raw as any)) && !('real' in (raw as any))))
-        ) {
-          porCriterio.set(id, normalizarDecisionDisciplina(raw));
-        } else {
-          porCriterio.set(id, valorRealCriterio(raw));
-        }
+        porCriterio.set(id, valorRealCriterio(raw));
       }
     } else {
       fallbackSinCriterios += Number(a.puntajeTotal) || 0;
@@ -131,4 +137,46 @@ export function fusionarPuntajeDisciplina(
   let sum = fallbackSinCriterios;
   for (const v of porCriterio.values()) sum += v;
   return round2(sum);
+}
+
+/**
+ * Detalle por controlador (acta) para reportes: aporte individual + suma fusionada.
+ */
+export function desgloseControladoresDisciplina(
+  actas: Array<{
+    idJurado?: number | null;
+    juradoNombre?: string;
+    puntajeTotal?: number | null;
+    criteriosEvaluados?: Record<string, unknown> | null;
+    observacion?: string | null;
+  }>,
+): {
+  controladores: Array<{
+    idJurado: number | null;
+    nombre: string;
+    puntaje: number;
+    observacion: string | null;
+  }>;
+  sumatoria: number;
+} {
+  const controladores = actas.map((a) => ({
+    idJurado: a.idJurado ?? null,
+    nombre: a.juradoNombre || (a.idJurado ? `Controlador #${a.idJurado}` : 'Controlador'),
+    puntaje: round2(Number(a.puntajeTotal) || valorRealDesdeActa(a.criteriosEvaluados)),
+    observacion: a.observacion || null,
+  }));
+  controladores.sort((a, b) =>
+    String(a.nombre).localeCompare(String(b.nombre), 'es'),
+  );
+  return {
+    controladores,
+    sumatoria: fusionarPuntajeDisciplina(actas),
+  };
+}
+
+function valorRealDesdeActa(crits?: Record<string, unknown> | null): number {
+  if (!crits || typeof crits !== 'object') return 0;
+  let s = 0;
+  for (const raw of Object.values(crits)) s += valorRealCriterio(raw);
+  return round2(s);
 }

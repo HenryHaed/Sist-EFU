@@ -32,6 +32,7 @@ import {
   valorRealCriterio,
   valorVisualCriterio,
   fusionarPuntajeDisciplina,
+  desgloseControladoresDisciplina,
   round2 as round2Disc,
 } from '../common/disciplina-scoring';
 import {
@@ -1434,8 +1435,10 @@ export class EvaluacionesService {
           }
 
           const decision = normalizarDecisionDisciplina(raw);
-          criteriosNormalizados[String(idC)] = empaquetarDecisionDisciplina(decision);
-          pts += decision;
+          const maxCrit = Number(crit.puntajeMaximo) || 0;
+          const packed = empaquetarDecisionDisciplina(decision, maxCrit);
+          criteriosNormalizados[String(idC)] = packed;
+          pts += packed.valor;
         }
       } else {
         for (const [key, raw] of Object.entries(criterios)) {
@@ -1446,7 +1449,7 @@ export class EvaluacionesService {
       }
     }
 
-    pts = esDisciplina ? Math.round(pts) : round2Disc(pts);
+    pts = esDisciplina ? round2Disc(pts) : round2Disc(pts);
 
     if (!ev) {
       ev = this.evaluacionRepo.create({
@@ -3575,10 +3578,15 @@ export class EvaluacionesService {
       esDisciplina = esFaseDisciplinaNombre(fase?.nombre);
     }
 
+    const maxRaw = Number(data.puntajeMaximo);
     const payload: any = {
       nombre: data.nombre,
-      // Disciplina: cada criterio vale 1 pt (SI) o 0 (NO)
-      puntajeMaximo: esDisciplina ? 1 : Number(data.puntajeMaximo),
+      // Disciplina: SI otorga puntajeMaximo (ej. 5), NO otorga 0
+      puntajeMaximo: esDisciplina
+        ? Number.isFinite(maxRaw) && maxRaw > 0
+          ? maxRaw
+          : 5
+        : Number(data.puntajeMaximo),
       escalaVisual: esDisciplina
         ? 1
         : data.escalaVisual != null && data.escalaVisual !== ''
@@ -3607,17 +3615,22 @@ export class EvaluacionesService {
 
     const payload: any = {};
     if (data.nombre !== undefined) payload.nombre = data.nombre;
-    if (esDisciplina) {
-      payload.puntajeMaximo = 1;
-      payload.escalaVisual = 1;
-    } else {
-      if (data.puntajeMaximo !== undefined) payload.puntajeMaximo = Number(data.puntajeMaximo);
-      if (data.escalaVisual !== undefined) {
-        payload.escalaVisual =
-          data.escalaVisual != null && data.escalaVisual !== ''
-            ? Number(data.escalaVisual)
-            : 1;
+    if (data.puntajeMaximo !== undefined) {
+      const maxRaw = Number(data.puntajeMaximo);
+      if (esDisciplina) {
+        payload.puntajeMaximo = Number.isFinite(maxRaw) && maxRaw > 0 ? maxRaw : 5;
+        payload.escalaVisual = 1;
+      } else {
+        payload.puntajeMaximo = maxRaw;
       }
+    } else if (esDisciplina) {
+      payload.escalaVisual = 1;
+    }
+    if (!esDisciplina && data.escalaVisual !== undefined) {
+      payload.escalaVisual =
+        data.escalaVisual != null && data.escalaVisual !== ''
+          ? Number(data.escalaVisual)
+          : 1;
     }
     if (data.urlImagen !== undefined) payload.urlImagen = data.urlImagen;
     await this.criterioRepo.update(id, payload);
@@ -3959,7 +3972,8 @@ export class EvaluacionesService {
 
   /**
    * Matriz de calificaciones EFU: por fraternidad → jurados (notas por fase) +
-   * promedio final + sanciones dinámicas + nota Chacha-Warmi (1 pareja).
+   * disciplina como SUMATORIA de N controladores (no promedio) +
+   * pesos de fase desde gestión + nota final sobre Σ pesos.
    */
   async getMatrizCalificaciones(idGestion: number) {
     const gestion = await this.gestionRepo.findOne({ where: { idGestion } });
@@ -3969,11 +3983,29 @@ export class EvaluacionesService {
       where: { gestion: { idGestion }, tipoConcurso: 'EFU' },
       order: { idFase: 'ASC' },
     });
-    const fasesEfuMeta = fasesEfu.map((f) => ({
-      idFase: f.idFase,
-      nombre: f.nombre,
-      categoriaEfu: f.categoriaEfu || null,
-    }));
+    const fasesEfuMeta = fasesEfu.map((f) => {
+      const peso = f.pesoPorcentaje != null ? Number(f.pesoPorcentaje) : 0;
+      const esDisciplina = esFaseDisciplinaNombre(f.nombre);
+      return {
+        idFase: f.idFase,
+        nombre: f.nombre,
+        categoriaEfu: f.categoriaEfu || null,
+        pesoPorcentaje: peso,
+        esDisciplina,
+        etiquetaEscala: `${f.nombre} (/${peso})`,
+      };
+    });
+    const techoEfu = round2(
+      fasesEfuMeta.reduce((s, f) => s + (Number(f.pesoPorcentaje) || 0), 0),
+    );
+    const fasesDisciplinaIds = new Set(
+      fasesEfuMeta.filter((f) => f.esDisciplina).map((f) => f.idFase),
+    );
+    const techoDisciplina = round2(
+      fasesEfuMeta
+        .filter((f) => f.esDisciplina)
+        .reduce((s, f) => s + (Number(f.pesoPorcentaje) || 0), 0),
+    );
 
     const frats = await this.fraternidadRepo.find({
       where: {
@@ -4001,6 +4033,16 @@ export class EvaluacionesService {
     const scores = calcularScoresEfu(
       evsEfu.map((e) => actaDesdeEvaluacion(e)).filter((a): a is NonNullable<typeof a> => !!a),
     );
+
+    // Actas de disciplina por fraternidad (para desglose de controladores)
+    const discPorFrat = new Map<number, typeof evsEfu>();
+    for (const e of evsEfu) {
+      const fid = e.fraternidad?.idFraternidad;
+      const faseId = e.fase?.idFase;
+      if (!fid || !faseId || !fasesDisciplinaIds.has(faseId)) continue;
+      if (!discPorFrat.has(fid)) discPorFrat.set(fid, []);
+      discPorFrat.get(fid)!.push(e);
+    }
 
     // Chacha-Warmi: promedio de actas por fraternidad (nota de la pareja)
     const evsChacha = await this.evaluacionRepo
@@ -4085,11 +4127,49 @@ export class EvaluacionesService {
       const puntajeFinal = Math.max(0, round2(promedioFinal + impactoSanciones));
       const suspendida = sanciones.some((s) => s.tipoImpacto === 'SUSPENSION');
 
+      const actasDisc = discPorFrat.get(f.idFraternidad) || [];
+      const desgloseDisc = desgloseControladoresDisciplina(
+        actasDisc.map((e) => ({
+          idJurado: e.jurado?.idJurado ?? null,
+          juradoNombre: nombreJuradoDesdeUsuario(e.jurado),
+          puntajeTotal: e.puntajeTotal,
+          criteriosEvaluados: e.criteriosEvaluados,
+          observacion: (e as any).observacion || null,
+        })),
+      );
+      const disciplinaNota = round2(
+        score?.disciplinaMerged != null
+          ? Number(score.disciplinaMerged)
+          : desgloseDisc.sumatoria,
+      );
+
+      const notasPromedioPorFase: Record<number, number | null> = {};
+      for (const fase of fasesEfuMeta) {
+        if (fase.esDisciplina) {
+          notasPromedioPorFase[fase.idFase] = disciplinaNota;
+        } else {
+          // Promedio de jurados artísticos que sí calificaron esa fase
+          const vals: number[] = [];
+          for (const j of score?.jurados || []) {
+            const acta = j.fases.find((x) => x.idFase === fase.idFase);
+            if (acta) vals.push(Number(acta.puntajeTotal) || 0);
+          }
+          notasPromedioPorFase[fase.idFase] =
+            vals.length > 0
+              ? round2(vals.reduce((a, b) => a + b, 0) / vals.length)
+              : null;
+        }
+      }
+
       const jurados = (score?.jurados || []).map((j) => {
         const notasPorFase: Record<number, number | null> = {};
         for (const fase of fasesEfuMeta) {
-          const acta = j.fases.find((x) => x.idFase === fase.idFase);
-          notasPorFase[fase.idFase] = acta ? round2(acta.puntajeTotal) : null;
+          if (fase.esDisciplina) {
+            notasPorFase[fase.idFase] = null; // disciplina no es nota de jurado artístico
+          } else {
+            const acta = j.fases.find((x) => x.idFase === fase.idFase);
+            notasPorFase[fase.idFase] = acta ? round2(acta.puntajeTotal) : null;
+          }
         }
         return {
           idJurado: j.idJurado,
@@ -4132,6 +4212,15 @@ export class EvaluacionesService {
         sanciones,
         suspendida,
         puntajeFinal,
+        escalaFinal: techoEfu,
+        notasPromedioPorFase,
+        disciplina: {
+          nota: disciplinaNota,
+          techo: techoDisciplina,
+          modo: 'sumatoria',
+          cantidadControladores: desgloseDisc.controladores.length,
+          controladores: desgloseDisc.controladores,
+        },
         chachaWarmi,
       };
     });
@@ -4143,6 +4232,10 @@ export class EvaluacionesService {
       (g as any).nro = i + 1;
     });
 
+    const pesosTxt = fasesEfuMeta
+      .map((f) => `${f.nombre}: /${f.pesoPorcentaje}`)
+      .join(' · ');
+
     return {
       gestion: {
         idGestion: gestion.idGestion,
@@ -4151,7 +4244,10 @@ export class EvaluacionesService {
         activa: gestion.activa,
       },
       fasesEfu: fasesEfuMeta,
-      formula: `${FORMULA_EFU_PROMEDIO}; final = max(0, Promedio Final + sanciones); fases no calificadas no restan`,
+      techoEfu,
+      techoDisciplina,
+      formula:
+        `${FORMULA_EFU_PROMEDIO}. Disciplina = SUMATORIA de criterios de los N controladores (no promedio), techo = peso de fase en Gestión. Escala EFU: ${pesosTxt}. Nota final sobre ${techoEfu}.`,
       grupos,
     };
   }

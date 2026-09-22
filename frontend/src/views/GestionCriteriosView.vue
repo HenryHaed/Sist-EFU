@@ -87,7 +87,7 @@
             </td>
             <td class="px-8 py-4">
               <span class="bg-primary/5 text-primary border border-primary/20 px-3 py-1 rounded-lg font-black text-sm">
-                <template v-if="esFaseDisciplina">SI / NO · 1 pt</template>
+                <template v-if="esFaseDisciplina">SI / NO · {{ Number(c.puntajeMaximo) }} pts</template>
                 <template v-else>{{ Number(c.puntajeMaximo) }} pts</template>
               </span>
             </td>
@@ -138,7 +138,7 @@
               <p class="font-bold text-slate-800 text-base leading-tight mb-1">{{ c.nombre }}</p>
               <div class="flex items-center gap-2">
                 <span class="bg-primary/5 text-primary border border-primary/20 px-2 py-0.5 rounded text-[10px] font-black">
-                  <template v-if="esFaseDisciplina">SI / NO · 1 pt</template>
+                  <template v-if="esFaseDisciplina">SI / NO · {{ Number(c.puntajeMaximo) }} pts</template>
                   <template v-else>{{ Number(c.puntajeMaximo) }} pts</template>
                 </span>
                 <span class="text-[9px] uppercase font-black text-slate-400 tracking-widest">Fase: {{ fase?.nombre }}</span>
@@ -224,7 +224,7 @@
               <span class="min-w-0">
                 <span class="font-bold text-slate-700 block truncate">{{ c.nombre }}</span>
                 <span class="text-[9px] text-slate-400 font-black uppercase">
-                  <template v-if="esFaseDisciplina">SI / NO · 1 pt</template>
+                  <template v-if="esFaseDisciplina">SI / NO · {{ Number(c.puntajeMaximo) }} pts</template>
                   <template v-else>{{ Number(c.puntajeMaximo) }} pts</template>
                 </span>
               </span>
@@ -266,9 +266,11 @@
               <input v-model="form.nombre" type="text" placeholder="Ej: Coreografía y Compás" class="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none font-bold placeholder:text-slate-300 transition-all shadow-inner" />
             </div>
 
-            <div v-if="!esFaseDisciplina">
+            <div>
               <div class="flex items-center justify-between mb-2">
-                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500">Puntaje máximo (pts reales) *</label>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  {{ esFaseDisciplina ? 'Puntos si cumple (SI) *' : 'Puntaje máximo (pts reales) *' }}
+                </label>
                 <div class="flex items-center gap-1.5 text-[10px] font-black">
                   <span :class="disponiblePuntajeCalc < 0 ? 'text-secondary' : 'text-primary' " class="transition-colors">
                     {{ disponiblePuntajeCalc < 0 ? '⚠ Exceso sobre Fase:' : 'Disponible en Fase:' }}
@@ -283,8 +285,10 @@
                  />
                  <span class="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xl">pts</span>
               </div>
+              <p v-if="esFaseDisciplina" class="text-[10px] text-slate-500 font-medium mt-2 leading-relaxed">
+                Decisión SI / NO: SI otorga estos puntos; NO otorga 0. La sumatoria de criterios debe caber en el peso de la fase (Gestión de fases).
+              </p>
               
-              <!-- Mini barra de progreso en modal -->
               <div class="mt-3">
                  <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-50 p-0.5 text-[0px]">
                    <div 
@@ -298,14 +302,6 @@
                     <span>Techo Fase: {{ limiteFase }}</span>
                  </div>
               </div>
-            </div>
-
-            <div v-else class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <p class="text-[10px] font-black uppercase tracking-widest text-emerald-800 mb-1">Tipo de criterio</p>
-              <p class="text-sm font-bold text-emerald-900">Decisión SI / NO → 1 pt / 0 pts</p>
-              <p class="text-[11px] text-emerald-700/80 font-medium mt-1 leading-relaxed">
-                El controlador solo indica si se cumple el criterio. No hay escala decimal.
-              </p>
             </div>
 
             <div>
@@ -413,7 +409,7 @@ const previsualizarImagen = (url) => {
   })
 }
 
-const form = ref({ idFase: '', nombre: '', puntajeMaximo: 1, escalaVisual: 1, urlImagen: '' })
+const form = ref({ idFase: '', nombre: '', puntajeMaximo: 5, escalaVisual: 1, urlImagen: '' })
 
 const esFaseDisciplina = computed(() =>
   String(props.fase?.nombre || '').toLowerCase().includes('disciplina'),
@@ -426,10 +422,7 @@ const limiteFase = computed(() => {
 })
 
 const puntajeUsado = computed(() => {
-  return (criterios.value || []).reduce((s, c) => {
-    if (esFaseDisciplina.value) return s + 1
-    return s + Number(c.puntajeMaximo || 0)
-  }, 0)
+  return (criterios.value || []).reduce((s, c) => s + Number(c.puntajeMaximo || 0), 0)
 })
 
 const disponiblePuntaje = computed(() => limiteFase.value - puntajeUsado.value)
@@ -437,20 +430,16 @@ const disponiblePuntaje = computed(() => limiteFase.value - puntajeUsado.value)
 const puntajeUsadoSinActual = computed(() => {
   return (criterios.value || [])
     .filter(c => c.idCriterio !== editandoId.value)
-    .reduce((s, c) => {
-      if (esFaseDisciplina.value) return s + 1
-      return s + Number(c.puntajeMaximo || 0)
-    }, 0)
+    .reduce((s, c) => s + Number(c.puntajeMaximo || 0), 0)
 })
 
 const puntajeUsadoConActual = computed(() => {
-  const sum = Number(puntajeUsadoSinActual.value) + (esFaseDisciplina.value ? 1 : Number(form.value.puntajeMaximo || 0))
+  const sum = Number(puntajeUsadoSinActual.value) + Number(form.value.puntajeMaximo || 0)
   return parseFloat(sum.toFixed(2))
 })
 
 const disponiblePuntajeCalc = computed(() => {
-  const add = esFaseDisciplina.value ? 1 : Number(form.value.puntajeMaximo || 0)
-  const disp = limiteFase.value - puntajeUsadoSinActual.value - add
+  const disp = limiteFase.value - puntajeUsadoSinActual.value - Number(form.value.puntajeMaximo || 0)
   return parseFloat(disp.toFixed(2))
 })
 
@@ -532,13 +521,13 @@ const abrirModal = (item = null) => {
     form.value = {
       ...item,
       idFase: props.fase.idFase,
-      puntajeMaximo: esFaseDisciplina.value ? 1 : Number(item.puntajeMaximo),
+      puntajeMaximo: Number(item.puntajeMaximo) || (esFaseDisciplina.value ? 5 : 0),
       escalaVisual: esFaseDisciplina.value ? 1 : Number(item.escalaVisual ?? 1),
     }
   } else {
     editandoId.value = null
     const sugerido = esFaseDisciplina.value
-      ? 1
+      ? Math.min(5, disponiblePuntaje.value > 0 ? disponiblePuntaje.value : 5)
       : (disponiblePuntaje.value > 0 ? Math.min(20, disponiblePuntaje.value) : 0)
     form.value = {
       idFase: props.fase.idFase,
@@ -556,11 +545,11 @@ const abrirModal = (item = null) => {
 const guardar = async () => {
   if (!form.value.idFase) return notify.error('Error', 'No hay una fase vinculada.')
   if (!form.value.nombre?.trim()) return notify.error('Error', 'El nombre del criterio es obligatorio.')
-  if (esFaseDisciplina.value) {
-    form.value.puntajeMaximo = 1
-    form.value.escalaVisual = 1
-  } else if (form.value.puntajeMaximo <= 0) {
+  if (!(Number(form.value.puntajeMaximo) > 0)) {
     return notify.error('Error', 'El puntaje debe ser mayor a 0.')
+  }
+  if (esFaseDisciplina.value) {
+    form.value.escalaVisual = 1
   }
   
   if (puntajeUsadoConActual.value > limiteFase.value) {
@@ -569,7 +558,7 @@ const guardar = async () => {
     return notify.warning(
       'Presupuesto excedido',
       esFaseDisciplina.value
-        ? `En disciplina cada criterio vale 1 pt. Solo puedes agregar ${disp} criterio(s) más (techo ${limiteFase.value}).`
+        ? `La suma de puntos de criterios no puede superar el techo de la fase${extra}. Disponible: ${disp} pts.`
         : `La suma de criterios de la fase no puede superar el techo permitido${extra}. Solo tienes disponible ${disp} pts.`,
     )
   }

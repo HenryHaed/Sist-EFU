@@ -85,7 +85,7 @@
             <span class="hidden sm:inline">Paso {{ criterioActualIndex + 1 }}: Evalúa {{ criterioActual.nombre }}</span>
           </h3>
           <p class="text-slate-500 text-[11px] sm:text-sm font-medium mt-1 break-words">
-            <template v-if="esFaseDisciplina">¿Cumple este criterio? · SI = 1 · NO = 0</template>
+            <template v-if="esFaseDisciplina">¿Cumple este criterio? · SI = {{ Number(criterioActual.puntajeMaximo) || 0 }} · NO = 0</template>
             <template v-else>Máximo {{ escalaActual }} pts</template>
             <span class="text-slate-400"> · paso {{ criterioActualIndex + 1 }} de {{ totalCriterios }}</span>
           </p>
@@ -161,7 +161,7 @@
                     >
                       <span class="material-symbols-outlined text-3xl sm:text-4xl">check_circle</span>
                       <span class="text-lg sm:text-xl">Sí</span>
-                      <span class="text-[10px] opacity-80 normal-case tracking-normal font-bold">1 pt</span>
+                      <span class="text-[10px] opacity-80 normal-case tracking-normal font-bold">{{ Number(criterioActual.puntajeMaximo) || 0 }} pts</span>
                     </button>
                     <button
                       type="button"
@@ -253,7 +253,7 @@
                 >
                   <span>Acumulado</span>
                   <span class="text-primary font-black tabular-nums">
-                    {{ totalDecisionesSi }} / {{ totalCriterios }}
+                    {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }}
                   </span>
                 </div>
 
@@ -322,8 +322,8 @@
               <template v-if="esFaseDisciplina">
                 <h5 class="text-slate-400 font-bold mb-1 uppercase text-[10px] tracking-widest">Puntaje acumulado</h5>
                 <div class="flex items-end gap-1 mb-2">
-                  <p class="text-5xl font-black italic tracking-tighter">{{ totalDecisionesSi }}</p>
-                  <p class="text-lg text-slate-500 font-bold mb-1.5">/ {{ totalCriterios }}</p>
+                  <p class="text-5xl font-black italic tracking-tighter">{{ formatNum(puntajeCalculado) }}</p>
+                  <p class="text-lg text-slate-500 font-bold mb-1.5">/ {{ formatNum(puntajePosible) }}</p>
                 </div>
               </template>
               <template v-else>
@@ -491,8 +491,8 @@
             <div class="bg-white border-b border-slate-200 p-4 sm:p-6 text-center">
               <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Puntaje total</p>
               <p class="text-2xl sm:text-4xl font-black text-primary tabular-nums leading-tight">
-                {{ totalDecisionesSi }}
-                <span class="text-base sm:text-xl font-bold text-slate-400">/ {{ totalCriterios }}</span>
+                {{ formatNum(puntajeCalculado) }}
+                <span class="text-base sm:text-xl font-bold text-slate-400">/ {{ formatNum(puntajePosible) }}</span>
               </p>
               <div class="mt-3 mx-auto max-w-xs h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div
@@ -522,7 +522,7 @@
                     class="shrink-0 text-xs sm:text-sm font-black uppercase tracking-widest px-2 py-1 rounded-lg"
                     :class="row.valor === 1 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-secondary'"
                   >
-                    {{ row.valor === 1 ? 'Sí · 1' : 'No · 0' }}
+                    {{ row.valor === 1 ? `Sí · ${row.pts}` : 'No · 0' }}
                   </span>
                 </div>
               </div>
@@ -605,7 +605,7 @@
             </p>
             <p class="text-xs text-slate-500 font-bold pt-1">
               <template v-if="esFaseDisciplina">
-                Puntaje: {{ totalDecisionesSi }} / {{ totalCriterios }}
+                Puntaje: {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }}
               </template>
               <template v-else>
                 Puntaje: {{ formatNum(puntajeCalculado) }} / {{ formatNum(puntajePosible) }}
@@ -943,10 +943,13 @@ const desgloseDisciplina = computed(() => {
   return criterios.value.map((c) => {
     const raw = formValues.value[c.idCriterio]
     const valor = raw === 1 ? 1 : raw === 0 ? 0 : null
+    const max = Number(c.puntajeMaximo) || 0
     return {
       idCriterio: c.idCriterio,
       nombre: c.nombre,
       valor,
+      max,
+      pts: valor === 1 ? max : valor === 0 ? 0 : 0,
     }
   })
 })
@@ -955,18 +958,23 @@ const totalDecisionesSi = computed(() =>
   desgloseDisciplina.value.reduce((s, r) => s + (r.valor === 1 ? 1 : 0), 0),
 )
 const pctDecisionesDisciplina = computed(() => {
-  if (!totalCriterios.value) return 0
-  return Math.min(100, (totalDecisionesSi.value / totalCriterios.value) * 100)
+  const max = Number(puntajePosible.value) || 0
+  if (!max) return 0
+  return Math.min(100, (Number(puntajeCalculado.value) / max) * 100)
 })
 
 const puntajeCalculado = computed(() => {
-  if (esFaseDisciplina.value) return totalDecisionesSi.value
+  if (esFaseDisciplina.value) {
+    return desgloseDisciplina.value.reduce((t, r) => t + (r.valor === 1 ? r.max : 0), 0)
+  }
   const sum = Object.values(formValues.value).reduce((t, val) => t + (Number(val) || 0), 0)
   return Number(Number(sum).toFixed(2))
 })
 
 const puntajePosible = computed(() => {
-  if (esFaseDisciplina.value) return totalCriterios.value
+  if (esFaseDisciplina.value) {
+    return criterios.value.reduce((a, c) => a + (Number(c.puntajeMaximo) || 0), 0)
+  }
   return criterios.value.reduce((a, c) => a + Number(c.puntajeMaximo), 0)
 })
 

@@ -691,6 +691,8 @@ export class ReportesService implements OnModuleInit {
       filtros: dto,
       gestion: matriz.gestion,
       fasesEfu: matriz.fasesEfu,
+      techoEfu: matriz.techoEfu,
+      techoDisciplina: matriz.techoDisciplina,
       formula: matriz.formula,
       data: grupos.slice(skip, skip + limit),
     };
@@ -1437,14 +1439,17 @@ export class ReportesService implements OnModuleInit {
       );
     y += 12;
     if (dto.tipoReporte === TipoReporte.CALIFICACIONES) {
+      const formulaTxt =
+        (resultado as any).formula ||
+        FORMULA_EFU_PROMEDIO + '; disciplina = sumatoria de controladores (no promedio)';
       doc
         .fontSize(7)
         .fillColor('#334155')
         .font('Helvetica-Oblique')
-        .text(FORMULA_EFU_PROMEDIO + '; final = max(0, Promedio Final + sanciones)', margin, y, {
+        .text(formulaTxt, margin, y, {
           width: contentW,
         });
-      y += 12;
+      y += 14;
     }
 
     const fontSize = 6.5;
@@ -1800,26 +1805,31 @@ export class ReportesService implements OnModuleInit {
       ]);
       renderTable(headers, widths, dataRows);
     } else if (dto.tipoReporte === TipoReporte.CALIFICACIONES) {
-      const fasesEfu: Array<{ idFase: number; nombre: string }> =
-        (resultado as any).fasesEfu || [];
-      const faseHeaders = fasesEfu.map((f) =>
-        String(f.nombre || 'Fase')
-          .toUpperCase()
-          .slice(0, 14),
-      );
+      const fasesEfu: Array<{
+        idFase: number;
+        nombre: string;
+        pesoPorcentaje?: number;
+        esDisciplina?: boolean;
+      }> = (resultado as any).fasesEfu || [];
+      const techoEfu = Number((resultado as any).techoEfu)
+        || fasesEfu.reduce((s, f) => s + (Number(f.pesoPorcentaje) || 0), 0);
+      const faseHeaders = fasesEfu.map((f) => {
+        const nom = String(f.nombre || 'Fase').toUpperCase().slice(0, 12);
+        const peso = Number(f.pesoPorcentaje) || 0;
+        return `${nom}/${peso}`;
+      });
       const headers = [
         'NRO',
         'CATEGORIA',
         'FRATERNIDAD',
         'DANZA',
-        'JURADO',
+        'JURADO/CTRL',
         ...faseHeaders,
         'SANCIONES',
-        'TOTAL EFU',
-        'CHACHA WARMI',
+        `FINAL/${techoEfu}`,
+        'CHACHA',
       ];
-      // Anchos relativos; se escalan a contentW
-      const baseW = [28, 42, 95, 70, 90, ...fasesEfu.map(() => 48), 48, 50, 52];
+      const baseW = [28, 42, 95, 70, 90, ...fasesEfu.map(() => 48), 48, 54, 48];
       const sumW = baseW.reduce((a, b) => a + b, 0) || 1;
       const widths = baseW.map((w) => (w / sumW) * contentW);
 
@@ -1857,23 +1867,25 @@ export class ReportesService implements OnModuleInit {
 
       for (const grupo of rows) {
         const jurados = Array.isArray(grupo.jurados) ? grupo.jurados : [];
-        const filasJurado = jurados.length ? jurados : [null];
+        const controladores = Array.isArray(grupo.disciplina?.controladores)
+          ? grupo.disciplina.controladores
+          : [];
 
-        for (let ji = 0; ji < filasJurado.length; ji++) {
-          const j = filasJurado[ji];
+        for (let ji = 0; ji < jurados.length; ji++) {
+          const j = jurados[ji];
           const primera = ji === 0;
           const notasFase = fasesEfu.map((f) =>
-            j ? fmtNota(j.notasPorFase?.[f.idFase]) : '—',
+            f.esDisciplina ? '—' : fmtNota(j?.notasPorFase?.[f.idFase]),
           );
           const cells = [
             primera ? String(grupo.nro ?? grupo.puesto ?? '—') : '',
             primera ? String(grupo.categoria || '—') : '',
             primera ? String(grupo.nombreFraternidad || '—') : '',
             primera ? String(grupo.tipoDanza || '—') : '',
-            j ? String(j.juradoNombre || '—') : '—',
+            String(j?.juradoNombre || '—'),
             ...notasFase,
             '',
-            j ? fmtNota(j.totalEfu) : '—',
+            fmtNota(j?.totalEfu),
             '',
           ];
           const previewH = measureRowHeight(cells, widths, 11);
@@ -1881,26 +1893,81 @@ export class ReportesService implements OnModuleInit {
           y += drawMatrixRow(cells, y, {});
         }
 
+        for (let ci = 0; ci < controladores.length; ci++) {
+          const c = controladores[ci];
+          const primeraCtrl = jurados.length === 0 && ci === 0;
+          const notasFase = fasesEfu.map((f) =>
+            f.esDisciplina ? fmtNota(c.puntaje) : '—',
+          );
+          const cells = [
+            primeraCtrl ? String(grupo.nro ?? grupo.puesto ?? '—') : '',
+            primeraCtrl ? String(grupo.categoria || '—') : '',
+            primeraCtrl ? String(grupo.nombreFraternidad || '—') : '',
+            primeraCtrl ? String(grupo.tipoDanza || '—') : '',
+            `Ctrl · ${c.nombre || '—'}`,
+            ...notasFase,
+            '',
+            fmtNota(c.puntaje),
+            '',
+          ];
+          const previewH = measureRowHeight(cells, widths, 11);
+          ensureSpace(previewH + 14, headers, widths);
+          y += drawMatrixRow(cells, y, {});
+        }
+
+        if (!jurados.length && !controladores.length) {
+          const cells = [
+            String(grupo.nro ?? grupo.puesto ?? '—'),
+            String(grupo.categoria || '—'),
+            String(grupo.nombreFraternidad || '—'),
+            String(grupo.tipoDanza || '—'),
+            '—',
+            ...fasesEfu.map(() => '—'),
+            '',
+            '—',
+            '',
+          ];
+          const previewH = measureRowHeight(cells, widths, 11);
+          ensureSpace(previewH + 14, headers, widths);
+          y += drawMatrixRow(cells, y, {});
+        }
+
+        const techo = Number(grupo.escalaFinal) || techoEfu;
+        const notasFinales = fasesEfu.map((f) => {
+          if (f.esDisciplina) return fmtNota(grupo.disciplina?.nota);
+          return fmtNota(grupo.notasPromedioPorFase?.[f.idFase]);
+        });
         const resumenCells = [
           '',
           '',
           '',
           '',
-          'PROMEDIO FINAL',
-          ...fasesEfu.map(() => ''),
-          grupo.suspendida
-            ? 'SUSP.'
-            : fmtNota(grupo.impactoSanciones),
-          fmtNota(grupo.promedioFinal),
+          `NOTA FINAL /${techo}`,
+          ...notasFinales,
+          grupo.suspendida ? 'SUSP.' : fmtNota(grupo.impactoSanciones),
+          `${fmtNota(grupo.puntajeFinal)} / ${techo}`,
           grupo.chachaWarmi?.nota != null ? fmtNota(grupo.chachaWarmi.nota) : '—',
         ];
         const previewResumen = measureRowHeight(resumenCells, widths, 11);
         ensureSpace(previewResumen + 4, headers, widths);
         y += drawMatrixRow(resumenCells, y, { highlight: true, bold: true });
 
+        const partesDetalle: string[] = [];
+        if (grupo.disciplina?.cantidadControladores) {
+          const detCtrl = (grupo.disciplina.controladores || [])
+            .map((c: any) => `${c.nombre}: ${fmtNota(c.puntaje)}`)
+            .join(' + ');
+          partesDetalle.push(
+            `Disciplina sumatoria (${grupo.disciplina.cantidadControladores}): ${fmtNota(grupo.disciplina.nota)} / ${Number(grupo.disciplina.techo) || '—'} · ${detCtrl || '—'}`,
+          );
+        }
         if (grupo.detalleSanciones && grupo.detalleSanciones !== '—') {
-          const detalle = `Sanciones: ${grupo.detalleSanciones} · Final: ${fmtNota(grupo.puntajeFinal)}`;
-          const detH = 10;
+          partesDetalle.push(`Sanciones: ${grupo.detalleSanciones}`);
+        }
+        partesDetalle.push(`Final: ${fmtNota(grupo.puntajeFinal)} / ${techo}`);
+        if (partesDetalle.length) {
+          const detalle = partesDetalle.join(' · ');
+          const detH = 12;
           ensureSpace(detH + 2, headers, widths);
           doc
             .fontSize(5.5)

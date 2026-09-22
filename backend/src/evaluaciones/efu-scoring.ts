@@ -56,7 +56,7 @@ export type EfuFraternidadScore = {
 };
 
 export const FORMULA_EFU_PROMEDIO =
-  'NotaFraternidad = suma de las fases que calificó el jurado; Promedio Final = avg(jurados artísticos) + nota disciplina fusionada';
+  'NotaFraternidad = suma de las fases artísticas que calificó el jurado; Promedio artístico = avg(jurados); Disciplina = sumatoria de criterios de controladores (no promedio); Promedio Final = avg(artísticos) + disciplina';
 
 export function nombreJuradoDesdeUsuario(jurado?: {
   idJurado?: number;
