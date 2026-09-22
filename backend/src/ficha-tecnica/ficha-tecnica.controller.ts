@@ -57,6 +57,16 @@ export class FichaTecnicaController {
     return this.service.listarAdmin(req.user);
   }
 
+  @Get('download-zip')
+  @Roles('superusuario', 'admin')
+  async downloadZip(@Request() req, @Res() res: Response) {
+    const { buffer, filename } = await this.service.buildZipTodasGeneradas(req.user);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.send(buffer);
+  }
+
   @Get(':id')
   @Roles('superusuario', 'admin')
   detalle(@Request() req, @Param('id', ParseIntPipe) id: number) {

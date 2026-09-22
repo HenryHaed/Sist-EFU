@@ -11,14 +11,26 @@
               <span v-if="gestionAnio" class="text-slate-400"> · Gestión {{ gestionAnio }}</span>
             </p>
           </div>
-          <v-btn
-            variant="tonal"
-            color="primary"
-            :loading="loading"
-            @click="cargar"
-          >
-            Actualizar
-          </v-btn>
+          <div class="flex flex-wrap gap-2">
+            <v-btn
+              color="success"
+              variant="flat"
+              :loading="descargandoZip"
+              :disabled="!conArchivo"
+              prepend-icon="mdi-folder-zip"
+              @click="descargarZip"
+            >
+              Descargar todo
+            </v-btn>
+            <v-btn
+              variant="tonal"
+              color="primary"
+              :loading="loading"
+              @click="cargar"
+            >
+              Actualizar
+            </v-btn>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -394,6 +406,7 @@ const items = ref([])
 const gestionAnio = ref(null)
 const busqueda = ref('')
 const filtroEstado = ref('todos')
+const descargandoZip = ref(false)
 
 const detalleAbierto = ref(false)
 const detalleRow = ref(null)
@@ -603,6 +616,34 @@ const descargar = async (lista) => {
     URL.revokeObjectURL(url)
   } catch (e) {
     notify.error('Error', 'No se pudo descargar el archivo.')
+  }
+}
+
+const descargarZip = async () => {
+  descargandoZip.value = true
+  try {
+    const { data } = await api.get('/listas-nomina/download-zip', { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Nominas_Excel_${Date.now()}.zip`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    let msg = 'No se pudo descargar el ZIP de planillas.'
+    if (e.response?.data instanceof Blob) {
+      try {
+        const text = await e.response.data.text()
+        msg = JSON.parse(text).message || msg
+      } catch { /* ignore */ }
+    } else if (e.response?.data?.message) {
+      msg = e.response.data.message
+    }
+    notify.error('Error', msg)
+  } finally {
+    descargandoZip.value = false
   }
 }
 

@@ -15,6 +15,7 @@ import { Gestion } from '../entities/Gestion';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
 import { CronogramaActividad } from '../entities/CronogramaActividad';
 import { estadoVentanaCronograma } from '../common/cronograma-actividad';
+import { buildZipStore, sanitizeZipFilePart } from '../common/zip-store';
 
 @Injectable()
 export class MonografiasService {
@@ -276,6 +277,51 @@ export class MonografiasService {
     });
 
     return this.toResponse(full!);
+  }
+
+  /** ZIP con todas las monografías subidas de la gestión activa. */
+  async buildZipTodas(user: { rol: string }): Promise<{ buffer: Buffer; filename: string; count: number }> {
+    const rol = user.rol?.toLowerCase();
+    if (!['superusuario', 'admin', 'veedor'].includes(rol)) {
+      throw new ForbiddenException('No tienes permiso para descargar el ZIP de monografías.');
+    }
+    const gestion = await findGestionActivaOrLatest(this.gestionRepo);
+    if (!gestion) throw new NotFoundException('No hay gestión activa.');
+
+    const monografias = await this.monografiaRepo.find({
+      where: { fraternidad: { gestion: { idGestion: gestion.idGestion } } },
+      relations: ['fraternidad'],
+      order: { idMonografia: 'ASC' },
+    });
+
+    const usedNames = new Map<string, number>();
+    const entries: { name: string; data: Buffer }[] = [];
+
+    for (const mono of monografias) {
+      const filename = String(mono.urlArchivo || '').split('/').pop();
+      if (!filename) continue;
+      const filePath = join(process.cwd(), 'uploads', 'Doc_Monografia', filename);
+      if (!fs.existsSync(filePath)) continue;
+
+      const resp = this.toResponse(mono);
+      let name = resp.nombreDescarga || `${sanitizeZipFilePart(mono.fraternidad?.nombre || 'Fraternidad')}.pdf`;
+      const times = (usedNames.get(name) || 0) + 1;
+      usedNames.set(name, times);
+      if (times > 1) {
+        name = name.replace(/\.pdf$/i, `_${times}.pdf`);
+      }
+      entries.push({ name, data: fs.readFileSync(filePath) });
+    }
+
+    if (!entries.length) {
+      throw new NotFoundException('No hay monografías subidas para descargar en ZIP.');
+    }
+
+    return {
+      buffer: buildZipStore(entries),
+      filename: `Monografias_Gestion_${gestion.anio || gestion.idGestion}.zip`,
+      count: entries.length,
+    };
   }
 
   static buildFilename(idFraternidad: number, originalname: string): string {

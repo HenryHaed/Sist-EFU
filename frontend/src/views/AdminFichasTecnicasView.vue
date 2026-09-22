@@ -25,6 +25,17 @@
           <option value="GENERADA">Generadas</option>
           <option value="BORRADOR">Borradores</option>
         </select>
+        <button
+          type="button"
+          @click="descargarZip"
+          :disabled="descargandoZip || !hayGeneradas"
+          class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest shrink-0"
+        >
+          <span class="material-symbols-outlined text-[18px]" :class="{ 'animate-spin': descargandoZip }">
+            {{ descargandoZip ? 'progress_activity' : 'folder_zip' }}
+          </span>
+          {{ descargandoZip ? 'ZIP…' : 'Descargar todo' }}
+        </button>
         <button type="button" @click="cargar" class="size-10 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center justify-center shrink-0">
           <span class="material-symbols-outlined text-slate-600">refresh</span>
         </button>
@@ -127,6 +138,11 @@ const filtroEstado = ref('GENERADA')
 const busqueda = ref('')
 const modal = ref(false)
 const detalle = ref(null)
+const descargandoZip = ref(false)
+
+const hayGeneradas = computed(() =>
+  lista.value.some((f) => f.estado === 'GENERADA'),
+)
 
 const filtradas = computed(() => {
   let rows = lista.value
@@ -218,6 +234,30 @@ const descargar = async (f) => {
       } catch { /* ignore */ }
     }
     Swal.fire('Error', msg, 'error')
+  }
+}
+
+const descargarZip = async () => {
+  descargandoZip.value = true
+  try {
+    const { data } = await api.get('/ficha-tecnica/download-zip', { responseType: 'blob' })
+    const url = window.URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Fichas_Tecnicas_${Date.now()}.zip`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    let msg = 'No se pudo descargar el ZIP.'
+    if (e.response?.data instanceof Blob) {
+      try {
+        const text = await e.response.data.text()
+        msg = JSON.parse(text).message || msg
+      } catch { /* ignore */ }
+    }
+    Swal.fire('Error', msg, 'error')
+  } finally {
+    descargandoZip.value = false
   }
 }
 

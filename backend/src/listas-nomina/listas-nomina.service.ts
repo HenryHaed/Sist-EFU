@@ -18,6 +18,8 @@ import { Fraternidad } from '../entities/Fraternidad';
 import { Usuario } from '../entities/Usuario';
 import { Gestion } from '../entities/Gestion';
 import { findGestionActivaOrLatest } from '../common/gestion.utils';
+import { buildZipStore, sanitizeZipFilePart } from '../common/zip-store';
+import { readFileSync } from 'fs';
 
 const UPLOAD_DIR = 'Doc_Nomina_Excel';
 const MAX_PREVIEW_ROWS = 2000;
@@ -1269,6 +1271,46 @@ export class ListasNominaService {
       mime:
         lista.mimeType ||
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+  }
+
+  /** ZIP con todas las planillas Excel cargadas de la gestión activa. */
+  async buildZipTodas(): Promise<{ buffer: Buffer; filename: string; count: number }> {
+    const gestion = await findGestionActivaOrLatest(this.gestionRepo);
+    if (!gestion) throw new NotFoundException('No hay gestión activa.');
+
+    const listas = await this.listaRepo.find({
+      where: { gestion: { idGestion: gestion.idGestion } },
+      relations: ['fraternidad'],
+      order: { idLista: 'ASC' },
+    });
+
+    const usedNames = new Map<string, number>();
+    const entries: { name: string; data: Buffer }[] = [];
+
+    for (const lista of listas) {
+      const filePath = this.absolutePathFromUrl(lista.urlArchivo);
+      if (!filePath || !existsSync(filePath)) continue;
+
+      const ext = extname(lista.nombreOriginal || lista.urlArchivo || '.xlsx') || '.xlsx';
+      const frat = sanitizeZipFilePart(lista.fraternidad?.nombre || `Nomina_${lista.idLista}`);
+      let name = `Nomina_${frat}${ext}`;
+      const times = (usedNames.get(name) || 0) + 1;
+      usedNames.set(name, times);
+      if (times > 1) {
+        name = `Nomina_${frat}_${times}${ext}`;
+      }
+      entries.push({ name, data: readFileSync(filePath) });
+    }
+
+    if (!entries.length) {
+      throw new NotFoundException('No hay planillas Excel cargadas para descargar en ZIP.');
+    }
+
+    return {
+      buffer: buildZipStore(entries),
+      filename: `Nominas_Excel_Gestion_${gestion.anio || gestion.idGestion}.zip`,
+      count: entries.length,
     };
   }
 

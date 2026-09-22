@@ -122,6 +122,17 @@ export class ListasNominaController {
     return this.service.listarAdmin();
   }
 
+  @Get('download-zip')
+  @Roles('superusuario', 'admin')
+  @ApiOperation({ summary: 'Descargar ZIP con todas las planillas Excel de la gestión activa' })
+  async downloadZip(@Res() res: Response) {
+    const { buffer, filename } = await this.service.buildZipTodas();
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.send(buffer);
+  }
+
   @Get(':id/miembros')
   @Roles('superusuario', 'admin')
   @ApiOperation({ summary: 'Fraternos registrados de una nómina' })

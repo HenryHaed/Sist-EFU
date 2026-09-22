@@ -3557,9 +3557,58 @@ export class EvaluacionesService {
   }
 
   async deleteFase(id: number) {
-    const f = await this.faseRepo.findOne({ where: { idFase: id } });
-    if (f && f.urlImagen) this.eliminarImagenSiExiste(f.urlImagen);
-    return this.faseRepo.delete(id);
+    const f = await this.faseRepo.findOne({
+      where: { idFase: id },
+      relations: ['gestion'],
+    });
+    if (!f) throw new NotFoundException('Fase no encontrada');
+
+    if (f.urlImagen) this.eliminarImagenSiExiste(f.urlImagen);
+
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
+    try {
+      // Desligar hijas que apuntan a esta fase como padre
+      await qr.query(`UPDATE fases SET id_fase_padre = NULL WHERE id_fase_padre = $1`, [id]);
+
+      // Usuarios concursantes asignados a esta fase
+      await qr.query(`UPDATE usuarios SET id_fase_concurso = NULL WHERE id_fase_concurso = $1`, [id]);
+
+      // Evaluaciones de la fase
+      await qr.query(`DELETE FROM evaluaciones WHERE id_fase = $1`, [id]);
+
+      // Desempates (candidatos CASCADE)
+      await qr.query(`DELETE FROM desempates_fase WHERE id_fase = $1`, [id]);
+
+      // Inscripciones a concurso (archivos CASCADE)
+      await qr.query(`DELETE FROM inscripciones_concurso WHERE id_fase = $1`, [id]);
+
+      // Participantes del concurso en esta fase
+      await qr.query(`DELETE FROM participantes_concurso WHERE id_fase = $1`, [id]);
+
+      // Criterios asignados a jurados + criterios de la fase
+      await qr.query(`
+        DELETE FROM jurado_criterios
+        WHERE id_criterio IN (SELECT id_criterio FROM criterios WHERE id_fase = $1)
+      `, [id]);
+      await qr.query(`DELETE FROM criterios WHERE id_fase = $1`, [id]);
+
+      // Vinculación jurado ↔ fase
+      await qr.query(`DELETE FROM jurado_fases WHERE id_fase = $1`, [id]);
+
+      // Finalmente la fase
+      await qr.query(`DELETE FROM fases WHERE id_fase = $1`, [id]);
+
+      await qr.commitTransaction();
+      return { ok: true, idFase: id, nombre: f.nombre };
+    } catch (err: any) {
+      await qr.rollbackTransaction();
+      const detail = err?.driverError?.detail || err?.message || 'Error desconocido';
+      throw new BadRequestException(`No se pudo eliminar la fase: ${detail}`);
+    } finally {
+      await qr.release();
+    }
   }
 
   async createCriterio(data: any) {

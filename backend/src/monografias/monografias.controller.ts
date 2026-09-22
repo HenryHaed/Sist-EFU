@@ -52,6 +52,17 @@ export class MonografiasController {
     return this.monografiasService.listadoFraternidadesConMonografia(req.user);
   }
 
+  @Get('download-zip')
+  @Roles('superusuario', 'admin', 'veedor')
+  @ApiOperation({ summary: 'Descargar ZIP con todas las monografías de la gestión activa' })
+  async downloadZip(@Request() req: any, @Res() res: Response) {
+    const { buffer, filename } = await this.monografiasService.buildZipTodas(req.user);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.send(buffer);
+  }
+
   @Get(':idMonografia/download')
   @Roles('superusuario', 'admin', 'veedor', 'jurado')
   @ApiOperation({ summary: 'Descargar monografía como Fraternidad_serie.pdf' })

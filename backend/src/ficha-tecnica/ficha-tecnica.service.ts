@@ -26,6 +26,7 @@ import {
   PDF_UMSA_BLUE,
   PDF_UMSA_RED,
 } from '../common/pdf-layout';
+import { buildZipStore, sanitizeZipFilePart } from '../common/zip-store';
 
 const EMPTY_PERSONA = (): PersonaFicha => ({
   nombresApellidos: '',
@@ -673,6 +674,56 @@ export class FichaTecnicaService {
       return this.regenerarYEnviarPdf(ficha, res);
     }
     return this.streamPdfFile(ficha, res);
+  }
+
+  /** ZIP con todas las fichas generadas (PDF) de la gestión activa. */
+  async buildZipTodasGeneradas(user: { rol: string }): Promise<{
+    buffer: Buffer;
+    filename: string;
+    count: number;
+  }> {
+    this.assertAdmin(user.rol);
+    const gestion = await findGestionActivaOrLatest(this.gestionRepo);
+    if (!gestion) throw new NotFoundException('No hay gestión activa.');
+
+    const fichas = await this.fichaRepo.find({
+      where: {
+        gestion: { idGestion: gestion.idGestion },
+        estado: EstadoFichaTecnica.GENERADA,
+      },
+      relations: ['fraternidad'],
+      order: { idFicha: 'ASC' },
+    });
+
+    const usedNames = new Map<string, number>();
+    const entries: { name: string; data: Buffer }[] = [];
+
+    for (const ficha of fichas) {
+      if (!ficha.urlPdf) continue;
+      const diskName = String(ficha.urlPdf).split('/').pop();
+      if (!diskName) continue;
+      const filePath = join(process.cwd(), 'uploads', 'Doc_Ficha_Tecnica', diskName);
+      if (!fs.existsSync(filePath)) continue;
+
+      const frat = sanitizeZipFilePart(
+        ficha.nombreFraternidad || ficha.fraternidad?.nombre || `Ficha_${ficha.idFicha}`,
+      );
+      let name = `Ficha_Tecnica_${frat}.pdf`;
+      const times = (usedNames.get(name) || 0) + 1;
+      usedNames.set(name, times);
+      if (times > 1) name = `Ficha_Tecnica_${frat}_${times}.pdf`;
+      entries.push({ name, data: fs.readFileSync(filePath) });
+    }
+
+    if (!entries.length) {
+      throw new NotFoundException('No hay fichas técnicas generadas para descargar en ZIP.');
+    }
+
+    return {
+      buffer: buildZipStore(entries),
+      filename: `Fichas_Tecnicas_Gestion_${gestion.anio || gestion.idGestion}.zip`,
+      count: entries.length,
+    };
   }
 
   async descargarMiPdf(idUsuario: number, res: Response) {

@@ -30,6 +30,17 @@
       </div>
       <button
         type="button"
+        @click="descargarZip"
+        :disabled="descargandoZip || conMono === 0"
+        class="inline-flex items-center gap-1.5 px-5 py-2.5 bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-800 transition-all disabled:opacity-50"
+      >
+        <span class="material-symbols-outlined text-[16px]" :class="{ 'animate-spin': descargandoZip }">
+          {{ descargandoZip ? 'progress_activity' : 'folder_zip' }}
+        </span>
+        {{ descargandoZip ? 'ZIP…' : 'Descargar todo' }}
+      </button>
+      <button
+        type="button"
         @click="cargar"
         class="px-5 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-900 transition-all"
       >
@@ -145,6 +156,7 @@ const listado = ref([])
 const busqueda = ref('')
 const filtroEstado = ref('')
 const descargandoId = ref(null)
+const descargandoZip = ref(false)
 const visor = ref({ abierto: false, url: '', titulo: '' })
 
 const conMono = computed(() => listado.value.filter((x) => x.tieneMonografia).length)
@@ -244,6 +256,32 @@ const descargarMonografia = async (item) => {
     a.remove()
   } finally {
     descargandoId.value = null
+  }
+}
+
+const descargarZip = async () => {
+  descargandoZip.value = true
+  try {
+    const { data } = await api.get('/monografias/download-zip', { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Monografias_${Date.now()}.zip`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    let msg = 'No se pudo descargar el ZIP de monografías.'
+    if (e.response?.data instanceof Blob) {
+      try {
+        const text = await e.response.data.text()
+        msg = JSON.parse(text).message || msg
+      } catch { /* ignore */ }
+    }
+    alert(msg)
+  } finally {
+    descargandoZip.value = false
   }
 }
 
