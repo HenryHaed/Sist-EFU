@@ -1930,17 +1930,20 @@ export class ReportesService implements OnModuleInit {
           const c = controladores[ci];
           const primeraCtrl = jurados.length === 0 && ci === 0;
           const notasFase = fasesEfu.map((f) =>
-            f.esDisciplina ? fmtNota(c.puntaje) : '—',
+            f.esDisciplina
+              ? fmtNota(c.puntaje ?? 0)
+              : '—',
           );
+          const labelCtrl = `Ctrl · ${c.nombre || '—'}`;
           const cells = [
             primeraCtrl ? String(grupo.nro ?? grupo.puesto ?? '—') : '',
             primeraCtrl ? String(grupo.categoria || '—') : '',
             primeraCtrl ? String(grupo.nombreFraternidad || '—') : '',
             primeraCtrl ? String(grupo.tipoDanza || '—') : '',
-            `Ctrl · ${c.nombre || '—'}`,
+            labelCtrl,
             ...notasFase,
             '',
-            fmtNota(c.puntaje),
+            fmtNota(c.puntaje ?? 0),
             '',
           ];
           const previewH = measureRowHeight(cells, widths, 11);

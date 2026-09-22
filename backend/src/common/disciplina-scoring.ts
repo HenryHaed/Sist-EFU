@@ -141,6 +141,7 @@ export function fusionarPuntajeDisciplina(
 
 /**
  * Detalle por controlador (acta) para reportes: aporte individual + suma fusionada.
+ * Si se pasan `asignados`, aparecen TODOS (sin acta o nota 0 → 0.00), no solo los que sellaron.
  */
 export function desgloseControladoresDisciplina(
   actas: Array<{
@@ -149,6 +150,11 @@ export function desgloseControladoresDisciplina(
     puntajeTotal?: number | null;
     criteriosEvaluados?: Record<string, unknown> | null;
     observacion?: string | null;
+    estado?: string | null;
+  }>,
+  asignados?: Array<{
+    idJurado?: number | null;
+    nombre?: string;
   }>,
 ): {
   controladores: Array<{
@@ -156,23 +162,86 @@ export function desgloseControladoresDisciplina(
     nombre: string;
     puntaje: number;
     observacion: string | null;
+    revisado: boolean;
+    estado: string | null;
   }>;
   sumatoria: number;
 } {
-  const controladores = actas.map((a) => ({
-    idJurado: a.idJurado ?? null,
-    nombre: a.juradoNombre || (a.idJurado ? `Controlador #${a.idJurado}` : 'Controlador'),
-    puntaje: round2(Number(a.puntajeTotal) || valorRealDesdeActa(a.criteriosEvaluados)),
-    observacion: a.observacion || null,
-  }));
+  type Row = {
+    idJurado: number | null;
+    nombre: string;
+    puntaje: number;
+    observacion: string | null;
+    revisado: boolean;
+    estado: string | null;
+  };
+
+  const byKey = new Map<string, Row>();
+
+  const keyOf = (idJurado: number | null, nombre: string) =>
+    idJurado != null ? `j:${idJurado}` : `n:${nombre}`;
+
+  for (const a of asignados || []) {
+    const idJurado = a.idJurado ?? null;
+    const nombre =
+      a.nombre || (idJurado != null ? `Controlador #${idJurado}` : 'Controlador');
+    byKey.set(keyOf(idJurado, nombre), {
+      idJurado,
+      nombre,
+      puntaje: 0,
+      observacion: null,
+      revisado: false,
+      estado: null,
+    });
+  }
+
+  for (const a of actas) {
+    const idJurado = a.idJurado ?? null;
+    const nombre =
+      a.juradoNombre ||
+      (idJurado != null ? `Controlador #${idJurado}` : 'Controlador');
+    const key = keyOf(idJurado, nombre);
+    const rawPts = a.puntajeTotal;
+    const puntaje = round2(
+      rawPts != null && Number.isFinite(Number(rawPts))
+        ? Number(rawPts)
+        : valorRealDesdeActa(a.criteriosEvaluados),
+    );
+    // Incluye nota 0 explícita; sin acta previa queda 0 (asignado)
+    byKey.set(key, {
+      idJurado,
+      nombre,
+      puntaje,
+      observacion: a.observacion || null,
+      revisado: true,
+      estado: a.estado || null,
+    });
+  }
+
+  const controladores = Array.from(byKey.values());
   controladores.sort((a, b) =>
     String(a.nombre).localeCompare(String(b.nombre), 'es'),
   );
+
+  // Sumatoria: actas reales + asignados sin acta cuentan 0 (no suman)
+  const actasParaSuma = [
+    ...actas,
+    ...controladores
+      .filter((c) => !c.revisado)
+      .map((c) => ({
+        idJurado: c.idJurado,
+        juradoNombre: c.nombre,
+        puntajeTotal: 0,
+        criteriosEvaluados: null,
+      })),
+  ];
+
   return {
     controladores,
-    sumatoria: fusionarPuntajeDisciplina(actas),
+    sumatoria: fusionarPuntajeDisciplina(actasParaSuma),
   };
 }
+
 
 function valorRealDesdeActa(crits?: Record<string, unknown> | null): number {
   if (!crits || typeof crits !== 'object') return 0;

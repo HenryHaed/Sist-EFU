@@ -851,7 +851,7 @@ const filasMatrizGrupo = (grupo) => {
     const notas = {}
     for (const f of fasesEfuMatriz.value) {
       if (f.esDisciplina) {
-        notas[f.idFase] = fmtNotaMatriz(c.puntaje)
+        notas[f.idFase] = fmtNotaMatriz(c.puntaje ?? 0)
       } else {
         notas[f.idFase] = '—'
       }
@@ -866,7 +866,7 @@ const filasMatrizGrupo = (grupo) => {
       jurado: `Ctrl · ${c.nombre || '—'}`,
       notas,
       sanciones: '',
-      totalEfu: fmtNotaMatriz(c.puntaje),
+      totalEfu: fmtNotaMatriz(c.puntaje ?? 0),
       chacha: '',
       suspendida: false,
     })

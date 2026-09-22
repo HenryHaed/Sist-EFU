@@ -4017,13 +4017,38 @@ export class EvaluacionesService {
       order: { nombre: 'ASC' },
     });
 
-    const evsEfu = await this.evaluacionRepo.find({
+    // Jurados artísticos: solo actas selladas (COMPLETADO).
+    // Controladores disciplina: COMPLETADO + EN_PROGRESO (nota 0 cuenta; sin revisar se completa abajo).
+    const evsArtisticos = await this.evaluacionRepo.find({
       where: {
         estado: 'COMPLETADO',
         fase: { gestion: { idGestion }, tipoConcurso: 'EFU' },
       },
       relations: ['fraternidad', 'fase', 'jurado', 'jurado.usuario'],
     });
+    const evsDiscRaw = fasesDisciplinaIds.size
+      ? await this.evaluacionRepo.find({
+          where: {
+            estado: In(['COMPLETADO', 'EN_PROGRESO']),
+            fase: { idFase: In([...fasesDisciplinaIds]) },
+          },
+          relations: ['fraternidad', 'fase', 'jurado', 'jurado.usuario'],
+        })
+      : [];
+
+    // Controladores asignados a fase(s) de disciplina (aparecen aunque no hayan revisado → 0)
+    const controladoresAsignados = fasesDisciplinaIds.size
+      ? await this.juradoRepo
+          .createQueryBuilder('j')
+          .leftJoinAndSelect('j.usuario', 'u')
+          .leftJoinAndSelect('u.rol', 'rol')
+          .leftJoinAndSelect('j.fraternidadesHabilitadas', 'fratHab')
+          .innerJoin('j.fasesHabilitadas', 'fh', 'fh.id_fase IN (:...idsDisc)', {
+            idsDisc: [...fasesDisciplinaIds],
+          })
+          .where("(j.tipo_origen IS NULL OR j.tipo_origen <> 'Admin Bypass')")
+          .getMany()
+      : [];
 
     const incidencias = await this.incidenciaRepo.find({
       where: { gestion: { idGestion } },
@@ -4031,18 +4056,26 @@ export class EvaluacionesService {
     });
 
     const scores = calcularScoresEfu(
-      evsEfu.map((e) => actaDesdeEvaluacion(e)).filter((a): a is NonNullable<typeof a> => !!a),
+      [...evsArtisticos, ...evsDiscRaw]
+        .map((e) => actaDesdeEvaluacion(e))
+        .filter((a): a is NonNullable<typeof a> => !!a),
     );
 
     // Actas de disciplina por fraternidad (para desglose de controladores)
-    const discPorFrat = new Map<number, typeof evsEfu>();
-    for (const e of evsEfu) {
+    const discPorFrat = new Map<number, typeof evsDiscRaw>();
+    for (const e of evsDiscRaw) {
       const fid = e.fraternidad?.idFraternidad;
       const faseId = e.fase?.idFase;
       if (!fid || !faseId || !fasesDisciplinaIds.has(faseId)) continue;
       if (!discPorFrat.has(fid)) discPorFrat.set(fid, []);
       discPorFrat.get(fid)!.push(e);
     }
+
+    const ctrlAplicaAFrat = (ctrl: (typeof controladoresAsignados)[0], idFrat: number) => {
+      const fratsHab = ctrl.fraternidadesHabilitadas || [];
+      if (!fratsHab.length) return true;
+      return fratsHab.some((f) => f.idFraternidad === idFrat);
+    };
 
     // Chacha-Warmi: promedio de actas por fraternidad (nota de la pareja)
     const evsChacha = await this.evaluacionRepo
@@ -4126,6 +4159,12 @@ export class EvaluacionesService {
       const suspendida = sanciones.some((s) => s.tipoImpacto === 'SUSPENSION');
 
       const actasDisc = discPorFrat.get(f.idFraternidad) || [];
+      const asignadosFrat = controladoresAsignados
+        .filter((c) => ctrlAplicaAFrat(c, f.idFraternidad))
+        .map((c) => ({
+          idJurado: c.idJurado,
+          nombre: nombreJuradoDesdeUsuario(c),
+        }));
       const desgloseDisc = desgloseControladoresDisciplina(
         actasDisc.map((e) => ({
           idJurado: e.jurado?.idJurado ?? null,
@@ -4133,13 +4172,12 @@ export class EvaluacionesService {
           puntajeTotal: e.puntajeTotal,
           criteriosEvaluados: e.criteriosEvaluados,
           observacion: (e as any).observacion || null,
+          estado: e.estado || null,
         })),
+        asignadosFrat,
       );
-      const disciplinaNota = round2(
-        score?.disciplinaMerged != null
-          ? Number(score.disciplinaMerged)
-          : desgloseDisc.sumatoria,
-      );
+      // Nota disciplina: sumatoria (incluye 0 de no revisados / nota NO)
+      const disciplinaNota = round2(desgloseDisc.sumatoria);
 
       const notasPromedioPorFase: Record<number, number | null> = {};
       for (const fase of fasesEfuMeta) {
@@ -4256,7 +4294,7 @@ export class EvaluacionesService {
       techoEfu,
       techoDisciplina,
       formula:
-        `Nota final = suma de las notas de cada fase (${pesosTxt}). Fases artísticas = promedio de jurados; Disciplina = sumatoria de controladores. Escala total /${techoEfu}.`,
+        `Nota final = suma de las notas de cada fase (${pesosTxt}). Fases artísticas = promedio de jurados que sellaron acta; Disciplina = sumatoria de controladores asignados (sin revisar o nota NO = 0). Escala total /${techoEfu}.`,
       grupos,
     };
   }
