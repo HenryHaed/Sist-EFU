@@ -1847,10 +1847,7 @@ export class ReportesService implements OnModuleInit {
         startY: number,
         opts: { highlight?: boolean; bold?: boolean; largeFinal?: boolean } = {},
       ) => {
-        const rowH = Math.max(
-          measureRowHeight(cells, widths, 11),
-          opts.largeFinal ? 16 : 0,
-        );
+        const rowH = measureRowHeight(cells, widths, 11);
         if (opts.highlight) {
           doc.save().rect(margin, startY, contentW, rowH).fill('#fef08a').restore();
         }
@@ -1862,11 +1859,11 @@ export class ReportesService implements OnModuleInit {
         }
         let x = margin;
         cells.forEach((cell, i) => {
-          const esFinalGrande =
+          const esFilaFinal =
             opts.largeFinal && (i === idxJurado || i === idxFinal || i === idxChacha);
           doc
-            .font(opts.bold || opts.highlight || esFinalGrande ? 'Helvetica-Bold' : 'Helvetica')
-            .fontSize(esFinalGrande ? fontSize + 2.5 : fontSize)
+            .font(opts.bold || opts.highlight || esFilaFinal ? 'Helvetica-Bold' : 'Helvetica')
+            .fontSize(fontSize)
             .fillColor(i === idxChacha ? '#0c4a6e' : '#0f172a');
           doc.text(String(cell ?? '—'), x + 2, startY + 2, {
             width: widths[i] - 4,

@@ -370,7 +370,7 @@
                 <td
                   class="px-2 py-2"
                   :class="fila.esPromedio
-                    ? 'text-amber-900 uppercase tracking-wide text-sm sm:text-base font-black'
+                    ? 'text-amber-900 uppercase tracking-wide text-xs font-black'
                     : fila.esControlador
                       ? 'text-emerald-800 font-bold text-xs'
                       : 'text-slate-700 text-xs'"
@@ -380,29 +380,29 @@
                 <td
                   v-for="f in fasesEfuMatriz"
                   :key="'c-' + grupo.idFraternidad + '-' + ji + '-' + f.idFase"
-                  class="px-2 py-2 text-slate-700 text-center"
-                  :class="fila.esPromedio ? 'text-sm sm:text-base font-black' : 'text-xs'"
+                  class="px-2 py-2 text-slate-700 text-center text-xs"
+                  :class="fila.esPromedio ? 'font-black' : ''"
                 >
                   {{ fila.notas[f.idFase] }}
                 </td>
                 <td
-                  class="px-2 py-2 text-center"
+                  class="px-2 py-2 text-center text-xs"
                   :class="[
                     fila.suspendida ? 'text-red-700 font-black' : 'text-slate-700',
-                    fila.esPromedio ? 'text-sm sm:text-base font-black' : 'text-xs',
+                    fila.esPromedio ? 'font-black' : '',
                   ]"
                 >
                   {{ fila.sanciones }}
                 </td>
                 <td
-                  class="px-2 py-2 font-black text-slate-900 text-center"
-                  :class="fila.esPromedio ? 'text-base sm:text-lg' : 'text-xs font-bold text-slate-800'"
+                  class="px-2 py-2 text-center text-xs"
+                  :class="fila.esPromedio ? 'font-black text-slate-900' : 'font-bold text-slate-800'"
                 >
                   {{ fila.totalEfu }}
                 </td>
                 <td
-                  class="px-2 py-2 text-center bg-sky-100 text-sky-950 border-l border-sky-200"
-                  :class="fila.esPromedio ? 'text-sm sm:text-base font-black' : 'text-xs font-semibold'"
+                  class="px-2 py-2 text-center text-xs bg-sky-100 text-sky-950 border-l border-sky-200"
+                  :class="fila.esPromedio ? 'font-black' : 'font-semibold'"
                 >
                   {{ fila.chacha }}
                 </td>

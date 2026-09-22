@@ -872,6 +872,9 @@ export class UsuariosService {
         await qr.query(`DELETE FROM evaluaciones WHERE id_jurado = $1`, [j.id_jurado]);
         await qr.query(`DELETE FROM jurado_fases WHERE id_jurado = $1`, [j.id_jurado]);
         await qr.query(`DELETE FROM jurado_fraternidades WHERE id_jurado = $1`, [j.id_jurado]);
+        try {
+          await qr.query(`DELETE FROM jurado_criterios WHERE id_jurado = $1`, [j.id_jurado]);
+        } catch { /* ignore si la tabla no existe en entornos viejos */ }
       }
       await qr.query(`DELETE FROM jurados WHERE id_usuario = $1`, [id]);
 

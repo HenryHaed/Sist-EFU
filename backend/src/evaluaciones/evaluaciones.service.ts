@@ -4036,19 +4036,25 @@ export class EvaluacionesService {
         })
       : [];
 
-    // Controladores asignados a fase(s) de disciplina (aparecen aunque no hayan revisado → 0)
+    // Solo controladores HCU activos (usuario + rol existentes). No aparece quien fue borrado
+    // ni perfiles huérfanos que aún tengan fase disciplina en jurado_fases.
     const controladoresAsignados = fasesDisciplinaIds.size
       ? await this.juradoRepo
           .createQueryBuilder('j')
-          .leftJoinAndSelect('j.usuario', 'u')
-          .leftJoinAndSelect('u.rol', 'rol')
+          .innerJoinAndSelect('j.usuario', 'u')
+          .innerJoinAndSelect('u.rol', 'rol')
           .leftJoinAndSelect('j.fraternidadesHabilitadas', 'fratHab')
           .innerJoin('j.fasesHabilitadas', 'fh', 'fh.id_fase IN (:...idsDisc)', {
             idsDisc: [...fasesDisciplinaIds],
           })
-          .where("(j.tipo_origen IS NULL OR j.tipo_origen <> 'Admin Bypass')")
+          .where('rol.nombre = :rolCtrl', { rolCtrl: 'controladorhcu' })
+          .andWhere("(j.tipo_origen IS NULL OR j.tipo_origen <> 'Admin Bypass')")
           .getMany()
       : [];
+
+    const idsCtrlActivos = new Set(
+      controladoresAsignados.map((c) => c.idJurado).filter((id) => id != null),
+    );
 
     const incidencias = await this.incidenciaRepo.find({
       where: { gestion: { idGestion } },
@@ -4056,17 +4062,28 @@ export class EvaluacionesService {
     });
 
     const scores = calcularScoresEfu(
-      [...evsArtisticos, ...evsDiscRaw]
+      [
+        ...evsArtisticos,
+        // Disciplina: solo actas de controladores activos (mismo criterio que el desglose)
+        ...evsDiscRaw.filter((e) => {
+          const idJ = e.jurado?.idJurado;
+          return idJ != null && idsCtrlActivos.has(idJ) && !!e.jurado?.usuario;
+        }),
+      ]
         .map((e) => actaDesdeEvaluacion(e))
         .filter((a): a is NonNullable<typeof a> => !!a),
     );
 
-    // Actas de disciplina por fraternidad (para desglose de controladores)
+    // Actas de disciplina por fraternidad (solo controladores activos)
     const discPorFrat = new Map<number, typeof evsDiscRaw>();
     for (const e of evsDiscRaw) {
       const fid = e.fraternidad?.idFraternidad;
       const faseId = e.fase?.idFase;
+      const idJurado = e.jurado?.idJurado;
       if (!fid || !faseId || !fasesDisciplinaIds.has(faseId)) continue;
+      // Excluir actas de usuarios/controladores ya eliminados o sin rol controlador
+      if (idJurado == null || !idsCtrlActivos.has(idJurado)) continue;
+      if (!e.jurado?.usuario) continue;
       if (!discPorFrat.has(fid)) discPorFrat.set(fid, []);
       discPorFrat.get(fid)!.push(e);
     }
