@@ -388,7 +388,7 @@
                 <td class="px-2 py-2 text-xs font-bold text-slate-800 text-center">{{ fila.totalEfu }}</td>
                 <td class="px-2 py-2 text-xs text-slate-700 text-center">{{ fila.chacha }}</td>
               </tr>
-              <tr :key="'meta-' + grupo.idFraternidad">
+              <tr>
                 <td :colspan="5 + fasesEfuMatriz.length + 3" class="px-3 py-1.5 text-[10px] text-slate-500 italic bg-slate-50 border-b border-slate-100">
                   <span v-if="grupo.disciplina?.cantidadControladores">
                     Disciplina (sumatoria {{ grupo.disciplina.cantidadControladores }} controlador(es)):
